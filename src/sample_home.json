@@ -1,0 +1,71 @@
+{
+  "home_id": "sim_bay_area_001",
+  "location": {
+    "region": "Bay Area",
+    "zip_code": "94105",
+    "climate_zone": "3C"
+  },
+  "building_specs": {
+    "square_footage": 2200,
+    "num_rooms": 8,
+    "year_built": 1995,
+    "insulation_quality": "average",
+    "number_of_lights": 40,
+    "number_of_computers": 2
+  },
+  "energy_rates_pointer": "data/rates/pge_tou_c_2024.csv",
+  "equipment": [
+    {
+      "name": "Gas Furnace",
+      "category": "HVAC_Heating",
+      "annual_load": 40.0,
+      "seasonality": [0.2, 0.15, 0.1, 0.05, 0.0, 0.0, 0.0, 0.0, 0.0, 0.05, 0.15, 0.3],
+      "fuel_mix": {
+        "gas": 1.0
+      },
+      "efficiency": 0.8,
+      "installation_cost": 4500,
+      "lifespan": 15,
+      "current_age": 10
+    },
+    {
+      "name": "Central AC",
+      "category": "HVAC_Cooling",
+      "annual_load": 15.0,
+      "seasonality": [0.0, 0.0, 0.0, 0.0, 0.1, 0.25, 0.3, 0.25, 0.1, 0.0, 0.0, 0.0],
+      "fuel_mix": {
+        "electricity": 1.0
+      },
+      "efficiency": 4.1,
+      "installation_cost": 5000,
+      "lifespan": 15,
+      "current_age": 8
+    },
+    {
+      "name": "Gas Water Heater",
+      "category": "WaterHeating",
+      "annual_load": 15.0,
+      "seasonality": [0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833],
+      "fuel_mix": {
+        "gas": 1.0
+      },
+      "efficiency": 0.65,
+      "installation_cost": 1500,
+      "lifespan": 10,
+      "current_age": 5
+    },
+    {
+      "name": "Lights and Computers",
+      "category": "Baseload",
+      "annual_load": 8.5,
+      "seasonality": [0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833],
+      "fuel_mix": {
+        "electricity": 1.0
+      },
+      "efficiency": 1.0,
+      "installation_cost": 0,
+      "lifespan": 15,
+      "current_age": 5
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "home_id": "baseline_bay_area_001",
+  "home_type": "baseline",
+  "description": "Typical Bay Area home with conventional gas appliances (2,200 sq ft, built 1995)",
+  "location": {
+    "region": "Bay Area",
+    "zip_code": "94105",
+    "climate_zone": "3C"
+  },
+  "building_specs": {
+    "square_footage": 2200,
+    "year_built": 1995,
+    "insulation_quality": "average"
+  },
+  "equipment": [
+    {
+      "name": "Gas Furnace",
+      "category": "HVAC_Heating",
+      "description": "Standard gas forced-air furnace. Efficiency = AFUE.",
+      "annual_load": 40.0,
+      "seasonality": [0.20, 0.15, 0.10, 0.05, 0.0, 0.0, 0.0, 0.0, 0.0, 0.05, 0.15, 0.30],
+      "fuel_mix": { "gas": 1.0 },
+      "efficiency": 0.80,
+      "installation_cost": 4500,
+      "lifespan": 15,
+      "current_age": 10
+    },
+    {
+      "name": "Central AC",
+      "category": "HVAC_Cooling",
+      "description": "Central air conditioner. Efficiency = SEER converted to COP (SEER / 3.412).",
+      "annual_load": 15.0,
+      "seasonality": [0.0, 0.0, 0.0, 0.0, 0.10, 0.25, 0.30, 0.25, 0.10, 0.0, 0.0, 0.0],
+      "fuel_mix": { "electricity": 1.0 },
+      "efficiency": 4.1,
+      "installation_cost": 5000,
+      "lifespan": 15,
+      "current_age": 8
+    },
+    {
+      "name": "Gas Water Heater",
+      "category": "WaterHeating",
+      "description": "Standard tank gas water heater. Efficiency = UEF.",
+      "annual_load": 15.0,
+      "seasonality": [0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833,
+                      0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0837],
+      "fuel_mix": { "gas": 1.0 },
+      "efficiency": 0.65,
+      "installation_cost": 1500,
+      "lifespan": 10,
+      "current_age": 5
+    },
+    {
+      "name": "Lights and Computers",
+      "category": "Baseload",
+      "description": "Lighting, computers, and other plug loads. Efficiency = 1.0 (no conversion loss).",
+      "annual_load": 8.5,
+      "seasonality": [0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833,
+                      0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0837],
+      "fuel_mix": { "electricity": 1.0 },
+      "efficiency": 1.0,
+      "installation_cost": 0,
+      "lifespan": 15,
+      "current_age": 5
+    }
+  ]
+}

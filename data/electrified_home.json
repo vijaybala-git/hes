@@ -1,0 +1,67 @@
+{
+  "home_id": "electrified_bay_area_001",
+  "home_type": "electrified",
+  "description": "Same Bay Area home fully electrified: heat pump replaces furnace+AC, HPWH replaces gas water heater",
+  "location": {
+    "region": "Bay Area",
+    "zip_code": "94105",
+    "climate_zone": "3C"
+  },
+  "building_specs": {
+    "square_footage": 2200,
+    "year_built": 1995,
+    "insulation_quality": "average"
+  },
+  "equipment": [
+    {
+      "name": "Heat Pump - Heating",
+      "category": "HVAC_Heating",
+      "description": "Heat pump in heating mode. Efficiency = COP. Full system installation cost assigned here.",
+      "annual_load": 40.0,
+      "seasonality": [0.20, 0.15, 0.10, 0.05, 0.0, 0.0, 0.0, 0.0, 0.0, 0.05, 0.15, 0.30],
+      "fuel_mix": { "electricity": 1.0 },
+      "efficiency": 3.5,
+      "installation_cost": 10000,
+      "lifespan": 15,
+      "current_age": 0
+    },
+    {
+      "name": "Heat Pump - Cooling",
+      "category": "HVAC_Cooling",
+      "description": "Same heat pump unit in cooling mode. Cost is $0 — already counted in Heat Pump - Heating.",
+      "annual_load": 15.0,
+      "seasonality": [0.0, 0.0, 0.0, 0.0, 0.10, 0.25, 0.30, 0.25, 0.10, 0.0, 0.0, 0.0],
+      "fuel_mix": { "electricity": 1.0 },
+      "efficiency": 3.5,
+      "installation_cost": 0,
+      "lifespan": 15,
+      "current_age": 0
+    },
+    {
+      "name": "Heat Pump Water Heater",
+      "category": "WaterHeating",
+      "description": "Heat pump water heater (HPWH). Efficiency = UEF.",
+      "annual_load": 15.0,
+      "seasonality": [0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833,
+                      0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0837],
+      "fuel_mix": { "electricity": 1.0 },
+      "efficiency": 3.0,
+      "installation_cost": 2500,
+      "lifespan": 12,
+      "current_age": 0
+    },
+    {
+      "name": "Lights and Computers",
+      "category": "Baseload",
+      "description": "Lighting, computers, and other plug loads. Identical to baseline — not changed by electrification.",
+      "annual_load": 8.5,
+      "seasonality": [0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833,
+                      0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0837],
+      "fuel_mix": { "electricity": 1.0 },
+      "efficiency": 1.0,
+      "installation_cost": 0,
+      "lifespan": 15,
+      "current_age": 5
+    }
+  ]
+}

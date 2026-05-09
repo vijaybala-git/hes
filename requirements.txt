@@ -1,0 +1,5 @@
+mesa==3.5.1
+solara==1.57.3
+numpy>=2.0
+pandas>=2.0
+matplotlib>=3.9
