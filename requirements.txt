@@ -1,6 +1,7 @@
 mesa==3.5.1
 solara==1.57.3
 starlette==0.52.1
+networkx>=3.0
 numpy>=2.0
 pandas>=2.0
 matplotlib>=3.9
