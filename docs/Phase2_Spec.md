@@ -55,50 +55,86 @@ one at a time over years, not flipping a switch to a fully electrified home over
 
 ```
 JourneyHome A — "Your journey"     swap_years set by user per device slot
-JourneyHome B — "Do nothing"       all swap_years = None (gas forever)
+JourneyHome B — "Do nothing"       all swap_years = None; starting_state preserved as-is
 ```
 
 The gap between the two cumulative cost lines IS the value of the journey. The "do nothing"
-line is not flat — gas prices escalate and gas appliances trigger CapEx replacements at
-end-of-life, making it increasingly expensive to stay on gas. This is the core advocacy
-message.
+baseline is not flat — gas prices escalate, gas appliances trigger end-of-life CapEx
+replacements, and the baseline cannot revert past decisions: a home that already has an
+electric dryer keeps it electric in the "do nothing" home — it does not revert to gas.
+This is the core advocacy message.
 
 **DeviceSlot — the unit of configuration:**
 
 ```python
 @dataclass
 class DeviceSlot:
-    name: str                          # "HVAC", "Water Heater", "Dryer" etc.
-    category: str                      # CATEGORY_ORDER key
-    baseline_device: EnergyConsumer    # gas or legacy electric device
-    electric_device: EnergyConsumer    # replacement electric device
-    swap_year: int | None              # year swap occurs; None = never
-    install_cost: float                # gross install cost of electric device
-    rebate: float                      # rebate amount (IRA, TECH Clean CA etc.)
+    name: str                              # "HVAC", "Water Heater", "Dryer" etc.
+    category: str                          # CATEGORY_ORDER key
+
+    # Starting state drives both homes' year-0 device selection
+    starting_state: str                    # "gas" | "electric" | "none"
+                                           #   gas      → baseline runs gas device(s) (default)
+                                           #   electric → already swapped; both homes use electric_device
+                                           #   none     → not in baseline (e.g. EV Charger add)
+
+    baseline_devices: list[EnergyConsumer] # gas/legacy devices — list supports compound baseline
+                                           # e.g. [GasFurnace, CentralAC] for HVAC with cooling
+    has_cooling_baseline: bool = False     # HVAC only: True if home has central AC as separate unit
+    electric_device: EnergyConsumer = None # replacement device (None only when starting_state="none"
+                                           # and swap never planned)
+    swap_year: int | None = None           # year swap occurs; None = never; ignored if starting_state != "gas"
+    install_cost: float = 0.0             # gross install cost of electric device
+    rebate: float = 0.0                   # rebate amount (IRA, TECH Clean CA etc.)
 
     @property
     def net_install_cost(self):
         return self.install_cost - self.rebate
 ```
 
+**Starting state behaviour:**
+
+| `starting_state` | Journey home | "Do nothing" baseline |
+|---|---|---|
+| `"gas"` | Runs gas device(s) until `swap_year`, then electric | Runs gas device(s) forever |
+| `"electric"` | Runs electric device from year 0 (already done) | Runs electric device from year 0 |
+| `"none"` | Adds electric device at `swap_year` (clean add) | Zero consumption — slot absent |
+
 **Annual step logic per slot:**
 
 ```python
-def step(self, current_year, monthly_rates):
-    if self.swap_year is None or current_year < self.swap_year:
-        active = self.baseline_device
+def step(self, current_year, monthly_rates, is_baseline_home: bool = False):
+    if self.starting_state == "electric":
+        # Already swapped before sim start — both homes run electric device
+        active_list = [self.electric_device]
+
+    elif self.starting_state == "none" and is_baseline_home:
+        return  # slot absent from baseline (e.g. EV charger) — zero cost, zero consumption
+
+    elif self.swap_year is None or current_year < self.swap_year:
+        active_list = self.baseline_devices  # gas phase: one or more baseline devices
+
     else:
-        active = self.electric_device
+        active_list = [self.electric_device]  # post-swap: single electric device
 
-    active.step(monthly_rates)
+    for active in active_list:
+        active.step(monthly_rates)
 
-    # CapEx: swap event OR end-of-life replacement
-    if current_year == self.swap_year:
+    # CapEx: swap event OR per-device end-of-life replacement
+    if self.starting_state == "gas" and current_year == self.swap_year:
         self.capex_events.append((current_year, self.net_install_cost))
-    elif active.age >= active.lifespan:
-        self.capex_events.append((current_year, active.installation_cost))
-        active.age = 0
+    else:
+        for active in active_list:
+            if active.age >= active.lifespan:
+                self.capex_events.append((current_year, active.installation_cost))
+                active.age = 0
 ```
+
+**HVAC compound baseline note:** When `has_cooling_baseline=True` the HVAC slot carries
+`baseline_devices = [GasFurnace, CentralAC]`. Each ages and triggers replacement
+independently. The heat pump swap replaces both with a single install event. When
+`has_cooling_baseline=False` the furnace has no AC companion — the heat pump adds
+cooling as a new capability with no prior CapEx history for that function.
 
 **JourneyHome** iterates its list of `DeviceSlot` objects, aggregates costs into
 `annual_opex`, `cumulative_opex`, and `capex_by_year`. The `cost_history_by_category`
@@ -302,7 +338,16 @@ Full EPW weather-file simulation deferred to Phase 3.
   },
   "annual_hdd_65f": 1910,
   "annual_cdd_65f": 340,
-  "notes": "monthly_hdd + monthly_cdd sum to annual totals above"
+  "notes": "monthly_hdd + monthly_cdd sum to annual totals above",
+  "bedroom_scaling": {
+    "1": {"baseload_multiplier": 0.50, "hot_water_gal_per_day": 30},
+    "2": {"baseload_multiplier": 0.83, "hot_water_gal_per_day": 50},
+    "3": {"baseload_multiplier": 1.00, "hot_water_gal_per_day": 65},
+    "4": {"baseload_multiplier": 1.17, "hot_water_gal_per_day": 75},
+    "5": {"baseload_multiplier": 1.33, "hot_water_gal_per_day": 85}
+  },
+  "baseload_kwh_3br": 1200,
+  "source_bedroom_scaling": "DOE/ENERGY STAR occupancy proxy; 3BR is TMY3 reference (65 gal/day, 1200 kWh baseload)"
 }
 ```
 
@@ -321,7 +366,104 @@ national average. 1910 is correct for San Jose TMY3. Validation targets updated 
 
 Tolerance: ±5% on all physics devices.
 
-### 2.5 cost_history_by_category Bug Fix
+### 2.5 HomeConfig — Home Profile Data Model
+
+`HomeConfig` is a plain dataclass that carries all home-specific parameters through the
+stack. `HESModel` accepts one at construction; devices receive only the derived scalar
+values they need — they never read `HomeConfig` directly. The object is structured to
+serialize to JSON cleanly for Phase 3 session persistence.
+
+```python
+@dataclass
+class HomeConfig:
+    # ── Location ────────────────────────────────────────────────────────────────
+    zip_code:           str  = "95112"      # San Jose default
+    climate_zone:       str  = "CZ12"      # CA climate zone — Phase 3: auto-derive from zip
+
+    # ── Building ────────────────────────────────────────────────────────────────
+    num_bedrooms:       int  = 3            # ✅ Phase 2 active — scales baseload + hot water
+    square_footage:     int  = 1800         # carried; drives EPW model in Phase 3
+    year_built:         int  = 1985         # carried; future use
+    insulation_quality: str  = "average"   # ✅ Phase 2 active — poor / average / good → UA
+
+    # ── Phase 3 carry-forward (unused in Phase 2) ───────────────────────────────
+    num_bathrooms:      int  = 2
+    stories:            int  = 1
+    has_garage:         bool = False
+```
+
+**Bedroom scaling** — resolved by `HESModel.__init__`, not by devices:
+
+```python
+BEDROOM_SCALING = {
+    1: {"baseload_multiplier": 0.50, "hot_water_gal_per_day": 30},
+    2: {"baseload_multiplier": 0.83, "hot_water_gal_per_day": 50},
+    3: {"baseload_multiplier": 1.00, "hot_water_gal_per_day": 65},   # TMY3 reference
+    4: {"baseload_multiplier": 1.17, "hot_water_gal_per_day": 75},
+    5: {"baseload_multiplier": 1.33, "hot_water_gal_per_day": 85},
+}
+# Source: DOE/ENERGY STAR occupancy proxy anchored to 3BR = 65 gal/day, 1200 kWh/yr
+```
+
+`HESModel` resolves the multiplier once and injects concrete values:
+
+```python
+br = BEDROOM_SCALING[config.num_bedrooms]
+baseload_kwh = 1200 * br["baseload_multiplier"]      # → LightsAndPlugs constructor
+hw_gallons   = br["hot_water_gal_per_day"]           # → GasWH / HPWH constructors
+```
+
+**Phase 3 session config JSON shape** (schema defined now; `json.dump` wired in Phase 3):
+
+```json
+{
+  "version": "2",
+  "home": {
+    "zip_code": "95112",
+    "climate_zone": "CZ12",
+    "num_bedrooms": 3,
+    "square_footage": 1800,
+    "year_built": 1985,
+    "insulation_quality": "average",
+    "num_bathrooms": 2,
+    "stories": 1,
+    "has_garage": false
+  },
+  "device_specs": {
+    "furnace_afue": 0.80,
+    "gas_wh_uef": 0.65,
+    "hp_cop_heating": 3.5,
+    "hp_seer_cooling": 22,
+    "hpwh_uef": 3.5,
+    "hvac_has_cooling_baseline": false
+  },
+  "journey_slots": [
+    {
+      "name": "HVAC",
+      "category": "HVAC_Heating",
+      "starting_state": "gas",
+      "has_cooling_baseline": false,
+      "swap_year": 3,
+      "install_cost": 14000,
+      "rebate": 3500
+    }
+  ],
+  "simulation": {
+    "scenario": "moderate",
+    "sim_start_year": 2025,
+    "years": 20,
+    "comparison_mode": false,
+    "scenario_b": "stress"
+  }
+}
+```
+
+`home`, `device_specs`, `journey_slots`, and `simulation` are top-level siblings —
+each block loads independently. Phase 3 adds load/save buttons; no structural change needed.
+
+---
+
+### 2.6 cost_history_by_category Bug Fix
 
 **Problem (Phase 1):** `HomeSimulator.step()` appends one value per device per step.
 Multiple devices in the same category produce a list of length `n_devices × n_steps`
@@ -340,7 +482,7 @@ def step(self):
         self.cost_history_by_category[cat].append(cost)
 ```
 
-### 2.6 Core Unit Rule
+### 2.7 Core Unit Rule
 
 ```
 Each device stores and computes in its native unit:
@@ -590,13 +732,16 @@ Fix `cost_history_by_category` bug.
 **New file:** `src/journey.py` — `DeviceSlot` dataclass and `JourneyHome` class
 
 **`HESModel` changes:**
-- Constructor takes `journey_slots` (list of slot configs) and `scenario` string
+- Constructor accepts `home_config: HomeConfig` and `scenario: str`
+- Loads climate constants from `data/climate/bayarea_tmy3.json` once at init
+- Resolves bedroom scaling from `home_config.num_bedrooms` → injects `baseload_kwh`
+  and `hw_gallons` into device constructors
+- `home_config.insulation_quality` maps to UA value via `ua_by_insulation` climate constants
 - Calls `RateLoader.get_annual_monthly_rates()` at init — passes rate arrays to model
 - Instantiates two `JourneyHome` objects:
-  - `self.journey_home`: uses `swap_year` from slot configs
-  - `self.baseline_home`: same slots but all `swap_year = None`
-- Loads climate constants from `data/climate/bayarea_tmy3.json` once at init
-- `insulation_quality` parameter maps to UA value via climate constants
+  - `self.journey_home`: uses `swap_year` and `starting_state` from slot configs as-is
+  - `self.baseline_home`: same slots with all `swap_year = None`; `starting_state`
+    preserved (already-electric slots remain electric in the baseline)
 
 **`DataCollector` reporters:**
 ```python
@@ -619,8 +764,10 @@ Fix `cost_history_by_category` bug.
   {
     "name": "HVAC",
     "category": "HVAC_Heating",
-    "baseline_device": {"class": "GasFurnace",    "afue": 0.80, "age": 10},
-    "electric_device": {"class": "HeatPumpHVAC",  "cop_heating": 3.5, "seer_cooling": 22},
+    "starting_state": "gas",
+    "has_cooling_baseline": false,
+    "baseline_devices": [{"class": "GasFurnace", "afue": 0.80, "age": 10}],
+    "electric_device":   {"class": "HeatPumpHVAC", "cop_heating": 3.5, "seer_cooling": 22},
     "swap_year": null,
     "install_cost": 14000,
     "rebate": 3500
@@ -628,8 +775,10 @@ Fix `cost_history_by_category` bug.
   {
     "name": "Water Heater",
     "category": "WaterHeating",
-    "baseline_device": {"class": "GasWaterHeater",      "uef": 0.65, "age": 5},
-    "electric_device": {"class": "HeatPumpWaterHeater", "uef": 3.5},
+    "starting_state": "gas",
+    "has_cooling_baseline": false,
+    "baseline_devices": [{"class": "GasWaterHeater", "uef": 0.65, "age": 5}],
+    "electric_device":   {"class": "HeatPumpWaterHeater", "uef": 3.5},
     "swap_year": null,
     "install_cost": 2500,
     "rebate": 500
@@ -637,17 +786,32 @@ Fix `cost_history_by_category` bug.
   {
     "name": "Dryer",
     "category": "Baseload",
-    "baseline_device": {"class": "GasDryer",    "therms_per_cycle": 0.22, "cycles_per_week": 5},
-    "electric_device": {"class": "HeatPumpDryer", "kwh_per_cycle": 1.8,   "cycles_per_week": 5},
+    "starting_state": "gas",
+    "has_cooling_baseline": false,
+    "baseline_devices": [{"class": "GasDryer", "therms_per_cycle": 0.22, "cycles_per_week": 5}],
+    "electric_device":   {"class": "HeatPumpDryer", "kwh_per_cycle": 1.8, "cycles_per_week": 5},
     "swap_year": null,
     "install_cost": 1200,
     "rebate": 0
   },
   {
+    "name": "Cooktop",
+    "category": "Baseload",
+    "starting_state": "gas",
+    "has_cooling_baseline": false,
+    "baseline_devices": [{"class": "GasCooktop", "therms_per_meal": 0.05, "meals_per_week": 14}],
+    "electric_device":   {"class": "InductionCooktop", "kwh_per_meal": 0.9, "meals_per_week": 14},
+    "swap_year": null,
+    "install_cost": 1500,
+    "rebate": 0
+  },
+  {
     "name": "EV Charger",
     "category": "Baseload",
-    "baseline_device": null,
-    "electric_device": {"class": "EVCharger"},
+    "starting_state": "none",
+    "has_cooling_baseline": false,
+    "baseline_devices": [],
+    "electric_device":   {"class": "EVCharger"},
     "swap_year": null,
     "install_cost": 800,
     "rebate": 0
@@ -655,8 +819,10 @@ Fix `cost_history_by_category` bug.
   {
     "name": "Lights and Appliances",
     "category": "Baseload",
-    "baseline_device": {"class": "LightsAndPlugs", "annual_kwh": 1200},
-    "electric_device": {"class": "LightsAndPlugs", "annual_kwh": 1200},
+    "starting_state": "electric",
+    "has_cooling_baseline": false,
+    "baseline_devices": [],
+    "electric_device":   {"class": "LightsAndPlugs", "annual_kwh": 1200},
     "swap_year": null,
     "install_cost": 0,
     "rebate": 0
@@ -664,26 +830,38 @@ Fix `cost_history_by_category` bug.
 ]
 ```
 
-Note: `baseline_device: null` for EV Charger means the baseline home has no EV —
-zero consumption for that slot until `swap_year`.
+Notes:
+- `starting_state: "none"` for EV Charger — absent from baseline; zero consumption until user adds it
+- `starting_state: "electric"` for Lights — always-on electric load in both homes; `annual_kwh` is
+  scaled by bedroom multiplier in `HESModel` before the device is constructed
+- `has_cooling_baseline: false` is the Bay Area default (many homes have no central AC);
+  set to `true` to add `CentralAC` to `baseline_devices` alongside `GasFurnace`
 
 **Tests `tests/test_journey.py`:**
-- `DeviceSlot` uses baseline device before `swap_year`, electric after
-- `swap_year = None` always uses baseline device
+- `DeviceSlot` (`starting_state="gas"`) uses baseline devices before `swap_year`, electric after
+- `swap_year = None` with `starting_state="gas"` always uses baseline devices
+- `starting_state="electric"` uses electric device in BOTH journey and baseline home from year 0
+- `starting_state="none"` produces zero cost in baseline home; adds electric device after `swap_year` in journey home
+- HVAC `has_cooling_baseline=True`: baseline runs `[GasFurnace, CentralAC]`; both age independently
+- HVAC `has_cooling_baseline=False`: baseline runs `[GasFurnace]` only; heat pump swap adds cooling
 - CapEx event logged at `swap_year` with `net_install_cost`
-- End-of-life CapEx logged when `age >= lifespan` for active device
+- End-of-life CapEx logged per device in `baseline_devices` when `age >= lifespan`
 - `JourneyHome` `cost_history_by_category` has exactly `n_steps` entries per category
 - Two homes with identical configs produce identical cost trajectories
-- `baseline_home` (all `swap_year=None`) costs more than `journey_home` after
-  all swaps complete (with stress gas scenario)
+- `baseline_home` (all `swap_year=None`) costs more than `journey_home` after all swaps (stress scenario)
+- `HomeConfig` with 1BR → `LightsAndPlugs` annual_kwh ≈ 600 (0.50× of 1200)
+- `HomeConfig` with 4BR → hot water gallons/day = 75 (not 65)
+- `HomeConfig` bedroom scaling applied consistently across both homes
 - `HESModel.datacollector.get_model_vars_dataframe()` has `n_years` rows
 
 **Claude Code prompt:**
 ```
 Implement Objective 3 of docs/Phase2_Spec.md.
-Create src/journey.py with DeviceSlot and JourneyHome.
-Refactor src/model.py: replace HomeSimulator with JourneyHome,
-add RateLoader integration, fix cost_history_by_category bug per §2.5.
+Create src/home_config.py with the HomeConfig dataclass and BEDROOM_SCALING dict from §2.5.
+Create src/journey.py with DeviceSlot (updated fields per §2.1) and JourneyHome.
+Refactor src/model.py: accept HomeConfig, apply bedroom scaling at init,
+replace HomeSimulator with JourneyHome, add RateLoader integration,
+fix cost_history_by_category bug per §2.6.
 Load default slots from data/homes/journey_slots_default.json.
 Write tests/test_journey.py. Do not modify app.py.
 ```
@@ -772,88 +950,259 @@ Write tests/test_dual_scenario.py.
 
 ### Objective 6: UI — Journey Planner + WhyWatt Branding
 
-**Scope:** Full Solara UI refactor. New Journey Planner control panel.
-WhyWatt branding throughout. Dual scenario chart support.
+**Scope:** Full Solara UI refactor. Replace the Gas Home / Electric Home control panels
+with a Journey Planner. Add Home Profile panel with home details. WhyWatt branding
+throughout. Dual scenario chart support.
 
-**Branding:**
+---
+
+#### Branding
+
 - `solara.Title("WhyWatt?")` and `# ⚡ WhyWatt?` header
 - Header logo: `docs/assets/whywatt_logo.png` with `os.path.exists()` guard
-- Footer: group logo + org name, same guard
+- Footer: group logo (`docs/assets/group_logo.png`) + org name, same guard
 
-**Reactive state — new:**
+---
+
+#### Reactive state
 
 ```python
-# Journey planner — one entry per slot
-hvac_swap_year    = solara.reactive(3)    # None = "not planning to swap"
-wh_swap_year      = solara.reactive(5)
-dryer_swap_year   = solara.reactive(None)
-ev_swap_year      = solara.reactive(None)
+# ── Home profile ────────────────────────────────────────────────────────────
+zip_code            = solara.reactive("95112")
+climate_zone        = solara.reactive("CZ12")
+num_bedrooms        = solara.reactive(3)           # scales baseload + hot water
+square_footage      = solara.reactive(1800)        # carried, shown in top bar
+year_built          = solara.reactive(1985)        # carried, shown in top bar
+insulation_quality  = solara.reactive("average")   # poor / average / good → UA
 
-# Device specs (replaces MMBtu sliders)
-insulation_quality = solara.reactive("average")   # poor / average / good
-furnace_afue       = solara.reactive(0.80)
-gas_wh_uef         = solara.reactive(0.65)
-hp_cop_heating     = solara.reactive(3.5)
-hp_seer_cooling    = solara.reactive(22)
-hpwh_uef           = solara.reactive(3.5)
+# ── Baseline device specs ────────────────────────────────────────────────────
+furnace_afue        = solara.reactive(0.80)
+gas_wh_uef          = solara.reactive(0.65)
+hvac_has_cooling    = solara.reactive(False)       # True → adds CentralAC to baseline
 
-# Pricing
-price_scenario_a   = solara.reactive("moderate")
-comparison_mode    = solara.reactive(False)
-price_scenario_b   = solara.reactive("stress")
-years              = solara.reactive(20)
-sim_start_year     = solara.reactive(2025)
+# ── Electric replacement specs ───────────────────────────────────────────────
+hp_cop_heating      = solara.reactive(3.5)
+hp_seer_cooling     = solara.reactive(22)
+hpwh_uef            = solara.reactive(3.5)
 
-# Rebates (editable)
-hvac_rebate        = solara.reactive(3500)
-wh_rebate          = solara.reactive(500)
+# ── Journey planner — one group per slot ────────────────────────────────────
+# starting_state: "gas" | "electric" | "none"
+hvac_starting_state   = solara.reactive("gas")
+hvac_swap_planned     = solara.reactive(True)
+hvac_swap_year        = solara.reactive(3)
+hvac_install_cost     = solara.reactive(14000)
+hvac_rebate           = solara.reactive(3500)
+
+wh_starting_state     = solara.reactive("gas")
+wh_swap_planned       = solara.reactive(True)
+wh_swap_year          = solara.reactive(5)
+wh_install_cost       = solara.reactive(2500)
+wh_rebate             = solara.reactive(500)
+
+dryer_starting_state  = solara.reactive("gas")
+dryer_swap_planned    = solara.reactive(False)
+dryer_swap_year       = solara.reactive(8)
+dryer_install_cost    = solara.reactive(1200)
+dryer_rebate          = solara.reactive(0)
+
+cooktop_starting_state = solara.reactive("gas")
+cooktop_swap_planned   = solara.reactive(False)
+cooktop_swap_year      = solara.reactive(10)
+cooktop_install_cost   = solara.reactive(1500)
+cooktop_rebate         = solara.reactive(0)
+
+ev_starting_state     = solara.reactive("none")   # not in baseline by default
+ev_swap_planned       = solara.reactive(False)
+ev_swap_year          = solara.reactive(None)
+ev_install_cost       = solara.reactive(800)
+ev_rebate             = solara.reactive(0)
+
+# ── Pricing & timeline ───────────────────────────────────────────────────────
+price_scenario_a    = solara.reactive("moderate")
+comparison_mode     = solara.reactive(False)
+price_scenario_b    = solara.reactive("stress")
+years               = solara.reactive(20)
+sim_start_year      = solara.reactive(2025)
 ```
 
-**Journey Planner panel (replaces Gas Home + Electric Home panels):**
+---
 
-Each slot shows as a row:
+#### Top bar — HomeInfoBar
+
+Read-only chip row, updates whenever any home profile reactive changes:
+
 ```
-Device          Swap in year    Install cost    Rebate      Net cost
-HVAC            [slider 1–25]   $14,000        [$3,500]    $10,500
-Water Heater    [slider 1–25]   $2,500         [$500]      $2,000
-Dryer           [slider 1–25]   $1,200         [$0]        $1,200
-EV Charger      [slider 1–25]   $800           [$0]        $800
-                [ ] Not planning to swap  (checkbox disables slider)
+📍 San Jose, CA 95112  ·  Climate Zone CZ12  ·  3 bed  ·  1,800 sq ft  ·  Built 1985  ·  Average insulation
 ```
 
-**Control panels (three, as before):**
+Implementation: `HomeInfoBar` reads all home-profile reactives and renders a styled
+`solara.Markdown` row. No model object needed — purely reactive.
 
-- **Journey Planner** — swap year per device, rebate amounts, install costs
-- **Home Profile** — insulation quality, device efficiency specs (AFUE, COP, UEF, SEER)
-- **Energy & Timeline** — scenario A selector, years, comparison mode toggle,
-  scenario B selector (revealed when toggle on)
+---
 
-**Chart updates:**
+#### Summary stat bar
 
-All 6 existing charts updated to support 4-series output when `comparison_mode=True`.
-- Solid lines = Scenario A, dashed = Scenario B
-- Blue/grey palette retained
-
-**New chart: Journey Timeline** (add as 7th chart option):
-- Horizontal timeline showing swap events as vertical markers
-- Annotated with device name and net cost at each swap year
-- Gas price trajectory as background colour band to contextualise timing
-
-**Summary stat bar — updated:**
 ```
-Journey savings vs do-nothing (Scenario A):  $X over N years
-Journey payback year: Y
-[If comparison on] Scenario B savings: $Z over N years
+Journey savings vs do-nothing (Scenario A):  $X over N years  |  Payback: year Y
+[comparison_mode=True] Scenario B savings: $Z over N years
 ```
+
+Payback year = first year where cumulative journey cost < cumulative baseline cost.
+If no crossover within the simulation window, show "Not within {N} years".
+
+---
+
+#### Control panels (three cards, same EN-Roads layout)
+
+---
+
+##### Panel 1 — Journey Planner
+
+Each device slot renders as a single row. The row layout adapts to `starting_state`:
+
+**Row anatomy:**
+
+```
+[State ▾]  Device name          [Planning? ☐]  Swap yr [slider]  Install $  Rebate [-$]  Net $
+```
+
+**State dropdown values and row behaviour:**
+
+| State | Label | Slider | Install/Rebate | Baseline home |
+|---|---|---|---|---|
+| `"gas"` + planned | `Gas` | enabled | shown | Runs gas device forever |
+| `"gas"` + not planned | `Gas` | hidden | hidden | Runs gas device forever |
+| `"electric"` | `✓ Done` | hidden | hidden (sunk cost) | Runs electric device |
+| `"none"` + planned | `Add` | enabled, label "Add in year" | shown | Zero — absent |
+| `"none"` + not planned | `—` | hidden | hidden | Zero — absent |
+
+**Full panel layout:**
+
+```
+Your electrification journey
+─────────────────────────────────────────────────────────────────────────────
+              Starting    Plan?    Swap yr      Install    Rebate    Net
+HVAC          [Gas ▾]     [☑]     [===●  ] 3   $14,000   -$3,500   $10,500
+              ☐ Has central AC in baseline
+Water Heater  [Gas ▾]     [☑]     [=====●] 5   $2,500    -$500     $2,000
+Dryer         [Gas ▾]     [☐]     ─────────     ─         ─         ─
+Cooktop       [Gas ▾]     [☐]     ─────────     ─         ─         ─
+EV Charger    [— ▾]       [☐]     ─────────     ─         ─         ─
+─────────────────────────────────────────────────────────────────────────────
+ℹ️  "Do nothing" baseline runs automatically: gas devices stay gas;
+   already-done devices stay electric; no EV added.
+```
+
+HVAC row has a sub-toggle `☐ Has central AC in baseline` — when checked, sets
+`hvac_has_cooling=True`, which adds `CentralAC` to the baseline alongside the furnace
+(separate aging and replacement cost).
+
+Swap year slider: range 1–25, step 1. Label shows the calendar year:
+`Year 3  (2028)` = `sim_start_year + swap_year - 1`.
+
+---
+
+##### Panel 2 — Home Profile
+
+Three sections within one card:
+
+```
+🏠 Home Details
+  ZIP code         [ 95112     ]   text field  (Phase 3: auto-derive climate zone)
+  Climate zone     [ CZ12    ▾ ]   select: CZ3, CZ4, CZ5, CZ12, CZ13, CZ16
+  Bedrooms         [  3      ▾ ]   select 1–5  → scales baseload kWh + hot water
+  Square footage   [ 1,800     ]   number field  (carried; shown in top bar)
+  Year built       [ 1985      ]   number field  (carried; shown in top bar)
+
+🏗️ Building Performance
+  Insulation       ( Poor )  (● Average )  ( Good )   radio → UA value
+
+🔥 Baseline device specs     [shown only when relevant slot has starting_state = "gas"]
+  Furnace AFUE     ──────●──── 0.80    [slider 0.70–0.95]
+  Water heater UEF ────●────── 0.65    [slider 0.55–0.70]
+
+⚡ Electric replacement specs
+  Heat pump COP    ───────●─── 3.5     [slider 2.5–4.5]
+  Heat pump SEER   ──────●──── 22      [slider 16–28]
+  HPWH UEF         ────────●── 3.5     [slider 2.5–4.0]
+```
+
+CA climate zones in the selector: CZ3 (SF coast), CZ4 (inland bay), CZ5 (Santa Cruz),
+CZ12 (Sacramento/San Jose), CZ13 (Fresno), CZ16 (Tahoe/mountains).
+Phase 3: typing a ZIP auto-selects the zone.
+
+---
+
+##### Panel 3 — Energy & Prices
+
+```
+📈 Rate scenario
+   ( Conservative )  (● Moderate )  ( Stress / CEC )   radio
+
+   Conservative  — Elec +4%/yr, Gas +4%/yr  "Slow price growth"
+   Moderate      — Elec +7%/yr, Gas +8%/yr  "Recent trend (default)"
+   Stress / CEC  — Elec +10%/yr, Gas +12%/yr "High gas cost scenario"
+
+📅 Years to model     [========●    ] 20    [slider 5–30]
+
+── Scenario comparison ─────────────────────────────────────────────────────
+[ ] Compare two rate scenarios
+    [when checked, reveals:]
+    Scenario A: [Moderate  ▾]    Scenario B: [Stress ▾]
+    Charts switch to 4-series (solid = A, dashed = B)
+```
+
+Named scenarios replace raw %/year sliders — more meaningful to advocates.
+
+---
+
+#### Chart updates
+
+All 6 existing charts relabelled:
+- "Gas home" → **"Do nothing"** (grey, `C_BASE`)
+- "Electric home" → **"Your journey"** (blue, `C_ELEC`)
+
+When `comparison_mode=True`, each chart renders 4 series:
+- Solid grey = Do nothing, Scenario A
+- Solid blue = Your journey, Scenario A
+- Dashed grey = Do nothing, Scenario B
+- Dashed blue = Your journey, Scenario B
+
+**New chart — Journey Timeline (7th option):**
+
+Horizontal chart, one row per device slot:
+
+```
+        0    3    5    8   10   15   20
+HVAC    ─────●═══════════════════════   swap yr 3, net $10,500
+Water   ──────────●══════════════════   swap yr 5, net $2,000
+Dryer   ──────────────────────────────  (no swap — gas + end-of-life replacement at ~yr 10)
+Cooktop ──────────────────────────────  (no swap)
+EV      ──────────────────────────────  (not adding)
+
+         ░░░░░░░░░░░░░░░░░░░░░░░░░░░░   background = gas price band (low→high)
+```
+
+Dashed pre-swap line = gas device running. Solid post-swap line = electric device running.
+Vertical marker at swap year annotated with device name + net cost.
+Background colour band = normalised gas price trajectory (light orange to deep orange).
+
+---
 
 **Claude Code prompt:**
 ```
 Implement Objective 6 of docs/Phase2_Spec.md.
-Refactor app.py: replace Gas Home / Electric Home panels with Journey Planner.
-Add WhyWatt branding with logo guards.
-Update all 6 charts to support 4-series (comparison_mode).
-Add Journey Timeline as 7th chart type.
-Update reactive state as specified in §4 Objective 6.
+Refactor app.py completely:
+  - Replace Gas Home / Electric Home panels with Journey Planner, Home Profile,
+    and Energy & Prices panels as specified in §4 Objective 6.
+  - Add HomeInfoBar reading from reactive home-profile state (no model object needed).
+  - Add WhyWatt branding with os.path.exists() guards on logo files.
+  - Relabel all charts: "Gas home" → "Do nothing", "Electric home" → "Your journey".
+  - Update all 6 charts to render 4 series when comparison_mode=True
+    (solid A, dashed B; same blue/grey palette).
+  - Add Journey Timeline as 7th chart option.
+  - Update summary stat bar: savings vs do-nothing + payback year.
+  - Update reactive state and run_simulation() to build HomeConfig and pass it to HESModel.
 All existing tests must still pass.
 ```
 
@@ -874,6 +1223,7 @@ hes/
 │   │   ├── seasonal.py                ← SeasonalDevice + GasDryer, HeatPumpDryer etc.
 │   │   ├── physics.py                 ← PhysicsDevice + GasFurnace, HeatPumpHVAC etc.
 │   │   └── schedule.py                ← ScheduleDevice + EVCharger
+│   ├── home_config.py                 ← HomeConfig dataclass + BEDROOM_SCALING
 │   ├── rate_loader.py                 ← RateLoader (CPUC data + projection)
 │   ├── journey.py                     ← DeviceSlot + JourneyHome
 │   ├── model.py                       ← HESModel (refactored)
@@ -889,7 +1239,8 @@ hes/
 │   │   ├── gas_defaults.json
 │   │   └── ev_schedule_default.json
 │   └── homes/
-│       └── journey_slots_default.json
+│       ├── journey_slots_default.json ← default DeviceSlot configs (starting_state included)
+│       └── home_config_default.json   ← default HomeConfig values (Phase 3: user-editable)
 ├── docs/
 │   ├── assets/
 │   │   ├── whywatt_logo.png
@@ -925,12 +1276,20 @@ hes/
 - [ ] `GasWaterHeater` produces 200–220 therms (±5% of 210)
 - [ ] `HeatPumpWaterHeater` produces 1,000–1,100 kWh (±5% of 1,050)
 - [ ] `cost_history_by_category` has exactly `n_steps` entries per category
+- [ ] `HomeConfig` with 3BR → 65 gal/day hot water and 1,200 kWh baseload
+- [ ] `HomeConfig` with 1BR → ~600 kWh baseload (0.50× multiplier)
+- [ ] `starting_state="electric"` slot: baseline home runs electric device from year 0
+- [ ] HVAC `has_cooling_baseline=True`: baseline models furnace + AC aging separately
 - [ ] `solara run src/app.py` loads with WhyWatt branding, no errors
-- [ ] Journey Planner: setting HVAC swap_year=3 produces CapEx spike at year 3
+- [ ] HomeInfoBar displays zip, climate zone, bedrooms, sq ft, year built from reactive state
+- [ ] Journey Planner: HVAC swap_year=3 produces CapEx spike at year 3
+- [ ] Journey Planner: `starting_state="electric"` row renders as greyed "✓ Done" with no slider
+- [ ] Journey Planner: `starting_state="none"` row renders as "—" / "Add" with plan checkbox
 - [ ] Baseline ("do nothing") cumulative cost exceeds journey cost after all swaps (stress scenario)
-- [ ] Comparison mode shows 4-series charts correctly
+- [ ] Comparison mode shows 4-series charts (solid A, dashed B)
+- [ ] Journey Timeline chart renders swap markers with device name and net cost annotations
 - [ ] `RateLoader` returns 0.310 for PG&E electricity June 2023
-- [ ] Logo placeholder renders without crash when PNG not present
+- [ ] Logo placeholder renders without crash when PNG files are absent
 
 ---
 
@@ -948,3 +1307,5 @@ hes/
 | Financing / loan scenarios | Amortisation overlay on CapEx |
 | Monte Carlo uncertainty | Price + efficiency distributions |
 | Multi-journey comparison | Two user-defined journeys side by side |
+| Session save / load | `json.dump` / `json.load` using §2.5 schema; Load/Save buttons in UI |
+| ZIP → climate zone auto-derive | Zip-to-CZ lookup table; auto-populate climate_zone field |
