@@ -1,6 +1,6 @@
 # WhyWatt — Project Brain (Claude Code reads this automatically)
 
-> Keep this file current after each phase. Last updated: Phase 2 spec finalised.
+> Keep this file current after each phase. Last updated: Phase 2 spec updated — HomeConfig, DeviceSlot starting_state, HVAC compound baseline, bedroom scaling, UI redesign.
 
 ---
 
@@ -48,6 +48,11 @@ Do not start Objective N+1 until all tests for N pass.
 | Backward compat | None — clean break from Phase 1 | simplicity |
 | Dual scenario | Second HESModel instance, lazy | clean separation |
 | Uncertainty | Deterministic through Phase 3 | Monte Carlo deferred |
+| Home config | HomeConfig dataclass injected into HESModel | single source of truth; Phase 3 JSON persistence |
+| DeviceSlot baseline | baseline_devices: list (not single device) | HVAC can have furnace + AC as separate aging units |
+| Starting state | "gas" / "electric" / "none" per slot | models already-done swaps; "do nothing" preserves them |
+| Bedroom scaling | Multiplier table in BEDROOM_SCALING dict | DOE proxy; 3BR is TMY3 reference |
+| HVAC compound | has_cooling_baseline flag per slot | Bay Area default is no AC; adding heat pump is a clean add |
 
 ---
 
@@ -67,6 +72,14 @@ UA_good:    350 BTU/hr/°F
 
 **IMPORTANT:** Annual HDD for Bay Area is 1,910 — NOT 2,600 (that is the national average).
 All validation targets in the spec use 1,910.
+
+**Bedroom scaling (BEDROOM_SCALING dict, 3BR = reference):**
+```
+bedrooms:  1      2      3      4      5
+baseload:  0.50×  0.83×  1.00×  1.17×  1.33×   of 1200 kWh/yr
+hw_gal:    30     50     65     75     85       gal/day
+```
+Source: DOE/ENERGY STAR occupancy proxy. Applied by HESModel at init; devices receive injected scalars.
 
 **PG&E 2025 base rates:**
 ```
@@ -108,22 +121,24 @@ src/
     seasonal.py       SeasonalDevice + GasDryer, HeatPumpDryer, LightsAndPlugs etc.
     physics.py        PhysicsDevice + GasFurnace, HeatPumpHVAC, GasWH, HPWH
     schedule.py       ScheduleDevice + EVCharger
+  home_config.py      HomeConfig dataclass + BEDROOM_SCALING dict
   rate_loader.py      RateLoader — CPUC published periods + CAGR projection
   journey.py          DeviceSlot dataclass + JourneyHome Mesa agent
-  model.py            HESModel — two JourneyHome instances, dual scenario
-  app.py              Solara UI — Journey Planner, WhyWatt branding
+  model.py            HESModel — accepts HomeConfig, two JourneyHome instances, dual scenario
+  app.py              Solara UI — Journey Planner, Home Profile, WhyWatt branding
 data/
   rates/
     pge_elec_e1.json      historical E-1 periods + projection config
     pge_gas_g1.json       historical G-1 periods + projection config
   climate/
-    bayarea_tmy3.json     monthly HDD, CDD, water temps, UA map
+    bayarea_tmy3.json     monthly HDD, CDD, water temps, UA map, bedroom_scaling table
   appliances/
     electrical_defaults.json
     gas_defaults.json
     ev_schedule_default.json
   homes/
-    journey_slots_default.json   default DeviceSlot config for Bay Area home
+    journey_slots_default.json   default DeviceSlot configs (with starting_state)
+    home_config_default.json     default HomeConfig values (Phase 3: user save/load)
 docs/
   assets/
     whywatt_logo.png    (placeholder)
@@ -152,13 +167,23 @@ tests/
 3. `monthly_consumption()` always returns shape `(12,)` — no exceptions
 4. `cost_history_by_category` appends exactly once per step (sum-then-append pattern)
 5. Logo files use `os.path.exists()` guard — missing logo must not crash the app
+6. `HomeConfig` is the only object that carries home details — no loose parameters alongside it
+7. `starting_state` is always preserved when constructing the "do nothing" baseline —
+   never reset already-electric slots to gas
+8. `baseline_devices` is always a list (even if length 1) — never a single device reference
+9. HVAC install cost covers the full heat pump (heating + cooling) as one event — never split
 
 ---
 
-## Questions to resolve before Objective 6 UI work
+## UI design decisions (resolved for Objective 6)
 
-- [ ] Should swap_year UI use a slider or a year-picker dropdown?
-- [ ] Should "not planning to swap" be a checkbox or a special "Never" option in the slider?
-- [ ] Gas cooktop — add to baseline_home slots or keep just furnace/WH/dryer for Phase 2?
-- [ ] EV charger — show in Journey Planner even when not swapping (baseline has no EV)?
-- [ ] Income-qualified rebate toggle (CARE / non-CARE affects rebate amounts)?
+| Question | Decision |
+|---|---|
+| Swap year control | Slider (year 1–25), shows calendar year label |
+| "Not planning to swap" | Checkbox disables slider; row collapses cost fields |
+| Gas cooktop in Phase 2 | Yes — included as a slot with `starting_state="gas"` |
+| EV charger display | Always shown; `starting_state="none"` renders as "—" / "Add" |
+| Income-qualified rebates | Deferred to Phase 3 |
+| HVAC cooling in baseline | `has_cooling_baseline` toggle (default false for Bay Area) |
+| Baseline home label | "Do nothing" (not "Gas home") |
+| Journey home label | "Your journey" (not "Electric home") |
