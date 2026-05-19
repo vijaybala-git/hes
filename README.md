@@ -1,30 +1,34 @@
 ---
-title: Home Electrification Simulator
-emoji: 🏠
+title: WhyWatt?
+emoji: ⚡
 colorFrom: blue
 colorTo: gray
 sdk: docker
 pinned: false
 ---
 
-# Home Electrification Simulator (HES)
+# WhyWatt?
 
-An interactive tool comparing the long-run energy costs of a **gas home** vs. a fully **electrified home** in the Bay Area.
+An interactive tool showing the long-run cost of a user-defined **home electrification journey** vs. doing nothing — built for California community advocates.
 
-Built with [Mesa](https://mesa.readthedocs.io/) + [Solara](https://solara.dev/). Developed as a resource for climate and electrification advocates helping consumers make informed appliance choices.
+Built with [Mesa](https://mesa.readthedocs.io/) + [Solara](https://solara.dev/).
 
 ## What it does
 
-- Models heating, cooling, water heating, and baseload electricity over a user-selected time horizon (5–25 years)
-- Applies compounding gas and electricity price escalation
-- Tracks appliance replacement costs (CapEx) when devices reach end of life
-- Shows results as cumulative costs, annual costs, category breakdowns, and price trends
+- Models a household's electrification journey: swapping HVAC, water heater, dryer, cooktop, and adding an EV charger over time
+- Runs a parallel "do nothing" baseline automatically — gas devices stay gas, prices escalate, end-of-life replacements fire
+- Applies real PG&E/CPUC rate data with historically-calibrated escalation scenarios (conservative / moderate / stress)
+- Shows results as cumulative costs, annual costs, category breakdowns, and equipment replacement timelines
 
-## How to use
+## How to run
 
-Adjust the sliders in the three control panels at the bottom:
-- **Gas Home** — usage levels and replacement timing for the furnace, A/C, and water heater
-- **Electric Home** — heat pump and heat pump water heater settings; raise baseload to model EVs or induction cooking
-- **Energy Prices** — how fast gas and electricity prices rise per year, and how many years to look ahead
+```bash
+solara run src/app.py
+```
 
-Select any two charts from the dropdowns above the chart area.
+## Phase status
+
+- **Phase 1:** Complete — Mesa agent framework, dual JSON home configs, Solara UI, 42 unit tests.
+- **Phase 2:** In progress — Journey model, physics-based devices, real CPUC rate data.
+
+See `docs/Phase2_Spec.md` for full Phase 2 scope.

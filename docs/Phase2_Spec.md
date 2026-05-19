@@ -1293,6 +1293,290 @@ hes/
 
 ---
 
+## 8. Test & Validation Strategy
+
+This section defines the full testing approach for Phase 2. Tests are written alongside each
+objective — not after. The five layers work together: unit tests catch formula bugs,
+integration tests catch wiring bugs, directional tests catch sign/unit errors, snapshot tests
+catch regressions, and the debug export + validation notebook provide human-readable audits.
+
+---
+
+### 8.1 Layer 1 — Unit Tests
+
+**What they catch:** formula errors, wrong constants, shape violations, boundary conditions.
+**Speed:** < 1 second total. Run on every save.
+
+Each test file is gated to its objective:
+
+| File | Objective | Covers |
+|------|-----------|--------|
+| `tests/test_rate_loader.py` | 1 | RateLoader historical lookup, CAGR projection, scenario ordering |
+| `tests/test_devices.py` | 2 | All PhysicsDevice outputs within ±5%, shape (12,), SeasonalDevice, EVCharger |
+| `tests/test_journey.py` | 3 | DeviceSlot swap logic, CapEx events, cost_history_by_category length |
+| `tests/test_dual_scenario.py` | 5 | Scenario A vs B independence, stress > moderate over 20 years |
+
+**Key unit test cases (beyond the ±5% physics targets in §2.4):**
+
+```python
+# Shape contract — every device, always
+assert device.monthly_consumption().shape == (12,)
+
+# Cost identity for flat rates
+rates = np.full(12, 0.386)
+assert np.isclose(device.monthly_cost(rates).sum(),
+                  device.annual_consumption() * 0.386, rtol=1e-6)
+
+# Rate loader boundaries
+assert rate_loader.get_rate("electricity", 2025, 12) == 0.386   # last historical
+assert rate_loader.get_rate("electricity", 2026, 1) > 0.386     # projection kicks in
+
+# Unknown scenario raises
+with pytest.raises(ValueError):
+    rate_loader.get_rate("electricity", 2030, 1, scenario="unknown")
+```
+
+---
+
+### 8.2 Layer 2 — Integration / Scenario Tests
+
+**What they catch:** wiring bugs — rates not passed through, baseline inheriting swap years,
+CapEx double-counted, DataCollector reporters returning stale data.
+**Location:** `tests/test_journey.py` and `tests/test_dual_scenario.py`
+
+Key scenario-level assertions:
+
+```python
+# After all swaps, journey home must cost less than baseline (stress scenario)
+model = HESModel(scenario="stress", years=20, all_swap_years_set=True)
+model.run_all()
+assert model.baseline_home.cumulative_opex > model.journey_home.cumulative_opex
+
+# DataCollector has exactly n_years rows
+df = model.datacollector.get_model_vars_dataframe()
+assert len(df) == model.n_years
+
+# cost_history_by_category has exactly n_steps entries per category
+for cat, history in model.journey_home.cost_history_by_category.items():
+    assert len(history) == model.n_years
+
+# CapEx spike appears only at swap_year, not before or after
+capex = model.journey_home.capex_by_year
+assert capex[3] > 0     # swap at year 3
+assert capex[2] == 0    # nothing before
+assert capex[4] == 0    # nothing after (unless end-of-life coincides)
+
+# comparison_mode=False: no _b attributes
+model_single = HESModel(comparison_mode=False)
+assert not hasattr(model_single, 'journey_home_b')
+```
+
+---
+
+### 8.3 Layer 3 — Physics Sanity / Directional Tests
+
+**What they catch:** sign errors and unit confusion that still pass the ±5% absolute check
+by coincidence. These assert the *direction* of physical relationships, not absolute values.
+
+```python
+# More HDD → more heating consumption
+furnace_cold = GasFurnace(ua=500, afue=0.80, monthly_hdd=hdd_cold)
+furnace_mild = GasFurnace(ua=500, afue=0.80, monthly_hdd=hdd_mild)
+assert furnace_cold.annual_consumption() > furnace_mild.annual_consumption()
+
+# Better insulation → lower consumption
+furnace_good = GasFurnace(ua=350, afue=0.80, monthly_hdd=hdd)
+furnace_poor = GasFurnace(ua=650, afue=0.80, monthly_hdd=hdd)
+assert furnace_good.annual_consumption() < furnace_poor.annual_consumption()
+
+# Higher COP → lower kWh for same climate
+hp_efficient = HeatPumpHVAC(ua=500, cop=4.0, seer=22, ...)
+hp_standard  = HeatPumpHVAC(ua=500, cop=3.0, seer=22, ...)
+assert hp_efficient.annual_consumption() < hp_standard.annual_consumption()
+
+# Warmer inlet water → less water heating energy (smaller ΔT)
+wh_summer = GasWaterHeater(uef=0.65, monthly_inlet_temp=[65]*12, ...)
+wh_winter = GasWaterHeater(uef=0.65, monthly_inlet_temp=[54]*12, ...)
+assert wh_summer.annual_consumption() < wh_winter.annual_consumption()
+
+# Stress scenario rates exceed moderate in every future year
+for year in range(2026, 2046):
+    assert rate_loader.get_rate("gas", year, 6, "stress") > \
+           rate_loader.get_rate("gas", year, 6, "moderate")
+```
+
+---
+
+### 8.4 Layer 4 — Debug / Audit Export
+
+**What it catches:** errors invisible to automated tests — seasonal profiles that look flat
+when they should peak in winter, monthly costs that are right annually but wrong by month,
+a CapEx event that fires in the wrong year. Also the primary tool for stakeholder review.
+
+**Implementation:** `JourneyHome.export_debug_csv(path)` called from the UI or a test
+fixture. Controlled by a `debug=True` flag on `HESModel` or called explicitly.
+
+**Per-device monthly export** — one row per (year, device, month):
+
+```
+year, device,       fuel,        month, consumption, unit,   rate,  cost,  is_electric, device_age
+2025, HVAC,         gas,         1,     28.4,         therms, 2.08,  59.07, False,       11
+2025, HVAC,         gas,         2,     23.0,         therms, 2.08,  47.84, False,       11
+...
+2028, HVAC,         electricity, 1,     160.8,        kWh,    0.451, 72.52, True,        1
+2028, Water Heater, electricity, 1,     87.5,         kWh,    0.451, 39.46, True,        1
+```
+
+**CapEx event export** — one row per event:
+
+```
+year, device,       event_type,    cost
+2028, HVAC,         swap,          10500
+2035, Water Heater, end_of_life,   2500
+```
+
+**Model-level annual summary** (always produced, not just in debug mode):
+
+```
+year, journey_opex, baseline_opex, opex_delta, journey_capex, baseline_capex,
+      elec_rate_avg, gas_rate_avg, scenario
+```
+
+**Review workflow:**
+1. Run `model.export_debug_csv("debug_run.csv")`
+2. Open in Excel → pivot by device/year → chart monthly profiles
+3. Cross-check HVAC monthly therms against `HDD[m] × formula` by hand for one month
+4. Verify swap-year rows show transition from gas → electric mid-series
+5. Confirm seasonal shape: HVAC peaks in Jan/Feb, water heating peaks in winter
+
+---
+
+### 8.5 Layer 5 — Snapshot / Regression Tests
+
+**What they catch:** silent regressions — a refactor that shifts costs by 0.3% across all
+years, or a rate-loading change that only shows up in year 15.
+
+**Approach:** After Objective 3 produces a trusted reference run, save the `DataCollector`
+output as a JSON fixture. CI compares future runs against it within a tight tolerance.
+
+```python
+# tests/test_regression.py
+FIXTURE = "tests/fixtures/reference_run_moderate_20yr.json"
+
+def test_regression_moderate_20yr():
+    model = HESModel(scenario="moderate", years=20, sim_start_year=2025,
+                     insulation_quality="average")
+    model.run_all()
+    df = model.datacollector.get_model_vars_dataframe()
+    reference = pd.read_json(FIXTURE)
+
+    # Cumulative cost must match within 0.5%
+    assert np.allclose(df["Journey Cum Cost"],   reference["Journey Cum Cost"],   rtol=0.005)
+    assert np.allclose(df["Baseline Cum Cost"],  reference["Baseline Cum Cost"],  rtol=0.005)
+```
+
+Regenerate fixtures intentionally with `pytest --update-snapshots` (custom flag) after a
+deliberate model change. Never auto-regenerate in CI.
+
+---
+
+### 8.6 Validation Notebook
+
+**File:** `notebooks/validation.ipynb`
+**Purpose:** Human-readable sanity check before each merge. Run manually, not in CI.
+
+Five sections — build incrementally across objectives:
+
+| Section | Add in | Shows |
+|---------|--------|-------|
+| 1 — Device physics table | Obj 2 | Actual vs. expected vs. ±5% tolerance for all PhysicsDevices |
+| 2 — Rate loader chart | Obj 1 | Historical + projected rates 2018–2050, all three scenarios |
+| 3 — 20-year scenario run | Obj 3 | Cumulative cost curves, journey vs. baseline, moderate scenario |
+| 4 — Monthly profile chart | Obj 3 | HVAC monthly kWh/therms — confirms winter heating + summer cooling peaks |
+| 5 — Debug CSV pivot | Obj 3 | Annual cost by device and fuel, spot-check year 1 against manual calc |
+
+Section 2 catches the most subtle bug: a discontinuity at the 2025/2026 boundary where
+historical rates hand off to projected rates. Easy to see in a chart, impossible to see in
+a number.
+
+---
+
+### 8.7 Shared Fixtures — conftest.py
+
+`tests/conftest.py` provides shared fixtures to avoid copy-paste across all test files:
+
+```python
+# tests/conftest.py
+import pytest
+import numpy as np
+import json
+from pathlib import Path
+
+DATA = Path(__file__).parent.parent / "data"
+
+@pytest.fixture
+def bay_area_climate():
+    with open(DATA / "climate/bayarea_tmy3.json") as f:
+        return json.load(f)
+
+@pytest.fixture
+def monthly_hdd(bay_area_climate):
+    return np.array(bay_area_climate["monthly_hdd_65f"], dtype=float)
+
+@pytest.fixture
+def monthly_cdd(bay_area_climate):
+    return np.array(bay_area_climate["monthly_cdd_65f"], dtype=float)
+
+@pytest.fixture
+def monthly_inlet_temp(bay_area_climate):
+    return np.array(bay_area_climate["monthly_inlet_water_temp_f"], dtype=float)
+
+@pytest.fixture
+def flat_elec_rates():
+    """Flat $0.386/kWh — for cost identity tests."""
+    return np.full(12, 0.386)
+
+@pytest.fixture
+def flat_gas_rates():
+    """Flat $2.08/therm — for cost identity tests."""
+    return np.full(12, 2.08)
+
+@pytest.fixture
+def rate_loader():
+    from src.rate_loader import RateLoader
+    return RateLoader()
+
+@pytest.fixture
+def default_slots():
+    with open(DATA / "homes/journey_slots_default.json") as f:
+        return json.load(f)
+```
+
+---
+
+### 8.8 Test Sequencing by Objective
+
+| Objective | Write these | Gate: must pass before next |
+|-----------|-------------|----------------------------|
+| 0 | None (visual) | — |
+| 1 | `test_rate_loader.py` (Layers 1 + 3) | Yes |
+| 2 | `test_devices.py` (Layers 1 + 3) | Yes |
+| 3 | `test_journey.py` (Layers 1 + 2); `conftest.py`; debug CSV | Yes |
+| 4 | Grep check; full `pytest tests/` | Yes — zero MMBtu |
+| 5 | `test_dual_scenario.py` (Layer 2) | Yes |
+| 6 | Manual UI smoke; regression fixture generation (Layer 5) | Notebook sections 3–5 |
+
+**Running the suite:**
+
+```bash
+pytest tests/ -v                    # all tests, verbose
+pytest tests/test_devices.py -v     # single file
+pytest tests/ -k "furnace"          # filter by name
+pytest tests/ --update-snapshots    # regenerate regression fixtures
+```
+
+---
+
 ## 7. Deferred to Phase 3
 
 | Feature | Phase 3 approach |
