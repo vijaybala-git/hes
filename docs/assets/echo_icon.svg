@@ -1,0 +1,80 @@
+<svg width="60" height="60" viewBox="18 18 120 120" xmlns="http://www.w3.org/2000/svg">
+  <title>Electrification Collaboration icon</title>
+
+  <!-- Sun rays — gold -->
+  <g transform="translate(78,78)">
+    <polygon points="0,-58 -8,-42 8,-42"      fill="#EC9B1E"/>
+    <polygon points="-41,-41 -28,-22 -18,-32"  fill="#EC9B1E"/>
+    <polygon points="-58,0 -42,-8 -42,8"       fill="#EC9B1E"/>
+    <polygon points="-41,41 -18,32 -28,22"     fill="#EC9B1E"/>
+    <polygon points="0,58 8,42 -8,42"           fill="#EC9B1E"/>
+    <polygon points="-22,-52 -12,-34 -2,-44"   fill="#EC9B1E"/>
+    <polygon points="-52,-22 -34,-12 -44,-2"   fill="#EC9B1E"/>
+    <polygon points="-52,22 -44,2 -34,12"      fill="#EC9B1E"/>
+    <polygon points="-22,52 -2,44 -12,34"      fill="#EC9B1E"/>
+    <circle cx="-60" cy="-14" r="3" fill="#EC9B1E"/>
+    <circle cx="-60" cy="14"  r="2" fill="#EC9B1E"/>
+    <circle cx="-14" cy="-60" r="2" fill="#EC9B1E"/>
+  </g>
+
+  <!-- Wind/water rays — sky blue -->
+  <g transform="translate(78,78)">
+    <polygon points="0,-58 8,-42 18,-52"       fill="#50BDF8"/>
+    <polygon points="41,-41 28,-22 38,-12"     fill="#50BDF8"/>
+    <polygon points="58,0 42,-8 42,8"          fill="#50BDF8"/>
+    <polygon points="41,41 38,12 28,22"        fill="#50BDF8"/>
+    <polygon points="0,58 -8,42 18,52"         fill="#50BDF8"/>
+    <polygon points="52,-22 44,-2 34,-12"      fill="#50BDF8"/>
+    <polygon points="52,22 34,12 44,2"         fill="#50BDF8"/>
+    <circle cx="60" cy="-14" r="3" fill="#50BDF8"/>
+    <circle cx="60" cy="14"  r="2" fill="#50BDF8"/>
+    <ellipse cx="66" cy="0" rx="2.5" ry="4.5" fill="#50BDF8"/>
+  </g>
+
+  <!-- Circle split -->
+  <g transform="translate(78,78)">
+    <path d="M0,-45 A45,45 0 0,0 0,45 Z" fill="#D0302D"/>
+    <path d="M0,-45 A45,45 0 0,1 0,45 Z" fill="#005CA2"/>
+  </g>
+
+  <!-- Solar panels -->
+  <g transform="translate(78,78)" opacity="0.9">
+    <g transform="rotate(-30) translate(-30,-20)">
+      <rect x="0" y="0" width="22" height="15" rx="1" fill="#C0281F"/>
+      <line x1="7"  y1="0"  x2="7"  y2="15" stroke="white" stroke-width="0.7" opacity="0.6"/>
+      <line x1="14" y1="0"  x2="14" y2="15" stroke="white" stroke-width="0.7" opacity="0.6"/>
+      <line x1="0"  y1="5"  x2="22" y2="5"  stroke="white" stroke-width="0.7" opacity="0.6"/>
+      <line x1="0"  y1="10" x2="22" y2="10" stroke="white" stroke-width="0.7" opacity="0.6"/>
+    </g>
+    <g transform="rotate(-10) translate(-28,10)">
+      <rect x="0" y="0" width="22" height="15" rx="1" fill="#C0281F"/>
+      <line x1="7"  y1="0"  x2="7"  y2="15" stroke="white" stroke-width="0.7" opacity="0.6"/>
+      <line x1="14" y1="0"  x2="14" y2="15" stroke="white" stroke-width="0.7" opacity="0.6"/>
+      <line x1="0"  y1="5"  x2="22" y2="5"  stroke="white" stroke-width="0.7" opacity="0.6"/>
+      <line x1="0"  y1="10" x2="22" y2="10" stroke="white" stroke-width="0.7" opacity="0.6"/>
+    </g>
+  </g>
+
+  <!-- Wind turbines -->
+  <g transform="translate(78,78)" fill="white" opacity="0.88">
+    <g transform="translate(20,-5)">
+      <rect x="-1" y="0" width="2" height="32"/>
+      <polygon points="0,0 -8,-20 -2,-18"/>
+      <polygon points="0,0 10,-14 8,-6"/>
+      <circle cx="0" cy="0" r="2.5"/>
+    </g>
+    <g transform="translate(33,-16) scale(0.6)">
+      <rect x="-1" y="0" width="2" height="28"/>
+      <polygon points="0,0 -7,-18 -2,-16"/>
+      <polygon points="0,0 9,-12 7,-5"/>
+      <circle cx="0" cy="0" r="2.5"/>
+    </g>
+  </g>
+
+  <!-- Lightning bolt -->
+  <g transform="translate(78,78)">
+    <polygon points="6,-42 -8,2 4,2 -6,42 12,-4 0,-4 14,-42"
+      fill="white" stroke-linejoin="round"/>
+  </g>
+
+</svg>

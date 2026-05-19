@@ -1,0 +1,13 @@
+<svg width="320" height="92" viewBox="0 0 320 92" xmlns="http://www.w3.org/2000/svg">
+  <title>WhyWatt — Home Electrification Simulator (dark)</title>
+  <path d="M8 84 L8 44 L44 8 L80 44 L80 84 Z"
+    fill="#1A2540" stroke="#50BDF8" stroke-width="3.5" stroke-linejoin="round"/>
+  <rect x="30" y="45" width="8" height="18" rx="4" fill="#EC9B1E"/>
+  <rect x="46" y="48" width="8" height="13" rx="4" fill="#EC9B1E"/>
+  <path d="M40 67 L40 72 Q44 77 48 72 L48 67 Z" fill="#EC9B1E"/>
+  <text x="96" y="50" font-family="system-ui,-apple-system,Arial,sans-serif"
+    font-size="29" font-weight="800" fill="#E8F4FE">Why<tspan
+    fill="#50BDF8">Watt</tspan><tspan fill="#EC9B1E">?</tspan></text>
+  <text x="96" y="71" font-family="system-ui,-apple-system,Arial,sans-serif"
+    font-size="11" fill="#546E7A">Home Electrification Simulator</text>
+</svg>

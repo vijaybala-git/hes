@@ -1,11 +1,12 @@
 """
-Home Electrification Simulator — Solara UI  (Phase 1 / Objective 6 rev 2)
+WhyWatt? — Solara UI  (Phase 2 / Objective 0 branding scaffold)
 
 EN-ROADS-inspired layout:
   · Header  : title, location/home-spec info bar, key summary stat
   · Charts  : two selectable panes (choose from 6 chart types)
   · Controls: three panels — Gas Home | Electric Home | Energy Pricing
 """
+import os
 import solara
 import numpy as np
 import matplotlib
@@ -14,16 +15,42 @@ matplotlib.use("Agg")
 from matplotlib.figure import Figure
 from model import HESModel, CATEGORY_ORDER, CATEGORY_LABELS
 
-# ── Color palette ─────────────────────────────────────────────────────────────
-C_BASE   = "#9E9E9E"   # grey  — baseline (gas) home
-C_ELEC   = "#1976D2"   # blue  — electrified home
+# ── Asset paths (SVG logos — guarded, missing files must not crash) ──────────
+_HERE           = os.path.dirname(os.path.abspath(__file__))
+_ASSETS         = os.path.normpath(os.path.join(_HERE, "..", "docs", "assets"))
+_WHYWATT_LOGO   = os.path.join(_ASSETS, "whywatt_logo.svg")
+_ECHO_LOGO      = os.path.join(_ASSETS, "echo_logo.svg")
+_ECHO_ICON      = os.path.join(_ASSETS, "echo_icon.svg")
 
-# Category colors — (grey shade for baseline, blue shade for electrified)
+
+def _read_svg(path: str):
+    """Return SVG file content as a string, or None if file is missing."""
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+    return None
+
+
+# ── Color palette — harmonized WhyWatt + ECHo colors ─────────────────────────
+# WhyWatt navy  #0D47A1  ≈  ECHo circle navy   #005CA2
+# Shared amber  #EC9B1E  ≈  ECHo solar gold    #EC9B1E
+# ECHo sky blue #50BDF8  — secondary accent, new in Phase 2
+# ECHo red      #D0302D  — gas / do-nothing warning
+
+C_NAVY   = "#0D47A1"   # WhyWatt primary
+C_SKY    = "#50BDF8"   # ECHo sky blue — secondary accent
+C_AMBER  = "#EC9B1E"   # shared gold
+C_RED    = "#D0302D"   # gas / warning
+
+C_BASE   = C_RED       # baseline (gas) home line
+C_ELEC   = C_NAVY      # electrified home line
+
+# Category colors — (gas baseline palette, electric palette)
 CATEGORY_COLORS = {
-    "Baseload":     ("#E0E0E0", "#BBDEFB"),
-    "WaterHeating": ("#BDBDBD", "#64B5F6"),
-    "HVAC_Cooling": ("#9E9E9E", "#1E88E5"),
-    "HVAC_Heating": ("#616161", "#0D47A1"),
+    "Baseload":     ("#BDBDBD", "#BBDEFB"),
+    "WaterHeating": ("#9E9E9E", C_SKY),
+    "HVAC_Cooling": ("#757575", "#1E88E5"),
+    "HVAC_Heating": ("#424242", C_NAVY),
 }
 
 # ── Chart menu ────────────────────────────────────────────────────────────────
@@ -390,7 +417,7 @@ def PricingControls():
 
 @solara.component
 def Page():
-    solara.Title("Home Electrification Simulator")
+    solara.Title("WhyWatt?")
 
     model, df = solara.use_memo(run_simulation, dependencies=[
         years.value,
@@ -408,8 +435,14 @@ def Page():
 
     with solara.Column(margin=3, gap="10px"):
 
-        # ── Title ─────────────────────────────────────────────────────────────
-        solara.Markdown("# 🏠 ⚡ Home Electrification Simulator")
+        # ── Header — WhyWatt logo ─────────────────────────────────────────────
+        ww_svg = _read_svg(_WHYWATT_LOGO)
+        with solara.Row(style="align-items:center; gap:12px; padding:8px 0"):
+            if ww_svg:
+                solara.HTML(tag="div", unsafe_innerHTML=ww_svg,
+                            style="height:54px; display:flex; align-items:center")
+            else:
+                solara.Markdown("# ⚡ WhyWatt?")
 
         # ── Location / home info bar ──────────────────────────────────────────
         HomeInfoBar(model)
@@ -447,3 +480,35 @@ def Page():
                 ElectrifiedControls()
             with solara.Column(style="flex:1"):
                 PricingControls()
+
+        # ── Footer — ECHo branding ────────────────────────────────────────────
+        echo_svg = _read_svg(_ECHO_LOGO)
+        echo_icon_svg = _read_svg(_ECHO_ICON)
+        with solara.Row(
+            style="margin-top:16px; padding:10px 12px; "
+                  "border-top:2px solid #C5CAE9; "
+                  "background:#E8EAF6; border-radius:8px; "
+                  "align-items:center; gap:14px"
+        ):
+            if echo_svg:
+                solara.HTML(tag="div", unsafe_innerHTML=echo_svg,
+                            style="height:78px; display:flex; align-items:center")
+            elif echo_icon_svg:
+                solara.HTML(tag="div", unsafe_innerHTML=echo_icon_svg,
+                            style="height:78px; display:flex; align-items:center")
+            solara.Markdown(
+                "<small style='color:#546E7A; font-size:0.82em'>"
+                "WhyWatt? is supported by the "
+                "<strong style='color:#50BDF8'>Electrification Collaboration</strong> "
+                "— helping California communities make the switch."
+                "</small>"
+            )
+            solara.HTML(
+                tag="div",
+                unsafe_innerHTML=(
+                    "<span style='margin-left:auto; background:#0D47A1; color:white; "
+                    "border-radius:6px; padding:3px 10px; font-size:0.75em; "
+                    "font-weight:700; white-space:nowrap'>WhyWatt? v2.0</span>"
+                ),
+                style="margin-left:auto",
+            )
