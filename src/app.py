@@ -466,7 +466,6 @@ def make_journey_timeline(df, model, n):
     fig.patch.set_facecolor("#F9F9F9")
     ax = fig.add_subplot(111)
 
-    # Gas price background gradient: light→deep orange tracks price rise
     gas_rates = df["Gas Rate"].values
     g_min, g_max = gas_rates.min(), gas_rates.max()
     for yr_idx in range(n):
@@ -483,7 +482,6 @@ def make_journey_timeline(df, model, n):
         if state == "electric":
             ax.plot([1, n], [y, y], color=C_ELEC, lw=3, solid_capstyle="round", zorder=3)
             ax.text(n + 0.4, y, "✓ Done", va="center", fontsize=8, color=C_ELEC)
-
         elif state == "none":
             if sw is not None and sw <= n:
                 ax.plot([sw, n], [y, y], color=C_ELEC, lw=3, solid_capstyle="round", zorder=3)
@@ -493,8 +491,7 @@ def make_journey_timeline(df, model, n):
             else:
                 ax.plot([1, n], [y, y], color="#CCCCCC", lw=1.5, linestyle=":", zorder=2)
                 ax.text(n + 0.4, y, "Not adding", va="center", fontsize=7, color="#AAAAAA")
-
-        else:  # gas
+        else:
             if sw is not None and sw <= n:
                 ax.plot([1, sw], [y, y], color=C_BASE, lw=2.5, linestyle="--", zorder=3)
                 ax.plot([sw, n], [y, y], color=C_ELEC, lw=2.5, solid_capstyle="round", zorder=3)
@@ -541,18 +538,16 @@ def ChartPane(chart_name, model, df, n):
 
 @solara.component
 def HomeInfoBar():
-    """Chip row reading from reactive home-profile state — no model object needed."""
+    """Chip row — reads reactive home-profile state, no model needed."""
     insulation = insulation_quality.value.capitalize()
     solara.Markdown(
         f"📍 **San Jose, CA** &nbsp;·&nbsp; ZIP {zip_code.value} "
-        f"&nbsp;·&nbsp; Climate Zone {climate_zone.value} "
+        f"&nbsp;·&nbsp; {climate_zone.value} "
         f"&nbsp;·&nbsp; {num_bedrooms.value} bed "
         f"&nbsp;·&nbsp; {square_footage.value:,} sq ft "
         f"&nbsp;·&nbsp; Built {year_built.value} "
         f"&nbsp;·&nbsp; {insulation} insulation",
-        style={"font-size": "0.85em", "color": "#555",
-               "background": "#F0F4F8", "padding": "6px 12px",
-               "border-radius": "6px"},
+        style={"font-size": "0.85em", "color": "#445"},
     )
 
 
@@ -652,7 +647,6 @@ def SlotRow(name, state_rv, swap_planned_rv, swap_year_rv, install_cost_rv, reba
 @solara.component
 def JourneyPlannerPanel():
     with solara.Card("🗺️ Your Electrification Journey", margin=0, elevation=1):
-        # Column header hint
         with solara.Row(gap="8px",
                         style="padding:2px 0 4px 0; font-size:0.76em; color:#999"):
             solara.Text("Appliance",     style="min-width:110px; max-width:110px; font-weight:600")
@@ -717,7 +711,6 @@ def HomeProfilePanel():
 
 
 def _preset_buttons(gas_rv, elec_rv, apply_fn):
-    """Row of preset buttons for one scenario; apply_fn(preset_key) sets the sliders."""
     active = _current_preset_label(gas_rv.value, elec_rv.value)
     with solara.Row(gap="4px", style="flex-wrap:wrap"):
         for key, display in _PRESET_DISPLAY.items():
@@ -798,29 +791,20 @@ def Page():
     solara.Title("WhyWatt?")
 
     model, df = solara.use_memo(run_simulation, dependencies=[
-        # Home profile
         zip_code.value, climate_zone.value, num_bedrooms.value,
         square_footage.value, year_built.value, insulation_quality.value,
-        # Baseline device specs
         furnace_afue.value, gas_wh_uef.value, hvac_has_cooling.value,
-        # Electric specs
         hp_cop_heating.value, hp_seer_cooling.value, hpwh_uef.value,
-        # Journey planner — HVAC
         hvac_starting_state.value, hvac_swap_planned.value, hvac_swap_year.value,
         hvac_install_cost.value, hvac_rebate.value,
-        # Journey planner — Water Heater
         wh_starting_state.value, wh_swap_planned.value, wh_swap_year.value,
         wh_install_cost.value, wh_rebate.value,
-        # Journey planner — Dryer
         dryer_starting_state.value, dryer_swap_planned.value, dryer_swap_year.value,
         dryer_install_cost.value, dryer_rebate.value,
-        # Journey planner — Cooktop
         cooktop_starting_state.value, cooktop_swap_planned.value, cooktop_swap_year.value,
         cooktop_install_cost.value, cooktop_rebate.value,
-        # Journey planner — EV Charger
         ev_starting_state.value, ev_swap_planned.value, ev_swap_year.value,
         ev_install_cost.value, ev_rebate.value,
-        # Pricing
         gas_cagr_pct_a.value, elec_cagr_pct_a.value,
         comparison_mode.value,
         gas_cagr_pct_b.value, elec_cagr_pct_b.value,
@@ -831,17 +815,23 @@ def Page():
 
     with solara.Column(margin=3, gap="10px"):
 
-        # ── Header ─────────────────────────────────────────────────────────────
-        ww_svg = _read_svg(_WHYWATT_LOGO, height_px=54)
-        with solara.Row(style="align-items:center; gap:12px; padding:8px 0"):
+        # ── Header: logo (bigger) + home profile on same line ─────────────────
+        ww_svg = _read_svg(_WHYWATT_LOGO, height_px=72)
+        with solara.Row(style=(
+            "align-items:center; gap:20px; padding:10px 0;"
+            " border-bottom:2px solid #E8EAF6; margin-bottom:4px"
+        )):
             if ww_svg:
-                solara.HTML(tag="div", unsafe_innerHTML=ww_svg,
-                            style="height:54px; display:flex; align-items:center")
+                solara.HTML(
+                    tag="div",
+                    unsafe_innerHTML=ww_svg,
+                    style="height:72px; flex-shrink:0; display:flex; align-items:center",
+                )
             else:
                 solara.Markdown("# ⚡ WhyWatt?")
-
-        # ── Home info bar — reads reactives, no model needed ───────────────────
-        HomeInfoBar()
+            # Home info bar sits to the right of the logo on the same line
+            with solara.Column(style="flex:1; justify-content:center"):
+                HomeInfoBar()
 
         # ── Summary stats ───────────────────────────────────────────────────────
         SummaryStats(df, n, model)
