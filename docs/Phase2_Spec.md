@@ -1,9 +1,9 @@
 # WhyWatt — Phase 2 Development Spec
 
-**Status:** Phase 2 implemented through Objective 6; bug-fix + rate-decoupling patch in progress
+**Status:** Phase 2 implemented through Objective 6; §9 bug fixes, §10 rate decoupling, §11 per-device charts, §12 baseload formula added
 **Follows:** Phase 1 complete (Mesa + Solara, 42 unit tests, dual-home simulation)
 **Project rename:** HES → **WhyWatt?** (update all UI titles, headers, doc references)
-**Last updated:** Physics bug fixes (§9), baseload symmetry fix (§9), independent gas/elec rate sliders (§10) added
+**Last updated:** §12 Baseload formula + efficiency journey slot (Phase 2.5)
 
 ---
 
@@ -2091,6 +2091,825 @@ Step 3 — app.py:
     - Moving either slider independently updates charts in real time
     - Gas slider is red-accented, elec slider is navy-accented
     - "Custom" label appears when sliders diverge from a preset
+```
+
+---
+
+## 11. Per-Device Stacked Charts (Phase 2.5)
+
+Two new chart pairs added to the existing chart selector. Each pair shows the
+same x-axis (simulation years) with two vertically stacked charts:
+1. Annual cost ($/yr) by device
+2. Annual consumption (kWh-equivalent/yr) by device
+
+The charts are rendered for each home separately — "Do nothing" and "Your journey"
+— accessed via a tab toggle within the chart panel.
+
+---
+
+### 11.1 Design Decisions
+
+**Stacked area chart** (not bar) — smooth filled areas with `tension: 0.25`.
+Shows cumulative total at any year by reading the top of the stack.
+
+**Vertical pair, shared x-axis** — cost chart on top, consumption chart directly
+below. Same year labels, same annotations. Users can visually correlate cost and
+consumption at the same point in time without eye movement between separate panels.
+
+**Swap year annotations** — vertical dashed lines with labels ("HVAC swap",
+"WH swap" etc.) on the journey charts only. Powered by
+`chartjs-plugin-annotation`. Do-nothing charts have no annotations.
+Annotations use the same colour as the device being swapped.
+
+**Consumption conversion** — gas consumption (therms) is converted to kWh-equivalent
+for display on the consumption chart only. The conversion is display-only;
+no internal simulation values change:
+```python
+KWH_PER_THERM = 29.3   # 1 therm = 29.3 kWh (higher heating value)
+```
+This conversion makes the efficiency gain of heat pumps visible:
+a gas furnace using 286 therms = 8,380 kWh-equivalent, while a heat pump
+doing the same job uses ~2,100 kWh — a 4× reduction on the consumption chart.
+
+**Tab toggle** — "Do nothing" / "Your journey" tabs switch which home's chart
+pair is displayed. Both sets of charts are rendered at page load; only visibility
+changes on tab click.
+
+---
+
+### 11.2 Device Colour Assignment
+
+Consistent across both cost and consumption charts, both homes:
+
+| Device | Background (70% opacity) | Border |
+|--------|--------------------------|--------|
+| HVAC | `rgba(13,71,161,0.70)` | `#0D47A1` navy |
+| Water heater | `rgba(21,101,192,0.60)` | `#1565C0` mid-blue |
+| Dryer | `rgba(208,48,45,0.55)` | `#D0302D` red |
+| Cooktop | `rgba(236,155,30,0.55)` | `#EC9B1E` amber |
+| Baseload | `rgba(120,144,156,0.45)` | `#78909C` slate |
+
+Device order in stack (bottom to top): HVAC, Water heater, Dryer, Cooktop, Baseload.
+HVAC is anchored at the bottom because it is the largest single item and the
+most important swap story to tell.
+
+---
+
+### 11.3 Data Source — JourneyHome
+
+The per-device cost data already exists in `JourneyHome.cost_history_by_category`
+(one list per category, `n_years` entries). The chart builds on this:
+
+```python
+# Already collected in model — no new simulation work needed
+jh = model.journey_home
+bh = model.baseline_home
+
+cost_by_device_journey = {
+    "HVAC":        jh.cost_history_by_category["HVAC_Heating"],
+    "Water Heater":jh.cost_history_by_category["WaterHeating"],
+    "Dryer":       jh.cost_history_by_device["Dryer"],    # see §11.4
+    "Cooktop":     jh.cost_history_by_device["Cooktop"],
+    "Baseload":    jh.cost_history_by_category["Baseload"],
+}
+```
+
+**Problem:** `cost_history_by_category` aggregates all Baseload devices together
+(dryer + cooktop + lights + EV charger). We need per-device cost history to plot
+dryer and cooktop separately.
+
+**Fix — add `cost_history_by_slot` to `JourneyHome`:**
+
+```python
+# In JourneyHome.__init__:
+self.cost_history_by_slot: dict[str, list[float]] = {
+    slot.name: [] for slot in self.slots
+}
+
+# In JourneyHome.step(), after existing category aggregation:
+for slot in self.slots:
+    self.cost_history_by_slot[slot.name].append(
+        slot.active_device_cost_this_step   # float set during slot.step()
+    )
+```
+
+Each slot accumulates its own annual cost list of length `n_years`.
+The chart reads from `cost_history_by_slot` for device-level granularity.
+
+**For consumption** — need `consumption_history_by_slot`:
+```python
+self.consumption_history_by_slot: dict[str, list[float]] = {
+    slot.name: [] for slot in self.slots
+}
+# Populated same way as cost — native unit (kWh or therms)
+# Chart layer converts therms → kWh-eq before rendering
+```
+
+---
+
+### 11.4 app.py Chart Implementation
+
+**Chart selector update** — two separate entries, each independently selectable:
+
+```python
+CHART_OPTIONS = [
+    ("cumulative",          "Cumulative cost"),
+    ("annual",              "Annual cost"),
+    ("category",            "Cost by category"),
+    ("price_trend",         "Price trends"),
+    ("capex",               "Equipment costs"),
+    ("journey_timeline",    "Journey timeline"),
+    ("device_cost",         "Cost by device"),         # ← new
+    ("device_consumption",  "Energy use by device"),   # ← new
+]
+```
+
+Each chart type renders independently. Both use the same home tab toggle
+(`device_chart_home` reactive) and the same colour/annotation scheme.
+The two are separate chart options — the user picks one from the dropdown.
+
+**Shared render helper — one function, `chart_type` parameter:**
+
+```python
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import numpy as np
+
+KWH_PER_THERM = 29.3
+
+DEVICE_ORDER  = ["HVAC", "Water Heater", "Dryer", "Cooktop", "Lights and Appliances"]
+DEVICE_LABELS = ["HVAC", "Water heater", "Dryer", "Cooktop", "Baseload"]
+DEVICE_COLORS = ["#0D47A1", "#1565C0", "#D0302D", "#EC9B1E", "#78909C"]
+DEVICE_ALPHAS = [0.70,      0.60,       0.55,      0.55,      0.45]
+
+
+def render_device_chart(model, home: str = "journey",
+                        chart_type: str = "device_cost") -> plt.Figure:
+    """
+    Render a single stacked area chart.
+    chart_type: "device_cost"        → annual cost ($/yr) by device
+                "device_consumption" → annual energy (kWh-eq/yr) by device
+    home:       "journey" | "baseline"
+    """
+    jh = model.journey_home if home == "journey" else model.baseline_home
+    cal_years = [model.sim_start_year + y for y in range(model.n_years)]
+
+    fig, ax = plt.subplots(figsize=(8, 3.8))
+
+    stack = np.zeros(model.n_years)
+    patches = []
+
+    for i, name in enumerate(DEVICE_ORDER):
+        if chart_type == "device_cost":
+            data = np.array(
+                jh.cost_history_by_slot.get(name, [0] * model.n_years),
+                dtype=float
+            )
+            y_label   = "$/yr"
+            y_fmt     = lambda v, _: f"${v/1000:.0f}k"
+            tip_unit  = "$"
+            tip_suffix = ""
+
+        else:  # device_consumption
+            raw  = np.array(
+                jh.consumption_history_by_slot.get(name, [0] * model.n_years),
+                dtype=float
+            )
+            fuel = jh.fuel_history_by_slot.get(name, ["electricity"] * model.n_years)
+            data = np.where(
+                np.array(fuel) == "gas",
+                raw * KWH_PER_THERM,
+                raw
+            )
+            y_label   = "kWh-eq / yr"
+            y_fmt     = lambda v, _: f"{v/1000:.0f}k"
+            tip_unit  = ""
+            tip_suffix = " kWh"
+
+        ax.fill_between(cal_years, stack, stack + data,
+                        color=DEVICE_COLORS[i], alpha=DEVICE_ALPHAS[i],
+                        linewidth=0)
+        ax.plot(cal_years, stack + data,
+                color=DEVICE_COLORS[i], linewidth=1.2)
+        patches.append(mpatches.Patch(color=DEVICE_COLORS[i],
+                                      label=DEVICE_LABELS[i]))
+        stack += data
+
+    # ── Swap annotations (journey only) ──────────────────────────────────
+    SWAP_COLORS = {"HVAC": "#0D47A1", "Water Heater": "#1565C0",
+                   "Dryer": "#D0302D", "Cooktop": "#EC9B1E"}
+    if home == "journey":
+        for slot in jh.slots:
+            if slot.swap_year is None:
+                continue
+            cal = model.sim_start_year + slot.swap_year - 1
+            color = SWAP_COLORS.get(slot.name, "#78909C")
+            ax.axvline(cal, color=color, linewidth=1.2,
+                       linestyle=(0, (4, 3)), alpha=0.7)
+            ax.text(cal + 0.15, ax.get_ylim()[1] * 0.94,
+                    slot.name, fontsize=8, color=color, va="top")
+
+    # ── Styling ────────────────────────────────────────────────────────
+    ax.set_ylabel(y_label, fontsize=9, color="#78909C")
+    ax.set_xlabel("Year", fontsize=9, color="#78909C")
+    ax.tick_params(axis="both", labelsize=8, colors="#78909C")
+    ax.yaxis.set_major_formatter(plt.FuncFormatter(y_fmt))
+    ax.grid(axis="y", color="#78909C", alpha=0.12, linewidth=0.5)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.legend(handles=patches, loc="upper left",
+              fontsize=8, framealpha=0.9, ncol=len(DEVICE_ORDER))
+
+    home_label = "Your journey" if home == "journey" else "Do nothing"
+    chart_label = "Annual cost by device" if chart_type == "device_cost" \
+                  else "Annual energy use by device (kWh-equivalent)"
+    ax.set_title(f"{home_label} — {chart_label}",
+                 fontsize=10, fontweight=500, loc="left", pad=8)
+
+    plt.tight_layout()
+    return fig
+```
+
+**In `app.py`, render section:**
+
+```python
+# Reactive for device chart home selector (shared by both device chart types)
+device_chart_home = solara.reactive("journey")  # "journey" | "baseline"
+
+# Inside render_chart() or equivalent:
+if chart_type.value in ("device_cost", "device_consumption"):
+    with solara.Row():
+        solara.ToggleButtonsSingle(
+            value=device_chart_home,
+            values=[("journey", "Your journey"), ("baseline", "Do nothing")]
+        )
+    fig = render_device_chart(
+        model,
+        home=device_chart_home.value,
+        chart_type=chart_type.value
+    )
+    solara.FigureMatplotlib(fig)
+    plt.close(fig)
+```
+
+The home tab toggle (`Your journey` / `Do nothing`) persists across both chart
+types — switching from cost to consumption remembers which home was selected.
+
+---
+
+### 11.5 JourneyHome Changes — New History Dictionaries
+
+Three new per-slot history dicts added to `JourneyHome`:
+
+```python
+# Added to JourneyHome.__init__:
+self.cost_history_by_slot:        dict[str, list[float]] = {s.name: [] for s in slots}
+self.consumption_history_by_slot: dict[str, list[float]] = {s.name: [] for s in slots}
+self.fuel_history_by_slot:        dict[str, list[str]]   = {s.name: [] for s in slots}
+```
+
+Populated in `JourneyHome.step()` after the existing per-slot step call:
+
+```python
+for slot in self.slots:
+    slot_cost = slot.step(current_year, elec_r, gas_r, self.is_baseline_home)
+    ...
+    # New — record per-slot detail
+    self.cost_history_by_slot[slot.name].append(slot_cost)
+
+    active_dev = slot._last_active_device   # set by DeviceSlot.step()
+    if active_dev is not None:
+        self.consumption_history_by_slot[slot.name].append(
+            active_dev.history["consumption"][-1])
+        self.fuel_history_by_slot[slot.name].append(
+            active_dev.fuel_type)
+    else:
+        self.consumption_history_by_slot[slot.name].append(0.0)
+        self.fuel_history_by_slot[slot.name].append("electricity")
+```
+
+`DeviceSlot.step()` stores a `_last_active_device` reference so `JourneyHome`
+can read the fuel type without duplicating the active-device logic:
+
+```python
+# In DeviceSlot.step():
+self._last_active_device = active_list[0] if active_list else None
+```
+
+---
+
+### 11.6 Tooltip Behaviour
+
+Matplotlib does not have Chart.js-style interactive hover tooltips by default.
+For the Solara prototype, we use static tooltips via `mplcursors`:
+
+```python
+import mplcursors  # add to requirements.txt
+
+# After building the chart, attach cursor
+cursor = mplcursors.cursor(ax_cost, hover=True)
+@cursor.connect("add")
+def on_add(sel):
+    yr = int(sel.target[0])
+    sel.annotation.set_text(f"Year {yr}\nTotal: ${cost_stack[yr-1]:,.0f}")
+```
+
+If `mplcursors` causes rendering issues in Solara, fall back to static annotations
+at swap years only (no hover). Defer full interactive tooltip to Phase 3.
+
+---
+
+### 11.7 Tests
+
+Add to `tests/test_journey.py`:
+
+```python
+def test_cost_history_by_slot_length():
+    """Each slot has exactly n_years entries in cost_history_by_slot."""
+    model = HESModel(n_years=10)
+    model.run_all()
+    for slot in model.journey_home.slots:
+        h = model.journey_home.cost_history_by_slot[slot.name]
+        assert len(h) == 10, f"{slot.name}: expected 10, got {len(h)}"
+
+def test_consumption_history_by_slot_fuel_type():
+    """Before swap year, fuel is gas. After swap year, fuel is electricity."""
+    model = HESModel(n_years=10)
+    model.run_all()
+    jh = model.journey_home
+    hvac_slot = next(s for s in jh.slots if s.name == "HVAC")
+    fuels = jh.fuel_history_by_slot["HVAC"]
+    swap = hvac_slot.swap_year  # default 3
+    if swap:
+        assert all(f == "gas"         for f in fuels[:swap-1])
+        assert all(f == "electricity" for f in fuels[swap-1:])
+
+def test_kwh_equivalent_drops_at_swap():
+    """Total kWh-equivalent consumption drops at HVAC swap year (COP > 1)."""
+    model = HESModel(n_years=10)
+    model.run_all()
+    jh = model.journey_home
+    raw  = jh.consumption_history_by_slot["HVAC"]
+    fuel = jh.fuel_history_by_slot["HVAC"]
+    kwh_eq = [r*29.3 if f=="gas" else r for r,f in zip(raw, fuel)]
+    hvac_slot = next(s for s in jh.slots if s.name == "HVAC")
+    swap = hvac_slot.swap_year
+    if swap and swap < 10:
+        pre_swap_avg  = sum(kwh_eq[:swap])   / swap
+        post_swap_avg = sum(kwh_eq[swap:]) / (10-swap)
+        assert post_swap_avg < pre_swap_avg, \
+            "Heat pump must use less kWh-equivalent than gas furnace"
+```
+
+---
+
+### 11.8 Claude Code Prompt — Per-Device Charts
+
+```
+Implement §11 (Per-Device Stacked Charts) of docs/Phase2_Spec.md.
+Apply in two steps.
+
+Step 1 — journey.py:
+  Add three new per-slot history dicts to JourneyHome.__init__:
+    cost_history_by_slot, consumption_history_by_slot, fuel_history_by_slot
+  Populate them in JourneyHome.step() after each slot.step() call.
+  Add _last_active_device attribute to DeviceSlot — set during step().
+  Add tests from §11.7 to tests/test_journey.py.
+  Run pytest — all must pass before Step 2.
+
+Step 2 — app.py:
+  Add these two entries to CHART_OPTIONS (append after existing entries):
+    ("device_cost",        "Cost by device")
+    ("device_consumption", "Energy use by device")
+  Add device_chart_home = solara.reactive("journey") to reactive state.
+  Implement render_device_chart(model, home, chart_type) per §11.4:
+    - Single subplot (figsize 8×3.8)
+    - Stacked area chart for the requested chart_type
+    - device_cost: $/yr per device, y-axis ${n}k
+    - device_consumption: kWh-eq/yr per device, y-axis {n}k
+      gas therms converted via KWH_PER_THERM = 29.3 using fuel_history_by_slot
+    - Device order and colours per §11.2
+    - Swap year vertical dashed annotations on journey home only
+    - Legend in top-left (ncol=5)
+    - Chart title: "{home_label} — {chart_label}"
+  When chart_type.value in ("device_cost", "device_consumption"):
+    - Render ToggleButtonsSingle (Your journey / Do nothing)
+    - Call render_device_chart() with matching chart_type
+    - Display with solara.FigureMatplotlib(); plt.close(fig) after
+  Add mplcursors to requirements.txt.
+  Run solara run src/app.py and verify:
+    - Both new options appear in chart dropdown
+    - Each renders independently as a single stacked area chart
+    - Journey/baseline toggle works for both
+    - Swap annotations appear on journey charts only
+    - Switching between the two chart types remembers the home selection
+```
+
+---
+
+## 12. Baseload Formula + Efficiency Journey Slot (Phase 2.5)
+
+Replaces the bedroom-scaling lookup table with a physics-grounded formula.
+Adds a baseload efficiency improvement as a first-class journey slot in the
+Journey Planner — so LED upgrades and smart plug investments appear alongside
+HVAC and water heater swaps with their own cost, rebate, and payback story.
+
+---
+
+### 12.1 Formula
+
+```
+baseload_kwh = (sq_ft × intensity) + (bedrooms × per_bedroom) + constant
+```
+
+| Term | Symbol | Default | Source |
+|------|--------|---------|--------|
+| Floor area intensity | `intensity` | 0.45 kWh/sqft/yr | EIA RECS 2020 CA |
+| Per-bedroom occupancy load | `per_bedroom` | 200 kWh/bedroom/yr | DOE occupancy proxy |
+| Always-on constant (before) | `constant_before` | 500 kWh/yr | Fridge + standby + router |
+| Always-on constant (after) | `constant_after` | 300 kWh/yr | LED + smart plugs applied |
+
+`intensity` and `per_bedroom` are fixed constants in Phase 2 (Phase 3 sliders).
+`constant_before` and `constant_after` are user-controlled via sliders.
+
+**Validation for 3BR, 1,800 sqft, default constants:**
+```
+before: (1800 × 0.45) + (3 × 200) + 500 = 810 + 600 + 500 = 1,910 kWh/yr
+after:  (1800 × 0.45) + (3 × 200) + 300 = 810 + 600 + 300 = 1,710 kWh/yr
+savings: 200 kWh/yr ≈ $77/yr at $0.386/kWh
+```
+
+**Replaces bedroom scaling:** `BEDROOM_SCALING` dict and `baseload_multiplier`
+are removed from `home_config.py`. `HESModel.__init__` computes `baseload_kwh`
+directly from the formula. Hot water gallons scaling is retained separately
+(still bedroom-driven, unrelated to baseload).
+
+---
+
+### 12.2 Two-State Baseload Journey Slot
+
+The baseload slot becomes a proper journey slot with a before and after state.
+Both states are electric — the “swap” is efficiency improvement, not fuel change.
+
+**Updated slot in `journey_slots_default.json`:**
+
+```json
+{
+  "name": "Lights and Appliances",
+  "category": "Baseload",
+  "starting_state": "electric",
+  "baseline_devices": [
+    {"class": "LightsAndPlugs", "annual_kwh": "FORMULA_BEFORE", "lifespan": 15}
+  ],
+  "electric_device": {
+    "class": "LightsAndPlugs", "annual_kwh": "FORMULA_AFTER", "lifespan": 15
+  },
+  "swap_year": null,
+  "install_cost": 400,
+  "rebate": 0
+}
+```
+
+Note: `"FORMULA_BEFORE"` and `"FORMULA_AFTER"` are placeholders — `HESModel`
+computes the actual kWh values at init and injects them into the device
+constructors. The JSON schema carries the slot structure; the formula runs
+in Python.
+
+**Slot behaviour:**
+
+| State | Journey home | Do-nothing baseline |
+|-------|-------------|---------------------|
+| Before swap year (or no swap planned) | `LightsAndPlugs(kwh=formula_before)` | `LightsAndPlugs(kwh=formula_before)` |
+| On and after swap year | `LightsAndPlugs(kwh=formula_after)` | `LightsAndPlugs(kwh=formula_before)` |
+
+The do-nothing baseline always runs `formula_before` — no efficiency investment.
+The journey home transitions to `formula_after` at `swap_year`.
+
+**CapEx at swap year:** `install_cost - rebate` logged, same as other slots.
+Default `install_cost = 400` (LED + smart plug kit), `rebate = 0`.
+
+---
+
+### 12.3 `home_config.py` Changes
+
+**Remove:**
+```python
+# Delete entirely:
+BEDROOM_SCALING = { 1: {"baseload_multiplier": ...}, ... }
+```
+
+**Add:**
+```python
+# Baseload formula constants (Phase 2 fixed; Phase 3 makes sliders)
+BASELOAD_INTENSITY_KWH_PER_SQFT = 0.45   # EIA RECS 2020 CA
+BASELOAD_PER_BEDROOM_KWH        = 200.0  # DOE occupancy proxy
+
+def compute_baseload_kwh(sq_ft: int, bedrooms: int, constant: float) -> float:
+    """Return annual baseload kWh from formula."""
+    return (
+        sq_ft * BASELOAD_INTENSITY_KWH_PER_SQFT
+        + bedrooms * BASELOAD_PER_BEDROOM_KWH
+        + constant
+    )
+```
+
+**`HomeConfig` gains two new fields:**
+```python
+@dataclass
+class HomeConfig:
+    ...existing fields...
+    baseload_constant_before: float = 500.0  # always-on kWh/yr (current)
+    baseload_constant_after:  float = 300.0  # always-on kWh/yr (post LED/smart plugs)
+    baseload_swap_year:       int | None = None  # year of efficiency upgrade
+    baseload_install_cost:    float = 400.0
+    baseload_rebate:          float = 0.0
+```
+
+**Hot water scaling retained** — bedroom-based daily gallons remain in a
+separate small lookup (hot water is occupancy-driven, not sqft-driven):
+```python
+HOT_WATER_GAL_PER_DAY = {1: 30, 2: 50, 3: 65, 4: 75, 5: 85}
+# Source: DOE/ENERGY STAR; 3BR = TMY3 reference 65 gal/day
+```
+
+---
+
+### 12.4 `model.py` Changes
+
+**`HESModel.__init__` — replace bedroom scaling block:**
+
+```python
+# REMOVE:
+br = BEDROOM_SCALING[home_config.num_bedrooms]
+baseload_kwh = 1200 * br["baseload_multiplier"]
+hw_gallons   = br["hot_water_gal_per_day"]
+
+# REPLACE WITH:
+from home_config import compute_baseload_kwh, HOT_WATER_GAL_PER_DAY
+
+baseload_before = compute_baseload_kwh(
+    home_config.square_footage,
+    home_config.num_bedrooms,
+    home_config.baseload_constant_before
+)
+baseload_after = compute_baseload_kwh(
+    home_config.square_footage,
+    home_config.num_bedrooms,
+    home_config.baseload_constant_after
+)
+hw_gallons = HOT_WATER_GAL_PER_DAY[home_config.num_bedrooms]
+```
+
+**Slot construction — inject formula values into `LightsAndPlugs` devices:**
+
+```python
+# When building the Lights and Appliances slot:
+for cfg in slot_configs:
+    if cfg["name"] == "Lights and Appliances":
+        # Override annual_kwh with formula output
+        for dev in cfg.get("baseline_devices", []):
+            if dev["class"] == "LightsAndPlugs":
+                dev["annual_kwh"] = baseload_before
+        if cfg.get("electric_device", {}).get("class") == "LightsAndPlugs":
+            cfg["electric_device"]["annual_kwh"] = baseload_after
+        # Apply swap year and costs from HomeConfig
+        cfg["swap_year"]    = home_config.baseload_swap_year
+        cfg["install_cost"] = home_config.baseload_install_cost
+        cfg["rebate"]       = home_config.baseload_rebate
+```
+
+This keeps the JSON schema clean (no formula logic in JSON) while injecting
+the computed values before slot construction.
+
+---
+
+### 12.5 UI — Journey Planner Baseload Row
+
+The Lights and Appliances row in the Journey Planner expands to show the
+two-state configuration. It sits below the other device rows, visually
+separated by a thin divider with the label **“Baseload efficiency”**.
+
+**New reactive state:**
+
+```python
+# Baseload formula inputs (flow into HomeConfig)
+baseload_constant_before = solara.reactive(500)   # kWh/yr, slider 0–1500
+baseload_constant_after  = solara.reactive(300)   # kWh/yr, slider 0–1500
+baseload_swap_planned    = solara.reactive(False)
+baseload_swap_year       = solara.reactive(2)     # default year 2 if planned
+baseload_install_cost    = solara.reactive(400)
+baseload_rebate          = solara.reactive(0)
+```
+
+**Derived display reactive (computed, read-only):**
+```python
+@solara.computed
+def baseload_kwh_before():
+    return compute_baseload_kwh(
+        square_footage.value,
+        num_bedrooms.value,
+        baseload_constant_before.value
+    )
+
+@solara.computed
+def baseload_kwh_after():
+    return compute_baseload_kwh(
+        square_footage.value,
+        num_bedrooms.value,
+        baseload_constant_after.value
+    )
+```
+
+**UI panel layout (appended to Journey Planner, below divider):**
+
+```
+──────────────────────────────────────────────────────────────────
+💡 Baseload efficiency
+
+Current always-on load:
+  Always-on appliances    [───●───────] 500 kWh/yr
+  (fridge, standby, router, misc)
+  → Estimated total baseload: 1,910 kWh/yr
+     (1,800 sqft × 0.45 + 3 bed × 200 + 500)
+
+[ ] Planning a baseload efficiency upgrade (LED, smart plugs, etc.)
+    [when checked, reveals:]
+    Upgrade in year         [───●───────] 2   (2027)
+    After-upgrade constant  [──●────────] 300 kWh/yr
+    → Estimated total after: 1,710 kWh/yr
+    Install cost            $400
+    Rebate                  $0
+    Net cost                $400
+    → Annual saving: ~200 kWh/yr ≈ $77/yr
+    → Simple payback: ~5.2 yrs
+──────────────────────────────────────────────────────────────────
+```
+
+**Design notes:**
+- The formula breakdown `(sqft × 0.45 + bedrooms × 200 + constant)` is shown
+  inline below each constant slider so the user understands what drives the number.
+  It updates live as sq_ft or bedrooms change in the Home Profile panel.
+- The payback estimate is computed inline in the UI:
+  `payback = install_cost / (annual_saving × elec_rate)` using current elec_rate.
+- The always-on constant slider uses `C_NAVY` accent for both before/after.
+- When upgrade is not planned, only the "current" constant slider is visible.
+
+---
+
+### 12.6 `_build_home_config()` Changes in `app.py`
+
+The function that assembles `HomeConfig` from reactive state gains the new fields:
+
+```python
+def _build_home_config() -> HomeConfig:
+    return HomeConfig(
+        zip_code           = zip_code.value,
+        climate_zone       = climate_zone.value,
+        num_bedrooms       = num_bedrooms.value,
+        square_footage     = square_footage.value,
+        year_built         = year_built.value,
+        insulation_quality = insulation_quality.value,
+        # Baseload formula
+        baseload_constant_before = baseload_constant_before.value,
+        baseload_constant_after  = baseload_constant_after.value,
+        baseload_swap_year    = baseload_swap_year.value
+                               if baseload_swap_planned.value else None,
+        baseload_install_cost = baseload_install_cost.value,
+        baseload_rebate       = baseload_rebate.value,
+    )
+```
+
+---
+
+### 12.7 HomeInfoBar Update
+
+Add computed baseload to the info bar chip row:
+
+```
+📍 San Jose 95112  ·  3 bed  ·  1,800 sqft  ·  Built 1985  ·
+  Average insulation  ·  Baseload ~1,910 kWh/yr
+```
+
+The baseload chip updates live when sqft, bedrooms, or constant slider changes.
+
+---
+
+### 12.8 Tests
+
+Add to `tests/test_journey.py`:
+
+```python
+def test_baseload_formula_replaces_bedroom_scaling():
+    """Formula output matches hand calculation."""
+    from home_config import compute_baseload_kwh
+    result = compute_baseload_kwh(sq_ft=1800, bedrooms=3, constant=500)
+    expected = 1800 * 0.45 + 3 * 200 + 500   # = 1910
+    assert abs(result - expected) < 1.0
+
+def test_baseload_formula_varies_with_sqft():
+    """Larger home has higher baseload."""
+    from home_config import compute_baseload_kwh
+    small = compute_baseload_kwh(sq_ft=1000, bedrooms=2, constant=500)
+    large = compute_baseload_kwh(sq_ft=2500, bedrooms=2, constant=500)
+    assert large > small
+
+def test_baseload_efficiency_swap_reduces_cost():
+    """After swap year, baseload cost drops to formula_after level."""
+    from home_config import HomeConfig
+    config = HomeConfig(
+        square_footage=1800, num_bedrooms=3,
+        baseload_constant_before=500,
+        baseload_constant_after=300,
+        baseload_swap_year=2,
+        baseload_install_cost=400,
+    )
+    model = HESModel(home_config=config, n_years=10)
+    model.run_all()
+    jh = model.journey_home
+    # Year 1 cost (before swap) should exceed year 3 cost (after swap)
+    baseload_yr1 = jh.cost_history_by_slot["Lights and Appliances"][0]
+    baseload_yr3 = jh.cost_history_by_slot["Lights and Appliances"][2]
+    assert baseload_yr3 < baseload_yr1, \
+        "Post-swap baseload cost must be lower than pre-swap"
+
+def test_baseline_home_always_uses_formula_before():
+    """Do-nothing baseline never applies the efficiency upgrade."""
+    from home_config import HomeConfig
+    config = HomeConfig(
+        square_footage=1800, num_bedrooms=3,
+        baseload_constant_before=500,
+        baseload_constant_after=300,
+        baseload_swap_year=2,
+    )
+    model = HESModel(home_config=config, n_years=10)
+    model.run_all()
+    bh = model.baseline_home
+    # All years should use formula_before (no swap in baseline)
+    costs = bh.cost_history_by_slot["Lights and Appliances"]
+    # Costs should escalate monotonically (electricity rising, same kwh)
+    assert all(costs[i] <= costs[i+1] for i in range(len(costs)-1)), \
+        "Baseline baseload costs must rise monotonically (no efficiency drop)"
+
+def test_hot_water_gallons_still_bedroom_based():
+    """Hot water scaling uses bedroom lookup, not baseload formula."""
+    from home_config import HOT_WATER_GAL_PER_DAY
+    assert HOT_WATER_GAL_PER_DAY[3] == 65
+    assert HOT_WATER_GAL_PER_DAY[1] == 30
+    assert HOT_WATER_GAL_PER_DAY[5] == 85
+```
+
+---
+
+### 12.9 Claude Code Prompt — Baseload Formula
+
+```
+Implement §12 (Baseload Formula + Efficiency Journey Slot) of docs/Phase2_Spec.md.
+Apply in three steps — run pytest after each.
+
+Step 1 — home_config.py:
+  Remove BEDROOM_SCALING dict and baseload_multiplier entirely.
+  Add compute_baseload_kwh(sq_ft, bedrooms, constant) function per §12.3.
+  Add HOT_WATER_GAL_PER_DAY dict (bedroom → gallons, unchanged values).
+  Add four new fields to HomeConfig dataclass per §12.3:
+    baseload_constant_before = 500.0
+    baseload_constant_after  = 300.0
+    baseload_swap_year: int | None = None
+    baseload_install_cost = 400.0
+    baseload_rebate = 0.0
+  Add tests from §12.8 (formula tests only) to tests/test_journey.py.
+  Run pytest — all must pass.
+
+Step 2 — model.py:
+  Replace bedroom-scaling block with formula block per §12.4.
+  Inject formula values into LightsAndPlugs device constructors
+    for both baseline_devices and electric_device in the slot.
+  Apply baseload_swap_year, install_cost, rebate from HomeConfig to the slot.
+  Add remaining tests from §12.8 to tests/test_journey.py.
+  Run pytest — all must pass.
+
+Step 3 — app.py:
+  Add new reactive state per §12.5:
+    baseload_constant_before, baseload_constant_after,
+    baseload_swap_planned, baseload_swap_year,
+    baseload_install_cost, baseload_rebate
+  Add baseload_kwh_before and baseload_kwh_after as computed values
+    (call compute_baseload_kwh from home_config.py).
+  Append the Baseload efficiency section to Journey Planner per §12.5:
+    - Always-on constant slider (0–1500, default 500, C_NAVY accent)
+    - Inline formula breakdown showing sqft × 0.45 + beds × 200 + constant
+    - Computed total kWh displayed below slider, updates live
+    - "Planning an efficiency upgrade" checkbox
+    - When checked: reveal upgrade year slider, after-constant slider,
+      install cost, rebate, net cost, annual saving, simple payback
+  Update _build_home_config() per §12.6 to pass new fields.
+  Update HomeInfoBar to show baseload kWh chip per §12.7.
+  Run solara run src/app.py and verify:
+    - Baseload section visible at bottom of Journey Planner
+    - Total kWh updates live when sqft or bedrooms change
+    - Efficiency upgrade checkbox reveals/hides the upgrade controls
+    - With upgrade planned, journey home shows baseload cost drop at swap year
+    - Baseline (do nothing) baseload costs rise monotonically
+    - HomeInfoBar shows updated baseload chip
 ```
 
 ---
