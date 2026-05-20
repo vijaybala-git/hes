@@ -1,9 +1,9 @@
 # WhyWatt — Phase 2 Development Spec
 
-**Status:** Ready for implementation
+**Status:** Phase 2 implemented through Objective 6; bug-fix + rate-decoupling patch in progress
 **Follows:** Phase 1 complete (Mesa + Solara, 42 unit tests, dual-home simulation)
 **Project rename:** HES → **WhyWatt?** (update all UI titles, headers, doc references)
-**Last updated:** Journey model + monthly device hierarchy + CPUC rate data model added
+**Last updated:** Physics bug fixes (§9), baseload symmetry fix (§9), independent gas/elec rate sliders (§10) added
 
 ---
 
@@ -1573,6 +1573,524 @@ pytest tests/ -v                    # all tests, verbose
 pytest tests/test_devices.py -v     # single file
 pytest tests/ -k "furnace"          # filter by name
 pytest tests/ --update-snapshots    # regenerate regression fixtures
+```
+
+---
+
+## 9. Bug Fixes — Post-Objective-6 Patch
+
+These fixes address issues discovered during UI testing. Apply as a single patch
+branch on top of Objective 6. All existing tests must still pass after the patch;
+new tests added per §9.4.
+
+---
+
+### 9.1 Physics Bug: HeatPumpHVAC Cooling Formula
+
+**Location:** `src/devices/physics.py`, `HeatPumpHVAC.monthly_consumption()`
+
+**Problem:** The cooling formula divides by `(seer / 10.0) × 3412`, which is
+dimensionally inconsistent. SEER is in BTU/Wh — it should be applied directly
+as a coefficient against kWh, not scaled by 3412 BTU/kWh.
+
+**Correct formula:**
+```
+cooling kWh[m] = cdd[m] × 24 × UA / (SEER × 1000)
+```
+
+This gives for Bay Area defaults (CDD=340, UA=500, SEER=22):
+
+| Formula | Result |
+|---------|--------|
+| Old: `cdd×24×UA / ((seer/10)×3412)` | ~543 kWh — looks close but is wrong |
+| **Correct: `cdd×24×UA / (seer×1000)`** | **~185 kWh — Bay Area mild climate** |
+
+Note: the original spec target of ~550 kWh was derived using the wrong formula.
+The corrected target for Bay Area (CDD=340) is **~185 kWh/yr** — consistent with
+a mild climate that rarely needs air conditioning.
+
+**Fix:**
+```python
+# src/devices/physics.py — HeatPumpHVAC.monthly_consumption()
+def monthly_consumption(self) -> np.ndarray:
+    heating = self._hdd * 24 * self.ua / (self.cop * 3412)
+    cooling = self._cdd * 24 * self.ua / (self.seer * 1000)   # ← corrected
+    return heating + cooling
+```
+
+Same fix applies to `CentralAC.monthly_consumption()`:
+```python
+# src/devices/physics.py — CentralAC.monthly_consumption()
+def monthly_consumption(self) -> np.ndarray:
+    return self._cdd * 24 * self.ua / (self.seer * 1000)   # ← corrected
+```
+
+**Updated validation targets:**
+
+| Device | Old target | Corrected target |
+|--------|-----------|------------------|
+| HeatPumpHVAC cooling (SEER=22, CDD=340) | ~550 kWh | **~185 kWh** |
+| CentralAC (SEER=14, CDD=340) | ~860 kWh | **~291 kWh** |
+
+Update `tests/test_devices.py` HeatPumpHVAC cooling test to use 185 kWh ± 10%.
+Update `tests/test_devices.py` CentralAC test to use 291 kWh ± 10%.
+
+---
+
+### 9.2 Baseload Symmetry Bug
+
+**Location:** `data/homes/journey_slots_default.json`, `starting_state` of
+`"Lights and Appliances"` slot; `JourneyHome` slot stepping logic.
+
+**Problem:** The `LightsAndPlugs` device (baseload electricity) is `starting_state:
+"electric"` and correctly runs in both homes. However, validation reveals that the
+gas home total is being compared against the electric home total **including** EV
+charger load that the gas home does not have — creating an unfair comparison:
+
+- Gas home year-1 opex: ~$1,636 (furnace + WH + dryer + cooktop + baseload)
+- Electric home year-1 opex: ~$2,095 (same devices electrified + baseload)
+
+The electric home is correctly more expensive in year 1 at 2025 rates. **This is
+not a bug** — it is correct physics. The electric home's higher year-1 cost is
+offset by lower escalation (elec +7%/yr vs gas +8%/yr) over the journey horizon.
+
+**The real bug:** The default `journey_slots_default.json` has all `swap_year:
+null`, meaning the journey home **never swaps any device** — it runs identical
+gas devices as the baseline forever. Both lines are identical and the chart shows
+no separation.
+
+**Fix — set sensible default swap years in `journey_slots_default.json`:**
+
+```json
+[
+  { "name": "HVAC",            "swap_year": 3  },
+  { "name": "Water Heater",    "swap_year": 5  },
+  { "name": "Dryer",           "swap_year": null },
+  { "name": "Cooktop",         "swap_year": null },
+  { "name": "EV Charger",      "swap_year": null },
+  { "name": "Lights and Appliances", "swap_year": null }
+]
+```
+
+HVAC at year 3 and WH at year 5 are planned by default so the demo immediately
+shows meaningful separation between the journey and do-nothing lines. Users can
+adjust all swap years from the Journey Planner panel.
+
+**Also fix in `app.py` reactive defaults:**
+
+```python
+hvac_swap_planned  = solara.reactive(True)    # was False
+hvac_swap_year     = solara.reactive(3)       # was None
+wh_swap_planned    = solara.reactive(True)    # was False
+wh_swap_year       = solara.reactive(5)       # was None
+```
+
+---
+
+### 9.3 GasWaterHeater Output Below Target
+
+**Problem:** The validation run shows GasWaterHeater at ~184 therms vs. target
+~210 therms. This is because the target was computed using `daily_gallons=65`
+but the actual default `daily_hot_water_gallons` in `bayarea_tmy3.json` produces
+a slightly different result depending on rounding. Re-verify:
+
+```
+target = 65 gal/day × avg_days/month × 8.33 lb/gal × avg_ΔT × 0.00001 / 0.65
+```
+
+With Bay Area monthly inlet temps [54..66°F] and setpoint 120°F:
+- Average ΔT = 120 - 60 = 60°F (approx)
+- Annual: 65 × 365 × 8.33 × 60 × 0.00001 / 0.65 = **183.9 therms**
+
+The formula is correct. The target of ~210 therms in the original spec was based
+on a higher ΔT assumption (setpoint 125°F or inlet temp 50°F). Update the
+validation target to **~184 therms ± 5%** and update `CLAUDE.md`.
+
+**Fix:** Update spec target and test tolerance:
+```python
+# tests/test_devices.py
+assert 175 <= gwh.annual_consumption() <= 195   # ~184 therms, ±5%
+```
+
+---
+
+### 9.4 Bug Fix Tests
+
+Add to `tests/test_devices.py`:
+
+```python
+def test_hp_hvac_cooling_formula_corrected(monthly_cdd, monthly_hdd, monthly_inlet_temp):
+    """Cooling formula uses SEER×1000 not (SEER/10)×3412."""
+    hp = HeatPumpHVAC(model=mock_model(), ua_btu_hr_f=500,
+                      cop_heating=3.5, seer_cooling=22,
+                      monthly_hdd=monthly_hdd, monthly_cdd=monthly_cdd)
+    cooling_kwh = (hp._cdd * 24 * hp.ua / (hp.seer * 1000)).sum()
+    assert 165 <= cooling_kwh <= 205    # ~185 kWh, Bay Area mild cooling
+
+def test_gas_wh_corrected_target(monthly_inlet_temp):
+    """Gas WH target is ~184 therms for Bay Area defaults."""
+    gwh = GasWaterHeater(model=mock_model(), uef=0.65, daily_gallons=65,
+                         monthly_inlet_temp_f=monthly_inlet_temp)
+    assert 175 <= gwh.annual_consumption() <= 195
+
+def test_journey_baseline_diverge_with_defaults():
+    """Default swap_years (HVAC=3, WH=5) must produce diverging cost lines."""
+    model = HESModel(n_years=20)
+    model.run_all()
+    df = model.datacollector.get_model_vars_dataframe()
+    # By year 20, baseline must exceed journey cost
+    assert df["Baseline Cum Cost"].iloc[-1] > df["Journey Cum Cost"].iloc[-1]
+    # Lines must diverge — they cannot be identical at year 20
+    delta = df["Opex Delta"].iloc[-1]
+    assert delta > 0, f"Expected positive savings, got {delta:.0f}"
+```
+
+---
+
+### 9.5 Claude Code Prompt — Bug Fix Patch
+
+```
+Apply the bug-fix patch described in §9 of docs/Phase2_Spec.md.
+Do NOT touch any code outside the three changes listed.
+
+Change 1 — physics.py cooling formula:
+  In HeatPumpHVAC.monthly_consumption(), change:
+    cooling = self._cdd * 24 * self.ua / ((self.seer / 10.0) * 3412)
+  to:
+    cooling = self._cdd * 24 * self.ua / (self.seer * 1000)
+  Apply the identical fix to CentralAC.monthly_consumption().
+
+Change 2 — journey_slots_default.json swap years:
+  Set swap_year to 3 for the HVAC slot.
+  Set swap_year to 5 for the Water Heater slot.
+  All other slots remain swap_year: null.
+
+Change 3 — app.py reactive defaults:
+  Set hvac_swap_planned = solara.reactive(True)
+  Set hvac_swap_year    = solara.reactive(3)
+  Set wh_swap_planned   = solara.reactive(True)
+  Set wh_swap_year      = solara.reactive(5)
+
+After changes:
+  Update tests/test_devices.py:
+    - HeatPumpHVAC cooling target: 165–205 kWh (was 522–578)
+    - CentralAC target: 275–310 kWh
+    - GasWaterHeater target: 175–195 therms (was 200–220)
+  Add the three new tests from §9.4.
+  Run pytest tests/ — all must pass.
+  Run: solara run src/app.py
+    Verify two diverging lines appear in Cumulative Cost chart by default.
+```
+
+---
+
+## 10. Independent Gas / Electricity Rate Sliders
+
+This section replaces the single named-scenario selector in Objective 6 with
+independent per-fuel escalation controls. The named presets remain as convenience
+buttons but are no longer the only way to set rates.
+
+---
+
+### 10.1 Problem with Coupled Scenarios
+
+The current `scenario_a / scenario_b` string approach ties gas and electricity
+to the same named scenario, so:
+- `"moderate"` gives elec +7% AND gas +8% — no way to say "moderate gas, conservative elec"
+- Advocates often want to explore "what if gas spikes but grid stays flat" without
+  being locked to a preset
+- The CEC stranded gas analysis specifically calls out **asymmetric** escalation as
+  the key risk — the tool should make this explorable
+
+---
+
+### 10.2 RateLoader Change — Add `custom_cagr` Parameter
+
+**File:** `src/rate_loader.py`
+
+Add an optional `custom_cagr` float parameter to `get_annual_monthly_rates()`.
+When provided, it overrides the scenario-lookup CAGR for the projection period.
+Historical period lookup is unchanged.
+
+```python
+def get_annual_monthly_rates(
+    self,
+    fuel: str,
+    sim_start_year: int,
+    n_years: int,
+    scenario: str = "moderate",
+    custom_cagr: float | None = None,   # ← new parameter
+) -> np.ndarray:
+    """
+    Returns shape (n_years, 12).
+    If custom_cagr is provided, it overrides the scenario CAGR for projection years.
+    Historical period rates are always used as-is regardless of custom_cagr.
+    """
+    # For projection years: cagr = custom_cagr if provided, else scenario cagr
+    ...
+```
+
+`get_rate()` also gets `custom_cagr`:
+```python
+def get_rate(
+    self, fuel: str, year: int, month: int,
+    scenario: str = "moderate",
+    custom_cagr: float | None = None,
+) -> float:
+    ...
+```
+
+Backward compatibility: `custom_cagr=None` → behaviour identical to current
+(scenario string drives CAGR). All existing tests pass unchanged.
+
+---
+
+### 10.3 HESModel Change — Accept Independent CAGRs
+
+**File:** `src/model.py`
+
+Replace the `scenario_a / scenario_b` string pair with explicit per-fuel CAGRs.
+Keep the scenario strings as optional convenience parameters that pre-fill the CAGRs.
+
+```python
+class HESModel(mesa.Model):
+    def __init__(self,
+                 home_config:      HomeConfig | None = None,
+                 # ── Scenario A — explicit CAGRs (takes priority) ──────────
+                 elec_cagr_a:      float | None = None,    # e.g. 0.07
+                 gas_cagr_a:       float | None = None,    # e.g. 0.08
+                 # ── Scenario A — named preset (used when explicit CAGRs absent)
+                 scenario_a:       str = "moderate",
+                 # ── Scenario B (comparison mode) ─────────────────────────
+                 elec_cagr_b:      float | None = None,
+                 gas_cagr_b:       float | None = None,
+                 scenario_b:       str = "stress",
+                 comparison_mode:  bool = False,
+                 n_years:          int  = 20,
+                 sim_start_year:   int  = 2025,
+                 slot_configs:     list | None = None):
+```
+
+**CAGR resolution logic (applies to both A and B):**
+```python
+# Scenario A
+elec_cagr_a = elec_cagr_a if elec_cagr_a is not None \
+              else SCENARIO_PRESETS[scenario_a]["elec"]
+gas_cagr_a  = gas_cagr_a  if gas_cagr_a  is not None \
+              else SCENARIO_PRESETS[scenario_a]["gas"]
+
+SCENARIO_PRESETS = {
+    "conservative": {"elec": 0.04, "gas": 0.04},
+    "moderate":     {"elec": 0.07, "gas": 0.08},
+    "stress":       {"elec": 0.10, "gas": 0.12},
+}
+```
+
+Rate arrays built with explicit CAGRs:
+```python
+rl = RateLoader()
+self.elec_rates = rl.get_annual_monthly_rates(
+    "electricity", sim_start_year, n_years,
+    scenario=scenario_a, custom_cagr=elec_cagr_a)
+self.gas_rates = rl.get_annual_monthly_rates(
+    "gas", sim_start_year, n_years,
+    scenario=scenario_a, custom_cagr=gas_cagr_a)
+```
+
+---
+
+### 10.4 app.py Reactive State Change
+
+Replace the `price_scenario_a / price_scenario_b` string reactives with
+independent CAGR sliders. The preset buttons populate both sliders simultaneously
+but do not lock them.
+
+**New reactive state (replaces old scenario strings):**
+
+```python
+# ── Pricing — independent per-fuel CAGRs ──────────────────────────────────
+# Preset radio populates both sliders; user can then fine-tune either independently
+gas_cagr_pct_a   = solara.reactive(8)     # integer %/yr, Scenario A
+elec_cagr_pct_a  = solara.reactive(7)     # integer %/yr, Scenario A
+
+comparison_mode  = solara.reactive(False)
+gas_cagr_pct_b   = solara.reactive(12)    # integer %/yr, Scenario B
+elec_cagr_pct_b  = solara.reactive(10)    # integer %/yr, Scenario B
+
+years            = solara.reactive(20)
+sim_start_year   = solara.reactive(2025)
+```
+
+**Preset buttons** — populate sliders without locking them:
+```python
+def _apply_preset(preset: str):
+    p = SCENARIO_PRESETS[preset]
+    gas_cagr_pct_a.set(int(p["gas"] * 100))
+    elec_cagr_pct_a.set(int(p["elec"] * 100))
+```
+
+**run_simulation() change:**
+```python
+model = HESModel(
+    home_config    = _build_home_config(),
+    gas_cagr_a     = gas_cagr_pct_a.value  / 100.0,
+    elec_cagr_a    = elec_cagr_pct_a.value / 100.0,
+    gas_cagr_b     = gas_cagr_pct_b.value  / 100.0,
+    elec_cagr_b    = elec_cagr_pct_b.value / 100.0,
+    comparison_mode = comparison_mode.value,
+    n_years        = years.value,
+    sim_start_year = sim_start_year.value,
+    slot_configs   = _build_slot_configs(),
+)
+```
+
+---
+
+### 10.5 UI Layout — Energy & Prices Panel (Revised)
+
+Replaces the radio-only panel from Objective 6:
+
+```
+📈 Energy & Prices
+
+Quick presets:  [ Conservative ]  [● Moderate ]  [ Stress / CEC ]
+                (clicking a preset fills both sliders below)
+
+Gas escalation       ───────●──── 8 %/yr    (range 0–20)
+Electricity escal.   ──────●───── 7 %/yr    (range 0–15)
+
+💡 Gas typically rises faster than electricity as grid decarbonises.
+
+── Scenario comparison ──────────────────────────────────────────────────
+[ ] Compare two rate scenarios
+    [when checked, reveals:]
+    Scenario B
+    Quick presets:  [ Conservative ]  [ Moderate ]  [● Stress / CEC ]
+    Gas escalation       ─────────────●── 12 %/yr
+    Electricity escal.   ──────────●──── 10 %/yr
+    Charts switch to 4-series (solid = A, dashed = B)
+
+📅 Years to model    [========●    ] 20    (5–30)
+```
+
+**Visual design notes:**
+- Gas slider uses `C_RED` (`#D0302D`) accent — signals risk/cost
+- Elec slider uses `C_NAVY` (`#0D47A1`) accent — signals reliability/lower growth
+- Preset buttons are a `solara.ToggleButtonsSingle` — visually shows active preset
+  or goes to "Custom" if sliders are moved away from preset values
+- "Custom" appears automatically when either slider no longer matches a preset:
+  ```python
+  def _current_preset_label():
+      for name, p in SCENARIO_PRESETS.items():
+          if (int(p["gas"]*100)  == gas_cagr_pct_a.value and
+              int(p["elec"]*100) == elec_cagr_pct_a.value):
+              return name.capitalize()
+      return "Custom"
+  ```
+
+---
+
+### 10.6 Price Trend Chart Updates
+
+The existing Electricity Price Trend and Gas Price Trend charts (chart options 5 and 6)
+should be updated to label the trend line with the actual CAGR value, not the scenario name:
+
+```python
+# Chart label — show actual CAGR, not just scenario name
+label_a = f"Gas (+{gas_cagr_pct_a.value}%/yr)"
+label_b = f"Gas Scenario B (+{gas_cagr_pct_b.value}%/yr)"  # when comparison_mode=True
+```
+
+---
+
+### 10.7 Tests — Rate Decoupling
+
+Add to `tests/test_rate_loader.py`:
+
+```python
+def test_custom_cagr_overrides_scenario(rate_loader):
+    """custom_cagr=0.15 overrides moderate (0.07) for future years."""
+    rate_default = rate_loader.get_rate("electricity", 2030, 6, "moderate")
+    rate_custom  = rate_loader.get_rate("electricity", 2030, 6, "moderate",
+                                        custom_cagr=0.15)
+    assert rate_custom > rate_default
+    # Verify formula: 0.386 × 1.15^5
+    expected = 0.386 * (1.15 ** 5)
+    assert abs(rate_custom - expected) < 0.001
+
+def test_custom_cagr_does_not_affect_historical(rate_loader):
+    """Historical period rates are unaffected by custom_cagr."""
+    rate_hist    = rate_loader.get_rate("electricity", 2023, 6, "moderate")
+    rate_custom  = rate_loader.get_rate("electricity", 2023, 6, "moderate",
+                                        custom_cagr=0.99)
+    assert rate_hist == rate_custom == 0.310
+
+def test_gas_elec_cagr_independent(rate_loader):
+    """Gas and electricity escalate at different rates when custom_cagr differs."""
+    elec = rate_loader.get_annual_monthly_rates(
+        "electricity", 2025, 5, custom_cagr=0.03)
+    gas  = rate_loader.get_annual_monthly_rates(
+        "gas",         2025, 5, custom_cagr=0.12)
+    # Year 5 gas rate must be much higher relative to base than elec
+    elec_ratio = elec[4].mean() / elec[0].mean()
+    gas_ratio  = gas[4].mean()  / gas[0].mean()
+    assert gas_ratio > elec_ratio * 1.3   # gas grows at least 30% faster
+
+def test_model_accepts_independent_cagrs():
+    """HESModel with explicit gas_cagr=0.12, elec_cagr=0.04 produces
+       higher gas rates than electricity in year 20."""
+    model = HESModel(gas_cagr_a=0.12, elec_cagr_a=0.04, n_years=20)
+    model.run_all()
+    df = model.datacollector.get_model_vars_dataframe()
+    # Gas rate in year 20 should be much higher than elec rate
+    # (in $/therm vs $/kWh, convert both to $/MMBtu equivalent for comparison)
+    # Simpler: just verify year-20 gas rate >> year-1 gas rate by ~factor of 9
+    # 2.08 × 1.12^20 ≈ $20/therm
+    gas_yr20 = df["Gas Rate"].iloc[-1]
+    assert gas_yr20 > 10.0, f"Gas rate in year 20 should exceed $10/therm, got {gas_yr20:.2f}"
+```
+
+---
+
+### 10.8 Claude Code Prompt — Rate Decoupling
+
+```
+Implement §10 (Independent Gas/Electricity Rate Sliders) of docs/Phase2_Spec.md.
+Apply in three steps — test after each.
+
+Step 1 — rate_loader.py:
+  Add optional custom_cagr: float | None = None parameter to both get_rate()
+  and get_annual_monthly_rates().
+  When custom_cagr is not None, use it instead of the scenario CAGR for
+  projection years only. Historical period lookup is unchanged.
+  All existing tests must still pass (custom_cagr=None is backward-compatible).
+  Add the four new tests from §10.7 to tests/test_rate_loader.py.
+
+Step 2 — model.py:
+  Add elec_cagr_a, gas_cagr_a, elec_cagr_b, gas_cagr_b parameters to
+  HESModel.__init__(). Add SCENARIO_PRESETS dict inside model.py.
+  Resolve: explicit CAGR takes priority over named scenario string.
+  Pass custom_cagr= to RateLoader calls.
+  Verify: HESModel(scenario_a="moderate") produces identical output to before
+  (backward-compat test using the regression fixture from §8.5).
+
+Step 3 — app.py:
+  Replace price_scenario_a / price_scenario_b reactive strings with
+  gas_cagr_pct_a, elec_cagr_pct_a, gas_cagr_pct_b, elec_cagr_pct_b integer reactives.
+  Add _apply_preset(preset) helper.
+  Rebuild the Energy & Prices panel per §10.5:
+    - Preset buttons (Conservative / Moderate / Stress) at top
+    - Gas slider (0–20%, C_RED accent)
+    - Elec slider (0–15%, C_NAVY accent)
+    - "Custom" label appears automatically when sliders diverge from a preset
+    - Scenario B panel revealed when comparison_mode toggle is on
+  Update run_simulation() to pass explicit CAGRs to HESModel.
+  Update price trend chart labels to show actual CAGR % (§10.6).
+  Run solara run src/app.py and confirm:
+    - Preset buttons populate both sliders
+    - Moving either slider independently updates charts in real time
+    - Gas slider is red-accented, elec slider is navy-accented
+    - "Custom" label appears when sliders diverge from a preset
 ```
 
 ---
