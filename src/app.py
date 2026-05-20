@@ -466,6 +466,7 @@ def make_journey_timeline(df, model, n):
     fig.patch.set_facecolor("#F9F9F9")
     ax = fig.add_subplot(111)
 
+    # Gas price background gradient: light→deep orange tracks price rise
     gas_rates = df["Gas Rate"].values
     g_min, g_max = gas_rates.min(), gas_rates.max()
     for yr_idx in range(n):
@@ -482,6 +483,7 @@ def make_journey_timeline(df, model, n):
         if state == "electric":
             ax.plot([1, n], [y, y], color=C_ELEC, lw=3, solid_capstyle="round", zorder=3)
             ax.text(n + 0.4, y, "✓ Done", va="center", fontsize=8, color=C_ELEC)
+
         elif state == "none":
             if sw is not None and sw <= n:
                 ax.plot([sw, n], [y, y], color=C_ELEC, lw=3, solid_capstyle="round", zorder=3)
@@ -491,7 +493,8 @@ def make_journey_timeline(df, model, n):
             else:
                 ax.plot([1, n], [y, y], color="#CCCCCC", lw=1.5, linestyle=":", zorder=2)
                 ax.text(n + 0.4, y, "Not adding", va="center", fontsize=7, color="#AAAAAA")
-        else:
+
+        else:  # gas
             if sw is not None and sw <= n:
                 ax.plot([1, sw], [y, y], color=C_BASE, lw=2.5, linestyle="--", zorder=3)
                 ax.plot([sw, n], [y, y], color=C_ELEC, lw=2.5, solid_capstyle="round", zorder=3)
@@ -538,16 +541,18 @@ def ChartPane(chart_name, model, df, n):
 
 @solara.component
 def HomeInfoBar():
-    """Chip row — reads reactive home-profile state, no model needed."""
+    """Chip row reading from reactive home-profile state — no model object needed."""
     insulation = insulation_quality.value.capitalize()
     solara.Markdown(
         f"📍 **San Jose, CA** &nbsp;·&nbsp; ZIP {zip_code.value} "
-        f"&nbsp;·&nbsp; {climate_zone.value} "
+        f"&nbsp;·&nbsp; Climate Zone {climate_zone.value} "
         f"&nbsp;·&nbsp; {num_bedrooms.value} bed "
         f"&nbsp;·&nbsp; {square_footage.value:,} sq ft "
         f"&nbsp;·&nbsp; Built {year_built.value} "
         f"&nbsp;·&nbsp; {insulation} insulation",
-        style={"font-size": "0.85em", "color": "#445"},
+        style={"font-size": "0.85em", "color": "#555",
+               "background": "#F0F4F8", "padding": "6px 12px",
+               "border-radius": "6px"},
     )
 
 
@@ -815,7 +820,7 @@ def Page():
 
     with solara.Column(margin=3, gap="10px"):
 
-        # ── Header: logo (bigger) + home profile on same line ─────────────────
+        # ── Header ─────────────────────────────────────────────────────────────
         ww_svg = _read_svg(_WHYWATT_LOGO, height_px=72)
         with solara.Row(style=(
             "align-items:center; gap:20px; padding:10px 0;"
@@ -829,13 +834,11 @@ def Page():
                 )
             else:
                 solara.Markdown("# ⚡ WhyWatt?")
-            # Home info bar sits to the right of the logo on the same line
             with solara.Column(style="flex:1; justify-content:center"):
                 HomeInfoBar()
 
         # ── Summary stats ───────────────────────────────────────────────────────
         SummaryStats(df, n, model)
-
         # ── Chart selectors ─────────────────────────────────────────────────────
         with solara.Row(gap="16px"):
             with solara.Column(style="flex:1; min-width:200px"):
