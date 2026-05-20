@@ -15,7 +15,7 @@ from pathlib import Path
 import mesa
 import numpy as np
 
-from home_config import HomeConfig, BEDROOM_SCALING
+from home_config import HomeConfig, compute_baseload_kwh, HOT_WATER_GAL_PER_DAY
 from journey import JourneyHome, DeviceSlot, CATEGORY_ORDER, CATEGORY_LABELS
 from rate_loader import RateLoader
 from devices.physics  import GasFurnace, HeatPumpHVAC, GasWaterHeater, HeatPumpWaterHeater, CentralAC
@@ -24,7 +24,6 @@ from devices.schedule import EVCharger
 
 _DATA = Path(__file__).parent.parent / "data"
 
-_BASELOAD_KWH_3BR = 1200   # DOE reference; scaled by bedroom multiplier
 
 SCENARIO_PRESETS = {
     "conservative": {"elec": 0.04, "gas": 0.04},
@@ -98,7 +97,7 @@ def _make_device(spec: dict, mesa_model: mesa.Model, *,
 
     if cls == "LightsAndPlugs":
         return LightsAndPlugs(mesa_model,
-                              annual_kwh=baseload_kwh,
+                              annual_kwh=spec.get("annual_kwh", baseload_kwh),
                               age=age, lifespan=ls, installation_cost=cost)
 
     if cls == "EVCharger":
@@ -215,18 +214,39 @@ class HESModel(mesa.Model):
 
         ua = float(ua_map[home_config.insulation_quality])
 
-        # ── Bedroom scaling ───────────────────────────────────────────────────
-        br           = BEDROOM_SCALING[home_config.num_bedrooms]
-        baseload_kwh = _BASELOAD_KWH_3BR * br["baseload_multiplier"]
-        hw_gallons   = float(br["hot_water_gal_per_day"])
+        # ── Baseload formula ──────────────────────────────────────────────────
+        baseload_before = compute_baseload_kwh(
+            home_config.square_footage,
+            home_config.num_bedrooms,
+            home_config.baseload_constant_before,
+        )
+        baseload_after = compute_baseload_kwh(
+            home_config.square_footage,
+            home_config.num_bedrooms,
+            home_config.baseload_constant_after,
+        )
+        hw_gallons = float(HOT_WATER_GAL_PER_DAY[home_config.num_bedrooms])
 
         # ── Slot configs ──────────────────────────────────────────────────────
         if slot_configs is None:
             with open(_DATA / "homes/journey_slots_default.json") as f:
                 slot_configs = json.load(f)
 
+        # Inject formula values into Lights and Appliances slot
+        for cfg in slot_configs:
+            if cfg["name"] == "Lights and Appliances":
+                for dev in cfg.get("baseline_devices", []):
+                    if dev["class"] == "LightsAndPlugs":
+                        dev["annual_kwh"] = baseload_before
+                ed = cfg.get("electric_device")
+                if ed and ed.get("class") == "LightsAndPlugs":
+                    ed["annual_kwh"] = baseload_after
+                cfg["swap_year"]    = home_config.baseload_swap_year
+                cfg["install_cost"] = home_config.baseload_install_cost
+                cfg["rebate"]       = home_config.baseload_rebate
+
         device_kw = dict(hdd=hdd, cdd=cdd, inlet_temp=inlet_temp,
-                         ua=ua, hw_gallons=hw_gallons, baseload_kwh=baseload_kwh)
+                         ua=ua, hw_gallons=hw_gallons, baseload_kwh=baseload_before)
 
         # ── Rate arrays — Scenario A ──────────────────────────────────────────
         rl = RateLoader()

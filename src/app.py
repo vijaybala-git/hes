@@ -6,11 +6,12 @@ import solara
 import numpy as np
 import matplotlib
 import matplotlib.ticker
+import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
 matplotlib.use("Agg")
 from matplotlib.figure import Figure
 from model import HESModel, SCENARIO_PRESETS
-from home_config import HomeConfig
+from home_config import HomeConfig, compute_baseload_kwh
 from journey import CATEGORY_ORDER, CATEGORY_LABELS
 
 # ── Asset paths ───────────────────────────────────────────────────────────────
@@ -60,9 +61,86 @@ CHART_OPTIONS = [
     "Electricity Price Trend",
     "Gas Price Trend",
     "Journey Timeline",
+    "Cost by Device",
+    "Energy Use by Device",
 ]
 
-# ── Reactive state ─────────────────────────────────────────────────────────────
+KWH_PER_THERM = 29.3
+
+DEVICE_ORDER  = ["HVAC", "Water Heater", "Dryer", "Cooktop", "Lights and Appliances"]
+DEVICE_LABELS = ["HVAC", "Water Heater", "Dryer", "Cooktop", "Baseload"]
+DEVICE_COLORS = ["#0D47A1", "#1565C0", "#D0302D", "#EC9B1E", "#78909C"]
+DEVICE_ALPHAS = [0.70,      0.60,       0.55,      0.55,      0.45]
+
+# ── Defaults (single source of truth for reset) ──────────────────────────────
+_DEFAULTS = {
+    # Home profile
+    "zip_code":               "95112",
+    "climate_zone":           "CZ12",
+    "num_bedrooms":           3,
+    "square_footage":         1800,
+    "year_built":             1985,
+    "insulation_quality":     "average",
+    # Baseline device specs
+    "furnace_afue":           0.80,
+    "gas_wh_uef":             0.65,
+    "hvac_has_cooling":       False,
+    # Electric replacement specs
+    "hp_cop_heating":         3.5,
+    "hp_seer_cooling":        22,
+    "hpwh_uef":               3.5,
+    # Journey — HVAC
+    "hvac_starting_state":    "gas",
+    "hvac_swap_planned":      True,
+    "hvac_swap_year":         3,
+    "hvac_install_cost":      14000,
+    "hvac_rebate":            3500,
+    # Journey — Water Heater
+    "wh_starting_state":      "gas",
+    "wh_swap_planned":        True,
+    "wh_swap_year":           5,
+    "wh_install_cost":        2500,
+    "wh_rebate":              500,
+    # Journey — Dryer
+    "dryer_starting_state":   "gas",
+    "dryer_swap_planned":     False,
+    "dryer_swap_year":        8,
+    "dryer_install_cost":     1200,
+    "dryer_rebate":           0,
+    # Journey — Cooktop
+    "cooktop_starting_state": "gas",
+    "cooktop_swap_planned":   False,
+    "cooktop_swap_year":      10,
+    "cooktop_install_cost":   1500,
+    "cooktop_rebate":         0,
+    # Journey — EV Charger
+    "ev_starting_state":      "none",
+    "ev_swap_planned":        False,
+    "ev_swap_year":           2,
+    "ev_install_cost":        800,
+    "ev_rebate":              0,
+    # Journey — Baseload efficiency
+    "baseload_constant_before": 500,
+    "baseload_constant_after":  300,
+    "baseload_swap_planned":    False,
+    "baseload_swap_year":       2,
+    "baseload_install_cost":    400,
+    "baseload_rebate":          0,
+    # Pricing
+    "gas_cagr_pct_a":         8,
+    "elec_cagr_pct_a":        7,
+    "comparison_mode":        False,
+    "gas_cagr_pct_b":         12,
+    "elec_cagr_pct_b":        10,
+    "years":                  20,
+    "sim_start_year":         2025,
+    # Charts
+    "chart_left":             "Cumulative Energy Costs",
+    "chart_right":            "Cost Breakdown by Category",
+    "device_chart_home":      "journey",
+}
+
+# ── Reactive state (initialised from _DEFAULTS) ────────────────────────────────
 
 # Home profile
 zip_code           = solara.reactive("95112")
@@ -117,6 +195,17 @@ ev_swap_year      = solara.reactive(2)
 ev_install_cost   = solara.reactive(800)
 ev_rebate         = solara.reactive(0)
 
+# Journey planner — Baseload efficiency
+baseload_constant_before = solara.reactive(500)   # kWh/yr, always-on before upgrade
+baseload_constant_after  = solara.reactive(300)   # kWh/yr, always-on after upgrade
+baseload_swap_planned    = solara.reactive(False)
+baseload_swap_year       = solara.reactive(2)
+baseload_install_cost    = solara.reactive(400)
+baseload_rebate          = solara.reactive(0)
+
+# Device chart home selector (shared by both device chart types)
+device_chart_home = solara.reactive("journey")   # "journey" | "baseline"
+
 # Pricing & timeline — independent per-fuel CAGRs
 gas_cagr_pct_a  = solara.reactive(8)    # %/yr, Scenario A — moderate default
 elec_cagr_pct_a = solara.reactive(7)    # %/yr, Scenario A
@@ -130,7 +219,65 @@ sim_start_year   = solara.reactive(2025)
 chart_left  = solara.reactive("Cumulative Energy Costs")
 chart_right = solara.reactive("Cost Breakdown by Category")
 
-# ── Labels / option lists ──────────────────────────────────────────────────────
+# ── Reset function ───────────────────────────────────────────────────────────
+def reset_to_defaults():
+    """Reset every reactive to its _DEFAULTS value in one shot."""
+    zip_code.set(_DEFAULTS["zip_code"])
+    climate_zone.set(_DEFAULTS["climate_zone"])
+    num_bedrooms.set(_DEFAULTS["num_bedrooms"])
+    square_footage.set(_DEFAULTS["square_footage"])
+    year_built.set(_DEFAULTS["year_built"])
+    insulation_quality.set(_DEFAULTS["insulation_quality"])
+    furnace_afue.set(_DEFAULTS["furnace_afue"])
+    gas_wh_uef.set(_DEFAULTS["gas_wh_uef"])
+    hvac_has_cooling.set(_DEFAULTS["hvac_has_cooling"])
+    hp_cop_heating.set(_DEFAULTS["hp_cop_heating"])
+    hp_seer_cooling.set(_DEFAULTS["hp_seer_cooling"])
+    hpwh_uef.set(_DEFAULTS["hpwh_uef"])
+    hvac_starting_state.set(_DEFAULTS["hvac_starting_state"])
+    hvac_swap_planned.set(_DEFAULTS["hvac_swap_planned"])
+    hvac_swap_year.set(_DEFAULTS["hvac_swap_year"])
+    hvac_install_cost.set(_DEFAULTS["hvac_install_cost"])
+    hvac_rebate.set(_DEFAULTS["hvac_rebate"])
+    wh_starting_state.set(_DEFAULTS["wh_starting_state"])
+    wh_swap_planned.set(_DEFAULTS["wh_swap_planned"])
+    wh_swap_year.set(_DEFAULTS["wh_swap_year"])
+    wh_install_cost.set(_DEFAULTS["wh_install_cost"])
+    wh_rebate.set(_DEFAULTS["wh_rebate"])
+    dryer_starting_state.set(_DEFAULTS["dryer_starting_state"])
+    dryer_swap_planned.set(_DEFAULTS["dryer_swap_planned"])
+    dryer_swap_year.set(_DEFAULTS["dryer_swap_year"])
+    dryer_install_cost.set(_DEFAULTS["dryer_install_cost"])
+    dryer_rebate.set(_DEFAULTS["dryer_rebate"])
+    cooktop_starting_state.set(_DEFAULTS["cooktop_starting_state"])
+    cooktop_swap_planned.set(_DEFAULTS["cooktop_swap_planned"])
+    cooktop_swap_year.set(_DEFAULTS["cooktop_swap_year"])
+    cooktop_install_cost.set(_DEFAULTS["cooktop_install_cost"])
+    cooktop_rebate.set(_DEFAULTS["cooktop_rebate"])
+    ev_starting_state.set(_DEFAULTS["ev_starting_state"])
+    ev_swap_planned.set(_DEFAULTS["ev_swap_planned"])
+    ev_swap_year.set(_DEFAULTS["ev_swap_year"])
+    ev_install_cost.set(_DEFAULTS["ev_install_cost"])
+    ev_rebate.set(_DEFAULTS["ev_rebate"])
+    baseload_constant_before.set(_DEFAULTS["baseload_constant_before"])
+    baseload_constant_after.set(_DEFAULTS["baseload_constant_after"])
+    baseload_swap_planned.set(_DEFAULTS["baseload_swap_planned"])
+    baseload_swap_year.set(_DEFAULTS["baseload_swap_year"])
+    baseload_install_cost.set(_DEFAULTS["baseload_install_cost"])
+    baseload_rebate.set(_DEFAULTS["baseload_rebate"])
+    gas_cagr_pct_a.set(_DEFAULTS["gas_cagr_pct_a"])
+    elec_cagr_pct_a.set(_DEFAULTS["elec_cagr_pct_a"])
+    comparison_mode.set(_DEFAULTS["comparison_mode"])
+    gas_cagr_pct_b.set(_DEFAULTS["gas_cagr_pct_b"])
+    elec_cagr_pct_b.set(_DEFAULTS["elec_cagr_pct_b"])
+    years.set(_DEFAULTS["years"])
+    sim_start_year.set(_DEFAULTS["sim_start_year"])
+    chart_left.set(_DEFAULTS["chart_left"])
+    chart_right.set(_DEFAULTS["chart_right"])
+    device_chart_home.set(_DEFAULTS["device_chart_home"])
+
+
+# ── Labels / option lists ─────────────────────────────────────────────────────
 _CZ_OPTIONS = ["CZ3", "CZ4", "CZ5", "CZ12", "CZ13", "CZ16"]
 _BR_OPTIONS = [1, 2, 3, 4, 5]
 
@@ -272,6 +419,12 @@ def run_simulation():
         square_footage=square_footage.value,
         year_built=year_built.value,
         insulation_quality=insulation_quality.value,
+        baseload_constant_before=baseload_constant_before.value,
+        baseload_constant_after=baseload_constant_after.value,
+        baseload_swap_year=(baseload_swap_year.value
+                            if baseload_swap_planned.value else None),
+        baseload_install_cost=baseload_install_cost.value,
+        baseload_rebate=baseload_rebate.value,
     )
     m = HESModel(
         home_config=hc,
@@ -520,6 +673,79 @@ def make_journey_timeline(df, model, n):
     return fig
 
 
+def render_device_chart(model, home: str = "journey",
+                        chart_type: str = "device_cost") -> Figure:
+    """Stacked area chart — annual cost or kWh-equivalent per device per year."""
+    jh = model.journey_home if home == "journey" else model.baseline_home
+    n = model.n_years
+    cal_years = list(range(model.sim_start_year, model.sim_start_year + n))
+
+    fig = Figure(figsize=(8, 3.8), dpi=100)
+    fig.patch.set_facecolor("#F9F9F9")
+    ax = fig.add_subplot(111)
+    ax.set_facecolor("#F9F9F9")
+
+    stack = np.zeros(n)
+    patches = []
+    is_cost = chart_type == "device_cost"
+
+    if is_cost:
+        y_fmt   = lambda v, _: f"${v/1000:.1f}k"
+        y_label = "$/yr"
+    else:
+        y_fmt   = lambda v, _: f"{v/1000:.1f}k"
+        y_label = "kWh-eq / yr"
+
+    for i, name in enumerate(DEVICE_ORDER):
+        if is_cost:
+            data = np.array(
+                jh.cost_history_by_slot.get(name, [0] * n), dtype=float)
+        else:
+            raw   = np.array(
+                jh.consumption_history_by_slot.get(name, [0] * n), dtype=float)
+            fuels = jh.fuel_history_by_slot.get(name, ["electricity"] * n)
+            data  = np.where(np.array(fuels) == "gas", raw * KWH_PER_THERM, raw)
+
+        ax.fill_between(cal_years, stack, stack + data,
+                        color=DEVICE_COLORS[i], alpha=DEVICE_ALPHAS[i], linewidth=0)
+        ax.plot(cal_years, stack + data, color=DEVICE_COLORS[i], linewidth=1.2)
+        patches.append(mpatches.Patch(color=DEVICE_COLORS[i], label=DEVICE_LABELS[i]))
+        stack += data
+
+    # Swap annotations — journey home only
+    SWAP_COLORS = {"HVAC": "#0D47A1", "Water Heater": "#1565C0",
+                   "Dryer": "#D0302D", "Cooktop": "#EC9B1E"}
+    if home == "journey":
+        for slot in jh.slots:
+            if slot.swap_year is None:
+                continue
+            cal = model.sim_start_year + slot.swap_year - 1
+            color = SWAP_COLORS.get(slot.name, "#78909C")
+            ax.axvline(cal, color=color, linewidth=1.2,
+                       linestyle=(0, (4, 3)), alpha=0.7)
+            ax.text(cal + 0.15, 0.93, slot.name,
+                    transform=ax.get_xaxis_transform(),
+                    fontsize=7, color=color, va="top")
+
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(y_fmt))
+    ax.set_ylabel(y_label, fontsize=9, color="#78909C")
+    ax.set_xlabel("Year", fontsize=9, color="#78909C")
+    ax.tick_params(axis="both", labelsize=8, colors="#78909C")
+    ax.grid(axis="y", color="#78909C", alpha=0.12, linewidth=0.5)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.legend(handles=patches, loc="upper left", fontsize=8, framealpha=0.9, ncol=5)
+
+    home_label  = "Your journey" if home == "journey" else "Do nothing"
+    chart_label = "Annual cost by device" if is_cost \
+                  else "Annual energy use by device (kWh-eq)"
+    ax.set_title(f"{home_label} — {chart_label}",
+                 fontsize=10, fontweight="bold", loc="left", pad=8)
+
+    fig.tight_layout(pad=1.0)
+    return fig
+
+
 CHART_FNS = {
     "Cumulative Energy Costs":        make_cumulative_opex,
     "Annual Cost by Year":            make_annual_cost,
@@ -533,23 +759,53 @@ CHART_FNS = {
 
 # ── Sub-components ─────────────────────────────────────────────────────────────
 
+_DEVICE_CHART_NAMES = {"Cost by Device", "Energy Use by Device"}
+
+
 @solara.component
 def ChartPane(chart_name, model, df, n):
-    fig = CHART_FNS[chart_name](df, model, n)
-    solara.FigureMatplotlib(fig)
+    if chart_name in _DEVICE_CHART_NAMES:
+        chart_type = "device_cost" if chart_name == "Cost by Device" else "device_consumption"
+        home = device_chart_home.value
+        with solara.Column(gap="4px"):
+            with solara.Row(gap="6px", style="margin-bottom:4px"):
+                for val, label in [("journey", "Your journey"), ("baseline", "Do nothing")]:
+                    is_active = home == val
+                    solara.Button(
+                        label,
+                        on_click=lambda v=val: device_chart_home.set(v),
+                        style=(
+                            f"background:{C_NAVY}; color:white; border:none;"
+                            " border-radius:4px; padding:4px 14px;"
+                            " font-size:0.82em; cursor:pointer;"
+                            if is_active else
+                            "background:#F5F5F5; color:#444; border:1px solid #CCCCCC;"
+                            " border-radius:4px; padding:4px 14px;"
+                            " font-size:0.82em; cursor:pointer;"
+                        ),
+                    )
+            fig = render_device_chart(model, home=home, chart_type=chart_type)
+            solara.FigureMatplotlib(fig)
+    else:
+        fig = CHART_FNS[chart_name](df, model, n)
+        solara.FigureMatplotlib(fig)
 
 
 @solara.component
 def HomeInfoBar():
     """Chip row reading from reactive home-profile state — no model object needed."""
     insulation = insulation_quality.value.capitalize()
+    bl_kwh = compute_baseload_kwh(
+        square_footage.value, num_bedrooms.value, baseload_constant_before.value
+    )
     solara.Markdown(
         f"📍 **San Jose, CA** &nbsp;·&nbsp; ZIP {zip_code.value} "
         f"&nbsp;·&nbsp; Climate Zone {climate_zone.value} "
         f"&nbsp;·&nbsp; {num_bedrooms.value} bed "
         f"&nbsp;·&nbsp; {square_footage.value:,} sq ft "
         f"&nbsp;·&nbsp; Built {year_built.value} "
-        f"&nbsp;·&nbsp; {insulation} insulation",
+        f"&nbsp;·&nbsp; {insulation} insulation "
+        f"&nbsp;·&nbsp; Baseload ~{bl_kwh:,.0f} kWh/yr",
         style={"font-size": "0.85em", "color": "#555",
                "background": "#F0F4F8", "padding": "6px 12px",
                "border-radius": "6px"},
@@ -687,6 +943,66 @@ def JourneyPlannerPanel():
             "no EV added.</em></small>"
         )
 
+        # ── Baseload efficiency section ────────────────────────────────────────
+        solara.Markdown(
+            "<hr style='border:0;border-top:1px solid #DDD;margin:10px 0'>"
+            "<strong>💡 Baseload efficiency</strong>"
+        )
+
+        bl_before = compute_baseload_kwh(
+            square_footage.value, num_bedrooms.value, baseload_constant_before.value
+        )
+        solara.SliderInt(
+            f"Always-on appliances: {baseload_constant_before.value:,} kWh/yr",
+            value=baseload_constant_before, min=0, max=1500,
+        )
+        solara.Markdown(
+            f"<small style='color:#555'>→ Estimated total baseload: "
+            f"**{bl_before:,.0f} kWh/yr** "
+            f"({square_footage.value:,} sqft × 0.45 + {num_bedrooms.value} bed × 200 "
+            f"+ {baseload_constant_before.value})</small>"
+        )
+
+        solara.Checkbox(
+            label="Planning a baseload efficiency upgrade (LED, smart plugs, etc.)",
+            value=baseload_swap_planned,
+        )
+
+        if baseload_swap_planned.value:
+            bl_after = compute_baseload_kwh(
+                square_footage.value, num_bedrooms.value, baseload_constant_after.value
+            )
+            annual_saving_kwh = bl_before - bl_after
+            elec_rate = 0.386    # PG&E E-1 2025 base rate
+            annual_saving_usd = annual_saving_kwh * elec_rate
+            net_cost = baseload_install_cost.value - baseload_rebate.value
+            payback = (net_cost / annual_saving_usd) if annual_saving_usd > 0 else None
+
+            cal_yr = sim_start_year.value + baseload_swap_year.value - 1
+            solara.SliderInt(
+                f"Upgrade in year {baseload_swap_year.value}  ({cal_yr})",
+                value=baseload_swap_year, min=1, max=25,
+            )
+            solara.SliderInt(
+                f"After-upgrade always-on: {baseload_constant_after.value:,} kWh/yr",
+                value=baseload_constant_after, min=0, max=1500,
+            )
+            solara.Markdown(
+                f"<small style='color:#555'>→ Estimated total after: "
+                f"**{bl_after:,.0f} kWh/yr**</small>"
+            )
+            solara.InputInt("Install cost $", value=baseload_install_cost)
+            solara.InputInt("Rebate $", value=baseload_rebate)
+            pb_str = (f"~{payback:.1f} yrs" if payback is not None else "N/A")
+            solara.Markdown(
+                f"<small style='color:#555'>"
+                f"Net cost: **${net_cost:,}** &nbsp;·&nbsp; "
+                f"Annual saving: **~{annual_saving_kwh:,.0f} kWh/yr ≈ "
+                f"${annual_saving_usd:,.0f}/yr** &nbsp;·&nbsp; "
+                f"Simple payback: **{pb_str}**"
+                f"</small>"
+            )
+
 
 @solara.component
 def HomeProfilePanel():
@@ -810,6 +1126,9 @@ def Page():
         cooktop_install_cost.value, cooktop_rebate.value,
         ev_starting_state.value, ev_swap_planned.value, ev_swap_year.value,
         ev_install_cost.value, ev_rebate.value,
+        baseload_constant_before.value, baseload_constant_after.value,
+        baseload_swap_planned.value, baseload_swap_year.value,
+        baseload_install_cost.value, baseload_rebate.value,
         gas_cagr_pct_a.value, elec_cagr_pct_a.value,
         comparison_mode.value,
         gas_cagr_pct_b.value, elec_cagr_pct_b.value,
@@ -836,6 +1155,19 @@ def Page():
                 solara.Markdown("# ⚡ WhyWatt?")
             with solara.Column(style="flex:1; justify-content:center"):
                 HomeInfoBar()
+            # Reset button — far right of header bar
+            solara.Button(
+                "↺ Reset to defaults",
+                on_click=reset_to_defaults,
+                style=(
+                    "background:transparent; color:#78909C;"
+                    " border:1.5px solid #C5CAE9;"
+                    " border-radius:6px; padding:5px 12px;"
+                    " font-size:0.80em; cursor:pointer;"
+                    " white-space:nowrap; flex-shrink:0;"
+                    " transition:all 0.15s;"
+                ),
+            )
 
         # ── Summary stats ───────────────────────────────────────────────────────
         SummaryStats(df, n, model)

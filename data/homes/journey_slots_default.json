@@ -57,12 +57,12 @@
   {
     "name": "Lights and Appliances",
     "category": "Baseload",
-    "starting_state": "electric",
+    "starting_state": "gas",
     "has_cooling_baseline": false,
-    "baseline_devices": [],
-    "electric_device":   {"class": "LightsAndPlugs", "annual_kwh": 1200, "lifespan": 15, "installation_cost": 0},
+    "baseline_devices": [{"class": "LightsAndPlugs", "annual_kwh": 0, "lifespan": 15, "installation_cost": 0}],
+    "electric_device":   {"class": "LightsAndPlugs", "annual_kwh": 0, "lifespan": 15, "installation_cost": 0},
     "swap_year": null,
-    "install_cost": 0,
+    "install_cost": 400,
     "rebate": 0
   }
 ]

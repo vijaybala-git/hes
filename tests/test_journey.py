@@ -515,23 +515,24 @@ def test_baseline_costs_more_than_journey_after_all_swaps():
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# HomeConfig bedroom scaling — injected into HESModel devices
+# HomeConfig baseload formula + hot water scaling — injected into HESModel devices
 # ═════════════════════════════════════════════════════════════════════════════
 
-def test_1br_lights_annual_kwh_is_half_reference():
-    """1BR home: LightsAndPlugs receives annual_kwh = 600 (0.50 × 1200)."""
-    from home_config import HomeConfig
+def test_1br_lights_annual_kwh_uses_formula():
+    """1BR/1800sqft home: LightsAndPlugs receives formula value (1800×0.45 + 1×200 + 300 = 1310)."""
+    from home_config import HomeConfig, compute_baseload_kwh
     from model import HESModel
 
     m = HESModel(home_config=HomeConfig(num_bedrooms=1), n_years=1)
 
     lights_slot = next(s for s in m.journey_home.slots if s.name == "Lights and Appliances")
     annual_kwh = lights_slot.electric_device.annual_consumption()
-    assert np.isclose(annual_kwh, 600.0), f"Expected 600 kWh, got {annual_kwh:.1f}"
+    expected = compute_baseload_kwh(1800, 1, 300)   # formula_after for default HomeConfig
+    assert np.isclose(annual_kwh, expected), f"Expected {expected:.1f} kWh, got {annual_kwh:.1f}"
 
 
 def test_4br_hot_water_gallons_per_day():
-    """4BR home: GasWaterHeater receives 75 gal/day (BEDROOM_SCALING[4])."""
+    """4BR home: GasWaterHeater receives 75 gal/day (HOT_WATER_GAL_PER_DAY[4])."""
     from home_config import HomeConfig
     from model import HESModel
 
@@ -542,8 +543,8 @@ def test_4br_hot_water_gallons_per_day():
     assert wh_dev.daily_gallons == 75, f"Expected 75 gal/day, got {wh_dev.daily_gallons}"
 
 
-def test_bedroom_scaling_consistent_across_both_homes():
-    """Both journey_home and baseline_home receive same bedroom-scaled values."""
+def test_formula_baseload_consistent_across_both_homes():
+    """Both journey_home and baseline_home receive same formula-based electric_device values."""
     from home_config import HomeConfig
     from model import HESModel
 
@@ -600,6 +601,51 @@ def test_opex_delta_is_baseline_minus_journey():
     np.testing.assert_allclose(df["Opex Delta"], computed_delta, rtol=1e-9)
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+# §11.7 — per-slot history dicts
+# ═════════════════════════════════════════════════════════════════════════════
+
+def test_cost_history_by_slot_length():
+    """Each slot has exactly n_years entries in cost_history_by_slot."""
+    from model import HESModel
+    model = HESModel(n_years=10)
+    model.run_all()
+    for slot in model.journey_home.slots:
+        h = model.journey_home.cost_history_by_slot[slot.name]
+        assert len(h) == 10, f"{slot.name}: expected 10, got {len(h)}"
+
+
+def test_consumption_history_by_slot_fuel_type():
+    """Before swap year, HVAC fuel is gas; at and after swap year, fuel is electricity."""
+    from model import HESModel
+    model = HESModel(n_years=10)
+    model.run_all()
+    jh = model.journey_home
+    hvac_slot = next(s for s in jh.slots if s.name == "HVAC")
+    fuels = jh.fuel_history_by_slot["HVAC"]
+    swap = hvac_slot.swap_year   # default 3
+    if swap:
+        assert all(f == "gas"         for f in fuels[:swap - 1])
+        assert all(f == "electricity" for f in fuels[swap - 1:])
+
+
+def test_kwh_equivalent_drops_at_swap():
+    """Total kWh-equivalent HVAC consumption drops at swap year (COP > 1)."""
+    from model import HESModel
+    model = HESModel(n_years=10)
+    model.run_all()
+    jh = model.journey_home
+    raw  = jh.consumption_history_by_slot["HVAC"]
+    fuel = jh.fuel_history_by_slot["HVAC"]
+    kwh_eq = [r * 29.3 if f == "gas" else r for r, f in zip(raw, fuel)]
+    hvac_slot = next(s for s in jh.slots if s.name == "HVAC")
+    swap = hvac_slot.swap_year
+    if swap and swap < 10:
+        pre_avg  = sum(kwh_eq[:swap])    / swap
+        post_avg = sum(kwh_eq[swap:]) / (10 - swap)
+        assert post_avg < pre_avg, "Heat pump must use less kWh-equivalent than gas furnace"
+
+
 def test_cumulative_opex_non_decreasing():
     """Cumulative opex only grows (or stays flat) — never shrinks."""
     from model import HESModel
@@ -612,3 +658,69 @@ def test_cumulative_opex_non_decreasing():
     b_vals = df["Baseline Cum Cost"].values
     assert all(j_vals[i] <= j_vals[i + 1] for i in range(len(j_vals) - 1))
     assert all(b_vals[i] <= b_vals[i + 1] for i in range(len(b_vals) - 1))
+
+
+# ── §12.8 Baseload formula tests ──────────────────────────────────────────────
+
+def test_baseload_formula_replaces_bedroom_scaling():
+    """Formula output matches hand calculation."""
+    from home_config import compute_baseload_kwh
+    result = compute_baseload_kwh(sq_ft=1800, bedrooms=3, constant=500)
+    expected = 1800 * 0.45 + 3 * 200 + 500   # = 1910
+    assert abs(result - expected) < 1.0
+
+
+def test_baseload_formula_varies_with_sqft():
+    """Larger home has higher baseload."""
+    from home_config import compute_baseload_kwh
+    small = compute_baseload_kwh(sq_ft=1000, bedrooms=2, constant=500)
+    large = compute_baseload_kwh(sq_ft=2500, bedrooms=2, constant=500)
+    assert large > small
+
+
+def test_hot_water_gallons_still_bedroom_based():
+    """Hot water scaling uses bedroom lookup, not baseload formula."""
+    from home_config import HOT_WATER_GAL_PER_DAY
+    assert HOT_WATER_GAL_PER_DAY[3] == 65
+    assert HOT_WATER_GAL_PER_DAY[1] == 30
+    assert HOT_WATER_GAL_PER_DAY[5] == 85
+
+
+def test_baseload_efficiency_swap_reduces_cost():
+    """At swap year, journey baseload cost drops vs baseline (same rates, fewer kWh)."""
+    from model import HESModel
+    from home_config import HomeConfig
+    config = HomeConfig(
+        square_footage=1800, num_bedrooms=3,
+        baseload_constant_before=500,
+        baseload_constant_after=300,
+        baseload_swap_year=2,
+        baseload_install_cost=400,
+    )
+    model = HESModel(home_config=config, n_years=10)
+    model.run_all()
+    jh = model.journey_home
+    bh = model.baseline_home
+    # Compare same year (year 3) — journey uses formula_after, baseline uses formula_before
+    journey_yr3  = jh.cost_history_by_slot["Lights and Appliances"][2]
+    baseline_yr3 = bh.cost_history_by_slot["Lights and Appliances"][2]
+    assert journey_yr3 < baseline_yr3, \
+        "Journey baseload cost (formula_after) must be less than baseline (formula_before) at same rates"
+
+
+def test_baseline_home_always_uses_formula_before():
+    """Do-nothing baseline never applies the efficiency upgrade."""
+    from model import HESModel
+    from home_config import HomeConfig
+    config = HomeConfig(
+        square_footage=1800, num_bedrooms=3,
+        baseload_constant_before=500,
+        baseload_constant_after=300,
+        baseload_swap_year=2,
+    )
+    model = HESModel(home_config=config, n_years=10)
+    model.run_all()
+    bh = model.baseline_home
+    costs = bh.cost_history_by_slot["Lights and Appliances"]
+    assert all(costs[i] <= costs[i + 1] for i in range(len(costs) - 1)), \
+        "Baseline baseload costs must rise monotonically (no efficiency drop)"
