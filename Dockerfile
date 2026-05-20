@@ -9,9 +9,10 @@ WORKDIR /app
 COPY --chown=user requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source and data (model.py resolves ../data/ relative to src/)
+# Copy source, data, and assets
 COPY --chown=user src/  ./src/
 COPY --chown=user data/ ./data/
+COPY --chown=user docs/assets/ ./docs/assets/
 
 EXPOSE 7860
 CMD ["solara", "run", "src/app.py", "--host", "0.0.0.0", "--port", "7860"]
