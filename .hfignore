@@ -1,0 +1,8 @@
+docs/*.docx
+docs/*.pdf
+docs/*.md
+docs/Phase*.md
+docs/HES*.md
+docs/Glossary.md
+notebooks/
+tests/
