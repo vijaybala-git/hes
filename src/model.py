@@ -1,221 +1,322 @@
-import mesa
-import numpy as np
+"""
+HESModel — Phase 2 simulation model.
+
+Scenario A: two JourneyHome instances (journey + do-nothing baseline).
+Scenario B: optional second pair, created only when comparison_mode=True.
+
+Climate constants and rate arrays are resolved once at init and injected into devices.
+"""
+from __future__ import annotations
+
 import json
 import os
-from energy_consumer import EnergyConsumer
-from energy_price import EnergyPrice, DEFAULT_MONTHLY_ELEC_PRICES, DEFAULT_MONTHLY_GAS_PRICES
+from pathlib import Path
 
-_DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
+import mesa
+import numpy as np
 
-# Category keys used in device JSON — order matters for stacked charts (bottom → top)
-CATEGORY_ORDER = ["Baseload", "WaterHeating", "HVAC_Cooling", "HVAC_Heating"]
-CATEGORY_LABELS = {
-    "Baseload":     "Baseload",
-    "WaterHeating": "Water Heating",
-    "HVAC_Cooling": "Cooling",
-    "HVAC_Heating": "Heating",
+from home_config import HomeConfig, BEDROOM_SCALING
+from journey import JourneyHome, DeviceSlot, CATEGORY_ORDER, CATEGORY_LABELS
+from rate_loader import RateLoader
+from devices.physics  import GasFurnace, HeatPumpHVAC, GasWaterHeater, HeatPumpWaterHeater, CentralAC
+from devices.seasonal import GasDryer, HeatPumpDryer, GasCooktop, InductionCooktop, LightsAndPlugs
+from devices.schedule import EVCharger
+
+_DATA = Path(__file__).parent.parent / "data"
+
+_BASELOAD_KWH_3BR = 1200   # DOE reference; scaled by bedroom multiplier
+
+SCENARIO_PRESETS = {
+    "conservative": {"elec": 0.04, "gas": 0.04},
+    "moderate":     {"elec": 0.07, "gas": 0.08},
+    "stress":       {"elec": 0.10, "gas": 0.12},
 }
 
 
-class HomeSimulator(mesa.Agent):
-    """
-    Represents a single home containing a collection of EnergyConsumer devices.
-    Aggregates device-level outputs into home-level OpEx and CapEx totals,
-    and tracks annual cost history broken down by device category.
+def _make_device(spec: dict, mesa_model: mesa.Model, *,
+                 hdd: np.ndarray, cdd: np.ndarray,
+                 inlet_temp: np.ndarray, ua: float,
+                 hw_gallons: float, baseload_kwh: float):
+    """Instantiate one EnergyConsumer from a slot JSON device spec."""
+    cls   = spec["class"]
+    age   = spec.get("age", 0)
+    ls    = spec.get("lifespan", 15)
+    cost  = spec.get("installation_cost", 0.0)
 
-    Parameters
-    ----------
-    model : HESModel
-    config : dict
-        Parsed JSON home configuration.
-    name : str
-        Display name (e.g. "Baseline Home").
-    overrides : dict, optional
-        Per-device attribute overrides applied after loading from JSON.
-        Format: {"Device Name": {"efficiency": 3.5, "age": 2}, ...}
-    """
+    if cls == "GasFurnace":
+        return GasFurnace(mesa_model,
+                          afue=spec.get("afue", 0.80),
+                          ua_btu_hr_f=ua,
+                          monthly_hdd=hdd,
+                          age=age, lifespan=ls, installation_cost=cost)
 
-    def __init__(self, model, config, name="Home", overrides=None):
-        super().__init__(model)
-        self.name = name
-        self.config = config
-        self.devices = []
+    if cls == "HeatPumpHVAC":
+        return HeatPumpHVAC(mesa_model,
+                            cop_heating=spec.get("cop_heating", 3.5),
+                            seer_cooling=spec.get("seer_cooling", 22),
+                            ua_btu_hr_f=ua,
+                            monthly_hdd=hdd, monthly_cdd=cdd,
+                            age=age, lifespan=ls, installation_cost=cost)
 
-        for eq in config.get("equipment", []):
-            device = EnergyConsumer(
-                model=self.model,
-                name=eq["name"],
-                category=eq["category"],
-                annual_load=eq["annual_load"],
-                seasonality=eq["seasonality"],
-                fuel_mix=eq["fuel_mix"],
-                efficiency=eq.get("efficiency", 1.0),
-                installation_cost=eq.get("installation_cost", 0),
-                lifespan=eq.get("lifespan", 15),
-                current_age=eq.get("current_age", 0),
-            )
-            self.devices.append(device)
+    if cls == "GasWaterHeater":
+        return GasWaterHeater(mesa_model,
+                              uef=spec.get("uef", 0.65),
+                              daily_gallons=hw_gallons,
+                              monthly_inlet_temp_f=inlet_temp,
+                              age=age, lifespan=ls, installation_cost=cost)
 
-        # Apply UI overrides (slider-adjusted values land here)
-        if overrides:
-            for device in self.devices:
-                if device.name in overrides:
-                    for attr, value in overrides[device.name].items():
-                        setattr(device, attr, value)
+    if cls == "HeatPumpWaterHeater":
+        return HeatPumpWaterHeater(mesa_model,
+                                   uef=spec.get("uef", 3.5),
+                                   daily_gallons=hw_gallons,
+                                   monthly_inlet_temp_f=inlet_temp,
+                                   age=age, lifespan=ls, installation_cost=cost)
 
-        # --- Cumulative OpEx ---
-        self.cum_gas_cost  = 0.0
-        self.cum_elec_cost = 0.0
-        self.total_cum_cost = 0.0
+    if cls == "GasDryer":
+        return GasDryer(mesa_model,
+                        therms_per_cycle=spec.get("therms_per_cycle", 0.22),
+                        cycles_per_week=spec.get("cycles_per_week", 5),
+                        age=age, lifespan=ls, installation_cost=cost)
 
-        # --- Last-year monthly breakdown ---
-        self.last_year_gas_cost  = np.zeros(12)
-        self.last_year_elec_cost = np.zeros(12)
+    if cls == "HeatPumpDryer":
+        return HeatPumpDryer(mesa_model,
+                             kwh_per_cycle=spec.get("kwh_per_cycle", 1.8),
+                             cycles_per_week=spec.get("cycles_per_week", 5),
+                             age=age, lifespan=ls, installation_cost=cost)
 
-        # --- CapEx by simulation year: {year: total_usd} ---
-        self.capex_by_year = {}
+    if cls == "GasCooktop":
+        return GasCooktop(mesa_model,
+                          therms_per_meal=spec.get("therms_per_meal", 0.05),
+                          meals_per_week=spec.get("meals_per_week", 14),
+                          age=age, lifespan=ls, installation_cost=cost)
 
-        # --- Annual cost history by device category ---
-        # {category_key: [year1_cost, year2_cost, ...]}
-        # Categories follow CATEGORY_ORDER; populated in step()
-        self.cost_history_by_category = {cat: [] for cat in CATEGORY_ORDER}
+    if cls == "InductionCooktop":
+        return InductionCooktop(mesa_model,
+                                kwh_per_meal=spec.get("kwh_per_meal", 0.9),
+                                meals_per_week=spec.get("meals_per_week", 14),
+                                age=age, lifespan=ls, installation_cost=cost)
 
-    def step(self):
-        current_year = self.model.steps  # Mesa 3: 1-indexed
+    if cls == "LightsAndPlugs":
+        return LightsAndPlugs(mesa_model,
+                              annual_kwh=baseload_kwh,
+                              age=age, lifespan=ls, installation_cost=cost)
 
-        total_monthly_gas_cost  = np.zeros(12)
-        total_monthly_elec_cost = np.zeros(12)
-        year_capex = 0.0
+    if cls == "EVCharger":
+        return EVCharger(mesa_model, age=age, lifespan=ls, installation_cost=cost)
 
-        for device in self.devices:
-            device.step()
-            dev_gas_cost  = device.history['gas_cost'][-1]
-            dev_elec_cost = device.history['elec_cost'][-1]
-            total_monthly_gas_cost  += dev_gas_cost
-            total_monthly_elec_cost += dev_elec_cost
+    if cls == "CentralAC":
+        return CentralAC(mesa_model,
+                         seer_cooling=spec.get("seer_cooling", 14),
+                         ua_btu_hr_f=ua,
+                         monthly_cdd=cdd,
+                         age=age, lifespan=ls, installation_cost=cost)
 
-            # Accumulate this device's annual cost into its category bucket
-            annual_cost = float(np.sum(dev_gas_cost) + np.sum(dev_elec_cost))
-            cat = device.category
-            if cat in self.cost_history_by_category:
-                self.cost_history_by_category[cat].append(annual_cost)
-            else:
-                # Unknown category — collect under "Baseload" as fallback
-                self.cost_history_by_category["Baseload"].append(annual_cost)
+    raise ValueError(f"Unknown device class: {cls!r}")
 
-            for event_year, event_cost in device.capex_events:
-                if event_year == current_year:
-                    year_capex += event_cost
 
-        self.last_year_gas_cost  = total_monthly_gas_cost
-        self.last_year_elec_cost = total_monthly_elec_cost
+def _build_slots(slot_configs: list, is_baseline: bool,
+                 mesa_model: mesa.Model, *,
+                 hdd, cdd, inlet_temp, ua, hw_gallons, baseload_kwh) -> list:
+    """Create a fresh list of DeviceSlot objects with independent device instances."""
+    slots = []
+    kw = dict(hdd=hdd, cdd=cdd, inlet_temp=inlet_temp,
+              ua=ua, hw_gallons=hw_gallons, baseload_kwh=baseload_kwh)
 
-        self.cum_gas_cost  += np.sum(total_monthly_gas_cost)
-        self.cum_elec_cost += np.sum(total_monthly_elec_cost)
-        self.total_cum_cost = self.cum_gas_cost + self.cum_elec_cost
+    for cfg in slot_configs:
+        baseline_devs = [
+            _make_device(d, mesa_model, **kw)
+            for d in cfg.get("baseline_devices", [])
+        ]
 
-        if year_capex > 0:
-            self.capex_by_year[current_year] = (
-                self.capex_by_year.get(current_year, 0.0) + year_capex
-            )
+        elec_spec = cfg.get("electric_device")
+        elec_dev  = _make_device(elec_spec, mesa_model, **kw) if elec_spec else None
 
-    @property
-    def annual_cost(self):
-        """Total energy cost for the most recent simulation year (USD)."""
-        return float(np.sum(self.last_year_gas_cost) + np.sum(self.last_year_elec_cost))
+        # Baseline home: all swap_years set to None; starting_state preserved
+        swap_yr = None if is_baseline else cfg.get("swap_year")
+
+        slots.append(DeviceSlot(
+            name               = cfg["name"],
+            category           = cfg["category"],
+            starting_state     = cfg["starting_state"],
+            baseline_devices   = baseline_devs,
+            has_cooling_baseline = cfg.get("has_cooling_baseline", False),
+            electric_device    = elec_dev,
+            swap_year          = swap_yr,
+            install_cost       = cfg.get("install_cost", 0.0),
+            rebate             = cfg.get("rebate", 0.0),
+        ))
+    return slots
 
 
 class HESModel(mesa.Model):
     """
-    Top-level simulation model for the Home Electrification Simulator.
-
-    Loads baseline and electrified home configurations from JSON, verifies they
-    share the same location and building specs, runs annual simulation steps,
-    and collects outputs for the UI.
+    Top-level Phase 2 simulation.
 
     Parameters
     ----------
-    gas_esc : float
-        Annual gas price escalation rate (e.g. 0.04 = 4%/year).
-    elec_esc : float
-        Annual electricity price escalation rate (e.g. 0.03 = 3%/year).
-    baseline_overrides : dict, optional
-        UI slider overrides for baseline home devices.
-    electrified_overrides : dict, optional
-        UI slider overrides for electrified home devices.
+    home_config : HomeConfig, optional
+        Home profile (bedrooms, insulation, etc.).  Defaults to 3BR average Bay Area home.
+    scenario_a : str
+        Rate escalation scenario for the primary comparison — "conservative", "moderate",
+        or "stress".
+    scenario_b : str
+        Rate escalation scenario for optional second comparison (used only when
+        comparison_mode=True).
+    comparison_mode : bool
+        When True, a second pair of JourneyHome instances (journey_home_b /
+        baseline_home_b) is created under scenario_b and stepped in parallel.
+    n_years : int
+        Simulation length in years.
+    sim_start_year : int
+        Real calendar year that simulation year 1 maps to (for rate lookup).
+    slot_configs : list, optional
+        Override default slot JSON.  Each element is a slot-config dict matching
+        the schema in data/homes/journey_slots_default.json.
     """
 
-    def __init__(self, gas_esc=0.04, elec_esc=0.03,
-                 baseline_overrides=None, electrified_overrides=None):
+    def __init__(self,
+                 home_config:     HomeConfig | None = None,
+                 # Explicit per-fuel CAGRs — take priority over named scenario
+                 elec_cagr_a:     float | None = None,
+                 gas_cagr_a:      float | None = None,
+                 scenario_a:      str  = "moderate",
+                 elec_cagr_b:     float | None = None,
+                 gas_cagr_b:      float | None = None,
+                 scenario_b:      str  = "stress",
+                 comparison_mode: bool = False,
+                 n_years:         int  = 20,
+                 sim_start_year:  int  = 2025,
+                 slot_configs:    list | None = None):
         super().__init__()
 
-        # --- Energy price models ---
-        self.elec_price = EnergyPrice("electricity", DEFAULT_MONTHLY_ELEC_PRICES, elec_esc)
-        self.gas_price  = EnergyPrice("gas",         DEFAULT_MONTHLY_GAS_PRICES,  gas_esc)
+        self.rate_scenario   = scenario_a
+        self.n_years         = n_years
+        self.sim_start_year  = sim_start_year
+        self.comparison_mode = comparison_mode
 
-        self.current_monthly_elec_prices = DEFAULT_MONTHLY_ELEC_PRICES.copy()
-        self.current_monthly_gas_prices  = DEFAULT_MONTHLY_GAS_PRICES.copy()
-        self.current_elec_rate = float(np.mean(self.current_monthly_elec_prices))
-        self.current_gas_rate  = float(np.mean(self.current_monthly_gas_prices))
+        # Resolve CAGRs: explicit value takes priority over scenario preset
+        elec_cagr_a = elec_cagr_a if elec_cagr_a is not None else SCENARIO_PRESETS[scenario_a]["elec"]
+        gas_cagr_a  = gas_cagr_a  if gas_cagr_a  is not None else SCENARIO_PRESETS[scenario_a]["gas"]
+        elec_cagr_b = elec_cagr_b if elec_cagr_b is not None else SCENARIO_PRESETS[scenario_b]["elec"]
+        gas_cagr_b  = gas_cagr_b  if gas_cagr_b  is not None else SCENARIO_PRESETS[scenario_b]["gas"]
 
-        # --- Load home configurations ---
-        self.baseline_home    = self._load_home("baseline_home.json",    "Baseline Home",    baseline_overrides)
-        self.electrified_home = self._load_home("electrified_home.json", "Electrified Home", electrified_overrides)
+        if home_config is None:
+            home_config = HomeConfig()
+        self.home_config = home_config
 
-        # --- Verify both homes share the same location and building specs ---
-        b_loc   = self.baseline_home.config.get("location", {})
-        e_loc   = self.electrified_home.config.get("location", {})
-        b_specs = self.baseline_home.config.get("building_specs", {})
-        e_specs = self.electrified_home.config.get("building_specs", {})
-        if b_loc != e_loc:
-            raise ValueError(
-                f"Baseline and electrified homes must share the same location.\n"
-                f"  Baseline:    {b_loc}\n  Electrified: {e_loc}"
-            )
-        if b_specs != e_specs:
-            raise ValueError(
-                f"Baseline and electrified homes must share the same building specs.\n"
-                f"  Baseline:    {b_specs}\n  Electrified: {e_specs}"
-            )
+        # ── Climate constants ─────────────────────────────────────────────────
+        with open(_DATA / "climate/bayarea_tmy3.json") as f:
+            climate = json.load(f)
 
-        # Expose for UI display (read-only)
-        self.location       = b_loc
-        self.building_specs = b_specs
+        hdd        = np.array(climate["monthly_hdd_65f"],           dtype=float)
+        cdd        = np.array(climate["monthly_cdd_65f"],           dtype=float)
+        inlet_temp = np.array(climate["monthly_inlet_water_temp_f"], dtype=float)
+        ua_map     = climate["ua_by_insulation"]
 
-        # --- Model-level aggregate ---
-        self.opex_delta = 0.0
+        ua = float(ua_map[home_config.insulation_quality])
 
-        # --- DataCollector: one row per simulation year ---
-        self.datacollector = mesa.DataCollector(
-            model_reporters={
-                "Baseline Cum Cost":       lambda m: m.baseline_home.total_cum_cost,
-                "Electrified Cum Cost":    lambda m: m.electrified_home.total_cum_cost,
-                "Opex Delta":              lambda m: m.opex_delta,
-                "Baseline Annual Cost":    lambda m: m.baseline_home.annual_cost,
-                "Electrified Annual Cost": lambda m: m.electrified_home.annual_cost,
-                "Elec Rate":               lambda m: m.current_elec_rate,
-                "Gas Rate":                lambda m: m.current_gas_rate,
-            }
-        )
+        # ── Bedroom scaling ───────────────────────────────────────────────────
+        br           = BEDROOM_SCALING[home_config.num_bedrooms]
+        baseload_kwh = _BASELOAD_KWH_3BR * br["baseload_multiplier"]
+        hw_gallons   = float(br["hot_water_gal_per_day"])
 
-    def _load_home(self, filename, name, overrides):
-        config_path = os.path.join(_DATA_DIR, filename)
-        with open(config_path, "r") as f:
-            config = json.load(f)
-        return HomeSimulator(self, config, name=name, overrides=overrides)
+        # ── Slot configs ──────────────────────────────────────────────────────
+        if slot_configs is None:
+            with open(_DATA / "homes/journey_slots_default.json") as f:
+                slot_configs = json.load(f)
+
+        device_kw = dict(hdd=hdd, cdd=cdd, inlet_temp=inlet_temp,
+                         ua=ua, hw_gallons=hw_gallons, baseload_kwh=baseload_kwh)
+
+        # ── Rate arrays — Scenario A ──────────────────────────────────────────
+        rl = RateLoader()
+        self.elec_rates = rl.get_annual_monthly_rates(
+            "electricity", sim_start_year, n_years, scenario_a,
+            custom_cagr=elec_cagr_a)   # (n_years, 12)
+        self.gas_rates  = rl.get_annual_monthly_rates(
+            "gas",         sim_start_year, n_years, scenario_a,
+            custom_cagr=gas_cagr_a)    # (n_years, 12)
+
+        self.current_elec_rates = self.elec_rates[0]
+        self.current_gas_rates  = self.gas_rates[0]
+
+        # ── Two JourneyHome instances — Scenario A ────────────────────────────
+        journey_slots  = _build_slots(slot_configs, False, self, **device_kw)
+        baseline_slots = _build_slots(slot_configs, True,  self, **device_kw)
+
+        self.journey_home  = JourneyHome(self, journey_slots,  self.elec_rates, self.gas_rates, is_baseline_home=False)
+        self.baseline_home = JourneyHome(self, baseline_slots, self.elec_rates, self.gas_rates, is_baseline_home=True)
+
+        # ── Scenario B (lazy — only when comparison_mode=True) ────────────────
+        if comparison_mode:
+            self.elec_rates_b = rl.get_annual_monthly_rates(
+                "electricity", sim_start_year, n_years, scenario_b,
+                custom_cagr=elec_cagr_b)
+            self.gas_rates_b  = rl.get_annual_monthly_rates(
+                "gas",         sim_start_year, n_years, scenario_b,
+                custom_cagr=gas_cagr_b)
+
+            self.current_elec_rates_b = self.elec_rates_b[0]
+            self.current_gas_rates_b  = self.gas_rates_b[0]
+
+            journey_slots_b  = _build_slots(slot_configs, False, self, **device_kw)
+            baseline_slots_b = _build_slots(slot_configs, True,  self, **device_kw)
+
+            self.journey_home_b  = JourneyHome(self, journey_slots_b,  self.elec_rates_b, self.gas_rates_b, is_baseline_home=False)
+            self.baseline_home_b = JourneyHome(self, baseline_slots_b, self.elec_rates_b, self.gas_rates_b, is_baseline_home=True)
+
+        # ── DataCollector ─────────────────────────────────────────────────────
+        reporters = {
+            "Journey Cum Cost":    lambda m: m.journey_home.cumulative_opex,
+            "Baseline Cum Cost":   lambda m: m.baseline_home.cumulative_opex,
+            "Journey Annual Cost": lambda m: m.journey_home.annual_opex,
+            "Baseline Annual Cost":lambda m: m.baseline_home.annual_opex,
+            "Opex Delta":          lambda m: (m.baseline_home.cumulative_opex
+                                              - m.journey_home.cumulative_opex),
+            "Elec Rate":           lambda m: float(np.mean(m.current_elec_rates)),
+            "Gas Rate":            lambda m: float(np.mean(m.current_gas_rates)),
+        }
+        if comparison_mode:
+            reporters.update({
+                "Journey Cum Cost B":    lambda m: m.journey_home_b.cumulative_opex,
+                "Baseline Cum Cost B":   lambda m: m.baseline_home_b.cumulative_opex,
+                "Journey Annual Cost B": lambda m: m.journey_home_b.annual_opex,
+                "Baseline Annual Cost B":lambda m: m.baseline_home_b.annual_opex,
+                "Gas Rate B":            lambda m: float(np.mean(m.current_gas_rates_b)),
+                "Elec Rate B":           lambda m: float(np.mean(m.current_elec_rates_b)),
+            })
+        self.datacollector = mesa.DataCollector(model_reporters=reporters)
+
+    # ── Backward compat properties for app.py ─────────────────────────────────
+    @property
+    def location(self):
+        return {"region": "San Jose, CA",
+                "zip_code": self.home_config.zip_code,
+                "climate_zone": self.home_config.climate_zone}
+
+    @property
+    def building_specs(self):
+        return {"square_footage": self.home_config.square_footage,
+                "year_built":     self.home_config.year_built,
+                "insulation_quality": self.home_config.insulation_quality}
 
     def step(self):
-        year_index = self.steps - 1  # 0-based for escalation
+        year_idx = self.steps - 1
+        self.current_elec_rates = self.elec_rates[year_idx]
+        self.current_gas_rates  = self.gas_rates[year_idx]
 
-        self.current_monthly_elec_prices = self.elec_price.get_monthly_prices(year_index)
-        self.current_monthly_gas_prices  = self.gas_price.get_monthly_prices(year_index)
-        self.current_elec_rate = float(np.mean(self.current_monthly_elec_prices))
-        self.current_gas_rate  = float(np.mean(self.current_monthly_gas_prices))
-
+        self.journey_home.step()
         self.baseline_home.step()
-        self.electrified_home.step()
 
-        self.opex_delta = (self.baseline_home.total_cum_cost
-                          - self.electrified_home.total_cum_cost)
+        if self.comparison_mode:
+            self.current_elec_rates_b = self.elec_rates_b[year_idx]
+            self.current_gas_rates_b  = self.gas_rates_b[year_idx]
+            self.journey_home_b.step()
+            self.baseline_home_b.step()
 
         self.datacollector.collect(self)
+
+    def run_all(self):
+        """Run the full simulation (n_years steps)."""
+        for _ in range(self.n_years):
+            self.step()

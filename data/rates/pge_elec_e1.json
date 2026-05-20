@@ -1,0 +1,26 @@
+{
+  "utility": "PGE",
+  "schedule": "E-1",
+  "unit": "$/kWh",
+  "source": "CPUC Advice Letters; Cal Advocates Q2 2025 Electric Rates Report",
+  "periods": [
+    {"start": "2018-01", "end": "2018-12", "rate": 0.178},
+    {"start": "2019-01", "end": "2019-12", "rate": 0.189},
+    {"start": "2020-01", "end": "2020-12", "rate": 0.196},
+    {"start": "2021-01", "end": "2021-12", "rate": 0.210},
+    {"start": "2022-01", "end": "2022-05", "rate": 0.231},
+    {"start": "2022-06", "end": "2022-11", "rate": 0.248},
+    {"start": "2023-01", "end": "2023-06", "rate": 0.310},
+    {"start": "2023-07", "end": "2023-12", "rate": 0.338},
+    {"start": "2024-01", "end": "2024-06", "rate": 0.358},
+    {"start": "2024-07", "end": "2024-12", "rate": 0.371},
+    {"start": "2025-01", "end": "2025-12", "rate": 0.386}
+  ],
+  "projection": {
+    "base_rate": 0.386,
+    "base_year": 2025,
+    "cagr_conservative": 0.04,
+    "cagr_moderate":     0.07,
+    "cagr_stress":       0.10
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "EV Charger (L2)",
+  "device_class": "ScheduleDevice",
+  "fuel_type": "electricity",
+  "monthly_kwh": [290, 270, 290, 280, 300, 310, 320, 320, 300, 290, 280, 290],
+  "source": "EPA 2024 avg 10 kWh/session, slight summer uptick from more driving",
+  "annual_kwh": 3540,
+  "installation_cost": 800,
+  "lifespan": 20,
+  "upgrade_path": "Replace monthly_kwh with real odometer data or telematics API"
+}

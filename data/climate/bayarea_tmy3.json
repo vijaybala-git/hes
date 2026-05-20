@@ -1,0 +1,28 @@
+{
+  "station": "San Jose Mineta Airport",
+  "station_id": "724945",
+  "source": "NREL TMY3",
+  "base_year": 2024,
+  "monthly_hdd_65f": [420, 340, 260, 140, 50, 10, 0, 0, 10, 80, 220, 380],
+  "monthly_cdd_65f": [0, 0, 0, 5, 20, 60, 90, 85, 55, 20, 5, 0],
+  "monthly_inlet_water_temp_f": [54, 54, 55, 57, 60, 63, 65, 66, 65, 62, 58, 55],
+  "setpoint_water_temp_f": 120,
+  "daily_hot_water_gallons": 65,
+  "ua_by_insulation": {
+    "poor":    650,
+    "average": 500,
+    "good":    350
+  },
+  "annual_hdd_65f": 1910,
+  "annual_cdd_65f": 340,
+  "notes": "monthly_hdd + monthly_cdd sum to annual totals above",
+  "bedroom_scaling": {
+    "1": {"baseload_multiplier": 0.50, "hot_water_gal_per_day": 30},
+    "2": {"baseload_multiplier": 0.83, "hot_water_gal_per_day": 50},
+    "3": {"baseload_multiplier": 1.00, "hot_water_gal_per_day": 65},
+    "4": {"baseload_multiplier": 1.17, "hot_water_gal_per_day": 75},
+    "5": {"baseload_multiplier": 1.33, "hot_water_gal_per_day": 85}
+  },
+  "baseload_kwh_3br": 1200,
+  "source_bedroom_scaling": "DOE/ENERGY STAR occupancy proxy; 3BR is TMY3 reference (65 gal/day, 1200 kWh baseload)"
+}
