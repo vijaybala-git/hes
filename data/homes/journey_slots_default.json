@@ -1,0 +1,68 @@
+[
+  {
+    "name": "HVAC",
+    "category": "HVAC_Heating",
+    "starting_state": "gas",
+    "has_cooling_baseline": false,
+    "baseline_devices": [{"class": "GasFurnace", "afue": 0.80, "age": 10, "lifespan": 20, "installation_cost": 6000}],
+    "electric_device":   {"class": "HeatPumpHVAC", "cop_heating": 3.5, "seer_cooling": 22, "lifespan": 15, "installation_cost": 14000},
+    "swap_year": 3,
+    "install_cost": 14000,
+    "rebate": 3500
+  },
+  {
+    "name": "Water Heater",
+    "category": "WaterHeating",
+    "starting_state": "gas",
+    "has_cooling_baseline": false,
+    "baseline_devices": [{"class": "GasWaterHeater", "uef": 0.65, "age": 5, "lifespan": 12, "installation_cost": 1200}],
+    "electric_device":   {"class": "HeatPumpWaterHeater", "uef": 3.5, "lifespan": 15, "installation_cost": 2500},
+    "swap_year": 5,
+    "install_cost": 2500,
+    "rebate": 500
+  },
+  {
+    "name": "Dryer",
+    "category": "Baseload",
+    "starting_state": "gas",
+    "has_cooling_baseline": false,
+    "baseline_devices": [{"class": "GasDryer", "therms_per_cycle": 0.22, "cycles_per_week": 5, "lifespan": 15, "installation_cost": 800}],
+    "electric_device":   {"class": "HeatPumpDryer", "kwh_per_cycle": 1.8, "cycles_per_week": 5, "lifespan": 15, "installation_cost": 1200},
+    "swap_year": null,
+    "install_cost": 1200,
+    "rebate": 0
+  },
+  {
+    "name": "Cooktop",
+    "category": "Baseload",
+    "starting_state": "gas",
+    "has_cooling_baseline": false,
+    "baseline_devices": [{"class": "GasCooktop", "therms_per_meal": 0.05, "meals_per_week": 14, "lifespan": 20, "installation_cost": 1000}],
+    "electric_device":   {"class": "InductionCooktop", "kwh_per_meal": 0.9, "meals_per_week": 14, "lifespan": 20, "installation_cost": 1500},
+    "swap_year": null,
+    "install_cost": 1500,
+    "rebate": 0
+  },
+  {
+    "name": "EV Charger",
+    "category": "Baseload",
+    "starting_state": "none",
+    "has_cooling_baseline": false,
+    "baseline_devices": [],
+    "electric_device":   {"class": "EVCharger", "lifespan": 20, "installation_cost": 800},
+    "swap_year": null,
+    "install_cost": 800,
+    "rebate": 0
+  },
+  {
+    "name": "Lights and Appliances",
+    "category": "Baseload",
+    "starting_state": "electric",
+    "has_cooling_baseline": false,
+    "baseline_devices": [],
+    "electric_device":   {"class": "LightsAndPlugs", "annual_kwh": 1200, "lifespan": 15, "installation_cost": 0},
+    "swap_year": null,
+    "install_cost": 0,
+    "rebate": 0
+  }
+]

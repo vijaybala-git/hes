@@ -1,0 +1,24 @@
+{
+  "utility": "PGE",
+  "schedule": "G-1",
+  "unit": "$/therm",
+  "source": "PG&E Advice Letter 5014-G1; CPUC Annual Reports",
+  "periods": [
+    {"start": "2018-01", "end": "2018-12", "rate": 1.10},
+    {"start": "2019-01", "end": "2019-12", "rate": 1.18},
+    {"start": "2020-01", "end": "2020-12", "rate": 1.22},
+    {"start": "2021-01", "end": "2021-12", "rate": 1.35},
+    {"start": "2022-01", "end": "2022-12", "rate": 1.65},
+    {"start": "2023-01", "end": "2023-12", "rate": 1.85},
+    {"start": "2024-01", "end": "2024-08", "rate": 1.92},
+    {"start": "2024-09", "end": "2024-12", "rate": 1.98},
+    {"start": "2025-01", "end": "2025-12", "rate": 2.08}
+  ],
+  "projection": {
+    "base_rate": 2.08,
+    "base_year": 2025,
+    "cagr_conservative": 0.04,
+    "cagr_moderate":     0.08,
+    "cagr_stress":       0.12
+  }
+}

@@ -1,13 +1,15 @@
-<svg width="320" height="92" viewBox="0 0 320 92" xmlns="http://www.w3.org/2000/svg">
+<?xml version="1.0" encoding="utf-8"?>
+<svg width="320" height="92" viewBox="0 0 320 92" xmlns="http://www.w3.org/2000/svg" xmlns:bx="https://boxy-svg.com">
+  <defs>
+    <bx:export>
+      <bx:file format="svg" path="WhyWatt — Home Electrification Simulator.svg"/>
+    </bx:export>
+  </defs>
   <title>WhyWatt — Home Electrification Simulator</title>
-  <path d="M8 84 L8 44 L44 8 L80 44 L80 84 Z"
-    fill="#EEF2FF" stroke="#0D47A1" stroke-width="3.5" stroke-linejoin="round"/>
-  <rect x="30" y="45" width="8" height="18" rx="4" fill="#EC9B1E"/>
-  <rect x="46" y="48" width="8" height="13" rx="4" fill="#EC9B1E"/>
-  <path d="M40 67 L40 72 Q44 77 48 72 L48 67 Z" fill="#EC9B1E"/>
-  <text x="96" y="50" font-family="system-ui,-apple-system,Arial,sans-serif"
-    font-size="29" font-weight="800" fill="#0D47A1">Why<tspan
-    fill="#1565C0">Watt</tspan><tspan fill="#EC9B1E">?</tspan></text>
-  <text x="96" y="71" font-family="system-ui,-apple-system,Arial,sans-serif"
-    font-size="11" fill="#78909C">Home Electrification Simulator</text>
+  <path d="M8 84 L8 44 L44 8 L80 44 L80 84 Z" fill="#EEF2FF" stroke="#0D47A1" stroke-width="3.5" stroke-linejoin="round"/>
+  <rect x="30.973" y="44.513" width="8" height="18" rx="4" fill="#EC9B1E"/>
+  <rect x="49.895" y="47.27" width="8" height="13" rx="4" fill="#EC9B1E"/>
+  <path d="M 40.487 67 L 40.487 72 C 43.154 75.333 45.82 75.333 48.487 72 L 48.487 67 L 40.487 67 Z" fill="#EC9B1E"/>
+  <text x="96" y="50" font-family="system-ui,-apple-system,Arial,sans-serif" font-size="29" font-weight="800" fill="#0D47A1" style="white-space: pre;">Why<tspan fill="#1565C0">Watt</tspan><tspan fill="#EC9B1E">?</tspan></text>
+  <text x="96" y="71" font-family="system-ui,-apple-system,Arial,sans-serif" font-size="11" fill="#78909C" style="white-space: pre;">Home Electrification Simulator</text>
 </svg>
