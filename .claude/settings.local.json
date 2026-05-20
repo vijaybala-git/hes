@@ -13,7 +13,12 @@
       "PowerShell(Get-Command *)",
       "PowerShell(Test-Path *)",
       "PowerShell(& \"C:\\\\Users\\\\vijay\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python.exe\" -m pytest --version 2>&1)",
-      "PowerShell(cd D:\\\\vijay\\\\MyDocuments\\\\hes; $env:PYTHONPATH = \"src\"; .\\\\.venv\\\\Scripts\\\\python.exe -c \"import sys; sys.path.insert\\(0,'src'\\); import app; print\\('app imports OK'\\)\" 2>&1)"
+      "PowerShell(cd D:\\\\vijay\\\\MyDocuments\\\\hes; $env:PYTHONPATH = \"src\"; .\\\\.venv\\\\Scripts\\\\python.exe -c \"import sys; sys.path.insert\\(0,'src'\\); import app; print\\('app imports OK'\\)\" 2>&1)",
+      "Bash(python -m pytest tests/test_journey.py -x -q)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\vijay\\\\miniconda3\", \"C:\\\\Users\\\\vijay\\\\anaconda3\", \"C:\\\\ProgramData\\\\miniconda3\", \"C:\\\\ProgramData\\\\anaconda3\" -ErrorAction SilentlyContinue | Select-Object FullName -First 5; Get-ChildItem Env: | Where-Object { $_.Name -match \"CONDA|VIRTUAL|PIPENV\" })",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)"
     ]
   }
 }

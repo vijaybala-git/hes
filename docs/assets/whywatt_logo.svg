@@ -1,15 +1,98 @@
-<?xml version="1.0" encoding="utf-8"?>
-<svg width="320" height="92" viewBox="0 0 320 92" xmlns="http://www.w3.org/2000/svg" xmlns:bx="https://boxy-svg.com">
-  <defs>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="320"
+   height="100"
+   viewBox="0 0 320 100"
+   version="1.1"
+   id="svg4"
+   sodipodi:docname="whywatt_logo.svg"
+   inkscape:version="1.4.3 (0d15f75, 2025-12-25)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:bx="https://boxy-svg.com">
+  <sodipodi:namedview
+     id="namedview4"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="11.540625"
+     inkscape:cx="178.71649"
+     inkscape:cy="45.968048"
+     inkscape:window-width="3840"
+     inkscape:window-height="2071"
+     inkscape:window-x="-9"
+     inkscape:window-y="-9"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg4" />
+  <defs
+     id="defs1">
     <bx:export>
-      <bx:file format="svg" path="WhyWatt — Home Electrification Simulator.svg"/>
+      <bx:file
+         format="svg"
+         path="WhyWatt — Home Electrification Simulator.svg" />
     </bx:export>
   </defs>
-  <title>WhyWatt — Home Electrification Simulator</title>
-  <path d="M8 84 L8 44 L44 8 L80 44 L80 84 Z" fill="#EEF2FF" stroke="#0D47A1" stroke-width="3.5" stroke-linejoin="round"/>
-  <rect x="30.973" y="44.513" width="8" height="18" rx="4" fill="#EC9B1E"/>
-  <rect x="49.895" y="47.27" width="8" height="13" rx="4" fill="#EC9B1E"/>
-  <path d="M 40.487 67 L 40.487 72 C 43.154 75.333 45.82 75.333 48.487 72 L 48.487 67 L 40.487 67 Z" fill="#EC9B1E"/>
-  <text x="96" y="50" font-family="system-ui,-apple-system,Arial,sans-serif" font-size="29" font-weight="800" fill="#0D47A1" style="white-space: pre;">Why<tspan fill="#1565C0">Watt</tspan><tspan fill="#EC9B1E">?</tspan></text>
-  <text x="96" y="71" font-family="system-ui,-apple-system,Arial,sans-serif" font-size="11" fill="#78909C" style="white-space: pre;">Home Electrification Simulator</text>
+  <title
+     id="title1">WhyWatt — Home Electrification Simulator</title>
+  <path
+     d="M8 84 L8 44 L44 8 L80 44 L80 84 Z"
+     fill="#EEF2FF"
+     stroke="#0D47A1"
+     stroke-width="3.5"
+     stroke-linejoin="round"
+     id="path1" />
+  <rect
+     x="30.973"
+     y="44.513"
+     width="8"
+     height="18"
+     rx="4"
+     fill="#EC9B1E"
+     id="rect1" />
+  <rect
+     x="49.895"
+     y="47.27"
+     width="8"
+     height="13"
+     rx="4"
+     fill="#EC9B1E"
+     id="rect2" />
+  <path
+     d="M 40.487 67 L 40.487 72 C 43.154 75.333 45.82 75.333 48.487 72 L 48.487 67 L 40.487 67 Z"
+     fill="#EC9B1E"
+     id="path2" />
+  <text
+     x="96"
+     y="50"
+     font-family="system-ui,-apple-system,Arial,sans-serif"
+     font-size="29"
+     font-weight="800"
+     fill="#0D47A1"
+     style="white-space: pre;"
+     id="text3">Why<tspan
+   fill="#1565C0"
+   id="tspan2">Watt</tspan><tspan
+   fill="#EC9B1E"
+   id="tspan3">?</tspan></text>
+  <text
+     x="165"
+     y="71"
+     font-family="system-ui, '-apple-system', Arial, sans-serif"
+     fill="#78909c"
+     style="font-size:16px;text-align:center;text-anchor:middle;white-space:pre"
+     id="text4"><tspan
+       sodipodi:role="line"
+       id="tspan4"
+       x="165"
+       y="71">Home Electrification</tspan><tspan
+       sodipodi:role="line"
+       id="tspan5"
+       x="165"
+       y="91">Simulator</tspan></text>
 </svg>

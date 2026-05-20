@@ -1,10 +1,93 @@
-<?xml version="1.0" encoding="utf-8"?>
-<svg width="320" height="92" viewBox="0 0 320 92" xmlns="http://www.w3.org/2000/svg">
-  <title>WhyWatt — Home Electrification Simulator (dark)</title>
-  <path d="M8 84 L8 44 L44 8 L80 44 L80 84 Z" fill="#1A2540" stroke="#50BDF8" stroke-width="3.5" stroke-linejoin="round"/>
-  <rect x="33.408" y="45" width="8" height="18" rx="4" fill="#EC9B1E"/>
-  <rect x="49.652" y="46.539" width="8" height="13" rx="4" fill="#EC9B1E"/>
-  <path d="M 41.461 68.217 L 41.461 73.217 C 44.127 76.551 46.794 76.551 49.461 73.217 L 49.461 68.217 L 41.461 68.217 Z" fill="#EC9B1E"/>
-  <text x="96" y="50" font-family="system-ui,-apple-system,Arial,sans-serif" font-size="29" font-weight="800" fill="#E8F4FE" style="white-space: pre;">Why<tspan fill="#50BDF8">Watt</tspan><tspan fill="#EC9B1E">?</tspan></text>
-  <text x="96" y="71" font-family="system-ui,-apple-system,Arial,sans-serif" font-size="11" fill="#546E7A" style="white-space: pre;">Home Electrification Simulator</text>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="320"
+   height="92"
+   viewBox="0 0 320 92"
+   version="1.1"
+   id="svg4"
+   sodipodi:docname="whywatt_logo_dark.svg"
+   inkscape:version="1.4.3 (0d15f75, 2025-12-25)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs4" />
+  <sodipodi:namedview
+     id="namedview4"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="false"
+     inkscape:zoom="9.365625"
+     inkscape:cx="160"
+     inkscape:cy="45.965966"
+     inkscape:window-width="3840"
+     inkscape:window-height="2071"
+     inkscape:window-x="-9"
+     inkscape:window-y="-9"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg4" />
+  <title
+     id="title1">WhyWatt — Home Electrification Simulator (dark)</title>
+  <path
+     d="M8 84 L8 44 L44 8 L80 44 L80 84 Z"
+     fill="#1A2540"
+     stroke="#50BDF8"
+     stroke-width="3.5"
+     stroke-linejoin="round"
+     id="path1" />
+  <rect
+     x="33.408"
+     y="45"
+     width="8"
+     height="18"
+     rx="4"
+     fill="#EC9B1E"
+     id="rect1" />
+  <rect
+     x="49.652"
+     y="46.539"
+     width="8"
+     height="13"
+     rx="4"
+     fill="#EC9B1E"
+     id="rect2" />
+  <path
+     d="M 41.461 68.217 L 41.461 73.217 C 44.127 76.551 46.794 76.551 49.461 73.217 L 49.461 68.217 L 41.461 68.217 Z"
+     fill="#EC9B1E"
+     id="path2" />
+  <text
+     x="96"
+     y="50"
+     font-family="system-ui,-apple-system,Arial,sans-serif"
+     font-size="29"
+     font-weight="800"
+     fill="#E8F4FE"
+     style="white-space: pre;"
+     id="text3">Why<tspan
+   fill="#50BDF8"
+   id="tspan2">Watt</tspan><tspan
+   fill="#EC9B1E"
+   id="tspan3">?</tspan></text>
+  <text
+     x="166.77734"
+     y="71"
+     font-family="system-ui, '-apple-system', Arial, sans-serif"
+     font-size="11"
+     fill="#546e7a"
+     style="font-size:16px;text-align:center;text-anchor:middle;white-space:pre"
+     id="text4"><tspan
+       sodipodi:role="line"
+       id="tspan4"
+       x="96"
+       y="71">Home Electrification </tspan><tspan
+       sodipodi:role="line"
+       id="tspan5"
+       x="96"
+       y="91">Simulator</tspan></text>
 </svg>

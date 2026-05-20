@@ -44,6 +44,8 @@ class DeviceSlot:
         Step the slot for one simulation year.
         Returns the total OpEx cost for this slot in this year.
         """
+        self._last_active_device = None   # reset; set below after active_list is known
+
         # ── Determine which devices are active this year ──────────────────────
         if self.starting_state == "electric":
             active_list = [self.electric_device]
@@ -63,6 +65,8 @@ class DeviceSlot:
             rates = elec_rates if active.fuel_type == "electricity" else gas_rates
             active.step(rates)
             step_cost += active.history["cost"][-1]
+
+        self._last_active_device = active_list[0] if active_list else None
 
         # ── CapEx: swap install OR per-device end-of-life replacement ─────────
         if (self.swap_year is not None
@@ -98,7 +102,10 @@ class JourneyHome(mesa.Agent):
         self.annual_opex     = 0.0
         self.cumulative_opex = 0.0
         self.capex_by_year: dict = {}
-        self.cost_history_by_category: dict = {cat: [] for cat in CATEGORY_ORDER}
+        self.cost_history_by_category:    dict = {cat: []  for cat in CATEGORY_ORDER}
+        self.cost_history_by_slot:        dict = {s.name: [] for s in slots}
+        self.consumption_history_by_slot: dict = {s.name: [] for s in slots}
+        self.fuel_history_by_slot:        dict = {s.name: [] for s in slots}
 
     def step(self):
         year_idx     = self.model.steps - 1   # 0-based array index
@@ -117,6 +124,16 @@ class JourneyHome(mesa.Agent):
             year_opex += cost
             cat = slot.category if slot.category in year_category_costs else "Baseload"
             year_category_costs[cat] += cost
+
+            self.cost_history_by_slot[slot.name].append(cost)
+            active_dev = slot._last_active_device
+            if active_dev is not None:
+                self.consumption_history_by_slot[slot.name].append(
+                    active_dev.history["consumption"][-1])
+                self.fuel_history_by_slot[slot.name].append(active_dev.fuel_type)
+            else:
+                self.consumption_history_by_slot[slot.name].append(0.0)
+                self.fuel_history_by_slot[slot.name].append("electricity")
 
             for event_year, event_cost in slot.capex_events:
                 if event_year == current_year:
