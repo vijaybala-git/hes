@@ -13,7 +13,7 @@ python -m git_filter_repo --path "docs/WhyWatt_Phase2_Spec.docx" --invert-paths 
 python -m git_filter_repo --path "docs/HES_Phase2_Spec.docx" --invert-paths --force
 python -m git_filter_repo --path "docs/HES_Prototype_Feedback.docx" --invert-paths --force
 python -m git_filter_repo --path "docs/echorixzontalimage.pdf" --invert-paths --force
-python -m git_filter_repo --path "docs/assetsecho_logo.png" --invert-paths --force
+python -m git_filter_repo --path "docs/assets/echo_logo.png" --invert-paths --force
 
 Write-Host "Pushing to Hugging Face..." -ForegroundColor Cyan
 git push hf-whywatt hf-deploy:main --force
