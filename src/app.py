@@ -1114,13 +1114,16 @@ def ExpandableSlotRow(name, state_rv, swap_planned_rv, swap_year_rv,
 
     with solara.Row(
         gap="8px",
-        style=(
-            "align-items:center; flex-wrap:wrap; padding:6px 0;"
-            " border-bottom:1px solid #EEEEEE; cursor:pointer;"
-        ),
-        on_click=lambda: expanded_rv.set(not expanded_rv.value),
+        style="align-items:center; flex-wrap:wrap; padding:6px 0; border-bottom:1px solid #EEEEEE;",
     ):
-        solara.Text(chevron, style="color:#78909C; font-size:0.9em; flex-shrink:0; min-width:14px")
+        solara.Button(
+            chevron,
+            on_click=lambda: expanded_rv.set(not expanded_rv.value),
+            style=(
+                "background:none; border:none; cursor:pointer; color:#78909C;"
+                " font-size:0.9em; padding:0 4px 0 0; min-width:14px; flex-shrink:0;"
+            ),
+        )
         with solara.Column(style="min-width:100px; max-width:100px"):
             solara.Text(name, style="font-weight:500; font-size:0.9em")
         with solara.Column(style="min-width:90px; max-width:90px"):
