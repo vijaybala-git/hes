@@ -19,7 +19,7 @@ Write-Host "Pushing to Hugging Face..." -ForegroundColor Cyan
 git push hf-whywatt hf-deploy:main --force
 
 Write-Host "Cleaning up..." -ForegroundColor Cyan
-git checkout main
+git checkout main --force
 git branch -D hf-deploy
 
 Write-Host "Done. HF deploy complete." -ForegroundColor Green
