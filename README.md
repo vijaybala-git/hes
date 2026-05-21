@@ -6,6 +6,10 @@ colorTo: gray
 sdk: docker
 app_port: 7860
 pinned: false
+
+# HF overrides PORT to 7860
+env:
+  PORT: "7860"
 ---
 
 # WhyWatt?

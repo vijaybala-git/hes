@@ -1,9 +1,9 @@
 # WhyWatt — Phase 2 Development Spec
 
-**Status:** Phase 2 implemented through Objective 6; §9 bug fixes, §10 rate decoupling, §11 per-device charts, §12 baseload formula added
+**Status:** Phase 2 implemented through Objective 6; §9 bug fixes, §10 rate decoupling, §11 per-device charts, §12 baseload formula, §13 appliance detail expand/collapse added
 **Follows:** Phase 1 complete (Mesa + Solara, 42 unit tests, dual-home simulation)
 **Project rename:** HES → **WhyWatt?** (update all UI titles, headers, doc references)
-**Last updated:** §12 Baseload formula + efficiency journey slot (Phase 2.5)
+**Last updated:** §13 Appliance detail panels + slider default markers (Phase 2.5)
 
 ---
 
@@ -2910,6 +2910,909 @@ Step 3 — app.py:
     - With upgrade planned, journey home shows baseload cost drop at swap year
     - Baseline (do nothing) baseload costs rise monotonically
     - HomeInfoBar shows updated baseload chip
+```
+
+---
+
+## 13. Appliance Detail Expand/Collapse + Slider Default Markers (Phase 2.5)
+
+Surfaces all hidden assumptions by making each appliance row expandable.
+No new simulation variables — existing reactive state is reorganised into
+a cleaner expand/collapse UI. Slider default markers give advocates confidence
+that they understand what has and hasn't been changed.
+
+---
+
+### 13.1 Design Overview
+
+**Expand/collapse trigger:** Click anywhere on the top-level slot row to toggle.
+A chevron `▶ / ▼` rotates to indicate state. Click again to collapse.
+
+**Top row (always visible):**
+```
+▼ HVAC  |  Gas ▾  |  ☑ Plan swap  |  Yr 3 (2027)  |  $10,500 net
+```
+
+**Expanded panel — three sub-sections:**
+1. **Estimated consumption** (first, always shown, read-only display)
+2. **Current appliance specs** (sliders/inputs for existing device)
+3. **Replacement appliance specs** (shown only when swap is planned)
+
+**Collapse:** Click the row again. The chevron rotates back to `▶`.
+
+---
+
+### 13.2 Expand/Collapse Reactive State
+
+One boolean reactive per slot. Stored in `_DEFAULTS` and reset by `reset_to_defaults()`:
+
+```python
+# Expand state per slot — False = collapsed (default)
+hvac_expanded    = solara.reactive(False)
+wh_expanded      = solara.reactive(False)
+dryer_expanded   = solara.reactive(False)
+cooktop_expanded = solara.reactive(False)
+ev_expanded      = solara.reactive(False)
+```
+
+Add to `_DEFAULTS`:
+```python
+"hvac_expanded":    False,
+"wh_expanded":      False,
+"dryer_expanded":   False,
+"cooktop_expanded": False,
+"ev_expanded":      False,
+```
+
+Add to `reset_to_defaults()`:
+```python
+hvac_expanded.set(_DEFAULTS["hvac_expanded"])
+wh_expanded.set(_DEFAULTS["wh_expanded"])
+dryer_expanded.set(_DEFAULTS["dryer_expanded"])
+cooktop_expanded.set(_DEFAULTS["cooktop_expanded"])
+ev_expanded.set(_DEFAULTS["ev_expanded"])
+```
+
+---
+
+### 13.3 Appliance Detail Panels — Per-Appliance Spec
+
+Each panel has three sub-sections in fixed order:
+1. Estimated consumption (read-only, always first)
+2. Current appliance specs
+3. Replacement appliance specs (conditional on swap planned)
+
+**No new simulation variables are added.** All sliders in the detail panels
+control existing reactives that already flow into `run_simulation()`.
+
+---
+
+#### 13.3.1 HVAC
+
+**Estimated consumption (current device):**
+```
+Heating: ~286 therms/yr   (~8,380 kWh-eq)     [computed from GasFurnace formula]
+Cooling: n/a (no central AC)                  [when hvac_has_cooling = False]
+         ~291 kWh/yr cooling                  [when hvac_has_cooling = True, CentralAC]
+```
+
+**Current appliance specs:**
+```
+Type:        Gas Furnace
+AFUE         [default tick: 0.80]   [=======●===] 0.80
+Age (yrs)    [default tick: 10 ]   [====●=======] 10
+[ ] Has central AC in baseline
+    If checked:
+    Central AC SEER  [default tick: 14]   [===●=======] 14
+    AC age (yrs)     [default tick: 7 ]   [===●=======] 7
+```
+
+**Replacement appliance specs** (shown when `hvac_swap_planned = True`):
+```
+Type:        Heat Pump HVAC (replaces furnace + adds/replaces AC)
+Heating COP  [default tick: 3.5]   [=====●=====] 3.5
+Cooling SEER [default tick: 22 ]   [=======●===] 22
+Install $    [14000]
+Rebate $     [3500]
+Net cost     $10,500
+
+Estimated electric consumption:
+Heating: ~1,930 kWh/yr
+Cooling: ~185 kWh/yr
+Total:   ~2,115 kWh/yr
+```
+
+**New reactives needed:**
+```python
+# HVAC current device age (currently hardcoded in slot JSON)
+hvac_furnace_age  = solara.reactive(10)    # years, range 0-30
+hvac_ac_seer      = solara.reactive(14)    # existing CentralAC SEER
+hvac_ac_age       = solara.reactive(7)     # years
+```
+Add to `_DEFAULTS`: `"hvac_furnace_age": 10, "hvac_ac_seer": 14, "hvac_ac_age": 7`
+
+---
+
+#### 13.3.2 Water Heater
+
+**Estimated consumption (current device):**
+```
+~184 therms/yr   (~5,390 kWh-eq)   [computed from GasWH formula, 65 gal/day]
+```
+
+**Current appliance specs:**
+```
+Type:           Gas Water Heater
+UEF             [default tick: 0.65]  [=====●=====] 0.65
+Age (yrs)       [default tick: 5   ]  [==●========] 5
+Daily hot water [default tick: 65  ]  [======●====] 65 gal/day
+                (default from bedroom count: 3 bed → 65 gal/day)
+```
+
+**Replacement appliance specs** (when `wh_swap_planned = True`):
+```
+Type:            Heat Pump Water Heater
+UEF              [default tick: 3.5]  [========●==] 3.5
+Install $        [2500]
+Rebate $         [500]
+Net cost         $2,000
+
+Estimated electric consumption:
+~1,050 kWh/yr
+```
+
+**New reactives needed:**
+```python
+wh_gas_age        = solara.reactive(5)     # years, range 0-20
+hw_daily_gallons  = solara.reactive(65)    # gal/day, range 20-120
+                                           # default auto-set from bedroom count
+                                           # user can override
+```
+Add to `_DEFAULTS`: `"wh_gas_age": 5, "hw_daily_gallons": 65`
+
+**Important:** `hw_daily_gallons` overrides the bedroom-lookup default when the
+user has manually changed it. `_build_home_config()` passes it to `HomeConfig`;
+`HESModel` uses it instead of the lookup when explicitly set.
+
+`HomeConfig` gains one new field:
+```python
+hot_water_daily_gallons: int | None = None
+# None = use bedroom lookup; int = user-specified override
+```
+
+**Auto-populate on bedroom change:**
+When `num_bedrooms` reactive changes, if the user has NOT manually set
+`hw_daily_gallons` (i.e. it still equals the bedroom-lookup default for the
+*previous* bedroom count), update it to the new bedroom-lookup default.
+If the user *has* manually changed it, leave it alone.
+
+Implement with a simple flag:
+```python
+hw_gallons_user_override = solara.reactive(False)
+# Set True when user moves the gallons slider
+# Reset to False when reset_to_defaults() is called
+```
+
+---
+
+#### 13.3.3 Dryer
+
+**Estimated consumption (current device):**
+```
+~57 therms/yr  (~1,670 kWh-eq)   [GasDryer, 0.22 therms/cycle × 5 loads/wk]
+```
+
+**Current appliance specs:**
+```
+Type:           Gas Dryer
+Therms/cycle    [default tick: 0.22]   [=====●=====] 0.22
+Loads/week      [default tick: 5   ]   [====●======] 5
+```
+
+**Replacement appliance specs** (when `dryer_swap_planned = True`):
+```
+Type:           Heat Pump Dryer
+kWh/cycle       [default tick: 1.8]   [======●====] 1.8
+Loads/week      [default tick: 5  ]   [====●======] 5
+Install $       [1200]
+Rebate $        [0]
+Net cost        $1,200
+
+Estimated electric consumption:
+~468 kWh/yr
+```
+
+**New reactives needed:**
+```python
+dryer_gas_therms_per_cycle = solara.reactive(0.22)   # range 0.15-0.35
+dryer_loads_per_week       = solara.reactive(5)       # range 1-14
+dryer_hp_kwh_per_cycle     = solara.reactive(1.8)     # range 1.2-2.5
+```
+Add to `_DEFAULTS`.
+
+---
+
+#### 13.3.4 Cooktop
+
+**Estimated consumption (current device):**
+```
+~36 therms/yr  (~1,055 kWh-eq)   [GasCooktop, 0.05 therms/meal × 14 meals/wk]
+```
+
+**Current appliance specs:**
+```
+Type:           Gas Cooktop
+Therms/meal     [default tick: 0.05]   [=====●=====] 0.05
+Meals/week      [default tick: 14  ]   [=======●===] 14
+```
+
+**Replacement appliance specs** (when `cooktop_swap_planned = True`):
+```
+Type:           Induction Cooktop
+kWh/meal        [default tick: 0.9]   [=======●===] 0.9
+Meals/week      [default tick: 14 ]   [=======●===] 14
+Install $       [1500]
+Rebate $        [0]
+Net cost        $1,500
+
+Estimated electric consumption:
+~655 kWh/yr
+```
+
+**New reactives needed:**
+```python
+cooktop_gas_therms_per_meal   = solara.reactive(0.05)   # range 0.03-0.10
+cooktop_meals_per_week        = solara.reactive(14)      # range 3-21
+cooktop_induction_kwh_per_meal = solara.reactive(0.9)   # range 0.6-1.4
+```
+Add to `_DEFAULTS`.
+
+---
+
+#### 13.3.5 EV Charger
+
+**Estimated consumption (current device):**
+```
+~3,540 kWh/yr   [ScheduleDevice flat default: 295 kWh/month]
+                (starting_state = "none" — absent from baseline)
+```
+
+**Current appliance specs:**
+```
+Type:           None (not in baseline)
+                [only visible when starting_state = "none"]
+```
+
+**Replacement appliance specs** (when `ev_swap_planned = True`):
+```
+Type:           L2 EV Charger
+Monthly kWh     [default tick: 295]   [=======●===] 295 kWh/month
+                (annual: ~3,540 kWh/yr)
+Install $       [800]
+Rebate $        [0]
+Net cost        $800
+
+Estimated annual consumption:
+~3,540 kWh/yr
+```
+
+**New reactive needed:**
+```python
+ev_monthly_kwh = solara.reactive(295)   # kWh/month, range 50-600
+```
+Add to `_DEFAULTS`: `"ev_monthly_kwh": 295`
+
+---
+
+### 13.4 Estimated Consumption Display Helper
+
+Each expanded panel computes estimated consumption live from current slider values.
+This is a display-only calculation — does NOT run the simulation. Uses the same
+formulas as the physics devices but evaluated inline in Python:
+
+```python
+def _est_gas_furnace(afue: float, ua: int, annual_hdd: int = 1910) -> float:
+    """Estimated therms/yr from GasFurnace formula."""
+    return annual_hdd * 24 * ua / (afue * 100_000)
+
+def _est_hp_hvac_heating(cop: float, ua: int, annual_hdd: int = 1910) -> float:
+    """Estimated kWh/yr heating from HeatPumpHVAC formula."""
+    return annual_hdd * 24 * ua / (cop * 3412)
+
+def _est_hp_hvac_cooling(seer: float, ua: int, annual_cdd: int = 340) -> float:
+    """Estimated kWh/yr cooling from HeatPumpHVAC formula."""
+    return annual_cdd * 24 * ua / (seer * 1000)
+
+def _est_gas_wh(uef: float, daily_gal: int,
+               avg_inlet_f: float = 60.0, setpoint_f: float = 120.0) -> float:
+    """Estimated therms/yr from GasWH formula."""
+    delta_t = setpoint_f - avg_inlet_f
+    return daily_gal * 365 * 8.33 * delta_t * 0.00001 / uef
+
+def _est_hpwh(uef: float, daily_gal: int,
+             avg_inlet_f: float = 60.0, setpoint_f: float = 120.0) -> float:
+    """Estimated kWh/yr from HPWH formula."""
+    delta_t = setpoint_f - avg_inlet_f
+    return daily_gal * 365 * 8.33 * delta_t * 0.000293 / uef
+
+def _est_gas_dryer(therms_per_cycle: float, loads_per_week: int) -> float:
+    return therms_per_cycle * loads_per_week * 52
+
+def _est_hp_dryer(kwh_per_cycle: float, loads_per_week: int) -> float:
+    return kwh_per_cycle * loads_per_week * 52
+
+def _est_gas_cooktop(therms_per_meal: float, meals_per_week: int) -> float:
+    return therms_per_meal * meals_per_week * 52
+
+def _est_induction(kwh_per_meal: float, meals_per_week: int) -> float:
+    return kwh_per_meal * meals_per_week * 52
+
+KWH_PER_THERM = 29.3
+
+def _kwh_eq(therms: float) -> float:
+    return therms * KWH_PER_THERM
+```
+
+UA value resolved from `insulation_quality.value` via:
+```python
+UA_MAP = {"poor": 650, "average": 500, "good": 350}
+ua = UA_MAP[insulation_quality.value]
+```
+
+These functions are called inline inside the expanded panel component and their
+results displayed as read-only markdown. They do not affect the simulation.
+
+---
+
+### 13.5 Slider Default Markers — Style A
+
+**Style A:** Always show a small tick mark on the slider track at the default position,
+visible even when the slider is at default. When the slider has been moved from default,
+also show a delta label beneath the slider.
+
+**Implementation in Solara:** Solara's `SliderFloat` / `SliderInt` does not natively
+support track markers. Implement using a wrapper component `SliderWithDefault`:
+
+```python
+@solara.component
+def SliderWithDefault(
+    label: str,
+    value: solara.Reactive,
+    default: float | int,
+    min: float | int,
+    max: float | int,
+    step: float | int = 1,
+    unit: str = "",
+    fmt: str = "{v}",   # format string for value display
+):
+    """
+    Slider with:
+    - Default tick mark on the track (HTML datalist via unsafe_innerHTML)
+    - Delta label below when value != default
+    - Current value shown in the label
+    """
+    v = value.value
+    at_default = abs(v - default) < (step * 0.01)   # float-safe equality
+    delta = v - default
+
+    # Tick position as percentage of range
+    tick_pct = int(100 * (default - min) / (max - min)) if max != min else 50
+
+    # Slider label with current value
+    display_label = f"{label}: {fmt.format(v=v)}{unit}"
+
+    with solara.Column(gap="0px"):
+        # The slider itself
+        solara.SliderFloat(
+            display_label, value=value, min=min, max=max, step=step
+        ) if isinstance(default, float) else solara.SliderInt(
+            display_label, value=value, min=min, max=max, step=int(step)
+        )
+
+        # Default tick mark — CSS overlay on the track
+        solara.HTML(
+            tag="div",
+            unsafe_innerHTML=(
+                f"<div style='"
+                f"  position:relative; height:6px; margin:-4px 0 2px 0;"
+                f"  pointer-events:none;'"
+                f">"
+                f"  <div style='"
+                f"    position:absolute;"
+                f"    left:{tick_pct}%;"
+                f"    top:0; bottom:0;"
+                f"    width:2px;"
+                f"    background:#0D47A1;"
+                f"    opacity:0.5;"
+                f"    border-radius:1px;"
+                f"  '></div>"
+                f"  <div style='"
+                f"    position:absolute;"
+                f"    left:{tick_pct}%;"
+                f"    top:50%;"
+                f"    transform:translate(-50%, -50%);"
+                f"    width:6px; height:6px;"
+                f"    background:#0D47A1;"
+                f"    opacity:0.5;"
+                f"    border-radius:50%;"
+                f"  '></div>"
+                f"</div>"
+            ),
+        )
+
+        # Delta label — only shown when not at default
+        if not at_default:
+            sign = "+" if delta > 0 else ""
+            delta_str = f"{fmt.format(v=delta)}{unit}"
+            color = "#D0302D" if delta < 0 else "#2E7D32"
+            solara.HTML(
+                tag="div",
+                unsafe_innerHTML=(
+                    f"<div style='font-size:0.75em; color:{color}; "
+                    f"margin-top:1px; padding-left:2px;'>"
+                    f"{sign}{delta_str} from default ({fmt.format(v=default)}{unit})"
+                    f"</div>"
+                ),
+            )
+```
+
+**Usage example (HVAC AFUE slider):**
+```python
+SliderWithDefault(
+    label="Furnace AFUE",
+    value=furnace_afue,
+    default=_DEFAULTS["furnace_afue"],    # 0.80
+    min=0.70, max=0.95, step=0.01,
+    fmt="{v:.2f}",
+)
+```
+
+**Apply `SliderWithDefault` to all device spec sliders:**
+
+| Slider | Default | Min | Max | Step | Unit |
+|--------|---------|-----|-----|------|------|
+| Furnace AFUE | 0.80 | 0.70 | 0.95 | 0.01 | |
+| Furnace age | 10 | 0 | 30 | 1 | yrs |
+| Central AC SEER | 14 | 10 | 22 | 1 | |
+| Central AC age | 7 | 0 | 20 | 1 | yrs |
+| Gas WH UEF | 0.65 | 0.55 | 0.70 | 0.01 | |
+| Gas WH age | 5 | 0 | 20 | 1 | yrs |
+| Daily hot water | 65 | 20 | 120 | 5 | gal/day |
+| HP COP | 3.5 | 2.5 | 4.5 | 0.1 | |
+| HP SEER | 22 | 16 | 28 | 1 | |
+| HPWH UEF | 3.5 | 2.5 | 4.0 | 0.1 | |
+| Gas dryer therms/cycle | 0.22 | 0.15 | 0.35 | 0.01 | |
+| Dryer loads/week | 5 | 1 | 14 | 1 | /wk |
+| HP dryer kWh/cycle | 1.8 | 1.2 | 2.5 | 0.1 | |
+| Cooktop therms/meal | 0.05 | 0.03 | 0.10 | 0.01 | |
+| Cooktop meals/week | 14 | 3 | 21 | 1 | /wk |
+| Induction kWh/meal | 0.9 | 0.6 | 1.4 | 0.1 | |
+| EV monthly kWh | 295 | 50 | 600 | 5 | kWh/mo |
+| Gas esc %/yr | 8 | 0 | 20 | 1 | %/yr |
+| Elec esc %/yr | 7 | 0 | 15 | 1 | %/yr |
+| Baseload constant before | 500 | 0 | 1500 | 50 | kWh/yr |
+| Baseload constant after | 300 | 0 | 1500 | 50 | kWh/yr |
+
+**Sliders in the existing Home Profile panel** (insulation, sq ft, bedrooms) do NOT
+need `SliderWithDefault` since they are not device physics parameters — they are
+home profile facts unlikely to be mis-set.
+
+---
+
+### 13.6 Updated SlotRow Component
+
+Replace the current `SlotRow` component with `ExpandableSlotRow` that supports
+the click-to-expand pattern:
+
+```python
+@solara.component
+def ExpandableSlotRow(
+    name: str,
+    state_rv, swap_planned_rv, swap_year_rv,
+    install_cost_rv, rebate_rv,
+    expanded_rv,
+    detail_component,     # callable: detail_component() renders the expanded panel
+):
+    state   = state_rv.value
+    planned = swap_planned_rv.value
+    yr      = swap_year_rv.value
+    net     = install_cost_rv.value - rebate_rv.value
+    cal_yr  = sim_start_year.value + yr - 1
+    expanded = expanded_rv.value
+
+    chevron = "▼" if expanded else "▶"
+    show_swap = (state in ("gas", "none")) and planned
+
+    # ── Top row — clickable ──────────────────────────────────────────────
+    with solara.Row(
+        gap="8px",
+        style=(
+            "align-items:center; flex-wrap:wrap; padding:6px 0;"
+            " border-bottom:1px solid #EEEEEE; cursor:pointer;"
+        ),
+        on_click=lambda: expanded_rv.set(not expanded),
+    ):
+        solara.Text(chevron, style="color:#78909C; font-size:0.9em; flex-shrink:0")
+
+        with solara.Column(style="min-width:100px; max-width:100px"):
+            solara.Text(name, style="font-weight:500; font-size:0.9em")
+
+        with solara.Column(style="min-width:90px; max-width:90px"):
+            solara.Select("", value=state_rv, values=["gas", "electric", "none"])
+
+        with solara.Column(style="min-width:60px; max-width:60px"):
+            if state != "electric":
+                solara.Checkbox(label="Plan", value=swap_planned_rv)
+
+        if show_swap:
+            with solara.Column(style="min-width:160px"):
+                solara.SliderInt(
+                    f"Yr {yr} ({cal_yr})",
+                    value=swap_year_rv, min=1, max=25,
+                )
+            with solara.Column(style="min-width:90px"):
+                solara.InputInt("Install $", value=install_cost_rv)
+            with solara.Column(style="min-width:70px"):
+                solara.InputInt("Rebate", value=rebate_rv)
+            with solara.Column(style="min-width:65px"):
+                solara.Text(
+                    f"Net ${net:,}",
+                    style="color:#1976D2; font-weight:600; font-size:0.85em",
+                )
+        elif state == "electric":
+            solara.Text("✓ Done", style="color:#2E7D32; font-weight:600; font-size:0.85em")
+        else:
+            solara.Text("—", style="color:#BBBBBB; font-size:1.2em")
+
+    # ── Expanded detail panel ────────────────────────────────────────────
+    if expanded:
+        with solara.Column(
+            style=(
+                "margin:0 0 8px 24px; padding:10px 14px;"
+                " background:#F8F9FA; border-radius:8px;"
+                " border-left:3px solid #C5CAE9;"
+            )
+        ):
+            detail_component()
+```
+
+---
+
+### 13.7 Per-Appliance Detail Components
+
+Each appliance gets a dedicated detail component function. Pattern is identical:
+1. Estimated consumption section (read-only)
+2. Current device section (sliders)
+3. Replacement section (conditional, sliders + cost)
+
+```python
+@solara.component
+def HVACDetail():
+    ua = UA_MAP[insulation_quality.value]
+    is_gas = hvac_starting_state.value == "gas"
+
+    # ── 1. Estimated consumption ─────────────────────────────────────────
+    solara.Markdown("**Estimated consumption**")
+    if is_gas:
+        therms = _est_gas_furnace(furnace_afue.value, ua)
+        solara.Markdown(
+            f"|  | Current (gas) |\n|--|--|\n"
+            f"| Heating | {therms:.0f} therms/yr  (~{_kwh_eq(therms):,.0f} kWh-eq) |\n"
+            + (f"| Cooling (AC) | ~{_est_hp_hvac_cooling(hvac_ac_seer.value, ua):.0f} kWh/yr |\n"
+               if hvac_has_cooling.value else "")
+        )
+    else:  # electric
+        heat_kwh = _est_hp_hvac_heating(hp_cop_heating.value, ua)
+        cool_kwh = _est_hp_hvac_cooling(hp_seer_cooling.value, ua)
+        solara.Markdown(
+            f"|  | Current (electric) |\n|--|--|\n"
+            f"| Heating | {heat_kwh:.0f} kWh/yr |\n"
+            f"| Cooling | {cool_kwh:.0f} kWh/yr |\n"
+            f"| Total   | {heat_kwh + cool_kwh:.0f} kWh/yr |\n"
+        )
+
+    solara.Markdown("---")
+
+    # ── 2. Current device specs ──────────────────────────────────────────
+    if is_gas:
+        solara.Markdown("**Current: Gas Furnace**")
+        SliderWithDefault(
+            "Furnace AFUE", furnace_afue,
+            _DEFAULTS["furnace_afue"], 0.70, 0.95, 0.01
+        )
+        SliderWithDefault(
+            "Furnace age", hvac_furnace_age,
+            _DEFAULTS["hvac_furnace_age"], 0, 30, 1, unit=" yrs"
+        )
+        solara.Checkbox(
+            label="Has central AC in baseline",
+            value=hvac_has_cooling,
+        )
+        if hvac_has_cooling.value:
+            SliderWithDefault(
+                "Central AC SEER", hvac_ac_seer,
+                _DEFAULTS["hvac_ac_seer"], 10, 22, 1
+            )
+            SliderWithDefault(
+                "Central AC age", hvac_ac_age,
+                _DEFAULTS["hvac_ac_age"], 0, 20, 1, unit=" yrs"
+            )
+    else:
+        solara.Markdown("**Current: Heat Pump HVAC**")
+        SliderWithDefault(
+            "Heating COP", hp_cop_heating,
+            _DEFAULTS["hp_cop_heating"], 2.5, 4.5, 0.1
+        )
+        SliderWithDefault(
+            "Cooling SEER", hp_seer_cooling,
+            _DEFAULTS["hp_seer_cooling"], 16, 28, 1
+        )
+
+    # ── 3. Replacement specs ─────────────────────────────────────────────
+    if hvac_swap_planned.value and hvac_starting_state.value == "gas":
+        solara.Markdown("---")
+        solara.Markdown("**Replacement: Heat Pump HVAC**")
+        heat_kwh = _est_hp_hvac_heating(hp_cop_heating.value, ua)
+        cool_kwh = _est_hp_hvac_cooling(hp_seer_cooling.value, ua)
+        solara.Markdown(
+            f"Est. consumption: {heat_kwh:.0f} kWh/yr heating + "
+            f"{cool_kwh:.0f} kWh/yr cooling = **{heat_kwh + cool_kwh:.0f} kWh/yr total**"
+        )
+        SliderWithDefault(
+            "Heating COP", hp_cop_heating,
+            _DEFAULTS["hp_cop_heating"], 2.5, 4.5, 0.1
+        )
+        SliderWithDefault(
+            "Cooling SEER", hp_seer_cooling,
+            _DEFAULTS["hp_seer_cooling"], 16, 28, 1
+        )
+        solara.InputInt("Install cost $", value=hvac_install_cost)
+        solara.InputInt("Rebate $",       value=hvac_rebate)
+        solara.Text(
+            f"Net cost: ${hvac_install_cost.value - hvac_rebate.value:,}",
+            style="color:#1976D2; font-weight:600",
+        )
+```
+
+Same pattern for `WaterHeaterDetail`, `DryerDetail`, `CooktopDetail`, `EVDetail`.
+Each follows: consumption table → `---` → current specs → `---` → replacement specs.
+
+---
+
+### 13.8 Wiring into JourneyPlannerPanel
+
+Replace existing `SlotRow` calls with `ExpandableSlotRow`:
+
+```python
+@solara.component
+def JourneyPlannerPanel():
+    with solara.Card("🗺️ Your Electrification Journey", margin=0, elevation=1):
+
+        # Column headers
+        with solara.Row(gap="8px",
+                        style="padding:2px 0 4px 0; font-size:0.76em; color:#999"):
+            solara.Text(" ",        style="min-width:16px")   # chevron column
+            solara.Text("Appliance",  style="min-width:100px; font-weight:600")
+            solara.Text("State",      style="min-width:90px")
+            solara.Text("Plan swap?", style="min-width:60px")
+            solara.Text("Year / Cost", style="flex:1")
+
+        ExpandableSlotRow(
+            "HVAC",
+            hvac_starting_state, hvac_swap_planned,
+            hvac_swap_year, hvac_install_cost, hvac_rebate,
+            hvac_expanded,
+            lambda: HVACDetail()
+        )
+        ExpandableSlotRow(
+            "Water Heater",
+            wh_starting_state, wh_swap_planned,
+            wh_swap_year, wh_install_cost, wh_rebate,
+            wh_expanded,
+            lambda: WaterHeaterDetail()
+        )
+        ExpandableSlotRow(
+            "Dryer",
+            dryer_starting_state, dryer_swap_planned,
+            dryer_swap_year, dryer_install_cost, dryer_rebate,
+            dryer_expanded,
+            lambda: DryerDetail()
+        )
+        ExpandableSlotRow(
+            "Cooktop",
+            cooktop_starting_state, cooktop_swap_planned,
+            cooktop_swap_year, cooktop_install_cost, cooktop_rebate,
+            cooktop_expanded,
+            lambda: CooktopDetail()
+        )
+        ExpandableSlotRow(
+            "EV Charger",
+            ev_starting_state, ev_swap_planned,
+            ev_swap_year, ev_install_cost, ev_rebate,
+            ev_expanded,
+            lambda: EVDetail()
+        )
+
+        # ... (baseload efficiency section unchanged)
+```
+
+**The existing Home Profile panel is simplified:** Remove the device spec sliders
+(`furnace_afue`, `gas_wh_uef`, `hp_cop_heating`, `hp_seer_cooling`, `hpwh_uef`)
+from the Home Profile card since they now live in the expanded detail panels.
+Home Profile retains only: ZIP, climate zone, bedrooms, sq ft, year built, insulation.
+
+---
+
+### 13.9 Pass New Reactives into Simulation
+
+`_build_slot_configs()` updated to use the new per-appliance reactives:
+
+```python
+def _build_slot_configs() -> list:
+    has_ac = hvac_has_cooling.value
+    hvac_baseline = [
+        {"class": "GasFurnace",
+         "afue": furnace_afue.value,
+         "age": hvac_furnace_age.value}          # ← was hardcoded 10
+    ]
+    if has_ac:
+        hvac_baseline.append({
+            "class": "CentralAC",
+            "seer_cooling": hvac_ac_seer.value,  # ← was hardcoded 14
+            "age": hvac_ac_age.value,             # ← was hardcoded 7
+            "installation_cost": 5000
+        })
+    return [
+        {
+            "name": "HVAC", ...
+            "baseline_devices": hvac_baseline,
+            "electric_device": {
+                "class": "HeatPumpHVAC",
+                "cop_heating":  hp_cop_heating.value,
+                "seer_cooling": hp_seer_cooling.value,
+            }, ...
+        },
+        {
+            "name": "Water Heater", ...
+            "baseline_devices": [{
+                "class": "GasWaterHeater",
+                "uef": gas_wh_uef.value,
+                "age": wh_gas_age.value,           # ← was hardcoded 5
+                "daily_gallons_override": (
+                    hw_daily_gallons.value
+                    if hw_gallons_user_override.value else None
+                ),
+            }], ...
+        },
+        {
+            "name": "Dryer", ...
+            "baseline_devices": [{
+                "class": "GasDryer",
+                "therms_per_cycle": dryer_gas_therms_per_cycle.value,
+                "cycles_per_week":  dryer_loads_per_week.value,
+            }],
+            "electric_device": {
+                "class": "HeatPumpDryer",
+                "kwh_per_cycle":   dryer_hp_kwh_per_cycle.value,
+                "cycles_per_week": dryer_loads_per_week.value,
+            }, ...
+        },
+        {
+            "name": "Cooktop", ...
+            "baseline_devices": [{
+                "class": "GasCooktop",
+                "therms_per_meal": cooktop_gas_therms_per_meal.value,
+                "meals_per_week":  cooktop_meals_per_week.value,
+            }],
+            "electric_device": {
+                "class": "InductionCooktop",
+                "kwh_per_meal":  cooktop_induction_kwh_per_meal.value,
+                "meals_per_week": cooktop_meals_per_week.value,
+            }, ...
+        },
+        {
+            "name": "EV Charger", ...
+            "electric_device": {
+                "class": "EVCharger",
+                "monthly_kwh_override": ev_monthly_kwh.value,  # ← overrides default
+            }, ...
+        },
+        # Lights and Appliances slot unchanged
+    ]
+```
+
+---
+
+### 13.10 Tests
+
+Add to `tests/test_journey.py`:
+
+```python
+def test_slot_uses_configured_furnace_afue():
+    """Changing AFUE in slot config changes furnace consumption."""
+    model_80 = HESModel(slot_configs=_slots_with("GasFurnace", afue=0.80))
+    model_95 = HESModel(slot_configs=_slots_with("GasFurnace", afue=0.95))
+    model_80.run_all()
+    model_95.run_all()
+    # Higher AFUE = more efficient = lower gas consumption
+    hvac_therms_80 = model_80.baseline_home.consumption_history_by_slot["HVAC"][0]
+    hvac_therms_95 = model_95.baseline_home.consumption_history_by_slot["HVAC"][0]
+    assert hvac_therms_95 < hvac_therms_80
+
+def test_slot_uses_configured_dryer_loads():
+    """Dryer loads/week drives annual therms proportionally."""
+    model_5  = HESModel(slot_configs=_slots_with("GasDryer", cycles_per_week=5))
+    model_10 = HESModel(slot_configs=_slots_with("GasDryer", cycles_per_week=10))
+    model_5.run_all()
+    model_10.run_all()
+    dryer_5  = model_5.baseline_home.consumption_history_by_slot["Dryer"][0]
+    dryer_10 = model_10.baseline_home.consumption_history_by_slot["Dryer"][0]
+    assert abs(dryer_10 / dryer_5 - 2.0) < 0.05   # should be exactly 2×
+
+def test_hot_water_gallons_override():
+    """daily_gallons_override in slot config overrides bedroom default."""
+    model_65  = HESModel(slot_configs=_slots_with("GasWaterHeater", daily_gallons_override=65))
+    model_100 = HESModel(slot_configs=_slots_with("GasWaterHeater", daily_gallons_override=100))
+    model_65.run_all()
+    model_100.run_all()
+    wh_65  = model_65.baseline_home.consumption_history_by_slot["Water Heater"][0]
+    wh_100 = model_100.baseline_home.consumption_history_by_slot["Water Heater"][0]
+    assert wh_100 > wh_65
+```
+
+---
+
+### 13.11 Claude Code Prompt — Appliance Detail Panels
+
+```
+Implement §13 (Appliance Detail Expand/Collapse + Slider Default Markers)
+of docs/Phase2_Spec.md.
+Apply in three steps.
+
+Step 1 — New reactive state + _build_slot_configs() updates:
+  Add these new reactives to app.py (see §13.2 and §13.3):
+    hvac_expanded, wh_expanded, dryer_expanded, cooktop_expanded, ev_expanded
+    hvac_furnace_age, hvac_ac_seer, hvac_ac_age
+    wh_gas_age, hw_daily_gallons, hw_gallons_user_override
+    dryer_gas_therms_per_cycle, dryer_loads_per_week, dryer_hp_kwh_per_cycle
+    cooktop_gas_therms_per_meal, cooktop_meals_per_week, cooktop_induction_kwh_per_meal
+    ev_monthly_kwh
+  Add all new reactives to _DEFAULTS and reset_to_defaults().
+  Update _build_slot_configs() per §13.9 to use new reactives.
+  Update HomeConfig to add hot_water_daily_gallons: int | None = None.
+  Run pytest — all existing tests must still pass.
+
+Step 2 — SliderWithDefault component + estimation helpers:
+  Add _est_* helper functions per §13.4 (display-only, no simulation).
+  Add SliderWithDefault component per §13.5.
+  Add UA_MAP = {"poor": 650, "average": 500, "good": 350} to app.py constants.
+  Do not change any simulation code.
+
+Step 3 — ExpandableSlotRow + detail components:
+  Add ExpandableSlotRow component per §13.6.
+  Add HVACDetail, WaterHeaterDetail, DryerDetail, CooktopDetail, EVDetail
+  components per §13.7 pattern:
+    - First item: estimated consumption table (read-only)
+    - Second item: current device specs (SliderWithDefault)
+    - Third item: replacement specs (conditional, SliderWithDefault + costs)
+  Replace SlotRow calls in JourneyPlannerPanel with ExpandableSlotRow per §13.8.
+  Remove device spec sliders from HomeProfilePanel
+    (furnace_afue, gas_wh_uef, hp_cop, hp_seer, hpwh_uef now live in detail panels).
+  HomeProfilePanel retains: ZIP, climate zone, bedrooms, sq ft, year built, insulation.
+  Add tests from §13.10.
+  Run solara run src/app.py and verify:
+    - Clicking a row expands the detail panel; clicking again collapses it
+    - Chevron rotates correctly
+    - Estimated consumption shows as first item in every expanded panel
+    - SliderWithDefault shows default tick mark on all device spec sliders
+    - Delta label appears (green/red) when slider moves from default
+    - Delta label disappears when slider returns to default
+    - Current specs section: sliders match starting_state (gas shows furnace,
+      electric shows heat pump)
+    - Replacement section hidden when swap not planned; shown when planned
+    - Changing AFUE slider updates simulation results in real time
+    - Changing loads/week on dryer changes cost charts in real time
+    - HomeProfilePanel no longer shows device spec sliders
 ```
 
 ---

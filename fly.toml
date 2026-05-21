@@ -1,12 +1,13 @@
-# fly.toml app configuration file generated for whywatt on 2026-05-20T17:26:55Z
-#
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
+# fly.toml for WhyWatt
+# Solara runs on port 8080 via PORT env var; internal_port must match.
 
-app = 'whywatt'
+app = 'whywatt-hes'
 primary_region = 'sjc'
 
 [build]
+
+[env]
+  PORT = "8080"
 
 [http_service]
   internal_port = 8080
@@ -20,4 +21,3 @@ primary_region = 'sjc'
   memory = '1gb'
   cpu_kind = 'shared'
   cpus = 1
-  memory_mb = 256
