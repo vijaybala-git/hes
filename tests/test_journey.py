@@ -724,3 +724,63 @@ def test_baseline_home_always_uses_formula_before():
     costs = bh.cost_history_by_slot["Lights and Appliances"]
     assert all(costs[i] <= costs[i + 1] for i in range(len(costs) - 1)), \
         "Baseline baseload costs must rise monotonically (no efficiency drop)"
+
+
+# ── §13.10 Appliance detail spec tests ────────────────────────────────────────
+
+import copy as _copy
+
+def _default_slot_configs():
+    """Load the default slot configs from JSON."""
+    import json, pathlib
+    path = pathlib.Path(__file__).parent.parent / "data/homes/journey_slots_default.json"
+    return json.loads(path.read_text())
+
+
+def _slots_with(device_class: str, **overrides) -> list:
+    """Return default slot configs with overrides applied to the named device class."""
+    configs = _copy.deepcopy(_default_slot_configs())
+    for slot in configs:
+        for dev in slot.get("baseline_devices", []):
+            if dev.get("class") == device_class:
+                dev.update(overrides)
+        ed = slot.get("electric_device") or {}
+        if ed.get("class") == device_class:
+            ed.update(overrides)
+    return configs
+
+
+def test_slot_uses_configured_furnace_afue():
+    """Changing AFUE in slot config changes furnace consumption."""
+    from model import HESModel
+    model_80 = HESModel(slot_configs=_slots_with("GasFurnace", afue=0.80))
+    model_95 = HESModel(slot_configs=_slots_with("GasFurnace", afue=0.95))
+    model_80.run_all()
+    model_95.run_all()
+    hvac_80 = model_80.baseline_home.consumption_history_by_slot["HVAC"][0]
+    hvac_95 = model_95.baseline_home.consumption_history_by_slot["HVAC"][0]
+    assert hvac_95 < hvac_80, "Higher AFUE furnace must use less gas"
+
+
+def test_slot_uses_configured_dryer_loads():
+    """Dryer loads/week drives annual therms proportionally."""
+    from model import HESModel
+    model_5  = HESModel(slot_configs=_slots_with("GasDryer", cycles_per_week=5))
+    model_10 = HESModel(slot_configs=_slots_with("GasDryer", cycles_per_week=10))
+    model_5.run_all()
+    model_10.run_all()
+    dryer_5  = model_5.baseline_home.consumption_history_by_slot["Dryer"][0]
+    dryer_10 = model_10.baseline_home.consumption_history_by_slot["Dryer"][0]
+    assert abs(dryer_10 / dryer_5 - 2.0) < 0.05, "Double loads must double therms"
+
+
+def test_hot_water_gallons_override():
+    """daily_gallons_override in slot config overrides bedroom default."""
+    from model import HESModel
+    model_65  = HESModel(slot_configs=_slots_with("GasWaterHeater", daily_gallons_override=65))
+    model_100 = HESModel(slot_configs=_slots_with("GasWaterHeater", daily_gallons_override=100))
+    model_65.run_all()
+    model_100.run_all()
+    wh_65  = model_65.baseline_home.consumption_history_by_slot["Water Heater"][0]
+    wh_100 = model_100.baseline_home.consumption_history_by_slot["Water Heater"][0]
+    assert wh_100 > wh_65, "More gallons/day must mean higher gas consumption"

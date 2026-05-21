@@ -67,6 +67,44 @@ CHART_OPTIONS = [
 
 KWH_PER_THERM = 29.3
 
+UA_MAP = {"poor": 650, "average": 500, "good": 350}
+
+
+# ── Display-only consumption estimators (not used in simulation) ──────────────
+
+def _est_gas_furnace(afue: float, ua: int, annual_hdd: int = 1910) -> float:
+    return annual_hdd * 24 * ua / (afue * 100_000)
+
+def _est_hp_hvac_heating(cop: float, ua: int, annual_hdd: int = 1910) -> float:
+    return annual_hdd * 24 * ua / (cop * 3412)
+
+def _est_hp_hvac_cooling(seer: float, ua: int, annual_cdd: int = 340) -> float:
+    return annual_cdd * 24 * ua / (seer * 1000)
+
+def _est_gas_wh(uef: float, daily_gal: int,
+                avg_inlet_f: float = 60.0, setpoint_f: float = 120.0) -> float:
+    return daily_gal * 365 * 8.33 * (setpoint_f - avg_inlet_f) * 0.00001 / uef
+
+def _est_hpwh(uef: float, daily_gal: int,
+              avg_inlet_f: float = 60.0, setpoint_f: float = 120.0) -> float:
+    return daily_gal * 365 * 8.33 * (setpoint_f - avg_inlet_f) * 0.000293 / uef
+
+def _est_gas_dryer(therms_per_cycle: float, loads_per_week: int) -> float:
+    return therms_per_cycle * loads_per_week * 52
+
+def _est_hp_dryer(kwh_per_cycle: float, loads_per_week: int) -> float:
+    return kwh_per_cycle * loads_per_week * 52
+
+def _est_gas_cooktop(therms_per_meal: float, meals_per_week: int) -> float:
+    return therms_per_meal * meals_per_week * 52
+
+def _est_induction(kwh_per_meal: float, meals_per_week: int) -> float:
+    return kwh_per_meal * meals_per_week * 52
+
+def _kwh_eq(therms: float) -> float:
+    return therms * KWH_PER_THERM
+
+
 DEVICE_ORDER  = ["HVAC", "Water Heater", "Dryer", "Cooktop", "Lights and Appliances"]
 DEVICE_LABELS = ["HVAC", "Water Heater", "Dryer", "Cooktop", "Baseload"]
 DEVICE_COLORS = ["#0D47A1", "#1565C0", "#D0302D", "#EC9B1E", "#78909C"]
@@ -126,6 +164,29 @@ _DEFAULTS = {
     "baseload_swap_year":       2,
     "baseload_install_cost":    400,
     "baseload_rebate":          0,
+    # Expand/collapse state
+    "hvac_expanded":    False,
+    "wh_expanded":      False,
+    "dryer_expanded":   False,
+    "cooktop_expanded": False,
+    "ev_expanded":      False,
+    # HVAC detail specs
+    "hvac_furnace_age": 10,
+    "hvac_ac_seer":     14,
+    "hvac_ac_age":      7,
+    # WH detail specs
+    "wh_gas_age":       5,
+    "hw_daily_gallons": 65,
+    # Dryer detail specs
+    "dryer_gas_therms_per_cycle": 0.22,
+    "dryer_loads_per_week":       5,
+    "dryer_hp_kwh_per_cycle":     1.8,
+    # Cooktop detail specs
+    "cooktop_gas_therms_per_meal":    0.05,
+    "cooktop_meals_per_week":         14,
+    "cooktop_induction_kwh_per_meal": 0.9,
+    # EV detail specs
+    "ev_monthly_kwh": 295,
     # Pricing
     "gas_cagr_pct_a":         8,
     "elec_cagr_pct_a":        7,
@@ -203,6 +264,36 @@ baseload_swap_year       = solara.reactive(2)
 baseload_install_cost    = solara.reactive(400)
 baseload_rebate          = solara.reactive(0)
 
+# Expand/collapse state (one per slot)
+hvac_expanded    = solara.reactive(False)
+wh_expanded      = solara.reactive(False)
+dryer_expanded   = solara.reactive(False)
+cooktop_expanded = solara.reactive(False)
+ev_expanded      = solara.reactive(False)
+
+# HVAC detail specs
+hvac_furnace_age = solara.reactive(10)   # yrs
+hvac_ac_seer     = solara.reactive(14)   # existing CentralAC SEER
+hvac_ac_age      = solara.reactive(7)    # yrs
+
+# Water Heater detail specs
+wh_gas_age              = solara.reactive(5)     # yrs
+hw_daily_gallons        = solara.reactive(65)    # gal/day
+hw_gallons_user_override = solara.reactive(False) # True once user moves slider
+
+# Dryer detail specs
+dryer_gas_therms_per_cycle = solara.reactive(0.22)
+dryer_loads_per_week       = solara.reactive(5)
+dryer_hp_kwh_per_cycle     = solara.reactive(1.8)
+
+# Cooktop detail specs
+cooktop_gas_therms_per_meal    = solara.reactive(0.05)
+cooktop_meals_per_week         = solara.reactive(14)
+cooktop_induction_kwh_per_meal = solara.reactive(0.9)
+
+# EV detail specs
+ev_monthly_kwh = solara.reactive(295)   # kWh/month
+
 # Device chart home selector (shared by both device chart types)
 device_chart_home = solara.reactive("journey")   # "journey" | "baseline"
 
@@ -265,6 +356,24 @@ def reset_to_defaults():
     baseload_swap_year.set(_DEFAULTS["baseload_swap_year"])
     baseload_install_cost.set(_DEFAULTS["baseload_install_cost"])
     baseload_rebate.set(_DEFAULTS["baseload_rebate"])
+    hvac_expanded.set(_DEFAULTS["hvac_expanded"])
+    wh_expanded.set(_DEFAULTS["wh_expanded"])
+    dryer_expanded.set(_DEFAULTS["dryer_expanded"])
+    cooktop_expanded.set(_DEFAULTS["cooktop_expanded"])
+    ev_expanded.set(_DEFAULTS["ev_expanded"])
+    hvac_furnace_age.set(_DEFAULTS["hvac_furnace_age"])
+    hvac_ac_seer.set(_DEFAULTS["hvac_ac_seer"])
+    hvac_ac_age.set(_DEFAULTS["hvac_ac_age"])
+    wh_gas_age.set(_DEFAULTS["wh_gas_age"])
+    hw_daily_gallons.set(_DEFAULTS["hw_daily_gallons"])
+    hw_gallons_user_override.set(False)
+    dryer_gas_therms_per_cycle.set(_DEFAULTS["dryer_gas_therms_per_cycle"])
+    dryer_loads_per_week.set(_DEFAULTS["dryer_loads_per_week"])
+    dryer_hp_kwh_per_cycle.set(_DEFAULTS["dryer_hp_kwh_per_cycle"])
+    cooktop_gas_therms_per_meal.set(_DEFAULTS["cooktop_gas_therms_per_meal"])
+    cooktop_meals_per_week.set(_DEFAULTS["cooktop_meals_per_week"])
+    cooktop_induction_kwh_per_meal.set(_DEFAULTS["cooktop_induction_kwh_per_meal"])
+    ev_monthly_kwh.set(_DEFAULTS["ev_monthly_kwh"])
     gas_cagr_pct_a.set(_DEFAULTS["gas_cagr_pct_a"])
     elec_cagr_pct_a.set(_DEFAULTS["elec_cagr_pct_a"])
     comparison_mode.set(_DEFAULTS["comparison_mode"])
@@ -320,10 +429,20 @@ def _eff_swap_year(state, planned, yr):
 def _build_slot_configs() -> list:
     """Convert current reactive state into a slot-config list for HESModel."""
     has_ac = hvac_has_cooling.value
-    hvac_baseline = [{"class": "GasFurnace", "afue": furnace_afue.value, "age": 10}]
+    hvac_baseline = [{
+        "class": "GasFurnace",
+        "afue": furnace_afue.value,
+        "age": hvac_furnace_age.value,
+        "lifespan": 20, "installation_cost": 6000,
+    }]
     if has_ac:
-        hvac_baseline.append({"class": "CentralAC", "seer_cooling": 14,
-                               "age": 7, "installation_cost": 5000})
+        hvac_baseline.append({
+            "class": "CentralAC",
+            "seer_cooling": hvac_ac_seer.value,
+            "age": hvac_ac_age.value,
+            "installation_cost": 5000,
+        })
+    hw_override = hw_daily_gallons.value if hw_gallons_user_override.value else None
     return [
         {
             "name": "HVAC",
@@ -335,6 +454,7 @@ def _build_slot_configs() -> list:
                 "class": "HeatPumpHVAC",
                 "cop_heating": hp_cop_heating.value,
                 "seer_cooling": hp_seer_cooling.value,
+                "lifespan": 15, "installation_cost": 14000,
             },
             "swap_year": _eff_swap_year(hvac_starting_state.value,
                                         hvac_swap_planned.value, hvac_swap_year.value),
@@ -346,9 +466,19 @@ def _build_slot_configs() -> list:
             "category": "WaterHeating",
             "starting_state": wh_starting_state.value,
             "has_cooling_baseline": False,
-            "baseline_devices": [{"class": "GasWaterHeater",
-                                   "uef": gas_wh_uef.value, "age": 5}],
-            "electric_device": {"class": "HeatPumpWaterHeater", "uef": hpwh_uef.value},
+            "baseline_devices": [{
+                "class": "GasWaterHeater",
+                "uef": gas_wh_uef.value,
+                "age": wh_gas_age.value,
+                "lifespan": 12, "installation_cost": 1200,
+                "daily_gallons_override": hw_override,
+            }],
+            "electric_device": {
+                "class": "HeatPumpWaterHeater",
+                "uef": hpwh_uef.value,
+                "lifespan": 15, "installation_cost": 2500,
+                "daily_gallons_override": hw_override,
+            },
             "swap_year": _eff_swap_year(wh_starting_state.value,
                                         wh_swap_planned.value, wh_swap_year.value),
             "install_cost": wh_install_cost.value,
@@ -359,10 +489,18 @@ def _build_slot_configs() -> list:
             "category": "Baseload",
             "starting_state": dryer_starting_state.value,
             "has_cooling_baseline": False,
-            "baseline_devices": [{"class": "GasDryer",
-                                   "therms_per_cycle": 0.22, "cycles_per_week": 5}],
-            "electric_device": {"class": "HeatPumpDryer",
-                                "kwh_per_cycle": 1.8, "cycles_per_week": 5},
+            "baseline_devices": [{
+                "class": "GasDryer",
+                "therms_per_cycle": dryer_gas_therms_per_cycle.value,
+                "cycles_per_week":  dryer_loads_per_week.value,
+                "lifespan": 15, "installation_cost": 800,
+            }],
+            "electric_device": {
+                "class": "HeatPumpDryer",
+                "kwh_per_cycle":   dryer_hp_kwh_per_cycle.value,
+                "cycles_per_week": dryer_loads_per_week.value,
+                "lifespan": 15, "installation_cost": 1200,
+            },
             "swap_year": _eff_swap_year(dryer_starting_state.value,
                                         dryer_swap_planned.value, dryer_swap_year.value),
             "install_cost": dryer_install_cost.value,
@@ -373,10 +511,18 @@ def _build_slot_configs() -> list:
             "category": "Baseload",
             "starting_state": cooktop_starting_state.value,
             "has_cooling_baseline": False,
-            "baseline_devices": [{"class": "GasCooktop",
-                                   "therms_per_meal": 0.05, "meals_per_week": 14}],
-            "electric_device": {"class": "InductionCooktop",
-                                "kwh_per_meal": 0.9, "meals_per_week": 14},
+            "baseline_devices": [{
+                "class": "GasCooktop",
+                "therms_per_meal": cooktop_gas_therms_per_meal.value,
+                "meals_per_week":  cooktop_meals_per_week.value,
+                "lifespan": 20, "installation_cost": 1000,
+            }],
+            "electric_device": {
+                "class": "InductionCooktop",
+                "kwh_per_meal":  cooktop_induction_kwh_per_meal.value,
+                "meals_per_week": cooktop_meals_per_week.value,
+                "lifespan": 20, "installation_cost": 1500,
+            },
             "swap_year": _eff_swap_year(cooktop_starting_state.value,
                                         cooktop_swap_planned.value, cooktop_swap_year.value),
             "install_cost": cooktop_install_cost.value,
@@ -388,7 +534,11 @@ def _build_slot_configs() -> list:
             "starting_state": ev_starting_state.value,
             "has_cooling_baseline": False,
             "baseline_devices": [],
-            "electric_device": {"class": "EVCharger"},
+            "electric_device": {
+                "class": "EVCharger",
+                "monthly_kwh_override": ev_monthly_kwh.value,
+                "lifespan": 20, "installation_cost": 800,
+            },
             "swap_year": _eff_swap_year(ev_starting_state.value,
                                         ev_swap_planned.value, ev_swap_year.value),
             "install_cost": ev_install_cost.value,
@@ -397,12 +547,12 @@ def _build_slot_configs() -> list:
         {
             "name": "Lights and Appliances",
             "category": "Baseload",
-            "starting_state": "electric",
+            "starting_state": "gas",
             "has_cooling_baseline": False,
-            "baseline_devices": [],
-            "electric_device": {"class": "LightsAndPlugs", "annual_kwh": 1200},
+            "baseline_devices": [{"class": "LightsAndPlugs", "annual_kwh": 0, "lifespan": 15}],
+            "electric_device":   {"class": "LightsAndPlugs", "annual_kwh": 0, "lifespan": 15},
             "swap_year": None,
-            "install_cost": 0,
+            "install_cost": 400,
             "rebate": 0,
         },
     ]
@@ -425,6 +575,8 @@ def run_simulation():
                             if baseload_swap_planned.value else None),
         baseload_install_cost=baseload_install_cost.value,
         baseload_rebate=baseload_rebate.value,
+        hot_water_daily_gallons=(hw_daily_gallons.value
+                                  if hw_gallons_user_override.value else None),
     )
     m = HESModel(
         home_config=hc,
@@ -858,6 +1010,49 @@ def SummaryStats(df, n, model):
 
 
 @solara.component
+def SliderWithDefault(label, value, default, min, max, step=1, unit="", fmt="{v}"):
+    """Slider with a default-position tick mark and a delta label when changed."""
+    v = value.value
+    at_default = abs(v - default) < (step * 0.01)
+    delta = v - default
+    tick_pct = int(100 * (default - min) / (max - min)) if max != min else 50
+    display_label = f"{label}: {fmt.format(v=v)}{unit}"
+
+    with solara.Column(gap="0px"):
+        if isinstance(default, float):
+            solara.SliderFloat(display_label, value=value, min=min, max=max, step=step)
+        else:
+            solara.SliderInt(display_label, value=value, min=min, max=max, step=int(step))
+
+        solara.HTML(
+            tag="div",
+            unsafe_innerHTML=(
+                f"<div style='position:relative;height:6px;margin:-4px 0 2px 0;"
+                f"pointer-events:none;'>"
+                f"<div style='position:absolute;left:{tick_pct}%;top:0;bottom:0;"
+                f"width:2px;background:#0D47A1;opacity:0.5;border-radius:1px;'></div>"
+                f"<div style='position:absolute;left:{tick_pct}%;top:50%;"
+                f"transform:translate(-50%,-50%);width:6px;height:6px;"
+                f"background:#0D47A1;opacity:0.5;border-radius:50%;'></div>"
+                f"</div>"
+            ),
+        )
+
+        if not at_default:
+            sign = "+" if delta > 0 else ""
+            color = "#D0302D" if delta < 0 else "#2E7D32"
+            solara.HTML(
+                tag="div",
+                unsafe_innerHTML=(
+                    f"<div style='font-size:0.75em;color:{color};"
+                    f"margin-top:1px;padding-left:2px;'>"
+                    f"{sign}{fmt.format(v=delta)}{unit} from default "
+                    f"({fmt.format(v=default)}{unit})</div>"
+                ),
+            )
+
+
+@solara.component
 def SlotRow(name, state_rv, swap_planned_rv, swap_year_rv, install_cost_rv, rebate_rv):
     """One appliance row in the Journey Planner panel."""
     state   = state_rv.value
@@ -906,36 +1101,327 @@ def SlotRow(name, state_rv, swap_planned_rv, swap_year_rv, install_cost_rv, reba
 
 
 @solara.component
+def ExpandableSlotRow(name, state_rv, swap_planned_rv, swap_year_rv,
+                      install_cost_rv, rebate_rv, expanded_rv, detail_component):
+    state    = state_rv.value
+    planned  = swap_planned_rv.value
+    yr       = swap_year_rv.value
+    net      = install_cost_rv.value - rebate_rv.value
+    cal_yr   = sim_start_year.value + yr - 1
+    expanded = expanded_rv.value
+    chevron  = "▼" if expanded else "▶"
+    show_swap = (state in ("gas", "none")) and planned
+
+    with solara.Row(
+        gap="8px",
+        style=(
+            "align-items:center; flex-wrap:wrap; padding:6px 0;"
+            " border-bottom:1px solid #EEEEEE; cursor:pointer;"
+        ),
+        on_click=lambda: expanded_rv.set(not expanded_rv.value),
+    ):
+        solara.Text(chevron, style="color:#78909C; font-size:0.9em; flex-shrink:0; min-width:14px")
+        with solara.Column(style="min-width:100px; max-width:100px"):
+            solara.Text(name, style="font-weight:500; font-size:0.9em")
+        with solara.Column(style="min-width:90px; max-width:90px"):
+            solara.Select("", value=state_rv, values=["gas", "electric", "none"])
+        with solara.Column(style="min-width:60px; max-width:60px"):
+            if state != "electric":
+                solara.Checkbox(label="Plan", value=swap_planned_rv)
+        if show_swap:
+            with solara.Column(style="min-width:160px"):
+                solara.SliderInt(f"Yr {yr} ({cal_yr})", value=swap_year_rv, min=1, max=25)
+            with solara.Column(style="min-width:90px"):
+                solara.InputInt("Install $", value=install_cost_rv)
+            with solara.Column(style="min-width:70px"):
+                solara.InputInt("Rebate", value=rebate_rv)
+            with solara.Column(style="min-width:65px"):
+                solara.Text(f"Net ${net:,}",
+                            style="color:#1976D2; font-weight:600; font-size:0.85em")
+        elif state == "electric":
+            solara.Text("✓ Done", style="color:#2E7D32; font-weight:600; font-size:0.85em")
+        else:
+            solara.Text("—", style="color:#BBBBBB; font-size:1.2em")
+
+    if expanded:
+        with solara.Column(
+            style=(
+                "margin:0 0 8px 24px; padding:10px 14px;"
+                " background:#F8F9FA; border-radius:8px;"
+                " border-left:3px solid #C5CAE9;"
+            )
+        ):
+            detail_component()
+
+
+@solara.component
+def HVACDetail():
+    ua = UA_MAP[insulation_quality.value]
+    is_gas = hvac_starting_state.value == "gas"
+
+    solara.Markdown("**Estimated consumption**")
+    if is_gas:
+        therms = _est_gas_furnace(furnace_afue.value, ua)
+        cool_line = (
+            f"| Cooling (AC) | ~{_est_hp_hvac_cooling(hvac_ac_seer.value, ua):.0f} kWh/yr |\n"
+            if hvac_has_cooling.value else ""
+        )
+        solara.Markdown(
+            f"|  | Current (gas) |\n|--|--|\n"
+            f"| Heating | {therms:.0f} therms/yr (~{_kwh_eq(therms):,.0f} kWh-eq) |\n"
+            + cool_line
+        )
+    else:
+        heat_kwh = _est_hp_hvac_heating(hp_cop_heating.value, ua)
+        cool_kwh = _est_hp_hvac_cooling(hp_seer_cooling.value, ua)
+        solara.Markdown(
+            f"|  | Current (electric) |\n|--|--|\n"
+            f"| Heating | {heat_kwh:.0f} kWh/yr |\n"
+            f"| Cooling | {cool_kwh:.0f} kWh/yr |\n"
+            f"| Total   | {heat_kwh + cool_kwh:.0f} kWh/yr |\n"
+        )
+
+    solara.Markdown("---")
+    if is_gas:
+        solara.Markdown("**Current: Gas Furnace**")
+        SliderWithDefault("Furnace AFUE", furnace_afue, _DEFAULTS["furnace_afue"],
+                          0.70, 0.95, 0.01, fmt="{v:.2f}")
+        SliderWithDefault("Furnace age", hvac_furnace_age, _DEFAULTS["hvac_furnace_age"],
+                          0, 30, 1, unit=" yrs")
+        solara.Checkbox(label="Has central AC in baseline", value=hvac_has_cooling)
+        if hvac_has_cooling.value:
+            SliderWithDefault("Central AC SEER", hvac_ac_seer, _DEFAULTS["hvac_ac_seer"],
+                              10, 22, 1)
+            SliderWithDefault("Central AC age", hvac_ac_age, _DEFAULTS["hvac_ac_age"],
+                              0, 20, 1, unit=" yrs")
+    else:
+        solara.Markdown("**Current: Heat Pump HVAC**")
+        SliderWithDefault("Heating COP", hp_cop_heating, _DEFAULTS["hp_cop_heating"],
+                          2.5, 4.5, 0.1, fmt="{v:.1f}")
+        SliderWithDefault("Cooling SEER", hp_seer_cooling, _DEFAULTS["hp_seer_cooling"],
+                          16, 28, 1)
+
+    if hvac_swap_planned.value and is_gas:
+        solara.Markdown("---")
+        solara.Markdown("**Replacement: Heat Pump HVAC**")
+        heat_kwh = _est_hp_hvac_heating(hp_cop_heating.value, ua)
+        cool_kwh = _est_hp_hvac_cooling(hp_seer_cooling.value, ua)
+        solara.Markdown(
+            f"Est. consumption: {heat_kwh:.0f} kWh/yr heating + "
+            f"{cool_kwh:.0f} kWh/yr cooling = **{heat_kwh + cool_kwh:.0f} kWh/yr total**"
+        )
+        SliderWithDefault("Heating COP", hp_cop_heating, _DEFAULTS["hp_cop_heating"],
+                          2.5, 4.5, 0.1, fmt="{v:.1f}")
+        SliderWithDefault("Cooling SEER", hp_seer_cooling, _DEFAULTS["hp_seer_cooling"],
+                          16, 28, 1)
+        solara.InputInt("Install cost $", value=hvac_install_cost)
+        solara.InputInt("Rebate $", value=hvac_rebate)
+        solara.Text(f"Net cost: ${hvac_install_cost.value - hvac_rebate.value:,}",
+                    style="color:#1976D2; font-weight:600")
+
+
+@solara.component
+def WaterHeaterDetail():
+    ua = UA_MAP[insulation_quality.value]
+    gal = hw_daily_gallons.value
+    is_gas = wh_starting_state.value == "gas"
+
+    solara.Markdown("**Estimated consumption**")
+    if is_gas:
+        therms = _est_gas_wh(gas_wh_uef.value, gal)
+        solara.Markdown(
+            f"|  | Current (gas) |\n|--|--|\n"
+            f"| Water heating | {therms:.0f} therms/yr (~{_kwh_eq(therms):,.0f} kWh-eq) |\n"
+        )
+    else:
+        kwh = _est_hpwh(hpwh_uef.value, gal)
+        solara.Markdown(
+            f"|  | Current (electric) |\n|--|--|\n"
+            f"| Water heating | {kwh:.0f} kWh/yr |\n"
+        )
+
+    solara.Markdown("---")
+    if is_gas:
+        solara.Markdown("**Current: Gas Water Heater**")
+        SliderWithDefault("Gas WH UEF", gas_wh_uef, _DEFAULTS["gas_wh_uef"],
+                          0.55, 0.70, 0.01, fmt="{v:.2f}")
+        SliderWithDefault("Age", wh_gas_age, _DEFAULTS["wh_gas_age"],
+                          0, 20, 1, unit=" yrs")
+    else:
+        solara.Markdown("**Current: Heat Pump Water Heater**")
+        SliderWithDefault("HPWH UEF", hpwh_uef, _DEFAULTS["hpwh_uef"],
+                          2.5, 4.0, 0.1, fmt="{v:.1f}")
+
+    def _set_gallons(v):
+        hw_daily_gallons.set(v)
+        hw_gallons_user_override.set(True)
+
+    solara.SliderInt(
+        f"Daily hot water: {hw_daily_gallons.value} gal/day",
+        value=hw_daily_gallons, min=20, max=120, step=5,
+        on_value=_set_gallons,
+    )
+    solara.Text(f"(bedroom default: {_DEFAULTS['hw_daily_gallons']} gal/day)",
+                style="font-size:0.78em; color:#888")
+
+    if wh_swap_planned.value and is_gas:
+        solara.Markdown("---")
+        solara.Markdown("**Replacement: Heat Pump Water Heater**")
+        kwh = _est_hpwh(hpwh_uef.value, gal)
+        solara.Markdown(f"Est. consumption: **{kwh:.0f} kWh/yr**")
+        SliderWithDefault("HPWH UEF", hpwh_uef, _DEFAULTS["hpwh_uef"],
+                          2.5, 4.0, 0.1, fmt="{v:.1f}")
+        solara.InputInt("Install cost $", value=wh_install_cost)
+        solara.InputInt("Rebate $", value=wh_rebate)
+        solara.Text(f"Net cost: ${wh_install_cost.value - wh_rebate.value:,}",
+                    style="color:#1976D2; font-weight:600")
+
+
+@solara.component
+def DryerDetail():
+    is_gas = dryer_starting_state.value == "gas"
+
+    solara.Markdown("**Estimated consumption**")
+    if is_gas:
+        therms = _est_gas_dryer(dryer_gas_therms_per_cycle.value, dryer_loads_per_week.value)
+        solara.Markdown(
+            f"|  | Current (gas) |\n|--|--|\n"
+            f"| Dryer | {therms:.0f} therms/yr (~{_kwh_eq(therms):,.0f} kWh-eq) |\n"
+        )
+    else:
+        kwh = _est_hp_dryer(dryer_hp_kwh_per_cycle.value, dryer_loads_per_week.value)
+        solara.Markdown(
+            f"|  | Current (electric) |\n|--|--|\n"
+            f"| Dryer | {kwh:.0f} kWh/yr |\n"
+        )
+
+    solara.Markdown("---")
+    if is_gas:
+        solara.Markdown("**Current: Gas Dryer**")
+        SliderWithDefault("Therms/cycle", dryer_gas_therms_per_cycle,
+                          _DEFAULTS["dryer_gas_therms_per_cycle"],
+                          0.15, 0.35, 0.01, fmt="{v:.2f}")
+    else:
+        solara.Markdown("**Current: Heat Pump Dryer**")
+        SliderWithDefault("kWh/cycle", dryer_hp_kwh_per_cycle,
+                          _DEFAULTS["dryer_hp_kwh_per_cycle"],
+                          1.2, 2.5, 0.1, fmt="{v:.1f}")
+    SliderWithDefault("Loads/week", dryer_loads_per_week, _DEFAULTS["dryer_loads_per_week"],
+                      1, 14, 1, unit=" /wk")
+
+    if dryer_swap_planned.value and is_gas:
+        solara.Markdown("---")
+        solara.Markdown("**Replacement: Heat Pump Dryer**")
+        kwh = _est_hp_dryer(dryer_hp_kwh_per_cycle.value, dryer_loads_per_week.value)
+        solara.Markdown(f"Est. consumption: **{kwh:.0f} kWh/yr**")
+        SliderWithDefault("kWh/cycle", dryer_hp_kwh_per_cycle,
+                          _DEFAULTS["dryer_hp_kwh_per_cycle"],
+                          1.2, 2.5, 0.1, fmt="{v:.1f}")
+        solara.InputInt("Install cost $", value=dryer_install_cost)
+        solara.InputInt("Rebate $", value=dryer_rebate)
+        solara.Text(f"Net cost: ${dryer_install_cost.value - dryer_rebate.value:,}",
+                    style="color:#1976D2; font-weight:600")
+
+
+@solara.component
+def CooktopDetail():
+    is_gas = cooktop_starting_state.value == "gas"
+
+    solara.Markdown("**Estimated consumption**")
+    if is_gas:
+        therms = _est_gas_cooktop(cooktop_gas_therms_per_meal.value, cooktop_meals_per_week.value)
+        solara.Markdown(
+            f"|  | Current (gas) |\n|--|--|\n"
+            f"| Cooktop | {therms:.0f} therms/yr (~{_kwh_eq(therms):,.0f} kWh-eq) |\n"
+        )
+    else:
+        kwh = _est_induction(cooktop_induction_kwh_per_meal.value, cooktop_meals_per_week.value)
+        solara.Markdown(
+            f"|  | Current (electric) |\n|--|--|\n"
+            f"| Cooktop | {kwh:.0f} kWh/yr |\n"
+        )
+
+    solara.Markdown("---")
+    if is_gas:
+        solara.Markdown("**Current: Gas Cooktop**")
+        SliderWithDefault("Therms/meal", cooktop_gas_therms_per_meal,
+                          _DEFAULTS["cooktop_gas_therms_per_meal"],
+                          0.03, 0.10, 0.01, fmt="{v:.2f}")
+    else:
+        solara.Markdown("**Current: Induction Cooktop**")
+        SliderWithDefault("kWh/meal", cooktop_induction_kwh_per_meal,
+                          _DEFAULTS["cooktop_induction_kwh_per_meal"],
+                          0.6, 1.4, 0.1, fmt="{v:.1f}")
+    SliderWithDefault("Meals/week", cooktop_meals_per_week, _DEFAULTS["cooktop_meals_per_week"],
+                      3, 21, 1, unit=" /wk")
+
+    if cooktop_swap_planned.value and is_gas:
+        solara.Markdown("---")
+        solara.Markdown("**Replacement: Induction Cooktop**")
+        kwh = _est_induction(cooktop_induction_kwh_per_meal.value, cooktop_meals_per_week.value)
+        solara.Markdown(f"Est. consumption: **{kwh:.0f} kWh/yr**")
+        SliderWithDefault("kWh/meal", cooktop_induction_kwh_per_meal,
+                          _DEFAULTS["cooktop_induction_kwh_per_meal"],
+                          0.6, 1.4, 0.1, fmt="{v:.1f}")
+        solara.InputInt("Install cost $", value=cooktop_install_cost)
+        solara.InputInt("Rebate $", value=cooktop_rebate)
+        solara.Text(f"Net cost: ${cooktop_install_cost.value - cooktop_rebate.value:,}",
+                    style="color:#1976D2; font-weight:600")
+
+
+@solara.component
+def EVDetail():
+    annual_kwh = ev_monthly_kwh.value * 12
+    solara.Markdown("**Estimated consumption**")
+    solara.Markdown(
+        f"|  | After adding EV |\n|--|--|\n"
+        f"| EV charging | **{annual_kwh:,} kWh/yr** ({ev_monthly_kwh.value} kWh/month) |\n"
+    )
+    solara.Text("(Not in do-nothing baseline — absent until you add the EV)",
+                style="font-size:0.80em; color:#888")
+
+    if ev_swap_planned.value:
+        solara.Markdown("---")
+        solara.Markdown("**EV Charger (L2)**")
+        SliderWithDefault("Monthly kWh", ev_monthly_kwh, _DEFAULTS["ev_monthly_kwh"],
+                          50, 600, 5, unit=" kWh/mo")
+        solara.InputInt("Install cost $", value=ev_install_cost)
+        solara.InputInt("Rebate $", value=ev_rebate)
+        solara.Text(f"Net cost: ${ev_install_cost.value - ev_rebate.value:,}",
+                    style="color:#1976D2; font-weight:600")
+
+
+@solara.component
 def JourneyPlannerPanel():
     with solara.Card("🗺️ Your Electrification Journey", margin=0, elevation=1):
         with solara.Row(gap="8px",
                         style="padding:2px 0 4px 0; font-size:0.76em; color:#999"):
-            solara.Text("Appliance",     style="min-width:110px; max-width:110px; font-weight:600")
-            solara.Text("State",         style="min-width:95px;  max-width:95px")
-            solara.Text("Plan swap?",    style="min-width:65px;  max-width:65px")
-            solara.Text("Year / Cost",   style="flex:1")
+            solara.Text(" ",           style="min-width:14px")
+            solara.Text("Appliance",   style="min-width:100px; max-width:100px; font-weight:600")
+            solara.Text("State",       style="min-width:90px;  max-width:90px")
+            solara.Text("Plan swap?",  style="min-width:60px;  max-width:60px")
+            solara.Text("Year / Cost", style="flex:1")
 
-        SlotRow("HVAC",
-                hvac_starting_state, hvac_swap_planned,
-                hvac_swap_year, hvac_install_cost, hvac_rebate)
-        with solara.Row(style="padding:2px 0 2px 8px"):
-            solara.Checkbox(
-                label="Has central AC in baseline (models separate furnace + AC aging)",
-                value=hvac_has_cooling,
-            )
-
-        SlotRow("Water Heater",
-                wh_starting_state, wh_swap_planned,
-                wh_swap_year, wh_install_cost, wh_rebate)
-        SlotRow("Dryer",
-                dryer_starting_state, dryer_swap_planned,
-                dryer_swap_year, dryer_install_cost, dryer_rebate)
-        SlotRow("Cooktop",
-                cooktop_starting_state, cooktop_swap_planned,
-                cooktop_swap_year, cooktop_install_cost, cooktop_rebate)
-        SlotRow("EV Charger",
-                ev_starting_state, ev_swap_planned,
-                ev_swap_year, ev_install_cost, ev_rebate)
+        ExpandableSlotRow("HVAC",
+                          hvac_starting_state, hvac_swap_planned,
+                          hvac_swap_year, hvac_install_cost, hvac_rebate,
+                          hvac_expanded, lambda: HVACDetail())
+        ExpandableSlotRow("Water Heater",
+                          wh_starting_state, wh_swap_planned,
+                          wh_swap_year, wh_install_cost, wh_rebate,
+                          wh_expanded, lambda: WaterHeaterDetail())
+        ExpandableSlotRow("Dryer",
+                          dryer_starting_state, dryer_swap_planned,
+                          dryer_swap_year, dryer_install_cost, dryer_rebate,
+                          dryer_expanded, lambda: DryerDetail())
+        ExpandableSlotRow("Cooktop",
+                          cooktop_starting_state, cooktop_swap_planned,
+                          cooktop_swap_year, cooktop_install_cost, cooktop_rebate,
+                          cooktop_expanded, lambda: CooktopDetail())
+        ExpandableSlotRow("EV Charger",
+                          ev_starting_state, ev_swap_planned,
+                          ev_swap_year, ev_install_cost, ev_rebate,
+                          ev_expanded, lambda: EVDetail())
 
         solara.Markdown(
             "<small style='color:#888'>ℹ️ <em>\"Do nothing\" baseline runs automatically: "
@@ -1017,18 +1503,10 @@ def HomeProfilePanel():
         solara.Markdown("**Building Performance**")
         solara.Select("Insulation quality", value=insulation_quality,
                       values=["poor", "average", "good"])
-
-        solara.Markdown("**Baseline Device Specs**")
-        solara.SliderFloat("Furnace AFUE", value=furnace_afue,
-                           min=0.70, max=0.95, step=0.01)
-        solara.SliderFloat("Water heater UEF", value=gas_wh_uef,
-                           min=0.55, max=0.70, step=0.01)
-
-        solara.Markdown("**Electric Replacement Specs**")
-        solara.SliderFloat("Heat pump COP", value=hp_cop_heating,
-                           min=2.5, max=4.5, step=0.1)
-        solara.SliderInt("Heat pump SEER", value=hp_seer_cooling, min=16, max=28)
-        solara.SliderFloat("HPWH UEF", value=hpwh_uef, min=2.5, max=4.0, step=0.1)
+        solara.Markdown(
+            "<small style='color:#888'>Device specs live in each appliance row "
+            "(click ▶ to expand).</small>"
+        )
 
 
 def _preset_buttons(gas_rv, elec_rv, apply_fn):
@@ -1118,14 +1596,20 @@ def Page():
         hp_cop_heating.value, hp_seer_cooling.value, hpwh_uef.value,
         hvac_starting_state.value, hvac_swap_planned.value, hvac_swap_year.value,
         hvac_install_cost.value, hvac_rebate.value,
+        hvac_furnace_age.value, hvac_ac_seer.value, hvac_ac_age.value,
         wh_starting_state.value, wh_swap_planned.value, wh_swap_year.value,
         wh_install_cost.value, wh_rebate.value,
+        wh_gas_age.value, hw_daily_gallons.value, hw_gallons_user_override.value,
         dryer_starting_state.value, dryer_swap_planned.value, dryer_swap_year.value,
         dryer_install_cost.value, dryer_rebate.value,
+        dryer_gas_therms_per_cycle.value, dryer_loads_per_week.value,
+        dryer_hp_kwh_per_cycle.value,
         cooktop_starting_state.value, cooktop_swap_planned.value, cooktop_swap_year.value,
         cooktop_install_cost.value, cooktop_rebate.value,
+        cooktop_gas_therms_per_meal.value, cooktop_meals_per_week.value,
+        cooktop_induction_kwh_per_meal.value,
         ev_starting_state.value, ev_swap_planned.value, ev_swap_year.value,
-        ev_install_cost.value, ev_rebate.value,
+        ev_install_cost.value, ev_rebate.value, ev_monthly_kwh.value,
         baseload_constant_before.value, baseload_constant_after.value,
         baseload_swap_planned.value, baseload_swap_year.value,
         baseload_install_cost.value, baseload_rebate.value,

@@ -41,6 +41,9 @@ class HomeConfig:
     baseload_install_cost:    float      = 400.0
     baseload_rebate:          float      = 0.0
 
+    # ── Hot water override (None = use HOT_WATER_GAL_PER_DAY bedroom lookup) ────
+    hot_water_daily_gallons: int | None = None
+
     # ── Phase 3 carry-forward (unused in Phase 2) ─────────────────────────────
     num_bathrooms:      int  = 2
     stories:            int  = 1

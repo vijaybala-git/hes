@@ -58,16 +58,18 @@ def _make_device(spec: dict, mesa_model: mesa.Model, *,
                             age=age, lifespan=ls, installation_cost=cost)
 
     if cls == "GasWaterHeater":
+        daily_gal = spec.get("daily_gallons_override") or hw_gallons
         return GasWaterHeater(mesa_model,
                               uef=spec.get("uef", 0.65),
-                              daily_gallons=hw_gallons,
+                              daily_gallons=daily_gal,
                               monthly_inlet_temp_f=inlet_temp,
                               age=age, lifespan=ls, installation_cost=cost)
 
     if cls == "HeatPumpWaterHeater":
+        daily_gal = spec.get("daily_gallons_override") or hw_gallons
         return HeatPumpWaterHeater(mesa_model,
                                    uef=spec.get("uef", 3.5),
-                                   daily_gallons=hw_gallons,
+                                   daily_gallons=daily_gal,
                                    monthly_inlet_temp_f=inlet_temp,
                                    age=age, lifespan=ls, installation_cost=cost)
 
@@ -101,7 +103,10 @@ def _make_device(spec: dict, mesa_model: mesa.Model, *,
                               age=age, lifespan=ls, installation_cost=cost)
 
     if cls == "EVCharger":
-        return EVCharger(mesa_model, age=age, lifespan=ls, installation_cost=cost)
+        monthly_override = spec.get("monthly_kwh_override")
+        kwh_list = [monthly_override] * 12 if monthly_override is not None else None
+        return EVCharger(mesa_model, monthly_kwh=kwh_list,
+                         age=age, lifespan=ls, installation_cost=cost)
 
     if cls == "CentralAC":
         return CentralAC(mesa_model,
@@ -225,7 +230,11 @@ class HESModel(mesa.Model):
             home_config.num_bedrooms,
             home_config.baseload_constant_after,
         )
-        hw_gallons = float(HOT_WATER_GAL_PER_DAY[home_config.num_bedrooms])
+        hw_gallons = float(
+            home_config.hot_water_daily_gallons
+            if home_config.hot_water_daily_gallons is not None
+            else HOT_WATER_GAL_PER_DAY[home_config.num_bedrooms]
+        )
 
         # ── Slot configs ──────────────────────────────────────────────────────
         if slot_configs is None:
