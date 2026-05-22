@@ -18,4 +18,7 @@ COPY --chown=user data/ ./data/
 COPY --chown=user docs/assets/ ./docs/assets/
 
 EXPOSE $PORT
-CMD ["sh", "-c", "solara run src/app.py --host 0.0.0.0 --port $PORT"]
+
+# --no-open: don't try to open a browser window (fails in container)
+# --host 0.0.0.0: bind to all interfaces so HF/Fly can reach it
+CMD ["sh", "-c", "solara run src/app.py --host 0.0.0.0 --port $PORT --no-open"]

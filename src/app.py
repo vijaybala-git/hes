@@ -547,7 +547,7 @@ def _build_slot_configs() -> list:
         {
             "name": "Lights and Appliances",
             "category": "Baseload",
-            "starting_state": "gas",
+            "starting_state": "electric",
             "has_cooling_baseline": False,
             "baseline_devices": [{"class": "LightsAndPlugs", "annual_kwh": 0, "lifespan": 15}],
             "electric_device":   {"class": "LightsAndPlugs", "annual_kwh": 0, "lifespan": 15},
