@@ -16,5 +16,9 @@ COPY --chown=user data/ ./data/
 COPY --chown=user docs/assets/ ./docs/assets/
 
 EXPOSE $PORT
+<<<<<<< HEAD
 
 CMD ["sh", "-c", "solara run src/app.py --host 0.0.0.0 --port $PORT --no-open"]
+=======
+CMD ["sh", "-c", "solara run src/app.py --host 0.0.0.0 --port $PORT"]
+>>>>>>> dcadf3145e21f616f5e62e536a6d84d772a15ccc
