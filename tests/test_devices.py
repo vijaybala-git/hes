@@ -218,6 +218,38 @@ def test_ev_charger_fuel_type(mock_model):
     assert EVCharger(mock_model).fuel_type == "electricity"
 
 
+def test_physics_ev_charger_formula(mock_model):
+    """annual_kWh = miles × kWh/mile / efficiency."""
+    from devices.schedule import PhysicsEVCharger
+    ev = PhysicsEVCharger(mock_model, miles_per_year=7000,
+                          kwh_per_mile=0.30, charging_efficiency=0.90)
+    expected = 7000 * 0.30 / 0.90  # = 2333.3...
+    assert abs(ev.annual_consumption() - expected) < 1.0
+
+
+def test_physics_ev_charger_monthly_shape(mock_model):
+    from devices.schedule import PhysicsEVCharger
+    ev = PhysicsEVCharger(mock_model, miles_per_year=7000,
+                          kwh_per_mile=0.30, charging_efficiency=0.90)
+    monthly = ev.monthly_consumption()
+    assert monthly.shape == (12,)
+    assert abs(monthly.sum() - ev.annual_consumption()) < 0.1
+
+
+def test_physics_ev_charger_higher_miles_higher_kwh(mock_model):
+    from devices.schedule import PhysicsEVCharger
+    ev_low  = PhysicsEVCharger(mock_model, miles_per_year=5000,  kwh_per_mile=0.30)
+    ev_high = PhysicsEVCharger(mock_model, miles_per_year=15000, kwh_per_mile=0.30)
+    assert ev_high.annual_consumption() > ev_low.annual_consumption()
+
+
+def test_physics_ev_charger_efficient_vehicle_lower_kwh(mock_model):
+    from devices.schedule import PhysicsEVCharger
+    ev_efficient = PhysicsEVCharger(mock_model, miles_per_year=7000, kwh_per_mile=0.23)
+    ev_large     = PhysicsEVCharger(mock_model, miles_per_year=7000, kwh_per_mile=0.45)
+    assert ev_efficient.annual_consumption() < ev_large.annual_consumption()
+
+
 # ── Layer 3: directional physics ──────────────────────────────────────────────
 
 def test_more_hdd_more_furnace_consumption(mock_model):

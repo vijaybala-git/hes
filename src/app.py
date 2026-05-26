@@ -101,6 +101,14 @@ def _est_gas_cooktop(therms_per_meal: float, meals_per_week: int) -> float:
 def _est_induction(kwh_per_meal: float, meals_per_week: int) -> float:
     return kwh_per_meal * meals_per_week * 52
 
+def _est_ev_kwh(miles: int, kwh_per_mile: float,
+                charging_eff: float = 0.90) -> float:
+    return miles * kwh_per_mile / charging_eff
+
+def _apply_ev_efficiency_preset(label: str):
+    presets = {"Efficient": 0.23, "Average": 0.30, "Large": 0.45}
+    ev_kwh_per_mile.set(presets[label])
+
 def _kwh_eq(therms: float) -> float:
     return therms * KWH_PER_THERM
 
@@ -186,7 +194,9 @@ _DEFAULTS = {
     "cooktop_meals_per_week":         14,
     "cooktop_induction_kwh_per_meal": 0.9,
     # EV detail specs
-    "ev_monthly_kwh": 295,
+    "ev_miles_per_year":      7000,
+    "ev_kwh_per_mile":        0.30,
+    "ev_charging_efficiency": 0.90,
     # Pricing
     "gas_cagr_pct_a":         8,
     "elec_cagr_pct_a":        7,
@@ -292,7 +302,9 @@ cooktop_meals_per_week         = solara.reactive(14)
 cooktop_induction_kwh_per_meal = solara.reactive(0.9)
 
 # EV detail specs
-ev_monthly_kwh = solara.reactive(295)   # kWh/month
+ev_miles_per_year      = solara.reactive(7000)   # mi/yr
+ev_kwh_per_mile        = solara.reactive(0.30)   # kWh/mi
+ev_charging_efficiency = solara.reactive(0.90)   # 0–1
 
 # Device chart home selector (shared by both device chart types)
 device_chart_home = solara.reactive("journey")   # "journey" | "baseline"
@@ -373,7 +385,9 @@ def reset_to_defaults():
     cooktop_gas_therms_per_meal.set(_DEFAULTS["cooktop_gas_therms_per_meal"])
     cooktop_meals_per_week.set(_DEFAULTS["cooktop_meals_per_week"])
     cooktop_induction_kwh_per_meal.set(_DEFAULTS["cooktop_induction_kwh_per_meal"])
-    ev_monthly_kwh.set(_DEFAULTS["ev_monthly_kwh"])
+    ev_miles_per_year.set(_DEFAULTS["ev_miles_per_year"])
+    ev_kwh_per_mile.set(_DEFAULTS["ev_kwh_per_mile"])
+    ev_charging_efficiency.set(_DEFAULTS["ev_charging_efficiency"])
     gas_cagr_pct_a.set(_DEFAULTS["gas_cagr_pct_a"])
     elec_cagr_pct_a.set(_DEFAULTS["elec_cagr_pct_a"])
     comparison_mode.set(_DEFAULTS["comparison_mode"])
@@ -535,8 +549,10 @@ def _build_slot_configs() -> list:
             "has_cooling_baseline": False,
             "baseline_devices": [],
             "electric_device": {
-                "class": "EVCharger",
-                "monthly_kwh_override": ev_monthly_kwh.value,
+                "class": "PhysicsEVCharger",
+                "miles_per_year":      ev_miles_per_year.value,
+                "kwh_per_mile":        ev_kwh_per_mile.value,
+                "charging_efficiency": ev_charging_efficiency.value,
                 "lifespan": 20, "installation_cost": 800,
             },
             "swap_year": _eff_swap_year(ev_starting_state.value,
@@ -1374,11 +1390,15 @@ def CooktopDetail():
 
 @solara.component
 def EVDetail():
-    annual_kwh = ev_monthly_kwh.value * 12
+    annual_kwh = _est_ev_kwh(ev_miles_per_year.value,
+                              ev_kwh_per_mile.value,
+                              ev_charging_efficiency.value)
     solara.Markdown("**Estimated consumption**")
     solara.Markdown(
         f"|  | After adding EV |\n|--|--|\n"
-        f"| EV charging | **{annual_kwh:,} kWh/yr** ({ev_monthly_kwh.value} kWh/month) |\n"
+        f"| EV charging | **{annual_kwh:,.0f} kWh/yr** "
+        f"({ev_miles_per_year.value:,} mi × {ev_kwh_per_mile.value} kWh/mi ÷ "
+        f"{ev_charging_efficiency.value} eff.) |\n"
     )
     solara.Text("(Not in do-nothing baseline — absent until you add the EV)",
                 style="font-size:0.80em; color:#888")
@@ -1386,8 +1406,43 @@ def EVDetail():
     if ev_swap_planned.value:
         solara.Markdown("---")
         solara.Markdown("**EV Charger (L2)**")
-        SliderWithDefault("Monthly kWh", ev_monthly_kwh, _DEFAULTS["ev_monthly_kwh"],
-                          50, 600, 5, unit=" kWh/mo")
+
+        SliderWithDefault(
+            "Annual miles", ev_miles_per_year,
+            _DEFAULTS["ev_miles_per_year"],
+            1000, 30000, step=500, unit=" mi/yr",
+        )
+
+        SliderWithDefault(
+            "Vehicle efficiency", ev_kwh_per_mile,
+            _DEFAULTS["ev_kwh_per_mile"],
+            0.23, 0.45, step=0.01, unit=" kWh/mi", fmt="{v:.2f}",
+        )
+        with solara.Row(gap="6px", style="flex-wrap:wrap; margin:-4px 0 4px 0"):
+            for label in ("Efficient", "Average", "Large"):
+                solara.Button(
+                    label,
+                    on_click=lambda l=label: _apply_ev_efficiency_preset(l),
+                    style=(
+                        "font-size:0.78em; padding:2px 8px;"
+                        " border-radius:12px; cursor:pointer;"
+                        " background:#E8EAF6; border:1px solid #C5CAE9;"
+                        " color:#3949AB;"
+                    ),
+                )
+
+        SliderWithDefault(
+            "Charging efficiency", ev_charging_efficiency,
+            _DEFAULTS["ev_charging_efficiency"],
+            0.80, 0.98, step=0.01, fmt="{v:.2f}",
+        )
+
+        est = _est_ev_kwh(ev_miles_per_year.value,
+                          ev_kwh_per_mile.value,
+                          ev_charging_efficiency.value)
+        solara.Text(f"Est. consumption: ~{est:,.0f} kWh/yr",
+                    style="font-size:0.85em; color:#1976D2; font-weight:600")
+
         solara.InputInt("Install cost $", value=ev_install_cost)
         solara.InputInt("Rebate $", value=ev_rebate)
         solara.Text(f"Net cost: ${ev_install_cost.value - ev_rebate.value:,}",
@@ -1612,7 +1667,8 @@ def Page():
         cooktop_gas_therms_per_meal.value, cooktop_meals_per_week.value,
         cooktop_induction_kwh_per_meal.value,
         ev_starting_state.value, ev_swap_planned.value, ev_swap_year.value,
-        ev_install_cost.value, ev_rebate.value, ev_monthly_kwh.value,
+        ev_install_cost.value, ev_rebate.value,
+        ev_miles_per_year.value, ev_kwh_per_mile.value, ev_charging_efficiency.value,
         baseload_constant_before.value, baseload_constant_after.value,
         baseload_swap_planned.value, baseload_swap_year.value,
         baseload_install_cost.value, baseload_rebate.value,

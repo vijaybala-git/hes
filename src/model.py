@@ -20,7 +20,7 @@ from journey import JourneyHome, DeviceSlot, CATEGORY_ORDER, CATEGORY_LABELS
 from rate_loader import RateLoader
 from devices.physics  import GasFurnace, HeatPumpHVAC, GasWaterHeater, HeatPumpWaterHeater, CentralAC
 from devices.seasonal import GasDryer, HeatPumpDryer, GasCooktop, InductionCooktop, LightsAndPlugs
-from devices.schedule import EVCharger
+from devices.schedule import EVCharger, PhysicsEVCharger
 
 _DATA = Path(__file__).parent.parent / "data"
 
@@ -107,6 +107,13 @@ def _make_device(spec: dict, mesa_model: mesa.Model, *,
         kwh_list = [monthly_override] * 12 if monthly_override is not None else None
         return EVCharger(mesa_model, monthly_kwh=kwh_list,
                          age=age, lifespan=ls, installation_cost=cost)
+
+    if cls == "PhysicsEVCharger":
+        return PhysicsEVCharger(mesa_model,
+                                miles_per_year=spec.get("miles_per_year", 7000),
+                                kwh_per_mile=spec.get("kwh_per_mile", 0.30),
+                                charging_efficiency=spec.get("charging_efficiency", 0.90),
+                                age=age, lifespan=ls, installation_cost=cost)
 
     if cls == "CentralAC":
         return CentralAC(mesa_model,

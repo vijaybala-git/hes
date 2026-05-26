@@ -8,7 +8,7 @@ from devices.physics import (
     PhysicsDevice, GasFurnace, HeatPumpHVAC,
     GasWaterHeater, HeatPumpWaterHeater, CentralAC,
 )
-from devices.schedule import ScheduleDevice, EVCharger
+from devices.schedule import ScheduleDevice, EVCharger, PhysicsEVCharger
 
 __all__ = [
     "EnergyConsumer",
@@ -16,5 +16,5 @@ __all__ = [
     "InductionCooktop", "LightsAndPlugs", "Dishwasher", "ElectricOven",
     "PhysicsDevice", "GasFurnace", "HeatPumpHVAC",
     "GasWaterHeater", "HeatPumpWaterHeater", "CentralAC",
-    "ScheduleDevice", "EVCharger",
+    "ScheduleDevice", "EVCharger", "PhysicsEVCharger",
 ]
