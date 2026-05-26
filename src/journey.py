@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Optional
 
 import mesa
 import numpy as np
@@ -14,6 +15,36 @@ CATEGORY_LABELS = {
     "HVAC_Cooling": "Cooling",
     "HVAC_Heating": "Heating",
 }
+
+
+@dataclass
+class CapExOnlySlot:
+    """
+    A CapEx-only event (no energy consumption, no OpEx).
+    Used for e.g. electrical panel upgrades that cost money but use no energy.
+    Baseline home never receives these — they are proactive journey choices.
+    """
+    name:         str
+    category:     str          = "Infrastructure"
+    install_cost: float        = 3000.0
+    rebate:       float        = 0.0
+    lifespan:     int          = 25
+    install_year: Optional[int] = None   # None = not planning
+    capex_events: list         = field(default_factory=list)
+
+    @property
+    def net_install_cost(self) -> float:
+        return self.install_cost - self.rebate
+
+    def step(self, current_year: int, **_):
+        """Log CapEx at install_year; end-of-life replacement at install_year + lifespan."""
+        if self.install_year is None:
+            return
+        if current_year == self.install_year:
+            self.capex_events.append((current_year, self.net_install_cost))
+        eol = self.install_year + self.lifespan
+        if current_year == eol:
+            self.capex_events.append((current_year, self.install_cost))
 
 
 @dataclass
@@ -92,12 +123,14 @@ class JourneyHome(mesa.Agent):
                  slots: list,
                  elec_rates: np.ndarray,
                  gas_rates:  np.ndarray,
-                 is_baseline_home: bool = False):
+                 is_baseline_home: bool = False,
+                 capex_only_slots: list | None = None):
         super().__init__(model)
         self.slots = slots
         self._elec_rates = elec_rates   # shape (n_years, 12)
         self._gas_rates  = gas_rates    # shape (n_years, 12)
         self.is_baseline_home = is_baseline_home
+        self.capex_only_slots: list = capex_only_slots or []
 
         self.annual_opex     = 0.0
         self.cumulative_opex = 0.0
@@ -136,6 +169,13 @@ class JourneyHome(mesa.Agent):
                 self.fuel_history_by_slot[slot.name].append("electricity")
 
             for event_year, event_cost in slot.capex_events:
+                if event_year == current_year:
+                    year_capex += event_cost
+
+        # CapEx-only slots (e.g. electrical panel upgrade) — journey home only
+        for cslot in self.capex_only_slots:
+            cslot.step(current_year)
+            for event_year, event_cost in cslot.capex_events:
                 if event_year == current_year:
                     year_capex += event_cost
 

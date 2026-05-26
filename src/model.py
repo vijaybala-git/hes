@@ -16,7 +16,7 @@ import mesa
 import numpy as np
 
 from home_config import HomeConfig, compute_baseload_kwh, HOT_WATER_GAL_PER_DAY
-from journey import JourneyHome, DeviceSlot, CATEGORY_ORDER, CATEGORY_LABELS
+from journey import JourneyHome, DeviceSlot, CapExOnlySlot, CATEGORY_ORDER, CATEGORY_LABELS
 from rate_loader import RateLoader
 from devices.physics  import GasFurnace, HeatPumpHVAC, GasWaterHeater, HeatPumpWaterHeater, CentralAC
 from devices.seasonal import GasDryer, HeatPumpDryer, GasCooktop, InductionCooktop, LightsAndPlugs
@@ -195,9 +195,10 @@ class HESModel(mesa.Model):
                  gas_cagr_b:      float | None = None,
                  scenario_b:      str  = "stress",
                  comparison_mode: bool = False,
-                 n_years:         int  = 20,
-                 sim_start_year:  int  = 2025,
-                 slot_configs:    list | None = None):
+                 n_years:          int  = 20,
+                 sim_start_year:   int  = 2025,
+                 slot_configs:     list | None = None,
+                 capex_only_slots: list | None = None):
         super().__init__()
 
         self.rate_scenario   = scenario_a
@@ -280,8 +281,10 @@ class HESModel(mesa.Model):
         journey_slots  = _build_slots(slot_configs, False, self, **device_kw)
         baseline_slots = _build_slots(slot_configs, True,  self, **device_kw)
 
-        self.journey_home  = JourneyHome(self, journey_slots,  self.elec_rates, self.gas_rates, is_baseline_home=False)
-        self.baseline_home = JourneyHome(self, baseline_slots, self.elec_rates, self.gas_rates, is_baseline_home=True)
+        self.journey_home  = JourneyHome(self, journey_slots,  self.elec_rates, self.gas_rates,
+                                         is_baseline_home=False, capex_only_slots=capex_only_slots)
+        self.baseline_home = JourneyHome(self, baseline_slots, self.elec_rates, self.gas_rates,
+                                         is_baseline_home=True)
 
         # ── Scenario B (lazy — only when comparison_mode=True) ────────────────
         if comparison_mode:

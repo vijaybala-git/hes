@@ -784,3 +784,43 @@ def test_hot_water_gallons_override():
     wh_65  = model_65.baseline_home.consumption_history_by_slot["Water Heater"][0]
     wh_100 = model_100.baseline_home.consumption_history_by_slot["Water Heater"][0]
     assert wh_100 > wh_65, "More gallons/day must mean higher gas consumption"
+
+
+# ── §15.4 Panel Upgrade (CapExOnlySlot) tests ────────────────────────────────
+
+def test_panel_upgrade_capex_at_install_year():
+    """Panel upgrade CapEx fires at install_year, not before or after."""
+    from journey import CapExOnlySlot
+    from model import HESModel
+
+    slot = CapExOnlySlot(name="Electrical Panel",
+                         install_cost=3000, rebate=0,
+                         lifespan=25, install_year=1)
+    model = HESModel(n_years=10, capex_only_slots=[slot])
+    model.run_all()
+    assert model.journey_home.capex_by_year.get(1, 0) >= 3000
+    assert model.journey_home.capex_by_year.get(2, 0) == 0
+
+
+def test_panel_upgrade_absent_from_baseline():
+    """Panel upgrade does not appear in baseline home CapEx."""
+    from journey import CapExOnlySlot
+    from model import HESModel
+
+    slot = CapExOnlySlot(name="Electrical Panel",
+                         install_cost=3000, install_year=1)
+    model = HESModel(n_years=10, capex_only_slots=[slot])
+    model.run_all()
+    assert model.baseline_home.capex_by_year.get(1, 0) == 0
+
+
+def test_panel_upgrade_eol_replacement():
+    """End-of-life replacement fires at install_year + lifespan."""
+    from journey import CapExOnlySlot
+    from model import HESModel
+
+    slot = CapExOnlySlot(name="Electrical Panel",
+                         install_cost=3000, lifespan=5, install_year=1)
+    model = HESModel(n_years=10, capex_only_slots=[slot])
+    model.run_all()
+    assert model.journey_home.capex_by_year.get(6, 0) >= 3000  # yr 1 + lifespan 5

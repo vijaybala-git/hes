@@ -12,7 +12,7 @@ matplotlib.use("Agg")
 from matplotlib.figure import Figure
 from model import HESModel, SCENARIO_PRESETS
 from home_config import HomeConfig, compute_baseload_kwh
-from journey import CATEGORY_ORDER, CATEGORY_LABELS
+from journey import CATEGORY_ORDER, CATEGORY_LABELS, CapExOnlySlot
 
 # ── Asset paths ───────────────────────────────────────────────────────────────
 _HERE         = os.path.dirname(os.path.abspath(__file__))
@@ -193,6 +193,11 @@ _DEFAULTS = {
     "cooktop_gas_therms_per_meal":    0.05,
     "cooktop_meals_per_week":         14,
     "cooktop_induction_kwh_per_meal": 0.9,
+    # Panel upgrade
+    "panel_upgrade_planned": False,
+    "panel_upgrade_year":    1,
+    "panel_upgrade_cost":    3000,
+    "panel_upgrade_rebate":  0,
     # EV detail specs
     "ev_miles_per_year":      7000,
     "ev_kwh_per_mile":        0.30,
@@ -301,6 +306,12 @@ cooktop_gas_therms_per_meal    = solara.reactive(0.05)
 cooktop_meals_per_week         = solara.reactive(14)
 cooktop_induction_kwh_per_meal = solara.reactive(0.9)
 
+# Panel upgrade
+panel_upgrade_planned = solara.reactive(False)
+panel_upgrade_year    = solara.reactive(1)      # install in year 1 if planned
+panel_upgrade_cost    = solara.reactive(3000)   # slider 2000–10000
+panel_upgrade_rebate  = solara.reactive(0)
+
 # EV detail specs
 ev_miles_per_year      = solara.reactive(7000)   # mi/yr
 ev_kwh_per_mile        = solara.reactive(0.30)   # kWh/mi
@@ -385,6 +396,10 @@ def reset_to_defaults():
     cooktop_gas_therms_per_meal.set(_DEFAULTS["cooktop_gas_therms_per_meal"])
     cooktop_meals_per_week.set(_DEFAULTS["cooktop_meals_per_week"])
     cooktop_induction_kwh_per_meal.set(_DEFAULTS["cooktop_induction_kwh_per_meal"])
+    panel_upgrade_planned.set(_DEFAULTS["panel_upgrade_planned"])
+    panel_upgrade_year.set(_DEFAULTS["panel_upgrade_year"])
+    panel_upgrade_cost.set(_DEFAULTS["panel_upgrade_cost"])
+    panel_upgrade_rebate.set(_DEFAULTS["panel_upgrade_rebate"])
     ev_miles_per_year.set(_DEFAULTS["ev_miles_per_year"])
     ev_kwh_per_mile.set(_DEFAULTS["ev_kwh_per_mile"])
     ev_charging_efficiency.set(_DEFAULTS["ev_charging_efficiency"])
@@ -594,6 +609,16 @@ def run_simulation():
         hot_water_daily_gallons=(hw_daily_gallons.value
                                   if hw_gallons_user_override.value else None),
     )
+    capex_slots = []
+    if panel_upgrade_planned.value:
+        capex_slots.append(CapExOnlySlot(
+            name="Electrical Panel",
+            install_cost=panel_upgrade_cost.value,
+            rebate=panel_upgrade_rebate.value,
+            lifespan=25,
+            install_year=panel_upgrade_year.value,
+        ))
+
     m = HESModel(
         home_config=hc,
         n_years=years.value,
@@ -604,6 +629,7 @@ def run_simulation():
         comparison_mode=comparison_mode.value,
         sim_start_year=sim_start_year.value,
         slot_configs=_build_slot_configs(),
+        capex_only_slots=capex_slots or None,
     )
     m.run_all()
     df = m.datacollector.get_model_vars_dataframe()
@@ -825,6 +851,18 @@ def make_journey_timeline(df, model, n):
             else:
                 ax.plot([1, n], [y, y], color=C_BASE, lw=2.5, linestyle="--", zorder=3)
 
+    # Panel upgrade markers — grey vertical dashed lines with ⚡ label
+    panel_color = "#78909C"
+    has_panel_marker = False
+    for cslot in model.journey_home.capex_only_slots:
+        if cslot.install_year is not None and cslot.install_year <= n:
+            ax.axvline(cslot.install_year, color=panel_color, linewidth=1.5,
+                       linestyle=":", alpha=0.8, zorder=4)
+            ax.text(cslot.install_year + 0.2, n_rows - 0.55,
+                    f"⚡ {cslot.name}\n${cslot.net_install_cost:,.0f}",
+                    fontsize=7, color=panel_color, va="top", zorder=5)
+            has_panel_marker = True
+
     ax.set_yticks(range(n_rows))
     ax.set_yticklabels([s.name for s in display_slots], fontsize=9)
     ax.set_xlabel("Simulation Year")
@@ -835,6 +873,11 @@ def make_journey_timeline(df, model, n):
         Line2D([0], [0], color=C_BASE, lw=2, linestyle="--", label="Gas device running"),
         Line2D([0], [0], color=C_ELEC, lw=2, label="Electric device running"),
     ]
+    if has_panel_marker:
+        handles.append(
+            Line2D([0], [0], color=panel_color, lw=1.5, linestyle=":",
+                   label="Panel upgrade")
+        )
     ax.legend(handles=handles, fontsize=8, loc="lower right")
     _style(ax)
     fig.tight_layout(pad=1.0)
@@ -1487,6 +1530,40 @@ def JourneyPlannerPanel():
             "no EV added.</em></small>"
         )
 
+        # ── Electrical Panel Upgrade section ──────────────────────────────────
+        solara.Markdown(
+            "<hr style='border:0;border-top:1px solid #DDD;margin:10px 0'>"
+            "<strong>🔌 Electrical Panel Upgrade</strong>"
+            "<small style='color:#888; margin-left:8px'>"
+            "(optional — not needed for all homes)</small>"
+        )
+        solara.Markdown(
+            "<small style='color:#888'>Often required when adding an EV charger (L2) "
+            "or heat pump to older homes with 100A panels.</small>"
+        )
+        solara.Checkbox(
+            label="Planning a panel upgrade",
+            value=panel_upgrade_planned,
+        )
+        if panel_upgrade_planned.value:
+            cal_yr = sim_start_year.value + panel_upgrade_year.value - 1
+            solara.SliderInt(
+                f"Install in year {panel_upgrade_year.value}  ({cal_yr})",
+                value=panel_upgrade_year, min=1, max=25,
+            )
+            SliderWithDefault(
+                "Install cost", panel_upgrade_cost,
+                _DEFAULTS["panel_upgrade_cost"],
+                2000, 10000, step=500, unit=" $",
+            )
+            solara.InputInt("Rebate $", value=panel_upgrade_rebate)
+            net = panel_upgrade_cost.value - panel_upgrade_rebate.value
+            solara.Markdown(
+                f"<small style='color:#555'>"
+                f"Net cost: **${net:,}** &nbsp;·&nbsp; Lifespan: **25 years**"
+                f"</small>"
+            )
+
         # ── Baseload efficiency section ────────────────────────────────────────
         solara.Markdown(
             "<hr style='border:0;border-top:1px solid #DDD;margin:10px 0'>"
@@ -1669,6 +1746,8 @@ def Page():
         ev_starting_state.value, ev_swap_planned.value, ev_swap_year.value,
         ev_install_cost.value, ev_rebate.value,
         ev_miles_per_year.value, ev_kwh_per_mile.value, ev_charging_efficiency.value,
+        panel_upgrade_planned.value, panel_upgrade_year.value,
+        panel_upgrade_cost.value, panel_upgrade_rebate.value,
         baseload_constant_before.value, baseload_constant_after.value,
         baseload_swap_planned.value, baseload_swap_year.value,
         baseload_install_cost.value, baseload_rebate.value,
