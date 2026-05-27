@@ -124,17 +124,20 @@ class JourneyHome(mesa.Agent):
                  elec_rates: np.ndarray,
                  gas_rates:  np.ndarray,
                  is_baseline_home: bool = False,
-                 capex_only_slots: list | None = None):
+                 capex_only_slots: list | None = None,
+                 solar_coverage_pct: float = 0.0):
         super().__init__(model)
         self.slots = slots
         self._elec_rates = elec_rates   # shape (n_years, 12)
         self._gas_rates  = gas_rates    # shape (n_years, 12)
         self.is_baseline_home = is_baseline_home
         self.capex_only_slots: list = capex_only_slots or []
+        self.solar_coverage_pct = solar_coverage_pct
 
         self.annual_opex     = 0.0
         self.cumulative_opex = 0.0
         self.capex_by_year: dict = {}
+        self.solar_savings_history: list = []
         self.cost_history_by_category:    dict = {cat: []  for cat in CATEGORY_ORDER}
         self.cost_history_by_slot:        dict = {s.name: [] for s in slots}
         self.consumption_history_by_slot: dict = {s.name: [] for s in slots}
@@ -149,8 +152,9 @@ class JourneyHome(mesa.Agent):
 
         # Sum costs per category first, then append once — fixes Phase 1 bug
         year_category_costs = {cat: 0.0 for cat in CATEGORY_ORDER}
-        year_opex  = 0.0
-        year_capex = 0.0
+        year_opex      = 0.0
+        year_elec_opex = 0.0
+        year_capex     = 0.0
 
         for slot in self.slots:
             cost = slot.step(current_year, elec_r, gas_r, self.is_baseline_home)
@@ -164,6 +168,8 @@ class JourneyHome(mesa.Agent):
                 self.consumption_history_by_slot[slot.name].append(
                     active_dev.history["consumption"][-1])
                 self.fuel_history_by_slot[slot.name].append(active_dev.fuel_type)
+                if active_dev.fuel_type == "electricity":
+                    year_elec_opex += cost
             else:
                 self.consumption_history_by_slot[slot.name].append(0.0)
                 self.fuel_history_by_slot[slot.name].append("electricity")
@@ -187,6 +193,22 @@ class JourneyHome(mesa.Agent):
             self.capex_by_year[current_year] = (
                 self.capex_by_year.get(current_year, 0.0) + year_capex
             )
+
+        # Solar savings gated by install_year (see §19.1 fix above)
+        # Appliance opex gated by swap_year in DeviceSlot.step() — correct
+        solar_install_yr = None
+        for cslot in self.capex_only_slots:
+            if "Solar" in cslot.name and cslot.install_year is not None:
+                solar_install_yr = cslot.install_year
+                break
+        if (self.solar_coverage_pct > 0
+                and solar_install_yr is not None
+                and current_year >= solar_install_yr):
+            solar_saving = year_elec_opex * (self.solar_coverage_pct / 100.0)
+        else:
+            solar_saving = 0.0
+        year_opex -= solar_saving
+        self.solar_savings_history.append(solar_saving)
 
         self.annual_opex      = year_opex
         self.cumulative_opex += year_opex

@@ -198,7 +198,8 @@ class HESModel(mesa.Model):
                  n_years:          int  = 20,
                  sim_start_year:   int  = 2025,
                  slot_configs:     list | None = None,
-                 capex_only_slots: list | None = None):
+                 capex_only_slots: list | None = None,
+                 solar_coverage_pct: float = 0.0):
         super().__init__()
 
         self.rate_scenario   = scenario_a
@@ -282,7 +283,8 @@ class HESModel(mesa.Model):
         baseline_slots = _build_slots(slot_configs, True,  self, **device_kw)
 
         self.journey_home  = JourneyHome(self, journey_slots,  self.elec_rates, self.gas_rates,
-                                         is_baseline_home=False, capex_only_slots=capex_only_slots)
+                                         is_baseline_home=False, capex_only_slots=capex_only_slots,
+                                         solar_coverage_pct=solar_coverage_pct)
         self.baseline_home = JourneyHome(self, baseline_slots, self.elec_rates, self.gas_rates,
                                          is_baseline_home=True)
 
@@ -314,6 +316,8 @@ class HESModel(mesa.Model):
                                               - m.journey_home.cumulative_opex),
             "Elec Rate":           lambda m: float(np.mean(m.current_elec_rates)),
             "Gas Rate":            lambda m: float(np.mean(m.current_gas_rates)),
+            "Solar Saving":        lambda m: (m.journey_home.solar_savings_history[-1]
+                                              if m.journey_home.solar_savings_history else 0.0),
         }
         if comparison_mode:
             reporters.update({

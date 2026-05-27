@@ -173,11 +173,14 @@ _DEFAULTS = {
     "baseload_install_cost":    400,
     "baseload_rebate":          0,
     # Expand/collapse state
+    "home_profile_details_expanded": False,
+    "panel_expanded":   False,
     "hvac_expanded":    False,
     "wh_expanded":      False,
     "dryer_expanded":   False,
     "cooktop_expanded": False,
-    "ev_expanded":      False,
+    "ev_expanded":        False,
+    "baseload_expanded":  False,
     # HVAC detail specs
     "hvac_furnace_age": 10,
     "hvac_ac_seer":     14,
@@ -202,6 +205,18 @@ _DEFAULTS = {
     "ev_miles_per_year":      7000,
     "ev_kwh_per_mile":        0.30,
     "ev_charging_efficiency": 0.90,
+    # Solar + Battery
+    "solar_planned":           False,
+    "solar_install_year":      1,
+    "solar_coverage_pct":      60,
+    "solar_include_panels":    True,
+    "solar_panels_cost":       25000,
+    "solar_include_battery":   False,
+    "solar_battery_cost":      12000,
+    "solar_include_install":   True,
+    "solar_install_cost_item": 3000,
+    "solar_rebate":            0,
+    "solar_cost_expanded":     False,
     # Pricing
     "gas_cagr_pct_a":         8,
     "elec_cagr_pct_a":        7,
@@ -279,12 +294,19 @@ baseload_swap_year       = solara.reactive(2)
 baseload_install_cost    = solara.reactive(400)
 baseload_rebate          = solara.reactive(0)
 
-# Expand/collapse state (one per slot)
+# Expand/collapse state (one per slot + Home Profile details)
+home_profile_details_expanded = solara.reactive(False)
+panel_expanded   = solara.reactive(False)
 hvac_expanded    = solara.reactive(False)
 wh_expanded      = solara.reactive(False)
 dryer_expanded   = solara.reactive(False)
 cooktop_expanded = solara.reactive(False)
-ev_expanded      = solara.reactive(False)
+ev_expanded        = solara.reactive(False)
+baseload_expanded  = solara.reactive(False)
+
+# Synthetic read-only reactive for the baseload row state label (always "electric")
+_baseload_state = solara.reactive("electric")
+_panel_state    = solara.reactive("none")     # upgrade slot: always "none" label
 
 # HVAC detail specs
 hvac_furnace_age = solara.reactive(10)   # yrs
@@ -316,6 +338,23 @@ panel_upgrade_rebate  = solara.reactive(0)
 ev_miles_per_year      = solara.reactive(7000)   # mi/yr
 ev_kwh_per_mile        = solara.reactive(0.30)   # kWh/mi
 ev_charging_efficiency = solara.reactive(0.90)   # 0–1
+
+# Solar + Battery
+solar_planned           = solara.reactive(False)
+solar_install_year      = solara.reactive(1)
+solar_coverage_pct      = solara.reactive(60)     # %, range 0-100, step 5
+
+# Cost items (toggle booleans + editable amounts)
+solar_include_panels    = solara.reactive(True)
+solar_panels_cost       = solara.reactive(25000)
+solar_include_battery   = solara.reactive(False)
+solar_battery_cost      = solara.reactive(12000)
+solar_include_install   = solara.reactive(True)
+solar_install_cost_item = solara.reactive(3000)
+
+# Rebate (single flat value)
+solar_rebate            = solara.reactive(0)
+solar_cost_expanded     = solara.reactive(False)
 
 # Device chart home selector (shared by both device chart types)
 device_chart_home = solara.reactive("journey")   # "journey" | "baseline"
@@ -379,11 +418,14 @@ def reset_to_defaults():
     baseload_swap_year.set(_DEFAULTS["baseload_swap_year"])
     baseload_install_cost.set(_DEFAULTS["baseload_install_cost"])
     baseload_rebate.set(_DEFAULTS["baseload_rebate"])
+    home_profile_details_expanded.set(_DEFAULTS["home_profile_details_expanded"])
+    panel_expanded.set(_DEFAULTS["panel_expanded"])
     hvac_expanded.set(_DEFAULTS["hvac_expanded"])
     wh_expanded.set(_DEFAULTS["wh_expanded"])
     dryer_expanded.set(_DEFAULTS["dryer_expanded"])
     cooktop_expanded.set(_DEFAULTS["cooktop_expanded"])
     ev_expanded.set(_DEFAULTS["ev_expanded"])
+    baseload_expanded.set(_DEFAULTS["baseload_expanded"])
     hvac_furnace_age.set(_DEFAULTS["hvac_furnace_age"])
     hvac_ac_seer.set(_DEFAULTS["hvac_ac_seer"])
     hvac_ac_age.set(_DEFAULTS["hvac_ac_age"])
@@ -403,6 +445,17 @@ def reset_to_defaults():
     ev_miles_per_year.set(_DEFAULTS["ev_miles_per_year"])
     ev_kwh_per_mile.set(_DEFAULTS["ev_kwh_per_mile"])
     ev_charging_efficiency.set(_DEFAULTS["ev_charging_efficiency"])
+    solar_planned.set(_DEFAULTS["solar_planned"])
+    solar_install_year.set(_DEFAULTS["solar_install_year"])
+    solar_coverage_pct.set(_DEFAULTS["solar_coverage_pct"])
+    solar_include_panels.set(_DEFAULTS["solar_include_panels"])
+    solar_panels_cost.set(_DEFAULTS["solar_panels_cost"])
+    solar_include_battery.set(_DEFAULTS["solar_include_battery"])
+    solar_battery_cost.set(_DEFAULTS["solar_battery_cost"])
+    solar_include_install.set(_DEFAULTS["solar_include_install"])
+    solar_install_cost_item.set(_DEFAULTS["solar_install_cost_item"])
+    solar_rebate.set(_DEFAULTS["solar_rebate"])
+    solar_cost_expanded.set(_DEFAULTS["solar_cost_expanded"])
     gas_cagr_pct_a.set(_DEFAULTS["gas_cagr_pct_a"])
     elec_cagr_pct_a.set(_DEFAULTS["elec_cagr_pct_a"])
     comparison_mode.set(_DEFAULTS["comparison_mode"])
@@ -619,6 +672,23 @@ def run_simulation():
             install_year=panel_upgrade_year.value,
         ))
 
+    # Solar derived values
+    solar_gross = (
+        (solar_panels_cost.value if solar_include_panels.value else 0)
+        + (solar_battery_cost.value if solar_include_battery.value else 0)
+        + (solar_install_cost_item.value if solar_include_install.value else 0)
+    )
+    if solar_planned.value:
+        capex_slots.append(CapExOnlySlot(
+            name="Solar + Battery",
+            category="Infrastructure",
+            install_cost=solar_gross,
+            rebate=solar_rebate.value,
+            lifespan=25,
+            install_year=solar_install_year.value,
+        ))
+    solar_coverage = solar_coverage_pct.value if solar_planned.value else 0
+
     m = HESModel(
         home_config=hc,
         n_years=years.value,
@@ -630,6 +700,7 @@ def run_simulation():
         sim_start_year=sim_start_year.value,
         slot_configs=_build_slot_configs(),
         capex_only_slots=capex_slots or None,
+        solar_coverage_pct=float(solar_coverage),
     )
     m.run_all()
     df = m.datacollector.get_model_vars_dataframe()
@@ -655,16 +726,36 @@ def _new_fig(wide=False):
 
 # Chart 1 — Cumulative Energy Costs
 def make_cumulative_opex(df, model, n):
+    C_SOLAR = "#00897B"
     fig = _new_fig()
     ax  = fig.add_subplot(111)
     x = np.arange(1, n + 1)
     b = df["Baseline Cum Cost"].values
-    e = df["Journey Cum Cost"].values
     lbl_a = " (A)" if model.comparison_mode else ""
-    ax.plot(x, b, color=C_BASE, lw=2.5, label=f"Do nothing{lbl_a}")
-    ax.plot(x, e, color=C_ELEC, lw=2.5, label=f"Your journey{lbl_a}")
-    ax.fill_between(x, b, e, where=(b >= e), color=C_ELEC, alpha=0.12, label="Journey saves")
-    ax.fill_between(x, b, e, where=(b <  e), color=C_BASE, alpha=0.12, label="Gas saves")
+
+    has_solar = solar_planned.value and "Solar Saving" in df.columns
+
+    if has_solar:
+        # Journey Cum Cost already has solar deducted; reconstruct no-solar line
+        solar_savings_cum = np.cumsum(df["Solar Saving"].values)
+        e_no_solar = df["Journey Cum Cost"].values + solar_savings_cum
+        e_solar    = df["Journey Cum Cost"].values
+        ax.plot(x, b,         color=C_BASE,  lw=2.5, label=f"Do nothing{lbl_a}")
+        ax.plot(x, e_no_solar, color=C_ELEC, lw=2.0, linestyle="--",
+                label=f"Your journey{lbl_a}")
+        ax.plot(x, e_solar,   color=C_SOLAR, lw=2.5,
+                label=f"Your journey + Solar{lbl_a}")
+        ax.fill_between(x, b, e_solar, where=(b >= e_solar),
+                        color=C_SOLAR, alpha=0.10, label="Journey + Solar saves")
+        ax.fill_between(x, e_solar, e_no_solar, where=(e_no_solar > e_solar),
+                        color=C_ELEC, alpha=0.07, label="Solar adds")
+    else:
+        e = df["Journey Cum Cost"].values
+        ax.plot(x, b, color=C_BASE, lw=2.5, label=f"Do nothing{lbl_a}")
+        ax.plot(x, e, color=C_ELEC, lw=2.5, label=f"Your journey{lbl_a}")
+        ax.fill_between(x, b, e, where=(b >= e), color=C_ELEC, alpha=0.12, label="Journey saves")
+        ax.fill_between(x, b, e, where=(b <  e), color=C_BASE, alpha=0.12, label="Gas saves")
+
     if model.comparison_mode:
         bB = df["Baseline Cum Cost B"].values
         eB = df["Journey Cum Cost B"].values
@@ -851,16 +942,20 @@ def make_journey_timeline(df, model, n):
             else:
                 ax.plot([1, n], [y, y], color=C_BASE, lw=2.5, linestyle="--", zorder=3)
 
-    # Panel upgrade markers — grey vertical dashed lines with ⚡ label
+    # CapEx-only slot markers — ⚡ for panel, ☀️ for solar
     panel_color = "#78909C"
+    solar_color = "#F9A825"
     has_panel_marker = False
     for cslot in model.journey_home.capex_only_slots:
         if cslot.install_year is not None and cslot.install_year <= n:
-            ax.axvline(cslot.install_year, color=panel_color, linewidth=1.5,
+            is_solar = "Solar" in cslot.name
+            color = solar_color if is_solar else panel_color
+            icon  = "☀️" if is_solar else "⚡"
+            ax.axvline(cslot.install_year, color=color, linewidth=1.5,
                        linestyle=":", alpha=0.8, zorder=4)
             ax.text(cslot.install_year + 0.2, n_rows - 0.55,
-                    f"⚡ {cslot.name}\n${cslot.net_install_cost:,.0f}",
-                    fontsize=7, color=panel_color, va="top", zorder=5)
+                    f"{icon} {cslot.name}\n${cslot.net_install_cost:,.0f}",
+                    fontsize=7, color=color, va="top", zorder=5)
             has_panel_marker = True
 
     ax.set_yticks(range(n_rows))
@@ -876,7 +971,7 @@ def make_journey_timeline(df, model, n):
     if has_panel_marker:
         handles.append(
             Line2D([0], [0], color=panel_color, lw=1.5, linestyle=":",
-                   label="Panel upgrade")
+                   label="CapEx event (panel / solar)")
         )
     ax.legend(handles=handles, fontsize=8, loc="lower right")
     _style(ax)
@@ -1161,7 +1256,8 @@ def SlotRow(name, state_rv, swap_planned_rv, swap_year_rv, install_cost_rv, reba
 
 @solara.component
 def ExpandableSlotRow(name, state_rv, swap_planned_rv, swap_year_rv,
-                      install_cost_rv, rebate_rv, expanded_rv, detail_component):
+                      install_cost_rv, rebate_rv, expanded_rv, detail_component,
+                      is_upgrade_slot=False):
     state    = state_rv.value
     planned  = swap_planned_rv.value
     yr       = swap_year_rv.value
@@ -1169,7 +1265,8 @@ def ExpandableSlotRow(name, state_rv, swap_planned_rv, swap_year_rv,
     cal_yr   = sim_start_year.value + yr - 1
     expanded = expanded_rv.value
     chevron  = "▼" if expanded else "▶"
-    show_swap = (state in ("gas", "none")) and planned
+    # upgrade slots (baseload) show swap controls whenever planned, regardless of state
+    show_swap = planned if is_upgrade_slot else (state in ("gas", "none")) and planned
 
     with solara.Row(
         gap="8px",
@@ -1186,9 +1283,12 @@ def ExpandableSlotRow(name, state_rv, swap_planned_rv, swap_year_rv,
         with solara.Column(style="min-width:100px; max-width:100px"):
             solara.Text(name, style="font-weight:500; font-size:0.9em")
         with solara.Column(style="min-width:90px; max-width:90px"):
-            solara.Select("", value=state_rv, values=["gas", "electric", "none"])
+            if is_upgrade_slot:
+                solara.Text("Electric", style="color:#2E7D32; font-size:0.88em; padding:4px 0")
+            else:
+                solara.Select("", value=state_rv, values=["gas", "electric", "none"])
         with solara.Column(style="min-width:60px; max-width:60px"):
-            if state != "electric":
+            if is_upgrade_slot or state != "electric":
                 solara.Checkbox(label="Plan", value=swap_planned_rv)
         if show_swap:
             with solara.Column(style="min-width:160px"):
@@ -1200,7 +1300,7 @@ def ExpandableSlotRow(name, state_rv, swap_planned_rv, swap_year_rv,
             with solara.Column(style="min-width:65px"):
                 solara.Text(f"Net ${net:,}",
                             style="color:#1976D2; font-weight:600; font-size:0.85em")
-        elif state == "electric":
+        elif not is_upgrade_slot and state == "electric":
             solara.Text("✓ Done", style="color:#2E7D32; font-weight:600; font-size:0.85em")
         else:
             solara.Text("—", style="color:#BBBBBB; font-size:1.2em")
@@ -1493,8 +1593,196 @@ def EVDetail():
 
 
 @solara.component
+def BaseloadDetail():
+    """Expanded detail for the Lights & Appliances row."""
+    bl_before = compute_baseload_kwh(
+        square_footage.value, num_bedrooms.value, baseload_constant_before.value
+    )
+
+    solara.Markdown("**Estimated consumption**")
+    solara.Markdown(
+        f"|  | Current |\n|--|--|\n"
+        f"| Lights & appliances | **{bl_before:,.0f} kWh/yr** |\n"
+        f"| Formula | {square_footage.value:,} sqft × 0.45 + "
+        f"{num_bedrooms.value} bed × 200 + {baseload_constant_before.value} |\n"
+    )
+
+    solara.Markdown("---")
+    solara.Markdown("**Always-on appliances (constant term)**")
+    SliderWithDefault(
+        "Always-on", baseload_constant_before,
+        _DEFAULTS["baseload_constant_before"],
+        0, 1500, step=50, unit=" kWh/yr",
+    )
+    solara.Markdown(
+        f"<small style='color:#555'>→ Estimated total baseload: "
+        f"**{bl_before:,.0f} kWh/yr** "
+        f"({square_footage.value:,} sqft × 0.45 + {num_bedrooms.value} bed × 200 "
+        f"+ {baseload_constant_before.value})</small>"
+    )
+
+    if baseload_swap_planned.value:
+        bl_after = compute_baseload_kwh(
+            square_footage.value, num_bedrooms.value, baseload_constant_after.value
+        )
+        annual_saving_kwh = bl_before - bl_after
+        elec_rate = 0.386
+        annual_saving_usd = annual_saving_kwh * elec_rate
+        net_cost = baseload_install_cost.value - baseload_rebate.value
+        payback = (net_cost / annual_saving_usd) if annual_saving_usd > 0 else None
+        pb_str = f"~{payback:.1f} yrs" if payback is not None else "N/A"
+
+        solara.Markdown("---")
+        solara.Markdown("**After efficiency upgrade (LED, smart plugs, etc.)**")
+        SliderWithDefault(
+            "After-upgrade always-on", baseload_constant_after,
+            _DEFAULTS["baseload_constant_after"],
+            0, 1500, step=50, unit=" kWh/yr",
+        )
+        solara.Markdown(
+            f"<small style='color:#555'>→ Total after: **{bl_after:,.0f} kWh/yr** "
+            f"&nbsp;·&nbsp; Saving: **{annual_saving_kwh:,.0f} kWh/yr ≈ "
+            f"${annual_saving_usd:,.0f}/yr**</small>"
+        )
+        solara.Markdown(
+            f"<small style='color:#555'>"
+            f"Net cost: **${net_cost:,}** &nbsp;·&nbsp; "
+            f"Simple payback: **{pb_str}**"
+            f"</small>"
+        )
+
+
+@solara.component
+def SolarBatteryPanel(model):
+    with solara.Card(margin=0, elevation=1, style="overflow:hidden"):
+        with solara.Row(style=(
+            "background-color:#F0F0F0; padding:6px 12px;"
+            " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
+        )):
+            solara.Text("☀️🔋 Solar + Battery", style="font-weight:600; font-size:0.95em")
+        solara.Checkbox(label="Adding solar + battery to my journey",
+                        value=solar_planned)
+
+        if not solar_planned.value:
+            return
+
+        cal_yr = sim_start_year.value + solar_install_year.value - 1
+        solara.SliderInt(
+            f"Install in year {solar_install_year.value}  ({cal_yr})",
+            value=solar_install_year, min=1, max=25,
+        )
+        solara.SliderInt(
+            f"% of electricity covered: {solar_coverage_pct.value}%",
+            value=solar_coverage_pct, min=0, max=100, step=5,
+        )
+        solara.Text("(Phase 3 will compute this from system size + usage)",
+                    style="font-size:0.78em; color:#888")
+
+        gross_cost = (
+            (solar_panels_cost.value if solar_include_panels.value else 0)
+            + (solar_battery_cost.value if solar_include_battery.value else 0)
+            + (solar_install_cost_item.value if solar_include_install.value else 0)
+        )
+        net_cost = gross_cost - solar_rebate.value
+
+        # ── Collapsible cost row (same style as appliance rows) ───────────────
+        cost_expanded = solar_cost_expanded.value
+        cost_chevron  = "▼" if cost_expanded else "▶"
+        with solara.Row(
+            gap="8px",
+            style="align-items:center; flex-wrap:wrap; padding:6px 0; border-top:1px solid #EEEEEE;",
+        ):
+            solara.Button(
+                cost_chevron,
+                on_click=lambda: solar_cost_expanded.set(not solar_cost_expanded.value),
+                style=(
+                    "background:none; border:none; cursor:pointer; color:#78909C;"
+                    " font-size:0.9em; padding:0 4px 0 0; min-width:14px; flex-shrink:0;"
+                ),
+            )
+            solara.Text("Cost items", style="font-weight:500; font-size:0.9em; min-width:100px")
+            solara.Text(
+                f"Net ${net_cost:,}",
+                style="color:#1976D2; font-weight:600; font-size:0.85em",
+            )
+
+        if cost_expanded:
+            with solara.Column(
+                style=(
+                    "margin:0 0 8px 24px; padding:10px 14px;"
+                    " background:#F8F9FA; border-radius:8px;"
+                    " border-left:3px solid #C5CAE9;"
+                )
+            ):
+                with solara.Row(gap="8px", style="align-items:center; flex-wrap:wrap"):
+                    solara.Checkbox(label="Solar panels (10 kW)", value=solar_include_panels)
+                    if solar_include_panels.value:
+                        solara.InputInt("$", value=solar_panels_cost)
+
+                with solara.Row(gap="8px", style="align-items:center; flex-wrap:wrap"):
+                    solara.Checkbox(label="Battery storage (13.5 kWh)", value=solar_include_battery)
+                    if solar_include_battery.value:
+                        solara.InputInt("$", value=solar_battery_cost)
+
+                with solara.Row(gap="8px", style="align-items:center; flex-wrap:wrap"):
+                    solara.Checkbox(label="Installation & permitting", value=solar_include_install)
+                    if solar_include_install.value:
+                        solara.InputInt("$", value=solar_install_cost_item)
+
+                solara.InputInt("Rebate $", value=solar_rebate)
+                solara.Markdown(
+                    f"| | |\n|--|--|\n"
+                    f"| Gross cost | **${gross_cost:,}** |\n"
+                    f"| Rebate | **-${solar_rebate.value:,}** |\n"
+                    f"| **Net cost** | **${net_cost:,}** |\n"
+                    f"| Lifespan | 25 years |\n"
+                )
+
+        if model is not None and model.journey_home.solar_savings_history:
+            annual_saving = model.journey_home.solar_savings_history[0]
+            if annual_saving > 0 and net_cost > 0:
+                payback = net_cost / annual_saving
+                solara.Markdown(
+                    f"Est. annual saving: **${annual_saving:,.0f}/yr**  \n"
+                    f"Est. simple payback: **~{payback:.1f} yrs**  \n"
+                    f"<small style='color:#888'>"
+                    f"(Payback improves as electric rates rise over time)</small>"
+                )
+            elif annual_saving <= 0:
+                solara.Text("No electric loads to offset in year 1.",
+                            style="font-size:0.82em; color:#888")
+
+
+@solara.component
+def PanelDetail():
+    """Expanded detail for the Electrical Panel Upgrade row."""
+    solara.Markdown(
+        "<small style='color:#888'>Often required when adding an EV charger (L2) "
+        "or heat pump to older homes with 100A panels.</small>"
+    )
+    SliderWithDefault(
+        "Install cost", panel_upgrade_cost,
+        _DEFAULTS["panel_upgrade_cost"],
+        2000, 10000, step=500, unit=" $",
+    )
+    solara.InputInt("Rebate $", value=panel_upgrade_rebate)
+    net = panel_upgrade_cost.value - panel_upgrade_rebate.value
+    solara.Markdown(
+        f"<small style='color:#555'>"
+        f"Net cost: **${net:,}** &nbsp;·&nbsp; Lifespan: **25 years**"
+        f"</small>"
+    )
+
+
+@solara.component
 def JourneyPlannerPanel():
-    with solara.Card("🗺️ Your Electrification Journey", margin=0, elevation=1):
+    with solara.Card(margin=0, elevation=1, style="overflow:hidden"):
+        with solara.Row(style=(
+            "background-color:#F0F0F0; padding:6px 12px;"
+            " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
+        )):
+            solara.Text("🗺️ Your Electrification Journey",
+                        style="font-weight:600; font-size:0.95em")
         with solara.Row(gap="8px",
                         style="padding:2px 0 4px 0; font-size:0.76em; color:#999"):
             solara.Text(" ",           style="min-width:14px")
@@ -1523,125 +1811,61 @@ def JourneyPlannerPanel():
                           ev_starting_state, ev_swap_planned,
                           ev_swap_year, ev_install_cost, ev_rebate,
                           ev_expanded, lambda: EVDetail())
+        ExpandableSlotRow("Elec. Panel",
+                          _panel_state, panel_upgrade_planned,
+                          panel_upgrade_year, panel_upgrade_cost, panel_upgrade_rebate,
+                          panel_expanded, lambda: PanelDetail(),
+                          is_upgrade_slot=True)
+        ExpandableSlotRow("Lights & Appliances",
+                          _baseload_state, baseload_swap_planned,
+                          baseload_swap_year, baseload_install_cost, baseload_rebate,
+                          baseload_expanded, lambda: BaseloadDetail(),
+                          is_upgrade_slot=True)
 
         solara.Markdown(
             "<small style='color:#888'>ℹ️ <em>\"Do nothing\" baseline runs automatically: "
             "gas devices stay gas; already-done devices stay electric; "
-            "no EV added.</em></small>"
+            "</em></small>"
         )
-
-        # ── Electrical Panel Upgrade section ──────────────────────────────────
-        solara.Markdown(
-            "<hr style='border:0;border-top:1px solid #DDD;margin:10px 0'>"
-            "<strong>🔌 Electrical Panel Upgrade</strong>"
-            "<small style='color:#888; margin-left:8px'>"
-            "(optional — not needed for all homes)</small>"
-        )
-        solara.Markdown(
-            "<small style='color:#888'>Often required when adding an EV charger (L2) "
-            "or heat pump to older homes with 100A panels.</small>"
-        )
-        solara.Checkbox(
-            label="Planning a panel upgrade",
-            value=panel_upgrade_planned,
-        )
-        if panel_upgrade_planned.value:
-            cal_yr = sim_start_year.value + panel_upgrade_year.value - 1
-            solara.SliderInt(
-                f"Install in year {panel_upgrade_year.value}  ({cal_yr})",
-                value=panel_upgrade_year, min=1, max=25,
-            )
-            SliderWithDefault(
-                "Install cost", panel_upgrade_cost,
-                _DEFAULTS["panel_upgrade_cost"],
-                2000, 10000, step=500, unit=" $",
-            )
-            solara.InputInt("Rebate $", value=panel_upgrade_rebate)
-            net = panel_upgrade_cost.value - panel_upgrade_rebate.value
-            solara.Markdown(
-                f"<small style='color:#555'>"
-                f"Net cost: **${net:,}** &nbsp;·&nbsp; Lifespan: **25 years**"
-                f"</small>"
-            )
-
-        # ── Baseload efficiency section ────────────────────────────────────────
-        solara.Markdown(
-            "<hr style='border:0;border-top:1px solid #DDD;margin:10px 0'>"
-            "<strong>💡 Baseload efficiency</strong>"
-        )
-
-        bl_before = compute_baseload_kwh(
-            square_footage.value, num_bedrooms.value, baseload_constant_before.value
-        )
-        solara.SliderInt(
-            f"Always-on appliances: {baseload_constant_before.value:,} kWh/yr",
-            value=baseload_constant_before, min=0, max=1500,
-        )
-        solara.Markdown(
-            f"<small style='color:#555'>→ Estimated total baseload: "
-            f"**{bl_before:,.0f} kWh/yr** "
-            f"({square_footage.value:,} sqft × 0.45 + {num_bedrooms.value} bed × 200 "
-            f"+ {baseload_constant_before.value})</small>"
-        )
-
-        solara.Checkbox(
-            label="Planning a baseload efficiency upgrade (LED, smart plugs, etc.)",
-            value=baseload_swap_planned,
-        )
-
-        if baseload_swap_planned.value:
-            bl_after = compute_baseload_kwh(
-                square_footage.value, num_bedrooms.value, baseload_constant_after.value
-            )
-            annual_saving_kwh = bl_before - bl_after
-            elec_rate = 0.386    # PG&E E-1 2025 base rate
-            annual_saving_usd = annual_saving_kwh * elec_rate
-            net_cost = baseload_install_cost.value - baseload_rebate.value
-            payback = (net_cost / annual_saving_usd) if annual_saving_usd > 0 else None
-
-            cal_yr = sim_start_year.value + baseload_swap_year.value - 1
-            solara.SliderInt(
-                f"Upgrade in year {baseload_swap_year.value}  ({cal_yr})",
-                value=baseload_swap_year, min=1, max=25,
-            )
-            solara.SliderInt(
-                f"After-upgrade always-on: {baseload_constant_after.value:,} kWh/yr",
-                value=baseload_constant_after, min=0, max=1500,
-            )
-            solara.Markdown(
-                f"<small style='color:#555'>→ Estimated total after: "
-                f"**{bl_after:,.0f} kWh/yr**</small>"
-            )
-            solara.InputInt("Install cost $", value=baseload_install_cost)
-            solara.InputInt("Rebate $", value=baseload_rebate)
-            pb_str = (f"~{payback:.1f} yrs" if payback is not None else "N/A")
-            solara.Markdown(
-                f"<small style='color:#555'>"
-                f"Net cost: **${net_cost:,}** &nbsp;·&nbsp; "
-                f"Annual saving: **~{annual_saving_kwh:,.0f} kWh/yr ≈ "
-                f"${annual_saving_usd:,.0f}/yr** &nbsp;·&nbsp; "
-                f"Simple payback: **{pb_str}**"
-                f"</small>"
-            )
 
 
 @solara.component
 def HomeProfilePanel():
-    with solara.Card("🏠 Home Profile", margin=0, elevation=1):
-        solara.Markdown("**Home Details**")
+    expanded = home_profile_details_expanded.value
+    chevron  = "▼" if expanded else "▶"
+
+    with solara.Card(margin=0, elevation=1, style="overflow:hidden"):
+        with solara.Row(style=(
+            "background-color:#F0F0F0; padding:6px 12px;"
+            " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
+        )):
+            solara.Text("🏠 Home Profile", style="font-weight:600; font-size:0.95em")
+        # Always-visible fields
         solara.InputText("ZIP code", value=zip_code)
-        solara.Select("Climate zone", value=climate_zone, values=_CZ_OPTIONS)
         solara.Select("Bedrooms", value=num_bedrooms, values=_BR_OPTIONS)
         solara.InputInt("Square footage", value=square_footage)
-        solara.InputInt("Year built", value=year_built)
 
-        solara.Markdown("**Building Performance**")
-        solara.Select("Insulation quality", value=insulation_quality,
-                      values=["poor", "average", "good"])
-        solara.Markdown(
-            "<small style='color:#888'>Device specs live in each appliance row "
-            "(click ▶ to expand).</small>"
+        # Expand/collapse toggle
+        solara.Button(
+            f"{chevron} More details...",
+            on_click=lambda: home_profile_details_expanded.set(not expanded),
+            style=(
+                "background:none; border:none; cursor:pointer;"
+                " color:#546E7A; font-size:0.85em; padding:4px 0;"
+                " text-align:left; display:block;"
+            ),
         )
+
+        if expanded:
+            solara.Select("Climate zone", value=climate_zone, values=_CZ_OPTIONS)
+            solara.InputInt("Year built", value=year_built)
+            solara.Markdown("**Building Performance**")
+            solara.Select("Insulation quality", value=insulation_quality,
+                          values=["poor", "average", "good"])
+            solara.Markdown(
+                "<small style='color:#888'>Device specs live in each appliance row "
+                "(click ▶ to expand).</small>"
+            )
 
 
 def _preset_buttons(gas_rv, elec_rv, apply_fn):
@@ -1667,7 +1891,12 @@ def _preset_buttons(gas_rv, elec_rv, apply_fn):
 
 @solara.component
 def EnergyPricesPanel():
-    with solara.Card("📈 Energy & Prices", margin=0, elevation=1):
+    with solara.Card(margin=0, elevation=1, style="overflow:hidden"):
+        with solara.Row(style=(
+            "background-color:#F0F0F0; padding:6px 12px;"
+            " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
+        )):
+            solara.Text("📈 Energy & Prices", style="font-weight:600; font-size:0.95em")
         solara.Markdown("**Quick presets**")
         _preset_buttons(gas_cagr_pct_a, elec_cagr_pct_a, _apply_preset_a)
 
@@ -1751,6 +1980,11 @@ def Page():
         baseload_constant_before.value, baseload_constant_after.value,
         baseload_swap_planned.value, baseload_swap_year.value,
         baseload_install_cost.value, baseload_rebate.value,
+        solar_planned.value, solar_install_year.value, solar_coverage_pct.value,
+        solar_include_panels.value, solar_panels_cost.value,
+        solar_include_battery.value, solar_battery_cost.value,
+        solar_include_install.value, solar_install_cost_item.value,
+        solar_rebate.value,
         gas_cagr_pct_a.value, elec_cagr_pct_a.value,
         comparison_mode.value,
         gas_cagr_pct_b.value, elec_cagr_pct_b.value,
@@ -1760,6 +1994,18 @@ def Page():
     n = years.value
 
     with solara.Column(margin=3, gap="10px"):
+
+        # Scoped CSS: larger dropdown arrow only in chart header selectors
+        solara.HTML(
+            tag="div",
+            unsafe_innerHTML=(
+                "<style>"
+                ".chart-header-sel .v-input__icon--append .v-icon"
+                "{font-size:28px!important}"
+                "</style>"
+            ),
+            style="display:none",
+        )
 
         # ── Header ─────────────────────────────────────────────────────────────
         ww_svg = _read_svg(_WHYWATT_LOGO, height_px=72)
@@ -1793,20 +2039,30 @@ def Page():
 
         # ── Summary stats ───────────────────────────────────────────────────────
         SummaryStats(df, n, model)
-        # ── Chart selectors ─────────────────────────────────────────────────────
-        with solara.Row(gap="16px"):
-            with solara.Column(style="flex:1; min-width:200px"):
-                solara.Select("Left chart",  value=chart_left,  values=CHART_OPTIONS)
-            with solara.Column(style="flex:1; min-width:200px"):
-                solara.Select("Right chart", value=chart_right, values=CHART_OPTIONS)
 
-        # ── Dual chart panes ────────────────────────────────────────────────────
+        # ── Dual chart panes (selector in grey title bar inside each card) ──────
         with solara.Row(gap="8px", style="align-items:stretch"):
             with solara.Card(margin=0, elevation=1,
                              style="flex:1; min-width:300px; overflow:hidden"):
-                ChartPane(chart_left.value,  model, df, n)
+                with solara.Row(
+                    classes=["chart-header-sel"],
+                    style=(
+                        "background-color:#F0F0F0; padding:6px 12px;"
+                        " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
+                    ),
+                ):
+                    solara.Select("", value=chart_left, values=CHART_OPTIONS)
+                ChartPane(chart_left.value, model, df, n)
             with solara.Card(margin=0, elevation=1,
                              style="flex:1; min-width:300px; overflow:hidden"):
+                with solara.Row(
+                    classes=["chart-header-sel"],
+                    style=(
+                        "background-color:#F0F0F0; padding:6px 12px;"
+                        " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
+                    ),
+                ):
+                    solara.Select("", value=chart_right, values=CHART_OPTIONS)
                 ChartPane(chart_right.value, model, df, n)
 
         # ── Legend ──────────────────────────────────────────────────────────────
@@ -1831,6 +2087,7 @@ def Page():
                 JourneyPlannerPanel()
             with solara.Column(style="flex:1; min-width:240px"):
                 HomeProfilePanel()
+                SolarBatteryPanel(model)
             with solara.Column(style="flex:1; min-width:220px"):
                 EnergyPricesPanel()
 

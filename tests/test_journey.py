@@ -824,3 +824,78 @@ def test_panel_upgrade_eol_replacement():
     model = HESModel(n_years=10, capex_only_slots=[slot])
     model.run_all()
     assert model.journey_home.capex_by_year.get(6, 0) >= 3000  # yr 1 + lifespan 5
+
+
+# ── §17.7 Solar + Battery tests ───────────────────────────────────────────────
+
+def test_solar_reduces_elec_opex():
+    """Solar coverage reduces journey home electric opex proportionally.
+    A Solar CapExOnlySlot with install_year=1 is required to gate savings (§19.1)."""
+    from journey import CapExOnlySlot
+    from model import HESModel
+    # install_year=1 so savings apply from year 1 in the solar model
+    solar_slot = CapExOnlySlot(name="Solar + Battery", install_cost=0, install_year=1)
+    model_no_solar = HESModel(solar_coverage_pct=0,  n_years=5)
+    model_solar    = HESModel(solar_coverage_pct=50, n_years=5,
+                              capex_only_slots=[solar_slot])
+    model_no_solar.run_all()
+    model_solar.run_all()
+    df_ns = model_no_solar.datacollector.get_model_vars_dataframe()
+    df_s  = model_solar.datacollector.get_model_vars_dataframe()
+    assert df_s["Journey Cum Cost"].iloc[-1] < df_ns["Journey Cum Cost"].iloc[-1]
+
+
+def test_solar_does_not_affect_baseline():
+    """Solar coverage only affects journey home, not do-nothing baseline."""
+    from journey import CapExOnlySlot
+    from model import HESModel
+    solar_slot = CapExOnlySlot(name="Solar + Battery", install_cost=0, install_year=1)
+    model    = HESModel(solar_coverage_pct=80, n_years=5, capex_only_slots=[solar_slot])
+    model_ns = HESModel(solar_coverage_pct=0,  n_years=5)
+    model.run_all()
+    model_ns.run_all()
+    df    = model.datacollector.get_model_vars_dataframe()
+    df_ns = model_ns.datacollector.get_model_vars_dataframe()
+    assert np.allclose(
+        df["Baseline Cum Cost"].values,
+        df_ns["Baseline Cum Cost"].values,
+        rtol=0.001,
+    )
+
+
+def test_solar_capex_at_install_year():
+    """Solar CapEx fires at install_year in journey home."""
+    from journey import CapExOnlySlot
+    from model import HESModel
+    solar_slot = CapExOnlySlot(
+        name="Solar + Battery",
+        install_cost=40000, rebate=16000, lifespan=25, install_year=1,
+    )
+    model = HESModel(n_years=5, capex_only_slots=[solar_slot],
+                     solar_coverage_pct=60)
+    model.run_all()
+    assert model.journey_home.capex_by_year[1] >= 24000  # net = 40k - 16k
+
+
+# ── §19.1 Solar install-year gate test ───────────────────────────────────────
+
+def test_solar_saving_zero_before_install_year():
+    """Solar savings must be zero before install_year and positive at/after it."""
+    from journey import CapExOnlySlot
+    from model import HESModel
+
+    solar_slot = CapExOnlySlot(
+        name="Solar + Battery",
+        install_cost=25000, rebate=0, lifespan=25, install_year=3,
+    )
+    model = HESModel(n_years=5, capex_only_slots=[solar_slot],
+                     solar_coverage_pct=50)
+    model.run_all()
+
+    savings = model.journey_home.solar_savings_history
+    # Years 1 and 2 (indices 0, 1) must be zero — panel not installed yet
+    assert savings[0] == 0.0, f"Year 1 saving should be 0, got {savings[0]}"
+    assert savings[1] == 0.0, f"Year 2 saving should be 0, got {savings[1]}"
+    # Year 3 onward (indices 2+) must be positive
+    assert savings[2] > 0.0, f"Year 3 saving should be >0, got {savings[2]}"
+    assert savings[3] > 0.0, f"Year 4 saving should be >0, got {savings[3]}"

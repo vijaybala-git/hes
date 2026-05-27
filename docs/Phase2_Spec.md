@@ -1,9 +1,9 @@
 # WhyWatt — Phase 2 Development Spec
 
-**Status:** Phase 2 implemented through Objective 6; §9 bug fixes, §10 rate decoupling, §11 per-device charts, §12 baseload formula, §13 appliance detail expand/collapse added
+**Status:** Phase 2 implemented through Objective 6; §9 bug fixes, §10 rate decoupling, §11 per-device charts, §12 baseload formula, §13 appliance detail expand/collapse, §14-17 v2.7 additions
 **Follows:** Phase 1 complete (Mesa + Solara, 42 unit tests, dual-home simulation)
 **Project rename:** HES → **WhyWatt?** (update all UI titles, headers, doc references)
-**Last updated:** §13 Appliance detail panels + slider default markers (Phase 2.5)
+**Last updated:** §14 EV physics, §15 Panel Upgrade, §16 Baseload as full slot, §17 Solar+Battery (Phase 2.7)
 
 ---
 
@@ -3813,6 +3813,1023 @@ Step 3 — ExpandableSlotRow + detail components:
     - Changing AFUE slider updates simulation results in real time
     - Changing loads/week on dryer changes cost charts in real time
     - HomeProfilePanel no longer shows device spec sliders
+```
+
+---
+
+## 14. EV Charger Physics Model (Phase 2.7)
+
+Replaces the flat `ScheduleDevice` monthly default with a physics-grounded formula
+driven by annual miles and vehicle efficiency. Surfaces all assumptions as sliders
+with default markers (§13.5 pattern).
+
+---
+
+### 14.1 Formula
+
+```
+annual_kWh = miles_per_year × kwh_per_mile / charging_efficiency
+```
+
+| Parameter | Symbol | Default | Range | Markers |
+|-----------|--------|---------|-------|---------|
+| Annual miles driven | `miles_per_year` | 7,000 | 1,000–30,000 | — (continuous) |
+| Vehicle efficiency | `kwh_per_mile` | 0.30 | 0.23–0.45 | Low=0.23, Mid=0.30, High=0.45 |
+| Charging efficiency | `charging_efficiency` | 0.90 | 0.80–0.98 | fixed default tick only |
+
+**Vehicle efficiency marker labels:**
+- `0.23 kWh/mile` — Efficient EV (e.g. Tesla Model 3, Chevy Bolt)
+- `0.30 kWh/mile` — Average EV (e.g. Tesla Model Y, Hyundai Ioniq 5)
+- `0.45 kWh/mile` — Larger/older EV (e.g. Rivian R1T, older Leaf)
+
+**Validation at defaults (7,000 miles, 0.30 kWh/mi, 0.90 efficiency):**
+```
+annual_kWh = 7,000 × 0.30 / 0.90 = 2,333 kWh/yr
+```
+Compare to old flat default: 3,540 kWh/yr. The physics model is lower because
+7,000 miles is a moderate California driver; the old default assumed ~10 sessions/night
+which implied much higher mileage.
+
+---
+
+### 14.2 Device Changes
+
+**`EVCharger` upgrades from `ScheduleDevice` to a new `PhysicsEVCharger` subclass
+that generates its own 12-element monthly array from the formula:**
+
+```python
+class PhysicsEVCharger(ElectricalConsumer):
+    """
+    EV charger with physics-based annual consumption.
+    Monthly profile: flat with slight summer uptick (more driving May-Sep).
+    """
+    SEASONALITY = np.array(
+        [0.94, 0.88, 0.94, 0.91, 0.97, 1.00, 1.03, 1.03, 0.97, 0.94, 0.91, 0.94],
+        dtype=float
+    )  # sums to 12.0 — multiply by annual/12 to get monthly
+
+    def __init__(self, ...,
+                 miles_per_year: int = 7000,
+                 kwh_per_mile: float = 0.30,
+                 charging_efficiency: float = 0.90):
+        self.miles_per_year        = miles_per_year
+        self.kwh_per_mile          = kwh_per_mile
+        self.charging_efficiency   = charging_efficiency
+
+    @property
+    def annual_kwh(self) -> float:
+        return self.miles_per_year * self.kwh_per_mile / self.charging_efficiency
+
+    def monthly_consumption(self) -> np.ndarray:
+        monthly_base = self.annual_kwh / 12
+        return monthly_base * self.SEASONALITY
+```
+
+**Backward compatibility:** `EVCharger(ScheduleDevice)` is retained for any code
+that supplies a `monthly_values` list directly. `PhysicsEVCharger` is the new default
+for the UI. The `journey_slots_default.json` is updated to use `PhysicsEVCharger`.
+
+---
+
+### 14.3 UI — EV Charger Detail Panel
+
+Replaces the `monthly_kwh` slider in §13.3.5 with the physics parameters.
+Same `ExpandableSlotRow` pattern — only the `EVDetail` component changes.
+
+**Estimated consumption (first, read-only):**
+```
+Est. annual consumption: ~2,333 kWh/yr
+(7,000 miles × 0.30 kWh/mi ÷ 0.90 charging eff.)
+```
+
+**Replacement appliance specs (when `ev_swap_planned = True`):**
+```
+Type:                L2 EV Charger
+
+Annual miles         [──────●────────────] 7,000 mi/yr
+
+Vehicle efficiency   [────────●──────] 0.30 kWh/mi
+                     ● Efficient (0.23)  ● Average (0.30)  ● Large (0.45)
+                     [preset buttons — populate slider; user can fine-tune]
+
+Charging efficiency  [──────────●────] 0.90
+
+Est. consumption:    ~2,333 kWh/yr  (updates live)
+
+Install $            [800]
+Rebate $             [0]
+Net cost             $800
+```
+
+**New reactives (replace `ev_monthly_kwh`):**
+```python
+ev_miles_per_year       = solara.reactive(7000)   # range 1000-30000, step 500
+ev_kwh_per_mile         = solara.reactive(0.30)   # range 0.23-0.45, step 0.01
+ev_charging_efficiency  = solara.reactive(0.90)   # range 0.80-0.98, step 0.01
+```
+Add to `_DEFAULTS`. Remove `ev_monthly_kwh` from `_DEFAULTS` and `reset_to_defaults()`.
+
+**Efficiency preset buttons:**
+```python
+def _apply_ev_efficiency_preset(label: str):
+    presets = {"Efficient": 0.23, "Average": 0.30, "Large": 0.45}
+    ev_kwh_per_mile.set(presets[label])
+```
+
+**Estimation helper:**
+```python
+def _est_ev_kwh(miles: int, kwh_per_mile: float,
+               charging_eff: float = 0.90) -> float:
+    return miles * kwh_per_mile / charging_eff
+```
+
+**`_build_slot_configs()` update:**
+```python
+{
+    "name": "EV Charger",
+    "electric_device": {
+        "class": "PhysicsEVCharger",
+        "miles_per_year":       ev_miles_per_year.value,
+        "kwh_per_mile":         ev_kwh_per_mile.value,
+        "charging_efficiency":  ev_charging_efficiency.value,
+    }, ...
+}
+```
+
+---
+
+### 14.4 Tests
+
+Add to `tests/test_devices.py`:
+
+```python
+def test_physics_ev_charger_formula():
+    """Annual kWh = miles × kWh/mile / efficiency."""
+    ev = PhysicsEVCharger(miles_per_year=7000, kwh_per_mile=0.30,
+                          charging_efficiency=0.90)
+    expected = 7000 * 0.30 / 0.90   # = 2333.3
+    assert abs(ev.annual_consumption() - expected) < 1.0
+
+def test_physics_ev_charger_monthly_shape():
+    ev = PhysicsEVCharger(miles_per_year=7000, kwh_per_mile=0.30,
+                          charging_efficiency=0.90)
+    monthly = ev.monthly_consumption()
+    assert monthly.shape == (12,)
+    assert abs(monthly.sum() - ev.annual_consumption()) < 0.1   # sums to annual
+
+def test_physics_ev_charger_higher_miles_higher_kwh():
+    ev_low  = PhysicsEVCharger(miles_per_year=5000,  kwh_per_mile=0.30)
+    ev_high = PhysicsEVCharger(miles_per_year=15000, kwh_per_mile=0.30)
+    assert ev_high.annual_consumption() > ev_low.annual_consumption()
+
+def test_physics_ev_charger_efficient_vehicle_lower_kwh():
+    ev_efficient = PhysicsEVCharger(miles_per_year=7000, kwh_per_mile=0.23)
+    ev_large     = PhysicsEVCharger(miles_per_year=7000, kwh_per_mile=0.45)
+    assert ev_efficient.annual_consumption() < ev_large.annual_consumption()
+```
+
+---
+
+### 14.5 Claude Code Prompt — EV Charger Physics
+
+```
+Implement §14 (EV Charger Physics Model) of docs/Phase2_Spec.md.
+
+Step 1 — src/devices/schedule.py:
+  Add PhysicsEVCharger class per §14.2.
+  SEASONALITY constant = [0.94, 0.88, 0.94, 0.91, 0.97, 1.00,
+                          1.03, 1.03, 0.97, 0.94, 0.91, 0.94]
+  formula: annual_kwh = miles_per_year × kwh_per_mile / charging_efficiency
+  monthly_consumption() = annual_kwh / 12 × SEASONALITY
+  Add tests from §14.4 to tests/test_devices.py.
+  Run pytest — all must pass.
+
+Step 2 — app.py:
+  Replace ev_monthly_kwh reactive with:
+    ev_miles_per_year, ev_kwh_per_mile, ev_charging_efficiency
+  Add _apply_ev_efficiency_preset() helper.
+  Add _est_ev_kwh() estimation helper.
+  Update EVDetail component per §14.3:
+    - Estimated consumption line (formula inline, updates live)
+    - Annual miles slider (1000-30000, step 500)
+    - kWh/mile slider + Efficient/Average/Large preset buttons
+    - Charging efficiency slider (0.80-0.98)
+    - All use SliderWithDefault with default tick marks
+  Update _build_slot_configs() to use PhysicsEVCharger with new params.
+  Update _DEFAULTS and reset_to_defaults().
+  Run solara run src/app.py and verify:
+    - EV detail panel shows physics formula result
+    - Preset buttons populate kWh/mile slider
+    - Changing miles or efficiency updates estimated kWh live
+    - Simulation results change when EV params change
+```
+
+---
+
+## 15. Electrical Panel Upgrade (Phase 2.7)
+
+Adds a standalone CapEx-only slot for electrical panel upgrades. No energy
+consumption modelling — pure install cost amortised over 25 years.
+
+---
+
+### 15.1 Design
+
+The panel upgrade is an optional checkbox item, not a default slot. Many Bay Area
+homes already have 200A panels and don’t need an upgrade. When checked, it adds a
+CapEx event in the simulation at the chosen year.
+
+**No device consumption.** The panel upgrade slot has `baseline_device = None` and
+`electric_device = None`. It contributes only to `capex_by_year` and the Journey
+Timeline chart — never to opex.
+
+**Implementation:** A new `CapExOnlySlot` dataclass (thin wrapper, no device stepping):
+
+```python
+@dataclass
+class CapExOnlySlot:
+    name: str
+    category: str          = "Infrastructure"
+    install_cost: float    = 3000.0
+    rebate: float          = 0.0
+    lifespan: int          = 25             # years — for end-of-life replacement calc
+    install_year: int | None = None         # year of install; None = not planning
+
+    @property
+    def net_install_cost(self) -> float:
+        return self.install_cost - self.rebate
+
+    def step(self, current_year: int, **_):
+        """
+        Logs CapEx at install_year. No consumption, no opex.
+        End-of-life replacement logged at install_year + lifespan (if within horizon).
+        """
+        if current_year == self.install_year:
+            self.capex_events.append((current_year, self.net_install_cost))
+        eol = (self.install_year or 0) + self.lifespan
+        if current_year == eol:
+            self.capex_events.append((current_year, self.install_cost))  # replacement at full cost
+```
+
+`JourneyHome` iterates `CapExOnlySlot` items separately after device slots —
+they contribute to `capex_by_year` but not to `cost_history_by_category`.
+
+**Baseline home:** Panel upgrade is absent from baseline home — this is a proactive
+choice the homeowner makes as part of their journey, not something that happens in
+the “do nothing” scenario.
+
+---
+
+### 15.2 UI — Panel Upgrade Section
+
+Sits below the EV Charger row in the Journey Planner, above the Baseload Efficiency
+divider. Styled as a compact optional row (no expand/collapse needed — few fields):
+
+```
+─────────────────────────────────────────────────────────────────
+🔌 Electrical Panel Upgrade   (optional — not needed for all homes)
+
+[ ] Planning a panel upgrade
+    Install in year  [───●──────────] 1   (2026 — recommended before EV or HP install)
+    Install cost $   [──────●───────] 3,000   (range $2,000–$10,000)
+    Rebate $         [0        ]   (check local utility incentives)
+    Net cost         $3,000
+    Lifespan         25 years
+─────────────────────────────────────────────────────────────────
+```
+
+**Note in UI:** “Often required when adding EV charger (L2) or heat pump to older
+homes with 100A panels. Check with your electrician.”
+
+**New reactives:**
+```python
+panel_upgrade_planned    = solara.reactive(False)
+panel_upgrade_year       = solara.reactive(1)       # install in year 1 by default if planned
+panel_upgrade_cost       = solara.reactive(3000)    # slider 2000-10000, step 500
+panel_upgrade_rebate     = solara.reactive(0)
+```
+Add to `_DEFAULTS` and `reset_to_defaults()`.
+
+**`_build_slot_configs()` update:**
+```python
+# Add CapExOnlySlot when panel upgrade is planned
+if panel_upgrade_planned.value:
+    capex_only_slots.append(CapExOnlySlot(
+        name="Electrical Panel",
+        install_cost=panel_upgrade_cost.value,
+        rebate=panel_upgrade_rebate.value,
+        lifespan=25,
+        install_year=panel_upgrade_year.value,
+    ))
+```
+
+---
+
+### 15.3 Chart Integration
+
+**Journey Timeline:** Panel upgrade appears as a vertical marker on the timeline,
+styled differently from device swaps (uses a grey `⚡` marker, not a coloured device marker).
+
+**Equipment Replacements (CapEx) chart:** Panel upgrade CapEx appears as a bar
+in the journey home column at `install_year`. End-of-life replacement appears at
+`install_year + 25` if within the simulation horizon.
+
+**Cumulative cost chart:** Not directly shown — panel upgrade affects only the
+capex bars, not the opex lines.
+
+---
+
+### 15.4 Tests
+
+Add to `tests/test_journey.py`:
+
+```python
+def test_panel_upgrade_capex_at_install_year():
+    """Panel upgrade CapEx fires at install_year, not before or after."""
+    slot = CapExOnlySlot(name="Electrical Panel",
+                         install_cost=3000, rebate=0,
+                         lifespan=25, install_year=1)
+    model = HESModel(n_years=10, capex_only_slots=[slot])
+    model.run_all()
+    assert model.journey_home.capex_by_year[1] >= 3000
+    assert model.journey_home.capex_by_year[2] == 0
+
+def test_panel_upgrade_absent_from_baseline():
+    """Panel upgrade does not appear in baseline home CapEx."""
+    slot = CapExOnlySlot(name="Electrical Panel",
+                         install_cost=3000, install_year=1)
+    model = HESModel(n_years=10, capex_only_slots=[slot])
+    model.run_all()
+    assert model.baseline_home.capex_by_year.get(1, 0) == 0
+
+def test_panel_upgrade_eol_replacement():
+    """End-of-life replacement fires at install_year + lifespan."""
+    slot = CapExOnlySlot(name="Electrical Panel",
+                         install_cost=3000, lifespan=5, install_year=1)
+    model = HESModel(n_years=10, capex_only_slots=[slot])
+    model.run_all()
+    assert model.journey_home.capex_by_year.get(6, 0) >= 3000  # yr 1 + lifespan 5
+```
+
+---
+
+### 15.5 Claude Code Prompt — Panel Upgrade
+
+```
+Implement §15 (Electrical Panel Upgrade) of docs/Phase2_Spec.md.
+
+Step 1 — journey.py:
+  Add CapExOnlySlot dataclass per §15.1.
+  HESModel accepts optional capex_only_slots: list[CapExOnlySlot] = None.
+  JourneyHome iterates capex_only_slots after device slots —
+    logs CapEx events to capex_by_year only (no opex, no cost_history_by_category).
+  Baseline home does NOT step CapExOnlySlots.
+  Add tests from §15.4.
+  Run pytest — all must pass.
+
+Step 2 — app.py:
+  Add panel_upgrade_planned, panel_upgrade_year,
+    panel_upgrade_cost, panel_upgrade_rebate reactives.
+  Add panel upgrade section to JourneyPlannerPanel per §15.2:
+    - Checkbox to enable
+    - When checked: year slider, cost slider (2000-10000, step 500,
+      SliderWithDefault tick at 3000), rebate input, net cost display
+    - Tooltip: "Often required when adding EV charger or heat pump"
+  Update _build_slot_configs() to pass CapExOnlySlot when planned.
+  Update Journey Timeline chart to show panel upgrade as grey marker.
+  Update _DEFAULTS and reset_to_defaults().
+  Run solara run src/app.py and verify:
+    - Panel upgrade section visible below EV Charger row
+    - Checkbox reveals/hides year and cost controls
+    - CapEx chart shows panel upgrade bar at install year
+    - Panel upgrade absent from baseline home CapEx
+```
+
+---
+
+## 16. Baseload Efficiency — Promote to Full Journey Slot (Phase 2.7)
+
+Moves the “Baseload efficiency” section from its current position below a divider
+into the main Journey Planner table as a first-class slot row, identical in structure
+to HVAC/WH/Dryer/Cooktop rows.
+
+---
+
+### 16.1 Change
+
+**Before (Phase 2.5):** The baseload efficiency upgrade was a separate section below
+a `───` divider, styled differently from the appliance rows above.
+
+**After (Phase 2.7):** It becomes a standard `ExpandableSlotRow` in the Journey
+Planner table:
+
+```
+▶ Lights & Appliances  |  Electric  |  [☐ Plan upgrade]  |  ———  |  —  |  —
+```
+
+When expanded:
+```
+▼ Lights & Appliances  |  Electric  |  [☑ Plan upgrade]  |  Yr 2  |  $400  |  $400
+
+  Est. consumption (current):   1,910 kWh/yr
+  (1,800 sqft × 0.45 + 3 bed × 200 + 500 always-on)
+  ──────────────────────────────────────────
+  Always-on load (before)  [───●──────────] 500 kWh/yr
+  ──────────────────────────────────────────
+  Upgrade: LED + smart plugs
+  After-upgrade load       [──●───────────] 300 kWh/yr
+  Est. consumption (after):   1,710 kWh/yr
+  → Annual saving: ~200 kWh/yr ≈ $77/yr
+  → Simple payback: ~5.2 yrs
+  Install $400    Rebate $0    Net $400
+```
+
+**The `starting_state` is always `"electric"`** for this slot (both homes always
+have electricity for lights). The “plan” checkbox triggers the upgrade — not a
+fuel swap. The slot’s “plan swap” label in the column header should read
+**“Plan upgrade?”** for this row specifically.
+
+---
+
+### 16.2 Implementation
+
+**New `BaseloadDetail` component** following the §13.7 pattern:
+
+```python
+@solara.component
+def BaseloadDetail():
+    # 1. Estimated consumption (current)
+    kwh_before = compute_baseload_kwh(
+        square_footage.value, num_bedrooms.value, baseload_constant_before.value)
+    solara.Markdown(
+        f"**Estimated consumption (current)**\n\n"
+        f"~{kwh_before:,.0f} kWh/yr  "
+        f"({square_footage.value:,} sqft × 0.45 + {num_bedrooms.value} bed × 200 "
+        f"+ {baseload_constant_before.value} always-on)"
+    )
+    solara.Markdown("---")
+
+    # 2. Current: always-on constant slider
+    solara.Markdown("**Current appliances**")
+    SliderWithDefault(
+        "Always-on load", baseload_constant_before,
+        _DEFAULTS["baseload_constant_before"], 0, 1500, 50, unit=" kWh/yr"
+    )
+
+    # 3. Upgrade section (shown when planned)
+    if baseload_swap_planned.value:
+        solara.Markdown("---")
+        solara.Markdown("**Upgrade: LED + smart plugs**")
+        SliderWithDefault(
+            "After-upgrade load", baseload_constant_after,
+            _DEFAULTS["baseload_constant_after"], 0, 1500, 50, unit=" kWh/yr"
+        )
+        kwh_after = compute_baseload_kwh(
+            square_footage.value, num_bedrooms.value, baseload_constant_after.value)
+        annual_saving = kwh_before - kwh_after
+        elec_rate = elec_cagr_pct_a.value / 100.0   # proxy for current rate
+        saving_dollars = annual_saving * 0.386
+        payback = (
+            (baseload_install_cost.value - baseload_rebate.value) / saving_dollars
+            if saving_dollars > 0 else float("inf")
+        )
+        solara.Markdown(
+            f"Est. consumption (after): ~{kwh_after:,.0f} kWh/yr  "
+            f"\u2192 Annual saving: ~{annual_saving:.0f} kWh/yr ≈ "
+            f"${saving_dollars:.0f}/yr  "
+            f"\u2192 Simple payback: ~{payback:.1f} yrs"
+        )
+        solara.InputInt("Install cost $", value=baseload_install_cost)
+        solara.InputInt("Rebate $",       value=baseload_rebate)
+        net = baseload_install_cost.value - baseload_rebate.value
+        solara.Text(f"Net cost: ${net:,}", style="color:#1976D2; font-weight:600")
+```
+
+**Updated `JourneyPlannerPanel`** — add `BaseloadDetail` as the last `ExpandableSlotRow`
+before the footer note. Remove the old divider + separate baseload section.
+
+**Add `baseload_expanded` reactive:**
+```python
+baseload_expanded = solara.reactive(False)
+```
+Add to `_DEFAULTS` and `reset_to_defaults()`.
+
+**Column header adjustment:** The “Plan swap?” column header can stay as-is —
+the checkbox label within the `BaseloadDetail` row reads “Plan upgrade?” implicitly
+through context.
+
+---
+
+### 16.3 Claude Code Prompt — Baseload Full Slot
+
+```
+Implement §16 (Baseload as Full Journey Slot) of docs/Phase2_Spec.md.
+
+In app.py:
+  Add baseload_expanded = solara.reactive(False) to reactive state.
+  Add to _DEFAULTS and reset_to_defaults().
+  Add BaseloadDetail component per §16.2.
+  Replace the old divider + standalone baseload section in JourneyPlannerPanel
+    with an ExpandableSlotRow for "Lights & Appliances":
+      state_rv = a synthetic reactive that always shows "Electric"
+      swap_planned_rv = baseload_swap_planned
+      swap_year_rv = baseload_swap_year
+      install_cost_rv = baseload_install_cost
+      rebate_rv = baseload_rebate
+      expanded_rv = baseload_expanded
+      detail_component = lambda: BaseloadDetail()
+  The top row should show:
+    - "Electric" state (non-editable dropdown or static label)
+    - "Plan upgrade?" checkbox = baseload_swap_planned
+    - When planned: swap year slider + install cost + rebate + net
+    - When not planned: "--" placeholder
+  Run solara run src/app.py and verify:
+    - Baseload row appears in the main table (not below a divider)
+    - Click to expand shows estimation + slider + upgrade controls
+    - Formula breakdown updates live with sqft/bedrooms changes
+    - Remove old divider section — no duplicate baseload UI
+```
+
+---
+
+## 17. Solar + Battery (Phase 2.7)
+
+Adds a Solar + Battery section as a dedicated collapsible panel in the UI.
+Phase 2.7 uses a simplified `% coverage` model: solar + battery offset a user-specified
+percentage of total electric opex, modelled as a reduction in electricity costs.
+Detailed physics (PVWatts, NEM3, hourly dispatch) deferred to Phase 3.
+
+---
+
+### 17.1 Design Philosophy
+
+**What the % coverage model captures correctly:**
+- CapEx and rebate (install cost, IRA tax credit, local incentives)
+- Opex reduction (covered % of electricity is effectively $0 marginal cost)
+- Payback story (net capex ÷ annual savings)
+- Compounding benefit: as electric appliances are added to the journey, the solar
+  savings grow proportionally (more electric load = more offset)
+
+**What it deliberately simplifies:**
+- Solar production is seasonal; battery sizing matters for nighttime loads
+- NEM3 export value (~$0.05/kWh) is much lower than import rate ($0.386/kWh)
+- A detailed Phase 3 model will feed a more accurate coverage % from PVWatts
+
+**The `% coverage` slider is the interface between v2.7 and Phase 3** — Phase 3
+replaces the slider with a computed value from the detailed model, while the
+simulation engine below stays identical.
+
+---
+
+### 17.2 Simulation Model
+
+**Solar reduces electricity opex proportionally:**
+
+```python
+# In JourneyHome.step(), after computing annual_opex:
+if solar_coverage_pct > 0:
+    # Reduce only the electric portion of opex
+    elec_opex_this_year = sum(
+        slot.elec_cost_this_step for slot in self.slots
+    )
+    solar_saving = elec_opex_this_year * (solar_coverage_pct / 100.0)
+    self.annual_opex -= solar_saving
+    self.solar_savings_history.append(solar_saving)
+else:
+    self.solar_savings_history.append(0.0)
+```
+
+**Solar CapEx** is logged at `solar_install_year` as a `CapExOnlySlot` (same mechanism
+as the panel upgrade — no device stepping, pure CapEx).
+
+**Applied to journey home only.** The “do nothing” baseline has no solar.
+
+**Coverage escalation:** Solar coverage stays constant year-over-year in Phase 2.7
+(panel degrades ~0.5%/yr, not modelled yet). Phase 3 adds degradation.
+
+---
+
+### 17.3 CapEx Items — Clickable Buttons
+
+The Solar + Battery panel uses clickable buttons to add cost components. Each
+button adds a line item with its own cost and rebate input. The user can add
+multiple items; the total net cost is summed and passed as the solar CapEx.
+
+**Default cost items (pre-populated, user can edit):**
+
+| Button | Default gross cost | Notes |
+|--------|-------------------|-------|
+| Solar panels (10 kW) | $25,000 | ~3,000 kWh/yr per installed kW in Bay Area |
+| Battery storage (13.5 kWh) | $12,000 | One Tesla Powerwall or equivalent |
+| Installation & permitting | $3,000 | Electrical, permits, interconnection |
+
+**Rebate items (pre-populated):**
+
+| Button | Default rebate | Notes |
+|--------|---------------|-------|
+| IRA Federal Tax Credit (30%) | auto-calculated | 30% of gross solar cost |
+| SVCE/MCE local rebate | $1,500 | Community choice aggregator incentive |
+| SGIP battery rebate | $2,500 | CA Self-Generation Incentive Program |
+
+**UI layout:**
+
+```
+☀️🔋 Solar + Battery
+
+[ ] Adding solar + battery to my journey
+    [when checked, reveals:]
+
+    Install in year  [───●───────────] 1   (2026)
+
+    % of electricity covered  [───────●───] 60 %
+    (Phase 3 will compute this from system size + usage)
+
+    ── Cost items ──────────────────────────────────────────────
+    [ + Solar panels (10 kW) ]   $25,000
+    [ + Battery storage ]         $12,000
+    [ + Installation ]            $3,000
+    ── Rebates ───────────────────────────────────────────────
+    [ + IRA 30% credit ]         -$12,000  (auto: 30% of solar panels)
+    [ + SVCE/MCE rebate ]         -$1,500
+    [ + SGIP battery rebate ]     -$2,500
+    ───────────────────────────────────────────────
+    Gross cost:     $40,000
+    Total rebates:  -$16,000
+    Net cost:        $24,000    Lifespan: 25 years
+
+    Est. annual saving: $1,004/yr
+    (60% × ~$1,673 electric opex at current rates)
+    Est. simple payback: ~23.9 yrs
+    (Note: payback improves as electric rates rise over time)
+```
+
+**Button behaviour:** Each button is a toggle. Clicking adds the item (shows cost
+and rebate inputs). Clicking again removes it. The IRA 30% credit is auto-calculated
+when the solar panels item is present: `rebate = 0.30 × solar_panels_cost`.
+
+---
+
+### 17.4 Reactive State
+
+```python
+# Solar + Battery
+solar_planned           = solara.reactive(False)
+solar_install_year      = solara.reactive(1)
+solar_coverage_pct      = solara.reactive(60)     # %, range 0-100, step 5
+
+# Cost items (toggle booleans + editable amounts)
+solar_include_panels    = solara.reactive(True)
+solar_panels_cost       = solara.reactive(25000)
+solar_include_battery   = solara.reactive(False)
+solar_battery_cost      = solara.reactive(12000)
+solar_include_install   = solara.reactive(True)
+solar_install_cost_item = solara.reactive(3000)
+
+# Rebate items
+solar_include_ira       = solara.reactive(True)     # auto-calc: 30% of panels cost
+solar_include_local     = solara.reactive(False)
+solar_local_rebate      = solara.reactive(1500)
+solar_include_sgip      = solara.reactive(False)
+solar_sgip_rebate       = solara.reactive(2500)
+```
+
+Add all to `_DEFAULTS` and `reset_to_defaults()`.
+
+**Derived computations (read-only, inline in UI):**
+```python
+# Gross cost
+gross_cost = (
+    (solar_panels_cost.value if solar_include_panels.value else 0)
+    + (solar_battery_cost.value if solar_include_battery.value else 0)
+    + (solar_install_cost_item.value if solar_include_install.value else 0)
+)
+
+# IRA credit auto-calc: 30% of panels cost
+ira_credit = (
+    int(0.30 * solar_panels_cost.value)
+    if solar_include_ira.value and solar_include_panels.value else 0
+)
+
+# Total rebates
+total_rebates = (
+    ira_credit
+    + (solar_local_rebate.value if solar_include_local.value else 0)
+    + (solar_sgip_rebate.value if solar_include_sgip.value else 0)
+)
+
+net_solar_cost = gross_cost - total_rebates
+```
+
+---
+
+### 17.5 `_build_slot_configs()` Update
+
+```python
+# Solar CapEx as a CapExOnlySlot
+if solar_planned.value:
+    capex_only_slots.append(CapExOnlySlot(
+        name="Solar + Battery",
+        category="Infrastructure",
+        install_cost=gross_cost,
+        rebate=total_rebates,
+        lifespan=25,
+        install_year=solar_install_year.value,
+    ))
+
+# Pass coverage pct to HESModel for opex reduction
+solar_coverage = solar_coverage_pct.value if solar_planned.value else 0
+```
+
+**`HESModel.__init__` gains:**
+```python
+solar_coverage_pct: float = 0.0   # 0-100; reduces elec opex in JourneyHome only
+```
+
+---
+
+### 17.6 Chart Integration
+
+**Cumulative cost chart:** When solar is planned, add a third line:
+- “Your journey + Solar” (solid teal `#00897B`) showing the further reduction
+  from solar coverage
+- “Your journey” (solid blue) remains visible for comparison
+
+This gives advocates a three-line chart: Do nothing / Journey / Journey + Solar.
+
+**Journey Timeline:** Solar appears as a ☀️ marker at `solar_install_year`.
+
+**Equipment Replacements (CapEx):** Solar CapEx bar shown at `install_year`.
+
+---
+
+### 17.7 Tests
+
+Add to `tests/test_journey.py`:
+
+```python
+def test_solar_reduces_elec_opex():
+    """Solar coverage reduces journey home electric opex proportionally."""
+    model_no_solar = HESModel(solar_coverage_pct=0,  n_years=5)
+    model_solar    = HESModel(solar_coverage_pct=50, n_years=5)
+    model_no_solar.run_all()
+    model_solar.run_all()
+    df_ns = model_no_solar.datacollector.get_model_vars_dataframe()
+    df_s  = model_solar.datacollector.get_model_vars_dataframe()
+    # Solar home should have lower cumulative journey cost
+    assert df_s["Journey Cum Cost"].iloc[-1] < df_ns["Journey Cum Cost"].iloc[-1]
+
+def test_solar_does_not_affect_baseline():
+    """Solar coverage only affects journey home, not do-nothing baseline."""
+    model = HESModel(solar_coverage_pct=80, n_years=5)
+    model.run_all()
+    df = model.datacollector.get_model_vars_dataframe()
+    model_ns = HESModel(solar_coverage_pct=0, n_years=5)
+    model_ns.run_all()
+    df_ns = model_ns.datacollector.get_model_vars_dataframe()
+    # Baseline costs must be identical with and without solar
+    assert np.allclose(
+        df["Baseline Cum Cost"].values,
+        df_ns["Baseline Cum Cost"].values,
+        rtol=0.001
+    )
+
+def test_solar_capex_at_install_year():
+    """Solar CapEx fires at install_year in journey home."""
+    solar_slot = CapExOnlySlot(
+        name="Solar + Battery",
+        install_cost=40000, rebate=16000, lifespan=25, install_year=1)
+    model = HESModel(n_years=5, capex_only_slots=[solar_slot],
+                     solar_coverage_pct=60)
+    model.run_all()
+    assert model.journey_home.capex_by_year[1] >= 24000  # net = 40k - 16k
+```
+
+---
+
+### 17.8 Claude Code Prompt — Solar + Battery
+
+```
+Implement §17 (Solar + Battery) of docs/Phase2_Spec.md.
+
+Step 1 — model.py + journey.py:
+  Add solar_coverage_pct: float = 0.0 parameter to HESModel.__init__().
+  Pass it to JourneyHome (not BaselineHome).
+  In JourneyHome.step(), after computing annual_opex:
+    elec_opex = sum of elec-fuel slot costs this step
+    annual_opex -= elec_opex × (solar_coverage_pct / 100)
+    append to solar_savings_history
+  Add DataCollector reporter: "Solar Saving" per year.
+  Add tests from §17.7.
+  Run pytest — all must pass.
+
+Step 2 — app.py:
+  Add all solar reactives from §17.4.
+  Add Solar + Battery collapsible section to the UI — place it after the
+  Journey Planner card and before the Home Profile card:
+    - [ ] Planning solar checkbox
+    - When checked: install year slider, coverage % slider
+    - Cost items: toggle buttons for panels, battery, install
+      Each button adds an editable cost input when active
+    - Rebate items: toggle buttons for IRA (auto-calc), local, SGIP
+      Each button adds an editable rebate input when active
+    - IRA credit = 30% × panels cost when both enabled (auto-computed)
+    - Summary: gross cost, total rebates, net cost, est. annual saving, payback
+  Update _build_slot_configs() per §17.5 to pass solar CapExOnlySlot.
+  Update HESModel call to pass solar_coverage_pct.
+  Update cumulative cost chart per §17.6:
+    - Add third line "Journey + Solar" when solar_planned = True
+    - Color: teal #00897B, solid line
+  Update Journey Timeline to show solar marker.
+  Update _DEFAULTS and reset_to_defaults().
+  Run solara run src/app.py and verify:
+    - Solar section visible as collapsible panel
+    - Cost buttons toggle line items
+    - IRA credit auto-computes from panels cost
+    - Net cost and payback update live
+    - Cumulative cost chart shows 3 lines when solar planned
+    - Changing coverage % moves the "Journey + Solar" line
+    - Baseline line is unaffected by solar
+```
+
+
+---
+
+## 18. UI Polish — Phase 2.7
+
+Cosmetic and layout improvements to sharpen the interface. No simulation logic changes.
+
+---
+
+### 18.1 Chart Panel Title Highlighting
+
+**Problem:** The two chart panels (Left Chart, Right Chart) have plain text titles that
+are easy to overlook. The chart selector dropdowns sit inside each panel but there is
+no visual treatment distinguishing the panel header from the chart content below it.
+
+**Change:** Apply a grey background highlight to the title bar of each of the two chart
+panels. The title bar is the strip containing the chart selector dropdown (e.g.
+"Cumulative Cost", "Annual Cost by Device", etc.).
+
+**Visual spec:**
+```
+┌─────────────────────────────────────────────┐
+│  Left Chart  [ Cumulative Cost        ▾ ]   │  ← grey title bar (#F0F0F0)
+├─────────────────────────────────────────────┤
+│                                             │
+│   (chart renders here)                      │
+│                                             │
+└─────────────────────────────────────────────┘
+```
+
+**Implementation:**
+- Apply `background-color: #F0F0F0` (light grey) to the title bar container of each
+  chart panel via an inline style or a shared CSS class `chart-panel-title`.
+- The highlight covers the full width of the panel header strip — not just the
+  dropdown label text.
+- Both Left Chart and Right Chart panels get identical treatment.
+- No change to font, dropdown behaviour, or chart rendering below the title bar.
+
+**Solara pattern:**
+```python
+with solara.Row(
+    style="background-color: #F0F0F0; padding: 6px 12px; border-radius: 4px 4px 0 0;"
+):
+    solara.Select(label="Left Chart", values=CHART_OPTIONS, value=left_chart_selection)
+```
+
+---
+
+### 18.2 Home Profile Panel — Collapse Secondary Details
+
+**Problem:** The Home Profile card currently shows all fields flat (ZIP, Climate Zone,
+Bedrooms, Square Footage, Year Built, Building Performance/Insulation, Baseline device
+specs). This makes the left column tall and visually heavy, especially once the Solar +
+Battery panel is added below it (§18.3).
+
+**Change:** Wrap the secondary home details in a collapsible section within the Home
+Profile card. ZIP code, Bedrooms, and Square footage remain always visible. Climate
+Zone, Year Built, and Building Performance/Insulation are hidden by default behind a
+"More details…" toggle.
+
+**Always visible (never hidden):**
+```
+🏠 Home Profile
+  ZIP code       [ 95112 ]
+  Bedrooms       [ 3 ▾ ]
+  Square footage [ 1,800 ]
+  ▶ More details...
+```
+
+**Collapsed (default state):** The "More details…" toggle is shown closed (▶).
+Climate Zone, Year Built, and Building Performance are hidden.
+
+**Expanded:**
+```
+  ▼ More details...
+  Climate zone        [ CZ12 ▾ ]
+  Year built          [ 1985   ]
+  Building Performance
+    Insulation   ( Poor )  (● Average )  ( Good )
+```
+
+**Reactive state:**
+```python
+home_profile_details_expanded = solara.reactive(False)
+```
+Add to `_DEFAULTS` and `reset_to_defaults()`.
+
+**What moves into the dropdown vs. stays visible:**
+
+| Field | Always visible | In dropdown |
+|---|---|---|
+| ZIP code | ✓ | |
+| Bedrooms | ✓ | |
+| Square footage | ✓ | |
+| Climate zone | | ✓ |
+| Year built | | ✓ |
+| Building Performance / Insulation | | ✓ |
+
+**Rationale:** ZIP, Bedrooms, and Square Footage are the fields most users touch in a
+community engagement session. Climate Zone, Year Built, and Insulation are set-and-forget
+for most users. Hiding them reduces visual clutter without removing the capability.
+
+---
+
+### 18.3 Solar + Battery Panel — Position in Home Profile Column
+
+**Change from §17.8:** Move the Solar + Battery panel from its §17.8 position
+("after Journey Planner card, before Home Profile card") to sit **below the Home
+Profile card** in the left/home-profile column.
+
+**Left column layout after this change:**
+```
+Left column (home config)
+──────────────────────────────────────────────────
+Journey Planner card
+Energy & Prices card
+Home Profile card
+  ZIP | Bedrooms | Sq Ft          ← always visible
+  ▶ More details...               ← collapsed by default
+    Climate Zone, Year Built,
+    Building Performance
+──────────────────────────────────────────────────
+☀️🔋 Solar + Battery card
+  [ ] Adding solar + battery...  ← collapsed by default
+```
+
+**Right column layout (unchanged):**
+```
+Right column (charts)
+──────────────────────────────────────────────────
+Left Chart panel   [grey title bar]
+Right Chart panel  [grey title bar]
+```
+
+**Behaviour:** Solar + Battery card is a separate card sitting directly below Home
+Profile. It uses the existing §17 collapsible design (checkbox "Adding solar + battery
+to my journey" reveals all inputs). Default state: collapsed/unchecked.
+
+**Why this position:** Solar + Battery is a home-level infrastructure decision (a fixed
+install, not an annual operating parameter), so it belongs visually alongside the home
+configuration inputs. Placing it below Home Profile keeps it discoverable while
+preserving the primary journey-planning flow at the top of the column.
+
+---
+
+### 18.4 Claude Code Prompt — UI Polish
+
+```
+Implement §18 (UI Polish) of docs/Phase2_Spec.md.
+
+Step 1 — Chart panel title highlighting (§18.1):
+  In app.py, locate the two chart panel containers (Left Chart, Right Chart).
+  Wrap each panel's title/selector row in a solara.Row with:
+    style="background-color: #F0F0F0; padding: 6px 12px; border-radius: 4px 4px 0 0;"
+  Both panels get identical treatment.
+  No changes to chart logic, dropdown options, or chart rendering.
+
+Step 2 — Home Profile collapsible details (§18.2):
+  Add home_profile_details_expanded = solara.reactive(False).
+  Add to _DEFAULTS and reset_to_defaults().
+  In HomeProfilePanel:
+    Always visible: ZIP code, Bedrooms, Square footage.
+    Add clickable "▶ / ▼ More details..." toggle row below Square footage.
+    Collapsed (default): Climate zone, Year built, Building Performance hidden.
+    Expanded: show Climate zone, Year built, Building Performance / Insulation.
+  Use same chevron-rotate pattern as §13 ExpandableSlotRow.
+
+Step 3 — Solar + Battery panel relocation (§18.3):
+  Move the Solar + Battery card from its current position (between Journey Planner
+  and Home Profile) to below the Home Profile card in the same column.
+  No changes to Solar + Battery internals — §17 logic is unchanged.
+
+Run solara run src/app.py and verify:
+  - Both chart panel title bars have a light grey (#F0F0F0) background strip.
+  - Home Profile shows only ZIP, Bedrooms, Sq Ft by default.
+  - Clicking "More details..." expands Climate Zone, Year Built, Insulation.
+  - Solar + Battery card sits directly below Home Profile card in the left column.
+  - All existing §17 solar functionality (cost buttons, IRA auto-calc, 3-line chart)
+    works unchanged.
 ```
 
 ---
