@@ -261,7 +261,11 @@ class HESModel(mesa.Model):
                  elec_rate_model_a: str = "cagr_flat",
                  gas_rate_model_a:  str = "cagr_flat",
                  elec_rate_model_b: str = "acc_shaped",
-                 gas_rate_model_b:  str = "acc_seasonal"):
+                 gas_rate_model_b:  str = "acc_seasonal",
+                 acc_elec_cagr_a:   float = 0.07,
+                 acc_gas_cagr_a:    float = 0.08,
+                 acc_elec_cagr_b:   float = 0.07,
+                 acc_gas_cagr_b:    float = 0.08):
         super().__init__()
         self.elec_rate_model_a = elec_rate_model_a
         self.gas_rate_model_a  = gas_rate_model_a
@@ -337,14 +341,16 @@ class HESModel(mesa.Model):
         elec_loader_a = _make_loader(rl, elec_rate_model_a)
         gas_loader_a  = _make_loader(rl, gas_rate_model_a)
 
+        # CAGR mode uses user slider; ACC mode uses acc_cagr slider (ignores CAGR slider)
+        elec_cagr_a_eff = acc_elec_cagr_a if elec_rate_model_a == "acc_shaped"  else _cagr_for(elec_rate_model_a, elec_cagr_a)
+        gas_cagr_a_eff  = acc_gas_cagr_a  if gas_rate_model_a  == "acc_seasonal" else _cagr_for(gas_rate_model_a,  gas_cagr_a)
+
         self.elec_rates = elec_loader_a.get_annual_monthly_rates(
             "electricity", sim_start_year, n_years,
-            scenario=scenario_a,
-            custom_cagr=_cagr_for(elec_rate_model_a, elec_cagr_a))   # (n_years, 12)
+            scenario=scenario_a, custom_cagr=elec_cagr_a_eff)   # (n_years, 12)
         self.gas_rates  = gas_loader_a.get_annual_monthly_rates(
             "gas", sim_start_year, n_years,
-            scenario=scenario_a,
-            custom_cagr=_cagr_for(gas_rate_model_a, gas_cagr_a))     # (n_years, 12)
+            scenario=scenario_a, custom_cagr=gas_cagr_a_eff)    # (n_years, 12)
 
         self.current_elec_rates = self.elec_rates[0]
         self.current_gas_rates  = self.gas_rates[0]
@@ -372,14 +378,15 @@ class HESModel(mesa.Model):
             elec_loader_b = _make_loader(rl, elec_rate_model_b)
             gas_loader_b  = _make_loader(rl, gas_rate_model_b)
 
+            elec_cagr_b_eff = acc_elec_cagr_b if elec_rate_model_b == "acc_shaped"  else _cagr_for(elec_rate_model_b, elec_cagr_b)
+            gas_cagr_b_eff  = acc_gas_cagr_b  if gas_rate_model_b  == "acc_seasonal" else _cagr_for(gas_rate_model_b,  gas_cagr_b)
+
             self.elec_rates_b = elec_loader_b.get_annual_monthly_rates(
                 "electricity", sim_start_year, n_years,
-                scenario=scenario_b,
-                custom_cagr=_cagr_for(elec_rate_model_b, elec_cagr_b))
+                scenario=scenario_b, custom_cagr=elec_cagr_b_eff)
             self.gas_rates_b  = gas_loader_b.get_annual_monthly_rates(
                 "gas", sim_start_year, n_years,
-                scenario=scenario_b,
-                custom_cagr=_cagr_for(gas_rate_model_b, gas_cagr_b))
+                scenario=scenario_b, custom_cagr=gas_cagr_b_eff)
 
             self.current_elec_rates_b = self.elec_rates_b[0]
             self.current_gas_rates_b  = self.gas_rates_b[0]

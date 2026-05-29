@@ -142,7 +142,7 @@ class ACCRateLoader:
         for yr_idx in range(n_years):
             year = sim_start_year + yr_idx
             for mo in range(1, 13):
-                retail = self._base.get_rate(fuel, year, mo, scenario, custom_cagr=None)
+                retail = self._base.get_rate(fuel, year, mo, scenario, custom_cagr)
                 if fuel == "gas":
                     rates[yr_idx, mo - 1] = retail * float(self._gas_shape[mo - 1])
                 else:

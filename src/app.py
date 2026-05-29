@@ -2,6 +2,8 @@
 WhyWatt? — Solara UI (Phase 2 / Objective 6 — Journey Planner)
 """
 import os
+import json
+from pathlib import Path
 import solara
 import numpy as np
 import matplotlib
@@ -10,7 +12,7 @@ import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
 matplotlib.use("Agg")
 from matplotlib.figure import Figure
-from model import HESModel, SCENARIO_PRESETS
+from model import HESModel
 from home_config import HomeConfig, compute_baseload_kwh
 from journey import CATEGORY_ORDER, CATEGORY_LABELS, CapExOnlySlot
 
@@ -45,6 +47,9 @@ C_SKY   = "#50BDF8"
 C_RED   = "#D0302D"
 C_BASE  = C_RED
 C_ELEC  = C_NAVY
+# Rate model UI colors — distinct from journey Red/Blue
+C_RATE_ELEC = "#0288D1"   # light blue — electricity rate
+C_RATE_GAS  = "#E65100"   # deep orange — gas rate
 
 CATEGORY_COLORS = {
     "Baseload":     ("#BDBDBD", "#BBDEFB"),
@@ -58,8 +63,10 @@ CHART_OPTIONS = [
     "Annual Cost by Year",
     "Cost Breakdown by Category",
     "Equipment Replacements (CapEx)",
-    "Electricity Price Trend",
-    "Gas Price Trend",
+    "Electric CAGR Projection",
+    "Gas CAGR Projection",
+    "ACC Rate Projection",
+    "Electricity Rate Shape",
     "Journey Timeline",
     "Cost by Device",
     "Energy Use by Device",
@@ -186,8 +193,13 @@ _DEFAULTS = {
     "hvac_ac_seer":     14,
     "hvac_ac_age":      7,
     # WH detail specs
-    "wh_gas_age":       5,
-    "hw_daily_gallons": 65,
+    "wh_gas_age":              5,
+    "hw_daily_gallons":        65,
+    "gas_wh_tank_gallons":     50,
+    "hpwh_tank_gallons":       65,
+    "hpwh_ambient_location":   "conditioned",
+    "wh_inlet_temp_f":         60,
+    "wh_setpoint_f":           120,
     # Dryer detail specs
     "dryer_gas_therms_per_cycle": 0.22,
     "dryer_loads_per_week":       5,
@@ -218,17 +230,27 @@ _DEFAULTS = {
     "solar_rebate":            0,
     "solar_cost_expanded":     False,
     # Pricing
-    "gas_cagr_pct_a":         8,
+    "elec_rate_model_a":      "cagr_flat",
     "elec_cagr_pct_a":        7,
+    "acc_elec_cagr_a":        7,
+    "gas_rate_model_a":       "cagr_flat",
+    "gas_cagr_pct_a":         8,
+    "acc_gas_cagr_a":         8,
     "comparison_mode":        False,
-    "gas_cagr_pct_b":         12,
-    "elec_cagr_pct_b":        10,
+    "elec_rate_model_b":      "acc_shaped",
+    "elec_cagr_pct_b":        7,
+    "acc_elec_cagr_b":        7,
+    "gas_rate_model_b":       "acc_seasonal",
+    "gas_cagr_pct_b":         8,
+    "acc_gas_cagr_b":         8,
     "years":                  20,
     "sim_start_year":         2025,
     # Charts
     "chart_left":             "Cumulative Energy Costs",
     "chart_right":            "Cost Breakdown by Category",
     "device_chart_home":      "journey",
+    "acc_shape_year":         1,
+    "detail_open":            None,
 }
 
 # ── Reactive state (initialised from _DEFAULTS) ────────────────────────────────
@@ -317,6 +339,11 @@ hvac_ac_age      = solara.reactive(7)    # yrs
 wh_gas_age              = solara.reactive(5)     # yrs
 hw_daily_gallons        = solara.reactive(65)    # gal/day
 hw_gallons_user_override = solara.reactive(False) # True once user moves slider
+gas_wh_tank_gallons     = solara.reactive(50)    # gal
+hpwh_tank_gallons       = solara.reactive(65)    # gal
+hpwh_ambient_location   = solara.reactive("conditioned")  # "conditioned" | "unconditioned"
+wh_inlet_temp_f         = solara.reactive(60)    # °F — annual avg cold-water inlet
+wh_setpoint_f           = solara.reactive(120)   # °F — tank setpoint
 
 # Dryer detail specs
 dryer_gas_therms_per_cycle = solara.reactive(0.22)
@@ -359,18 +386,32 @@ solar_cost_expanded     = solara.reactive(False)
 # Device chart home selector (shared by both device chart types)
 device_chart_home = solara.reactive("journey")   # "journey" | "baseline"
 
-# Pricing & timeline — independent per-fuel CAGRs
-gas_cagr_pct_a  = solara.reactive(8)    # %/yr, Scenario A — moderate default
-elec_cagr_pct_a = solara.reactive(7)    # %/yr, Scenario A
-comparison_mode  = solara.reactive(False)
-gas_cagr_pct_b  = solara.reactive(12)   # %/yr, Scenario B — stress default
-elec_cagr_pct_b = solara.reactive(10)   # %/yr, Scenario B
-years            = solara.reactive(20)
+# ACC Rate Shape chart — year selector (chart-only, NOT a sim dep)
+acc_shape_year = solara.reactive(1)
+
+# Pricing & timeline
+elec_rate_model_a = solara.reactive("cagr_flat")   # "cagr_flat" | "acc_shaped"
+elec_cagr_pct_a   = solara.reactive(7)
+acc_elec_cagr_a   = solara.reactive(7)            # base escalation used when acc_shaped
+gas_rate_model_a  = solara.reactive("cagr_flat")   # "cagr_flat" | "acc_seasonal"
+gas_cagr_pct_a    = solara.reactive(8)
+acc_gas_cagr_a    = solara.reactive(8)             # base escalation used when acc_seasonal
+comparison_mode   = solara.reactive(False)
+elec_rate_model_b = solara.reactive("acc_shaped")
+elec_cagr_pct_b   = solara.reactive(7)
+acc_elec_cagr_b   = solara.reactive(7)
+gas_rate_model_b  = solara.reactive("acc_seasonal")
+gas_cagr_pct_b    = solara.reactive(8)
+acc_gas_cagr_b    = solara.reactive(8)
+years             = solara.reactive(20)
 sim_start_year   = solara.reactive(2025)
 
 # Chart selection
 chart_left  = solara.reactive("Cumulative Energy Costs")
 chart_right = solara.reactive("Cost Breakdown by Category")
+
+# Detail view state (§25)
+detail_open = solara.reactive(None)   # None | "hvac" | "water_heater" | "ev" | "cooktop" | "dryer" | "home" | "solar" | "rates"
 
 # ── Reset function ───────────────────────────────────────────────────────────
 def reset_to_defaults():
@@ -432,6 +473,11 @@ def reset_to_defaults():
     wh_gas_age.set(_DEFAULTS["wh_gas_age"])
     hw_daily_gallons.set(_DEFAULTS["hw_daily_gallons"])
     hw_gallons_user_override.set(False)
+    gas_wh_tank_gallons.set(_DEFAULTS["gas_wh_tank_gallons"])
+    hpwh_tank_gallons.set(_DEFAULTS["hpwh_tank_gallons"])
+    hpwh_ambient_location.set(_DEFAULTS["hpwh_ambient_location"])
+    wh_inlet_temp_f.set(_DEFAULTS["wh_inlet_temp_f"])
+    wh_setpoint_f.set(_DEFAULTS["wh_setpoint_f"])
     dryer_gas_therms_per_cycle.set(_DEFAULTS["dryer_gas_therms_per_cycle"])
     dryer_loads_per_week.set(_DEFAULTS["dryer_loads_per_week"])
     dryer_hp_kwh_per_cycle.set(_DEFAULTS["dryer_hp_kwh_per_cycle"])
@@ -456,47 +502,32 @@ def reset_to_defaults():
     solar_install_cost_item.set(_DEFAULTS["solar_install_cost_item"])
     solar_rebate.set(_DEFAULTS["solar_rebate"])
     solar_cost_expanded.set(_DEFAULTS["solar_cost_expanded"])
-    gas_cagr_pct_a.set(_DEFAULTS["gas_cagr_pct_a"])
+    elec_rate_model_a.set(_DEFAULTS["elec_rate_model_a"])
     elec_cagr_pct_a.set(_DEFAULTS["elec_cagr_pct_a"])
+    acc_elec_cagr_a.set(_DEFAULTS["acc_elec_cagr_a"])
+    gas_rate_model_a.set(_DEFAULTS["gas_rate_model_a"])
+    gas_cagr_pct_a.set(_DEFAULTS["gas_cagr_pct_a"])
+    acc_gas_cagr_a.set(_DEFAULTS["acc_gas_cagr_a"])
     comparison_mode.set(_DEFAULTS["comparison_mode"])
-    gas_cagr_pct_b.set(_DEFAULTS["gas_cagr_pct_b"])
+    elec_rate_model_b.set(_DEFAULTS["elec_rate_model_b"])
     elec_cagr_pct_b.set(_DEFAULTS["elec_cagr_pct_b"])
+    acc_elec_cagr_b.set(_DEFAULTS["acc_elec_cagr_b"])
+    gas_rate_model_b.set(_DEFAULTS["gas_rate_model_b"])
+    gas_cagr_pct_b.set(_DEFAULTS["gas_cagr_pct_b"])
+    acc_gas_cagr_b.set(_DEFAULTS["acc_gas_cagr_b"])
     years.set(_DEFAULTS["years"])
     sim_start_year.set(_DEFAULTS["sim_start_year"])
     chart_left.set(_DEFAULTS["chart_left"])
     chart_right.set(_DEFAULTS["chart_right"])
     device_chart_home.set(_DEFAULTS["device_chart_home"])
+    acc_shape_year.set(_DEFAULTS["acc_shape_year"])
+    detail_open.set(_DEFAULTS["detail_open"])
 
 
 # ── Labels / option lists ─────────────────────────────────────────────────────
 _CZ_OPTIONS = ["CZ3", "CZ4", "CZ5", "CZ12", "CZ13", "CZ16"]
 _BR_OPTIONS = [1, 2, 3, 4, 5]
 
-_PRESET_DISPLAY = {
-    "conservative": "Conservative",
-    "moderate":     "Moderate",
-    "stress":       "Stress / CEC",
-}
-
-
-def _current_preset_label(gas_pct: int, elec_pct: int) -> str:
-    """Return the matching preset name (Capitalized) or 'Custom'."""
-    for name, p in SCENARIO_PRESETS.items():
-        if int(p["gas"] * 100) == gas_pct and int(p["elec"] * 100) == elec_pct:
-            return name.capitalize()
-    return "Custom"
-
-
-def _apply_preset_a(preset: str):
-    p = SCENARIO_PRESETS[preset]
-    gas_cagr_pct_a.set(int(p["gas"] * 100))
-    elec_cagr_pct_a.set(int(p["elec"] * 100))
-
-
-def _apply_preset_b(preset: str):
-    p = SCENARIO_PRESETS[preset]
-    gas_cagr_pct_b.set(int(p["gas"] * 100))
-    elec_cagr_pct_b.set(int(p["elec"] * 100))
 
 
 # ── Slot config builder ────────────────────────────────────────────────────────
@@ -554,12 +585,19 @@ def _build_slot_configs() -> list:
                 "age": wh_gas_age.value,
                 "lifespan": 12, "installation_cost": 1200,
                 "daily_gallons_override": hw_override,
+                "tank_gallons": gas_wh_tank_gallons.value,
+                "setpoint_f": wh_setpoint_f.value,
+                "inlet_temp_f": wh_inlet_temp_f.value,
             }],
             "electric_device": {
                 "class": "HeatPumpWaterHeater",
                 "uef": hpwh_uef.value,
                 "lifespan": 15, "installation_cost": 2500,
                 "daily_gallons_override": hw_override,
+                "tank_gallons": hpwh_tank_gallons.value,
+                "ambient_location": hpwh_ambient_location.value,
+                "setpoint_f": wh_setpoint_f.value,
+                "inlet_temp_f": wh_inlet_temp_f.value,
             },
             "swap_year": _eff_swap_year(wh_starting_state.value,
                                         wh_swap_planned.value, wh_swap_year.value),
@@ -701,6 +739,15 @@ def run_simulation():
         slot_configs=_build_slot_configs(),
         capex_only_slots=capex_slots or None,
         solar_coverage_pct=float(solar_coverage),
+        # Rate model selections (§23) — used once ACCRateLoader is wired in model.py
+        elec_rate_model_a=elec_rate_model_a.value,
+        gas_rate_model_a=gas_rate_model_a.value,
+        elec_rate_model_b=elec_rate_model_b.value,
+        gas_rate_model_b=gas_rate_model_b.value,
+        acc_elec_cagr_a=acc_elec_cagr_a.value / 100.0,
+        acc_gas_cagr_a=acc_gas_cagr_a.value   / 100.0,
+        acc_elec_cagr_b=acc_elec_cagr_b.value / 100.0,
+        acc_gas_cagr_b=acc_gas_cagr_b.value   / 100.0,
     )
     m.run_all()
     df = m.datacollector.get_model_vars_dataframe()
@@ -856,41 +903,213 @@ def make_capex(df, model, n):
     return fig
 
 
-# Chart 5 — Electricity Price Trend
+# Chart 5 — Electric CAGR Projection
+def _elec_rate_label(model_str: str, cagr_pct: int, suffix: str = "") -> str:
+    if model_str == "cagr_flat":
+        return f"Elec +{cagr_pct}%/yr{suffix}"
+    return f"Electricity ACC-shaped{suffix}"
+
+def _gas_rate_label(model_str: str, cagr_pct: int, suffix: str = "") -> str:
+    if model_str == "cagr_flat":
+        return f"Gas +{cagr_pct}%/yr{suffix}"
+    return f"Gas ACC seasonal{suffix}"
+
+
 def make_elec_price(df, model, n):
     fig = _new_fig()
     ax  = fig.add_subplot(111)
     x = np.arange(1, n + 1)
-    lbl_a = f"Elec +{elec_cagr_pct_a.value}%/yr"
+    lbl_a = _elec_rate_label(model.elec_rate_model_a, elec_cagr_pct_a.value)
     ax.plot(x, df["Elec Rate"].values, color=C_ELEC, lw=2.5, label=lbl_a)
     if model.comparison_mode:
-        lbl_b = f"Elec +{elec_cagr_pct_b.value}%/yr (B)"
+        lbl_b = _elec_rate_label(model.elec_rate_model_b, elec_cagr_pct_b.value, " (B)")
         ax.plot(x, df["Elec Rate B"].values, color=C_ELEC, lw=2.0, linestyle="--", label=lbl_b)
         ax.legend(fontsize=8)
     ax.set_xlabel("Year")
     ax.set_ylabel("Avg Electricity Price  ($/kWh)")
-    ax.set_title("Electricity Price Trend", fontsize=10, fontweight="bold")
+    ax.set_title("Electric CAGR Projection", fontsize=10, fontweight="bold")
     _style(ax)
     fig.tight_layout(pad=1.0)
     return fig
 
 
-# Chart 6 — Gas Price Trend
+# Chart 6 — Gas CAGR Projection
 def make_gas_price(df, model, n):
     fig = _new_fig()
     ax  = fig.add_subplot(111)
     x = np.arange(1, n + 1)
-    lbl_a = f"Gas +{gas_cagr_pct_a.value}%/yr"
+    lbl_a = _gas_rate_label(model.gas_rate_model_a, gas_cagr_pct_a.value)
     ax.plot(x, df["Gas Rate"].values, color="#EF6C00", lw=2.5, label=lbl_a)
     if model.comparison_mode:
-        lbl_b = f"Gas +{gas_cagr_pct_b.value}%/yr (B)"
+        lbl_b = _gas_rate_label(model.gas_rate_model_b, gas_cagr_pct_b.value, " (B)")
         ax.plot(x, df["Gas Rate B"].values, color="#EF6C00", lw=2.0, linestyle="--", label=lbl_b)
         ax.legend(fontsize=8)
     ax.set_xlabel("Year")
     ax.set_ylabel("Avg Gas Price  ($/therm)")
-    ax.set_title("Gas Price Trend", fontsize=10, fontweight="bold")
+    ax.set_title("Gas CAGR Projection", fontsize=10, fontweight="bold")
     _style(ax)
     fig.tight_layout(pad=1.0)
+    return fig
+
+
+# Chart 7b — ACC Rate Projection (§24.3)
+def _load_acc_shapes():
+    """Return (elec_shape 12×24, gas_monthly_shape 12) arrays."""
+    with open(_ACC_SHAPE_PATH) as f:
+        ed = json.load(f)
+    with open(_ACC_GAS_SHAPE_PATH) as f:
+        gd = json.load(f)
+    return np.array(ed["shape_24h_by_month"], dtype=float), np.array(gd["monthly_shape"], dtype=float)
+
+
+def _plot_rate_band(ax, cal_x, base, lo_factor, hi_factor, lo_lbl, hi_lbl, color):
+    """Plot a CAGR base line + shaded seasonal band between lo_factor and hi_factor."""
+    ax.fill_between(cal_x, base * lo_factor, base * hi_factor,
+                    alpha=0.18, color=color)
+    ax.plot(cal_x, base,               color=color, lw=2.5, label="Annual avg")
+    ax.plot(cal_x, base * hi_factor,   color=color, lw=1.2, linestyle="--", label=hi_lbl)
+    ax.plot(cal_x, base * lo_factor,   color=color, lw=1.2, linestyle=":",  label=lo_lbl)
+
+
+def make_rate_trajectory(df, model, n):
+    fig = Figure(figsize=(7, 5), dpi=100)
+    fig.patch.set_facecolor("#F9F9F9")
+    ax_elec = fig.add_subplot(211)
+    ax_gas  = fig.add_subplot(212)
+    x     = np.arange(1, n + 1)
+    cal_x = model.sim_start_year + x - 1
+
+    elec_base = df["Elec Rate"].values   # CAGR annual mean $/kWh
+    gas_base  = df["Gas Rate"].values    # CAGR annual mean $/therm
+
+    # ── Electric subplot ──────────────────────────────────────────────────────
+    if model.elec_rate_model_a == "acc_shaped":
+        elec_shape, _ = _load_acc_shapes()
+        flat = elec_shape.flatten()
+        # p25 = typical cheap off-peak hour; p90 = peak evening hour
+        p25 = float(np.percentile(flat, 25))
+        p90 = float(np.percentile(flat, 90))
+        _plot_rate_band(ax_elec, cal_x, elec_base, p25, p90,
+                        f"Off-peak (p25 = {p25:.2f}×)",
+                        f"Peak evening (p90 = {p90:.2f}×)",
+                        C_RATE_ELEC)
+        ax_elec.text(0.01, 0.04,
+                     "Shaded band = off-peak to peak-hour rate range (ACC hourly shape)",
+                     transform=ax_elec.transAxes, fontsize=6.5, color="#9E9E9E")
+    else:
+        lbl_ea = _elec_rate_label(model.elec_rate_model_a, elec_cagr_pct_a.value, " (A)")
+        ax_elec.plot(cal_x, elec_base, color=C_RATE_ELEC, lw=2.5, label=lbl_ea)
+
+    if model.comparison_mode and "Elec Rate B" in df.columns:
+        lbl_eb = _elec_rate_label(model.elec_rate_model_b, elec_cagr_pct_b.value, " (B)")
+        ax_elec.plot(cal_x, df["Elec Rate B"].values,
+                     color=C_RATE_ELEC, lw=2.0, linestyle="--", label=lbl_eb)
+
+    ax_elec.legend(fontsize=7)
+    ax_elec.yaxis.set_major_formatter(
+        matplotlib.ticker.FuncFormatter(lambda v, _: f"${v:.3f}"))
+    ax_elec.set_ylabel("$/kWh")
+    ax_elec.set_title("ACC Rate Projection", fontsize=10, fontweight="bold")
+    _style(ax_elec)
+
+    # ── Gas subplot ───────────────────────────────────────────────────────────
+    if model.gas_rate_model_a == "acc_seasonal":
+        _, gas_shape = _load_acc_shapes()
+        winter_factor = float(np.max(gas_shape))   # ~1.20 (Jan/Dec)
+        summer_factor = float(np.min(gas_shape))   # ~0.85 (Apr–Oct)
+        _plot_rate_band(ax_gas, cal_x, gas_base, summer_factor, winter_factor,
+                        f"Summer (min {summer_factor:.2f}×)",
+                        f"Winter (max {winter_factor:.2f}×)",
+                        C_RATE_GAS)
+        ax_gas.text(0.01, 0.04,
+                    "Shaded band = summer low to winter peak (ACC seasonal gas shape)",
+                    transform=ax_gas.transAxes, fontsize=6.5, color="#9E9E9E")
+    else:
+        lbl_ga = _gas_rate_label(model.gas_rate_model_a, gas_cagr_pct_a.value, " (A)")
+        ax_gas.plot(cal_x, gas_base, color=C_RATE_GAS, lw=2.5, label=lbl_ga)
+
+    if model.comparison_mode and "Gas Rate B" in df.columns:
+        lbl_gb = _gas_rate_label(model.gas_rate_model_b, gas_cagr_pct_b.value, " (B)")
+        ax_gas.plot(cal_x, df["Gas Rate B"].values,
+                    color=C_RATE_GAS, lw=2.0, linestyle="--", label=lbl_gb)
+
+    ax_gas.legend(fontsize=7)
+    ax_gas.yaxis.set_major_formatter(
+        matplotlib.ticker.FuncFormatter(lambda v, _: f"${v:.2f}"))
+    ax_gas.set_ylabel("$/therm")
+    ax_gas.set_xlabel("Year")
+    _style(ax_gas)
+
+    fig.tight_layout(pad=1.2)
+    return fig
+
+
+# Chart 7c — Electricity Rate Shape heatmap (§24.2)
+_ACC_SHAPE_PATH = (
+    Path(__file__).parent.parent / "data" / "rates" / "acc_electric_shape_pge_2024.json"
+)
+_ACC_GAS_SHAPE_PATH = (
+    Path(__file__).parent.parent / "data" / "rates" / "acc_gas_shape_pge_2024.json"
+)
+
+def make_acc_rate_shape(df, model, n):
+    uses_acc = (
+        model.elec_rate_model_a == "acc_shaped"
+        or (model.comparison_mode and model.elec_rate_model_b == "acc_shaped")
+    )
+    if not uses_acc:
+        fig = _new_fig(wide=True)
+        ax  = fig.add_subplot(111)
+        ax.text(0.5, 0.5,
+                "Select ACC-Shaped electricity\nto see the hourly rate shape",
+                ha="center", va="center", fontsize=11, color="#9E9E9E",
+                transform=ax.transAxes)
+        ax.set_axis_off()
+        fig.tight_layout()
+        return fig
+
+    with open(_ACC_SHAPE_PATH) as f:
+        shape_data = json.load(f)
+    shape = np.array(shape_data["shape_24h_by_month"], dtype=float)  # (12, 24)
+
+    fig = Figure(figsize=(10, 4), dpi=100)
+    fig.patch.set_facecolor("#F9F9F9")
+    ax  = fig.add_subplot(111)
+
+    im = ax.pcolormesh(
+        np.arange(25),
+        np.arange(13),
+        shape,
+        cmap="RdYlBu_r",
+        vmin=0.5, vmax=1.8,
+        shading="flat",
+    )
+    fig.colorbar(im, ax=ax, label="Rate shape factor\n(1.0 = monthly average)")
+
+    ax.set_xticks(np.arange(24) + 0.5)
+    ax.set_xticklabels(
+        ["12a","1","2","3","4","5","6","7","8","9","10","11",
+         "12p","1","2","3","4","5","6","7","8","9","10","11"],
+        fontsize=7,
+    )
+    ax.set_yticks(np.arange(12) + 0.5)
+    ax.set_yticklabels(
+        ["Jan","Feb","Mar","Apr","May","Jun",
+         "Jul","Aug","Sep","Oct","Nov","Dec"],
+        fontsize=8,
+    )
+    ax.set_xlabel("Hour of day")
+    ax.set_ylabel("Month")
+    ax.set_title(
+        f"ACC Electric Rate Shape — PG&E Residential  ({model.sim_start_year} reference)",
+        fontsize=10, fontweight="bold",
+    )
+    ax.text(0.01, -0.18,
+            "Source: 2024 CPUC ACC Model (E3), CZ12. Shows avoided cost per hour — "
+            "not retail TOU pricing. Winter overnight elevated by heating-season grid capacity.",
+            transform=ax.transAxes, fontsize=7, color="#9E9E9E")
+    _style(ax)
+    fig.tight_layout(pad=1.2)
     return fig
 
 
@@ -1057,8 +1276,10 @@ CHART_FNS = {
     "Annual Cost by Year":            make_annual_cost,
     "Cost Breakdown by Category":     make_cost_breakdown,
     "Equipment Replacements (CapEx)": make_capex,
-    "Electricity Price Trend":        make_elec_price,
-    "Gas Price Trend":                make_gas_price,
+    "Electric CAGR Projection":        make_elec_price,
+    "Gas CAGR Projection":                make_gas_price,
+    "ACC Rate Projection":                make_rate_trajectory,
+    "Electricity Rate Shape":         make_acc_rate_shape,
     "Journey Timeline":               make_journey_timeline,
 }
 
@@ -1092,6 +1313,18 @@ def ChartPane(chart_name, model, df, n):
                     )
             fig = render_device_chart(model, home=home, chart_type=chart_type)
             solara.FigureMatplotlib(fig)
+    elif chart_name == "Electricity Rate Shape":
+        fig = make_acc_rate_shape(df, model, n)
+        solara.FigureMatplotlib(fig)
+        cal = sim_start_year.value + acc_shape_year.value - 1
+        solara.SliderInt(
+            f"Year {acc_shape_year.value}  ({cal})",
+            value=acc_shape_year, min=1, max=n,
+        )
+        solara.Text(
+            "Shape shown for 2025 reference year — multi-year ACC data in Phase 3.",
+            style="font-size:0.76em; color:#9E9E9E",
+        )
     else:
         fig = CHART_FNS[chart_name](df, model, n)
         solara.FigureMatplotlib(fig)
@@ -1206,573 +1439,1105 @@ def SliderWithDefault(label, value, default, min, max, step=1, unit="", fmt="{v}
             )
 
 
+
+
+# ── §25 Unified Summary + Detail UI ──────────────────────────────────────────
+
+_DETAIL_TITLES = {
+    "hvac":         "🌡️ HVAC — Heating & Cooling",
+    "water_heater": "🚿 Water Heater",
+    "ev":           "🚗 EV Charger",
+    "cooktop":      "🍳 Cooktop",
+    "dryer":        "👕 Dryer",
+    "panel":        "⚡ Electrical Panel Upgrade",
+    "baseload":     "💡 Baseload & Lights",
+    "home":         "🏠 Home Profile",
+    "solar":        "☀️ Solar + Battery",
+    "rates":        "📈 Rate Scenarios",
+}
+
+# ── §25.4.1 Style constants for two-column layout ─────────────────────────────
+_LEFT_COL  = "flex:1; min-width:180px; padding:0 16px 0 0"
+_RIGHT_COL = "flex:1; min-width:180px; padding:0 0 0 16px; border-left:2px solid #E8EAF6"
+_COSTS_BOX = (
+    "padding:10px 14px; background:#F0F4FF; border-radius:6px;"
+    " margin-top:12px; border-top:2px solid #C5CAE9;"
+)
+_CARD_NORMAL = (
+    "border:1px solid #E0E0E0; border-radius:6px;"
+    " padding:4px 8px; gap:2px; margin-bottom:6px; background:white;"
+)
+_CARD_OPEN = (
+    "border:1px solid #C5CAE9; border-radius:6px;"
+    " padding:4px 8px; gap:2px; margin-bottom:6px; background:#F3F4FF;"
+)
+_ROW_CTRL = "align-items:center; flex-wrap:wrap; margin-top:3px"
+_TOP_ROW  = (
+    "align-items:center; flex-wrap:wrap;"
+    " padding-bottom:6px; border-bottom:1px solid #EEEEEE; margin-bottom:6px;"
+)
+
+
+# ── §25.4.1 Shared detail-window helpers ──────────────────────────────────────
+
 @solara.component
-def SlotRow(name, state_rv, swap_planned_rv, swap_year_rv, install_cost_rv, rebate_rv):
-    """One appliance row in the Journey Planner panel."""
-    state   = state_rv.value
-    planned = swap_planned_rv.value
-    yr      = swap_year_rv.value
-    inst    = install_cost_rv.value
-    reb     = rebate_rv.value
-    net     = inst - reb
-    cal_yr  = sim_start_year.value + yr - 1
-
-    show_swap = (state in ("gas", "none")) and planned
-
-    with solara.Row(gap="8px", style=(
-        "align-items:center; flex-wrap:wrap; padding:6px 0;"
-        " border-bottom:1px solid #EEEEEE"
+def DetailTitleBar(title: str):
+    """Icon + name left, green ✓ Done right."""
+    with solara.Row(style=(
+        "background:#E8EAF6; padding:8px 14px;"
+        " border-radius:4px 4px 0 0; margin:-16px -16px 12px -16px;"
+        " align-items:center;"
     )):
-        with solara.Column(style="min-width:110px; max-width:110px"):
-            solara.Text(name, style="font-weight:500; font-size:0.9em")
-
-        with solara.Column(style="min-width:95px; max-width:95px"):
-            solara.Select("", value=state_rv, values=["gas", "electric", "none"])
-
-        with solara.Column(style="min-width:65px; max-width:65px"):
-            if state != "electric":
-                solara.Checkbox(label="Plan", value=swap_planned_rv)
-
-        if show_swap:
-            with solara.Column(style="min-width:170px"):
-                solara.SliderInt(
-                    f"Yr {yr}  ({cal_yr})",
-                    value=swap_year_rv, min=1, max=25,
-                )
-            with solara.Column(style="min-width:100px"):
-                solara.InputInt("Install $", value=install_cost_rv)
-            with solara.Column(style="min-width:80px"):
-                solara.InputInt("Rebate", value=rebate_rv)
-            with solara.Column(style="min-width:70px"):
-                solara.Text(
-                    f"Net ${net:,}",
-                    style="color:#1976D2; font-weight:600; font-size:0.85em",
-                )
-        elif state == "electric":
-            solara.Text("✓ Already done", style="color:#2E7D32; font-weight:600; font-size:0.85em")
-        else:
-            solara.Text("—", style="color:#BBBBBB; font-size:1.2em")
-
-
-@solara.component
-def ExpandableSlotRow(name, state_rv, swap_planned_rv, swap_year_rv,
-                      install_cost_rv, rebate_rv, expanded_rv, detail_component,
-                      is_upgrade_slot=False):
-    state    = state_rv.value
-    planned  = swap_planned_rv.value
-    yr       = swap_year_rv.value
-    net      = install_cost_rv.value - rebate_rv.value
-    cal_yr   = sim_start_year.value + yr - 1
-    expanded = expanded_rv.value
-    chevron  = "▼" if expanded else "▶"
-    # upgrade slots (baseload) show swap controls whenever planned, regardless of state
-    show_swap = planned if is_upgrade_slot else (state in ("gas", "none")) and planned
-
-    with solara.Row(
-        gap="8px",
-        style="align-items:center; flex-wrap:wrap; padding:6px 0; border-bottom:1px solid #EEEEEE;",
-    ):
+        solara.Text(title, style="font-weight:700; font-size:1.0em; flex:1; color:#0D47A1")
         solara.Button(
-            chevron,
-            on_click=lambda: expanded_rv.set(not expanded_rv.value),
+            "✓ Done",
+            on_click=lambda: detail_open.set(None),
             style=(
-                "background:none; border:none; cursor:pointer; color:#78909C;"
-                " font-size:0.9em; padding:0 4px 0 0; min-width:14px; flex-shrink:0;"
+                "background:#2E7D32; color:white; border:none;"
+                " border-radius:5px; padding:5px 14px;"
+                " font-size:0.85em; cursor:pointer; font-weight:600;"
             ),
         )
-        with solara.Column(style="min-width:100px; max-width:100px"):
-            solara.Text(name, style="font-weight:500; font-size:0.9em")
-        with solara.Column(style="min-width:90px; max-width:90px"):
-            if is_upgrade_slot:
-                solara.Text("Electric", style="color:#2E7D32; font-size:0.88em; padding:4px 0")
-            else:
-                solara.Select("", value=state_rv, values=["gas", "electric", "none"])
-        with solara.Column(style="min-width:60px; max-width:60px"):
-            if is_upgrade_slot or state != "electric":
-                solara.Checkbox(label="Plan", value=swap_planned_rv)
-        if show_swap:
-            with solara.Column(style="min-width:160px"):
-                solara.SliderInt(f"Yr {yr} ({cal_yr})", value=swap_year_rv, min=1, max=25)
-            with solara.Column(style="min-width:90px"):
-                solara.InputInt("Install $", value=install_cost_rv)
-            with solara.Column(style="min-width:70px"):
-                solara.InputInt("Rebate", value=rebate_rv)
-            with solara.Column(style="min-width:65px"):
-                solara.Text(f"Net ${net:,}",
-                            style="color:#1976D2; font-weight:600; font-size:0.85em")
-        elif not is_upgrade_slot and state == "electric":
-            solara.Text("✓ Done", style="color:#2E7D32; font-weight:600; font-size:0.85em")
-        else:
-            solara.Text("—", style="color:#BBBBBB; font-size:1.2em")
 
-    if expanded:
-        with solara.Column(
-            style=(
-                "margin:0 0 8px 24px; padding:10px 14px;"
-                " background:#F8F9FA; border-radius:8px;"
-                " border-left:3px solid #C5CAE9;"
+
+def _DS(heading: str):
+    """DetailSection heading — blue underlined label."""
+    solara.HTML(
+        tag="div",
+        unsafe_innerHTML=(
+            f"<div style='font-weight:700; font-size:0.9em; color:#0D47A1;"
+            f" border-bottom:1px solid #C5CAE9; padding-bottom:3px;"
+            f" margin:6px 0 3px;'>{heading}</div>"
+        ),
+    )
+
+
+@solara.component
+def _DSl(label, rv, default, lo, hi, step=1, unit="", fmt="{v}"):
+    """DetailSlider — wraps SliderWithDefault for use inside detail columns."""
+    with solara.Column(gap="0px", style="margin-bottom:4px"):
+        SliderWithDefault(label, rv, default, lo, hi, step, unit=unit, fmt=fmt)
+
+
+@solara.component
+def _DetailCosts(inst_rv, reb_rv):
+    """Costs & Rebates — always full-width, always last row of any detail window."""
+    net = inst_rv.value - reb_rv.value
+    with solara.Column(style=_COSTS_BOX):
+        solara.HTML(
+            tag="div",
+            unsafe_innerHTML=(
+                "<div style='font-weight:700; font-size:0.9em; color:#0D47A1;"
+                " border-bottom:1px solid #C5CAE9; padding-bottom:4px;"
+                " margin-bottom:8px;'>Costs &amp; Rebates</div>"
+            ),
+        )
+        with solara.Row(gap="12px", style="flex-wrap:wrap; align-items:center"):
+            with solara.Column(style="min-width:140px"):
+                solara.InputInt("Install cost $", value=inst_rv)
+            with solara.Column(style="min-width:120px"):
+                solara.InputInt("Rebate $", value=reb_rv)
+            solara.HTML(
+                tag="div",
+                unsafe_innerHTML=(
+                    f"<div style='font-size:1.05em; font-weight:700; color:#1976D2'>"
+                    f"Net ${net:,}</div>"
+                ),
             )
-        ):
-            detail_component()
 
+
+# ── §25.2 Summary card helpers ────────────────────────────────────────────────
+
+def _card_header(key: str, title: str):
+    """Title bar + ⋮ button — the only navigation trigger."""
+    with solara.Row(style="align-items:center; margin-bottom:4px"):
+        solara.Text(title, style="font-weight:600; font-size:0.88em; flex:1; color:#1A237E")
+        solara.Button(
+            "⋮",
+            on_click=lambda k=key: detail_open.set(
+                None if detail_open.value == k else k
+            ),
+            style=(
+                "background:none; border:none; cursor:pointer;"
+                " color:#78909C; font-size:1.1em; padding:0 4px;"
+                " border-radius:4px; min-width:24px;"
+            ),
+        )
+
+
+def _appliance_rows(state_rv, planned_rv, year_rv, cost_rv, rebate_rv,
+                    state_values=("gas", "electric", "none")):
+    """3-row content for standard appliance summary cards (HVAC, WH, Cooktop, Dryer)."""
+    state = state_rv.value
+    # Row 1: state dropdown + plan checkbox + year slider
+    with solara.Row(gap="6px", style=_ROW_CTRL):
+        with solara.Column(style="min-width:90px; max-width:90px"):
+            solara.Select("", value=state_rv, values=list(state_values))
+        if state != "electric":
+            solara.Checkbox(label="Plan", value=planned_rv)
+        if state != "electric" and planned_rv.value:
+            yr = year_rv.value
+            cal_yr = sim_start_year.value + yr - 1
+            with solara.Column(style="min-width:140px"):
+                solara.SliderInt(f"Yr {yr} ({cal_yr})", value=year_rv, min=1, max=25)
+        elif state == "electric":
+            solara.HTML(tag="span", unsafe_innerHTML=(
+                "<span style='font-size:0.80em; color:#2E7D32; margin-left:4px;'>"
+                "✓ Electrified</span>"
+            ))
+    # Row 2: install cost + rebate + net (combined) or status
+    if state != "electric" and planned_rv.value:
+        net = cost_rv.value - rebate_rv.value
+        with solara.Row(gap="6px", style=_ROW_CTRL):
+            with solara.Column(style="min-width:110px"):
+                solara.InputInt("Install $", value=cost_rv)
+            with solara.Column(style="min-width:100px"):
+                solara.InputInt("Rebate $", value=rebate_rv)
+            solara.HTML(tag="span", unsafe_innerHTML=(
+                f"<span style='font-size:0.82em; font-weight:600; color:#1976D2;'>"
+                f"Net ${net:,}</span>"
+            ))
+    else:
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            "<div style='font-size:0.80em; color:#AAAAAA; margin-top:3px;'>"
+            + ("No swap planned" if state != "electric" else "") + "</div>"
+        ))
+
+
+# ── §25.3 Summary card components ────────────────────────────────────────────
+
+@solara.component
+def HVACSummaryCard():
+    """§25.3.1 — state dropdown + plan year | install cost | rebate."""
+    is_open = detail_open.value == "hvac"
+    with solara.Column(classes=["summary-card"], style=_CARD_OPEN if is_open else _CARD_NORMAL):
+        _card_header("hvac", "🌡️ HVAC")
+        _appliance_rows(hvac_starting_state, hvac_swap_planned, hvac_swap_year,
+                        hvac_install_cost, hvac_rebate)
+
+
+@solara.component
+def WHSummaryCard():
+    """§25.3.2 — state dropdown + plan year | install cost | rebate."""
+    is_open = detail_open.value == "water_heater"
+    with solara.Column(classes=["summary-card"], style=_CARD_OPEN if is_open else _CARD_NORMAL):
+        _card_header("water_heater", "🚿 Water Heater")
+        _appliance_rows(wh_starting_state, wh_swap_planned, wh_swap_year,
+                        wh_install_cost, wh_rebate)
+
+
+@solara.component
+def EVSummaryCard():
+    """§25.3.3 — vehicle preset + plan year | charger L1/L2 | miles/yr."""
+    is_open = detail_open.value == "ev"
+    state   = ev_starting_state.value
+    with solara.Column(classes=["summary-card"], style=_CARD_OPEN if is_open else _CARD_NORMAL):
+        _card_header("ev", "🚗 EV Charger")
+        # Row 1: vehicle preset buttons + state + plan + year
+        with solara.Row(gap="4px", style=_ROW_CTRL):
+            for lbl, val in [("Eff", 0.23), ("Avg", 0.30), ("SUV", 0.45)]:
+                is_sel = abs(ev_kwh_per_mile.value - val) < 0.01
+                solara.Button(
+                    lbl,
+                    on_click=lambda v=val: ev_kwh_per_mile.set(v),
+                    style=(
+                        "font-size:0.72em; padding:2px 7px; border-radius:10px;"
+                        " cursor:pointer;"
+                        + (" background:#C5CAE9; border:1px solid #7986CB; color:#3949AB;"
+                           if is_sel else
+                           " background:#F5F5F5; border:1px solid #DDD; color:#666;")
+                    ),
+                )
+            with solara.Column(style="min-width:80px; max-width:80px"):
+                solara.Select("", value=ev_starting_state, values=["none", "electric"])
+            if state == "none":
+                solara.Checkbox(label="Plan", value=ev_swap_planned)
+            if state == "none" and ev_swap_planned.value:
+                yr = ev_swap_year.value
+                cal_yr = sim_start_year.value + yr - 1
+                with solara.Column(style="min-width:130px"):
+                    solara.SliderInt(f"Yr {yr} ({cal_yr})", value=ev_swap_year, min=1, max=25)
+            elif state == "electric":
+                solara.HTML(tag="span", unsafe_innerHTML=(
+                    "<span style='font-size:0.80em; color:#2E7D32;'>✓ Installed</span>"
+                ))
+        # Row 2: charger type
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            "<div style='font-size:0.80em; color:#555; margin-top:3px;'>"
+            "Charger: <strong>L2</strong> (240 V)</div>"
+        ))
+        # Row 3: miles/yr input
+        with solara.Row(gap="6px", style=_ROW_CTRL):
+            with solara.Column(style="min-width:140px"):
+                solara.InputInt("Miles/yr", value=ev_miles_per_year)
+
+
+@solara.component
+def CooktopSummaryCard():
+    """§25.3.4 — state dropdown + plan year | install cost | rebate."""
+    is_open = detail_open.value == "cooktop"
+    with solara.Column(classes=["summary-card"], style=_CARD_OPEN if is_open else _CARD_NORMAL):
+        _card_header("cooktop", "🍳 Cooktop")
+        _appliance_rows(cooktop_starting_state, cooktop_swap_planned, cooktop_swap_year,
+                        cooktop_install_cost, cooktop_rebate)
+
+
+@solara.component
+def DryerSummaryCard():
+    """§25.3.5 — state dropdown + plan year | install cost | rebate."""
+    is_open = detail_open.value == "dryer"
+    with solara.Column(classes=["summary-card"], style=_CARD_OPEN if is_open else _CARD_NORMAL):
+        _card_header("dryer", "👕 Dryer")
+        _appliance_rows(dryer_starting_state, dryer_swap_planned, dryer_swap_year,
+                        dryer_install_cost, dryer_rebate)
+
+
+@solara.component
+def PanelSummaryCard():
+    """§25.3.6 — amperage + plan year | install cost | rebate."""
+    is_open = detail_open.value == "panel"
+    planned = panel_upgrade_planned.value
+    with solara.Column(classes=["summary-card"], style=_CARD_OPEN if is_open else _CARD_NORMAL):
+        _card_header("panel", "⚡ Panel Upgrade")
+        # Row 1: plan checkbox + year slider
+        with solara.Row(gap="6px", style=_ROW_CTRL):
+            solara.Checkbox(label="Plan 200A upgrade", value=panel_upgrade_planned)
+            if planned:
+                yr = panel_upgrade_year.value
+                cal_yr = sim_start_year.value + yr - 1
+                with solara.Column(style="min-width:140px"):
+                    solara.SliderInt(f"Yr {yr} ({cal_yr})", value=panel_upgrade_year,
+                                     min=1, max=25)
+        # Row 2: install cost + rebate + net (combined) or status
+        if planned:
+            net = panel_upgrade_cost.value - panel_upgrade_rebate.value
+            with solara.Row(gap="6px", style=_ROW_CTRL):
+                with solara.Column(style="min-width:110px"):
+                    solara.InputInt("Cost $", value=panel_upgrade_cost)
+                with solara.Column(style="min-width:100px"):
+                    solara.InputInt("Rebate $", value=panel_upgrade_rebate)
+                solara.HTML(tag="span", unsafe_innerHTML=(
+                    f"<span style='font-size:0.82em; font-weight:600; color:#1976D2;'>"
+                    f"Net ${net:,}</span>"
+                ))
+        else:
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                "<div style='font-size:0.80em; color:#AAAAAA; margin-top:3px;'>"
+                "Not planned</div>"
+            ))
+
+
+@solara.component
+def BaseloadSummaryCard():
+    """§25.3.7 — elec kWh/mo | gas therms/mo | growth %/yr."""
+    is_open = detail_open.value == "baseload"
+    bl_kwh  = compute_baseload_kwh(square_footage.value, num_bedrooms.value,
+                                    baseload_constant_before.value)
+    with solara.Column(classes=["summary-card"], style=_CARD_OPEN if is_open else _CARD_NORMAL):
+        _card_header("baseload", "💡 Baseload")
+        # Row 1: elec kWh/mo
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            f"<div style='font-size:0.80em; color:#444; margin-top:3px;'>"
+            f"~<strong>{bl_kwh/12:,.0f} kWh/mo</strong> electricity</div>"
+        ))
+        # Row 2: gas therms/mo + plan upgrade checkbox
+        with solara.Row(gap="8px", style=_ROW_CTRL):
+            solara.HTML(tag="span", unsafe_innerHTML=(
+                "<span style='font-size:0.80em; color:#888;'>0 therms/mo gas</span>"
+            ))
+            solara.Checkbox(label="Plan upgrade", value=baseload_swap_planned)
+        # Row 3: saving or always-on constant info
+        if baseload_swap_planned.value:
+            bl_after = compute_baseload_kwh(square_footage.value, num_bedrooms.value,
+                                            baseload_constant_after.value)
+            saving  = bl_kwh - bl_after
+            yr      = baseload_swap_year.value
+            cal_yr  = sim_start_year.value + yr - 1
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                f"<div style='font-size:0.80em; color:#2E7D32; margin-top:3px;'>"
+                f"Save ~{saving:,.0f} kWh/yr · yr {yr} ({cal_yr})</div>"
+            ))
+        else:
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                f"<div style='font-size:0.80em; color:#888; margin-top:3px;'>"
+                f"Always-on: {baseload_constant_before.value} kWh/yr constant</div>"
+            ))
+
+
+@solara.component
+def HomeSummaryCard():
+    """§25.3.8 — zip + bedrooms | sq ft | climate zone."""
+    is_open = detail_open.value == "home"
+    with solara.Column(classes=["summary-card"], style=_CARD_OPEN if is_open else _CARD_NORMAL):
+        _card_header("home", "🏠 Home Profile")
+        # Row 1: ZIP + bedrooms
+        with solara.Row(gap="6px", style=_ROW_CTRL):
+            with solara.Column(style="min-width:75px; max-width:75px"):
+                solara.InputText("ZIP", value=zip_code)
+            with solara.Column(style="min-width:75px; max-width:75px"):
+                solara.Select("Beds", value=num_bedrooms, values=[1, 2, 3, 4, 5])
+        # Row 2: sq ft
+        with solara.Row(gap="6px", style=_ROW_CTRL):
+            with solara.Column(style="min-width:140px"):
+                solara.InputInt("Sq ft", value=square_footage)
+        # Row 3: climate zone
+        with solara.Row(gap="6px", style=_ROW_CTRL):
+            with solara.Column(style="min-width:120px"):
+                solara.Select("Climate zone", value=climate_zone, values=_CZ_OPTIONS)
+
+
+@solara.component
+def SolarSummaryCard():
+    """§25.3.9 — add solar + add battery checkboxes | plan yr | % coverage slider."""
+    is_open = detail_open.value == "solar"
+    planned = solar_planned.value
+    with solara.Column(classes=["summary-card"], style=_CARD_OPEN if is_open else _CARD_NORMAL):
+        _card_header("solar", "☀️ Solar + Battery")
+        # Row 1: add solar + add battery checkboxes
+        with solara.Row(gap="10px", style=_ROW_CTRL):
+            solara.Checkbox(label="Add solar", value=solar_planned)
+            if planned:
+                solara.Checkbox(label="+ Battery", value=solar_include_battery)
+        # Row 2: plan year slider (if planned)
+        if planned:
+            yr = solar_install_year.value
+            cal_yr = sim_start_year.value + yr - 1
+            with solara.Row(gap="4px", style=_ROW_CTRL):
+                with solara.Column(style="min-width:160px"):
+                    solara.SliderInt(f"Install yr {yr} ({cal_yr})",
+                                     value=solar_install_year, min=1, max=25)
+        else:
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                "<div style='font-size:0.80em; color:#AAAAAA; margin-top:3px;'>"
+                "Not planned</div>"
+            ))
+        # Row 3: % coverage slider (if planned)
+        if planned:
+            with solara.Column(style="min-width:160px"):
+                solara.SliderInt(
+                    f"{solar_coverage_pct.value}% electricity covered",
+                    value=solar_coverage_pct, min=0, max=100, step=5,
+                )
+        else:
+            solara.HTML(tag="div", unsafe_innerHTML="<div style='height:6px'></div>")
+
+
+def _model_toggle(label: str, rv, options: list, color: str):
+    """Inline model selector — two buttons + optional CAGR badge."""
+    with solara.Row(gap="4px", style="align-items:center; flex-wrap:wrap"):
+        solara.HTML(tag="span", unsafe_innerHTML=(
+            f"<span style='font-size:0.80em; font-weight:600; color:{color};"
+            f" min-width:28px'>{label}</span>"
+        ))
+        for key, display in options:
+            is_active = rv.value == key
+            solara.Button(
+                display,
+                on_click=lambda k=key: rv.set(k),
+                style=(
+                    f"background:{color}; color:white; border:none;"
+                    " border-radius:4px; padding:2px 8px; font-size:0.78em; cursor:pointer;"
+                    if is_active else
+                    "background:#F5F5F5; color:#666; border:1px solid #CCC;"
+                    " border-radius:4px; padding:2px 8px; font-size:0.78em; cursor:pointer;"
+                ),
+            )
+
+
+@solara.component
+def RatesSummaryCard():
+    """Energy & Prices summary — elec model | gas model | timeline."""
+    is_open = detail_open.value == "rates"
+    elec_model = elec_rate_model_a.value
+    gas_model  = gas_rate_model_a.value
+    with solara.Column(classes=["summary-card"], style=_CARD_OPEN if is_open else _CARD_NORMAL):
+        _card_header("rates", "📈 Rate Scenarios")
+        # Row 1: electricity rate model
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            f"<div style='font-size:0.78em; font-weight:600; color:{C_RATE_ELEC};"
+            " margin-bottom:2px'>Electricity Rate Model</div>"
+        ))
+        with solara.Row(gap="6px", style="align-items:center; flex-wrap:wrap"):
+            _model_toggle("⚡", elec_rate_model_a,
+                          [("cagr_flat", "CAGR"), ("acc_shaped", "ACC")], C_RATE_ELEC)
+            if elec_model == "cagr_flat":
+                solara.HTML(tag="span", unsafe_innerHTML=(
+                    f"<span style='font-size:0.80em; color:#546E7A;'>"
+                    f"+{elec_cagr_pct_a.value}%/yr</span>"
+                ))
+        # Row 2: gas rate model
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            f"<div style='font-size:0.78em; font-weight:600; color:{C_RATE_GAS};"
+            " margin-bottom:2px; margin-top:4px'>Gas Rate Model</div>"
+        ))
+        with solara.Row(gap="6px", style="align-items:center; flex-wrap:wrap"):
+            _model_toggle("🔥", gas_rate_model_a,
+                          [("cagr_flat", "CAGR"), ("acc_seasonal", "ACC")], C_RATE_GAS)
+            if gas_model == "cagr_flat":
+                solara.HTML(tag="span", unsafe_innerHTML=(
+                    f"<span style='font-size:0.80em; color:#546E7A;'>"
+                    f"+{gas_cagr_pct_a.value}%/yr</span>"
+                ))
+        # Row 3: timeline
+        solara.SliderInt(
+            f"Model: {years.value} yrs",
+            value=years, min=5, max=30,
+        )
+
+
+# ── §25.4 Detail windows ──────────────────────────────────────────────────────
 
 @solara.component
 def HVACDetail():
-    ua = UA_MAP[insulation_quality.value]
-    is_gas = hvac_starting_state.value == "gas"
+    """HVAC detail — two-column layout per §25.4.3."""
+    state = hvac_starting_state.value
+    ua    = UA_MAP[insulation_quality.value]
 
-    solara.Markdown("**Estimated consumption**")
-    if is_gas:
-        therms = _est_gas_furnace(furnace_afue.value, ua)
-        cool_line = (
-            f"| Cooling (AC) | ~{_est_hp_hvac_cooling(hvac_ac_seer.value, ua):.0f} kWh/yr |\n"
-            if hvac_has_cooling.value else ""
-        )
-        solara.Markdown(
-            f"|  | Current (gas) |\n|--|--|\n"
-            f"| Heating | {therms:.0f} therms/yr (~{_kwh_eq(therms):,.0f} kWh-eq) |\n"
-            + cool_line
-        )
-    else:
+    # Full-width: state + plan controls
+    with solara.Row(gap="8px", style=_TOP_ROW):
+        with solara.Column(style="min-width:110px"):
+            solara.Select("Starting state", value=hvac_starting_state,
+                          values=["gas", "electric", "none"])
+        if state != "electric":
+            with solara.Column(style="min-width:70px"):
+                solara.Checkbox(label="Plan swap", value=hvac_swap_planned)
+        if state != "electric" and hvac_swap_planned.value:
+            yr = hvac_swap_year.value
+            cal_yr = sim_start_year.value + yr - 1
+            with solara.Column(style="min-width:170px"):
+                solara.SliderInt(f"Yr {yr} ({cal_yr})", value=hvac_swap_year, min=1, max=25)
+
+    if state == "gas":
+        with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
+            with solara.Column(style=_LEFT_COL):
+                _DS("Current: Gas Furnace")
+                therms = _est_gas_furnace(furnace_afue.value, ua)
+                solara.Markdown(
+                    f"~**{therms:.0f} therms/yr** heating"
+                    + (f"  ·  {_est_hp_hvac_cooling(hvac_ac_seer.value, ua):.0f} kWh/yr AC"
+                       if hvac_has_cooling.value else "")
+                )
+                _DSl("Furnace AFUE", furnace_afue, _DEFAULTS["furnace_afue"],
+                     0.70, 0.95, 0.01, fmt="{v:.2f}")
+                _DSl("Furnace age", hvac_furnace_age, _DEFAULTS["hvac_furnace_age"],
+                     0, 30, 1, unit=" yrs")
+                solara.Checkbox(label="Has central AC (baseline)", value=hvac_has_cooling)
+                if hvac_has_cooling.value:
+                    _DSl("Central AC SEER", hvac_ac_seer, _DEFAULTS["hvac_ac_seer"], 10, 22, 1)
+                    _DSl("Central AC age", hvac_ac_age, _DEFAULTS["hvac_ac_age"],
+                         0, 20, 1, unit=" yrs")
+            with solara.Column(style=_RIGHT_COL):
+                _DS("Replacement: Heat Pump HVAC")
+                heat_kwh  = _est_hp_hvac_heating(hp_cop_heating.value, ua)
+                cool_kwh2 = _est_hp_hvac_cooling(hp_seer_cooling.value, ua)
+                solara.Markdown(
+                    f"~**{heat_kwh:.0f} kWh/yr** heat  "
+                    f"+ **{cool_kwh2:.0f} kWh/yr** cool  "
+                    f"= **{heat_kwh + cool_kwh2:.0f} kWh/yr**"
+                )
+                _DSl("Heating COP", hp_cop_heating, _DEFAULTS["hp_cop_heating"],
+                     2.5, 4.5, 0.1, fmt="{v:.1f}")
+                _DSl("Cooling SEER", hp_seer_cooling, _DEFAULTS["hp_seer_cooling"], 16, 28, 1)
+        if hvac_swap_planned.value:
+            _DetailCosts(hvac_install_cost, hvac_rebate)
+
+    elif state == "electric":
+        _DS("Current: Heat Pump HVAC")
         heat_kwh = _est_hp_hvac_heating(hp_cop_heating.value, ua)
         cool_kwh = _est_hp_hvac_cooling(hp_seer_cooling.value, ua)
         solara.Markdown(
-            f"|  | Current (electric) |\n|--|--|\n"
-            f"| Heating | {heat_kwh:.0f} kWh/yr |\n"
-            f"| Cooling | {cool_kwh:.0f} kWh/yr |\n"
-            f"| Total   | {heat_kwh + cool_kwh:.0f} kWh/yr |\n"
+            f"~**{heat_kwh:.0f} kWh/yr** heating  "
+            f"+ **{cool_kwh:.0f} kWh/yr** cooling  "
+            f"= **{heat_kwh + cool_kwh:.0f} kWh/yr** total"
         )
+        _DSl("Heating COP", hp_cop_heating, _DEFAULTS["hp_cop_heating"],
+             2.5, 4.5, 0.1, fmt="{v:.1f}")
+        _DSl("Cooling SEER", hp_seer_cooling, _DEFAULTS["hp_seer_cooling"], 16, 28, 1)
+        solara.Markdown("<small style='color:#2E7D32'>✓ Already electrified</small>")
 
-    solara.Markdown("---")
-    if is_gas:
-        solara.Markdown("**Current: Gas Furnace**")
-        SliderWithDefault("Furnace AFUE", furnace_afue, _DEFAULTS["furnace_afue"],
-                          0.70, 0.95, 0.01, fmt="{v:.2f}")
-        SliderWithDefault("Furnace age", hvac_furnace_age, _DEFAULTS["hvac_furnace_age"],
-                          0, 30, 1, unit=" yrs")
-        solara.Checkbox(label="Has central AC in baseline", value=hvac_has_cooling)
-        if hvac_has_cooling.value:
-            SliderWithDefault("Central AC SEER", hvac_ac_seer, _DEFAULTS["hvac_ac_seer"],
-                              10, 22, 1)
-            SliderWithDefault("Central AC age", hvac_ac_age, _DEFAULTS["hvac_ac_age"],
-                              0, 20, 1, unit=" yrs")
-    else:
-        solara.Markdown("**Current: Heat Pump HVAC**")
-        SliderWithDefault("Heating COP", hp_cop_heating, _DEFAULTS["hp_cop_heating"],
-                          2.5, 4.5, 0.1, fmt="{v:.1f}")
-        SliderWithDefault("Cooling SEER", hp_seer_cooling, _DEFAULTS["hp_seer_cooling"],
-                          16, 28, 1)
-
-    if hvac_swap_planned.value and is_gas:
-        solara.Markdown("---")
-        solara.Markdown("**Replacement: Heat Pump HVAC**")
-        heat_kwh = _est_hp_hvac_heating(hp_cop_heating.value, ua)
-        cool_kwh = _est_hp_hvac_cooling(hp_seer_cooling.value, ua)
-        solara.Markdown(
-            f"Est. consumption: {heat_kwh:.0f} kWh/yr heating + "
-            f"{cool_kwh:.0f} kWh/yr cooling = **{heat_kwh + cool_kwh:.0f} kWh/yr total**"
-        )
-        SliderWithDefault("Heating COP", hp_cop_heating, _DEFAULTS["hp_cop_heating"],
-                          2.5, 4.5, 0.1, fmt="{v:.1f}")
-        SliderWithDefault("Cooling SEER", hp_seer_cooling, _DEFAULTS["hp_seer_cooling"],
-                          16, 28, 1)
-        solara.InputInt("Install cost $", value=hvac_install_cost)
-        solara.InputInt("Rebate $", value=hvac_rebate)
-        solara.Text(f"Net cost: ${hvac_install_cost.value - hvac_rebate.value:,}",
-                    style="color:#1976D2; font-weight:600")
+    else:  # none
+        with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
+            with solara.Column(style=_LEFT_COL):
+                _DS("Current: No HVAC")
+                solara.Text("No baseline HVAC installed.",
+                            style="font-size:0.85em; color:#888")
+            with solara.Column(style=_RIGHT_COL):
+                _DS("Adding: Heat Pump HVAC")
+                heat_kwh = _est_hp_hvac_heating(hp_cop_heating.value, ua)
+                cool_kwh = _est_hp_hvac_cooling(hp_seer_cooling.value, ua)
+                solara.Markdown(
+                    f"Est: **{heat_kwh:.0f} + {cool_kwh:.0f} = "
+                    f"{heat_kwh + cool_kwh:.0f} kWh/yr**"
+                )
+                _DSl("Heating COP", hp_cop_heating, _DEFAULTS["hp_cop_heating"],
+                     2.5, 4.5, 0.1, fmt="{v:.1f}")
+                _DSl("Cooling SEER", hp_seer_cooling, _DEFAULTS["hp_seer_cooling"], 16, 28, 1)
+        if hvac_swap_planned.value:
+            _DetailCosts(hvac_install_cost, hvac_rebate)
 
 
 @solara.component
 def WaterHeaterDetail():
-    ua = UA_MAP[insulation_quality.value]
-    gal = hw_daily_gallons.value
-    is_gas = wh_starting_state.value == "gas"
+    """Water heater detail — §25.4.4 + §20 tank size & ambient location."""
+    state   = wh_starting_state.value
+    gal     = hw_daily_gallons.value
+    inlet   = wh_inlet_temp_f.value
+    setp    = wh_setpoint_f.value
 
-    solara.Markdown("**Estimated consumption**")
-    if is_gas:
-        therms = _est_gas_wh(gas_wh_uef.value, gal)
-        solara.Markdown(
-            f"|  | Current (gas) |\n|--|--|\n"
-            f"| Water heating | {therms:.0f} therms/yr (~{_kwh_eq(therms):,.0f} kWh-eq) |\n"
-        )
-    else:
-        kwh = _est_hpwh(hpwh_uef.value, gal)
-        solara.Markdown(
-            f"|  | Current (electric) |\n|--|--|\n"
-            f"| Water heating | {kwh:.0f} kWh/yr |\n"
-        )
+    # Top row: starting state / plan / year (mirrors summary card for direct-jump users)
+    with solara.Row(gap="8px", style=_TOP_ROW):
+        with solara.Column(style="min-width:110px"):
+            solara.Select("Starting state", value=wh_starting_state,
+                          values=["gas", "electric", "none"])
+        if state != "electric":
+            with solara.Column(style="min-width:70px"):
+                solara.Checkbox(label="Plan swap", value=wh_swap_planned)
+        if state != "electric" and wh_swap_planned.value:
+            yr = wh_swap_year.value
+            cal_yr = sim_start_year.value + yr - 1
+            with solara.Column(style="min-width:170px"):
+                solara.SliderInt(f"Yr {yr} ({cal_yr})", value=wh_swap_year, min=1, max=25)
 
-    solara.Markdown("---")
-    if is_gas:
-        solara.Markdown("**Current: Gas Water Heater**")
-        SliderWithDefault("Gas WH UEF", gas_wh_uef, _DEFAULTS["gas_wh_uef"],
-                          0.55, 0.70, 0.01, fmt="{v:.2f}")
-        SliderWithDefault("Age", wh_gas_age, _DEFAULTS["wh_gas_age"],
-                          0, 20, 1, unit=" yrs")
-    else:
-        solara.Markdown("**Current: Heat Pump Water Heater**")
-        SliderWithDefault("HPWH UEF", hpwh_uef, _DEFAULTS["hpwh_uef"],
-                          2.5, 4.0, 0.1, fmt="{v:.1f}")
-
-    def _set_gallons(v):
+    # Shared full-width parameters (affect both gas and HPWH estimates)
+    def _set_gal(v):
         hw_daily_gallons.set(v)
         hw_gallons_user_override.set(True)
-
     solara.SliderInt(
-        f"Daily hot water: {hw_daily_gallons.value} gal/day",
+        f"Daily hot water: {gal} gal/day",
         value=hw_daily_gallons, min=20, max=120, step=5,
-        on_value=_set_gallons,
+        on_value=_set_gal,
     )
-    solara.Text(f"(bedroom default: {_DEFAULTS['hw_daily_gallons']} gal/day)",
-                style="font-size:0.78em; color:#888")
+    solara.SliderInt(
+        f"Cold water inlet: {inlet}°F",
+        value=wh_inlet_temp_f, min=45, max=75, step=1,
+    )
+    solara.SliderInt(
+        f"Tank setpoint: {setp}°F",
+        value=wh_setpoint_f, min=110, max=140, step=5,
+    )
 
-    if wh_swap_planned.value and is_gas:
-        solara.Markdown("---")
-        solara.Markdown("**Replacement: Heat Pump Water Heater**")
-        kwh = _est_hpwh(hpwh_uef.value, gal)
-        solara.Markdown(f"Est. consumption: **{kwh:.0f} kWh/yr**")
-        SliderWithDefault("HPWH UEF", hpwh_uef, _DEFAULTS["hpwh_uef"],
-                          2.5, 4.0, 0.1, fmt="{v:.1f}")
-        solara.InputInt("Install cost $", value=wh_install_cost)
-        solara.InputInt("Rebate $", value=wh_rebate)
-        solara.Text(f"Net cost: ${wh_install_cost.value - wh_rebate.value:,}",
-                    style="color:#1976D2; font-weight:600")
+    if state == "gas":
+        with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
+            with solara.Column(style=_LEFT_COL):
+                _DS("Current: Gas Water Heater")
+                therms = _est_gas_wh(gas_wh_uef.value, gal, inlet, setp)
+                solara.Markdown(
+                    f"~**{therms:.0f} therms/yr** ≈ {_kwh_eq(therms):,.0f} kWh-eq")
+                _DSl("Gas WH UEF", gas_wh_uef, _DEFAULTS["gas_wh_uef"],
+                     0.55, 0.70, 0.01, fmt="{v:.2f}")
+                _DSl("Age", wh_gas_age, _DEFAULTS["wh_gas_age"], 0, 20, 1, unit=" yrs")
+                solara.Select(
+                    f"Tank size: {gas_wh_tank_gallons.value} gal",
+                    value=gas_wh_tank_gallons,
+                    values=[30, 40, 50, 65, 80],
+                )
+            with solara.Column(style=_RIGHT_COL):
+                _DS("Replacement: Heat Pump Water Heater")
+                kwh = _est_hpwh(hpwh_uef.value, gal, inlet, setp)
+                solara.Markdown(f"~**{kwh:.0f} kWh/yr**")
+                _DSl("HPWH UEF", hpwh_uef, _DEFAULTS["hpwh_uef"],
+                     2.5, 4.0, 0.1, fmt="{v:.1f}")
+                solara.Select(
+                    f"Tank size: {hpwh_tank_gallons.value} gal",
+                    value=hpwh_tank_gallons,
+                    values=[50, 65, 80],
+                )
+                solara.ToggleButtonsSingle(
+                    value=hpwh_ambient_location,
+                    values=["conditioned", "unconditioned"],
+                )
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    "<div style='font-size:0.75em; color:#999; margin-top:6px;'>"
+                    "Preview uses UEF + load only. Ambient COP degradation "
+                    "and standby losses are applied in the simulation.</div>"
+                ))
+        if wh_swap_planned.value:
+            _DetailCosts(wh_install_cost, wh_rebate)
 
+    elif state == "electric":
+        with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
+            with solara.Column(style=_LEFT_COL):
+                _DS("Current: Heat Pump Water Heater")
+                kwh = _est_hpwh(hpwh_uef.value, gal, inlet, setp)
+                solara.Markdown(f"~**{kwh:.0f} kWh/yr**")
+                solara.Markdown("<small style='color:#2E7D32'>✓ Already electrified</small>")
+            with solara.Column(style=_RIGHT_COL):
+                _DS("HPWH Specs")
+                _DSl("HPWH UEF", hpwh_uef, _DEFAULTS["hpwh_uef"], 2.5, 4.0, 0.1, fmt="{v:.1f}")
+                solara.Select(
+                    f"Tank size: {hpwh_tank_gallons.value} gal",
+                    value=hpwh_tank_gallons,
+                    values=[50, 65, 80],
+                )
+                solara.ToggleButtonsSingle(
+                    value=hpwh_ambient_location,
+                    values=["conditioned", "unconditioned"],
+                )
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    "<div style='font-size:0.75em; color:#999; margin-top:6px;'>"
+                    "Preview uses UEF + load only. Ambient COP degradation "
+                    "applied in simulation.</div>"
+                ))
 
-@solara.component
-def DryerDetail():
-    is_gas = dryer_starting_state.value == "gas"
-
-    solara.Markdown("**Estimated consumption**")
-    if is_gas:
-        therms = _est_gas_dryer(dryer_gas_therms_per_cycle.value, dryer_loads_per_week.value)
-        solara.Markdown(
-            f"|  | Current (gas) |\n|--|--|\n"
-            f"| Dryer | {therms:.0f} therms/yr (~{_kwh_eq(therms):,.0f} kWh-eq) |\n"
-        )
-    else:
-        kwh = _est_hp_dryer(dryer_hp_kwh_per_cycle.value, dryer_loads_per_week.value)
-        solara.Markdown(
-            f"|  | Current (electric) |\n|--|--|\n"
-            f"| Dryer | {kwh:.0f} kWh/yr |\n"
-        )
-
-    solara.Markdown("---")
-    if is_gas:
-        solara.Markdown("**Current: Gas Dryer**")
-        SliderWithDefault("Therms/cycle", dryer_gas_therms_per_cycle,
-                          _DEFAULTS["dryer_gas_therms_per_cycle"],
-                          0.15, 0.35, 0.01, fmt="{v:.2f}")
-    else:
-        solara.Markdown("**Current: Heat Pump Dryer**")
-        SliderWithDefault("kWh/cycle", dryer_hp_kwh_per_cycle,
-                          _DEFAULTS["dryer_hp_kwh_per_cycle"],
-                          1.2, 2.5, 0.1, fmt="{v:.1f}")
-    SliderWithDefault("Loads/week", dryer_loads_per_week, _DEFAULTS["dryer_loads_per_week"],
-                      1, 14, 1, unit=" /wk")
-
-    if dryer_swap_planned.value and is_gas:
-        solara.Markdown("---")
-        solara.Markdown("**Replacement: Heat Pump Dryer**")
-        kwh = _est_hp_dryer(dryer_hp_kwh_per_cycle.value, dryer_loads_per_week.value)
-        solara.Markdown(f"Est. consumption: **{kwh:.0f} kWh/yr**")
-        SliderWithDefault("kWh/cycle", dryer_hp_kwh_per_cycle,
-                          _DEFAULTS["dryer_hp_kwh_per_cycle"],
-                          1.2, 2.5, 0.1, fmt="{v:.1f}")
-        solara.InputInt("Install cost $", value=dryer_install_cost)
-        solara.InputInt("Rebate $", value=dryer_rebate)
-        solara.Text(f"Net cost: ${dryer_install_cost.value - dryer_rebate.value:,}",
-                    style="color:#1976D2; font-weight:600")
-
-
-@solara.component
-def CooktopDetail():
-    is_gas = cooktop_starting_state.value == "gas"
-
-    solara.Markdown("**Estimated consumption**")
-    if is_gas:
-        therms = _est_gas_cooktop(cooktop_gas_therms_per_meal.value, cooktop_meals_per_week.value)
-        solara.Markdown(
-            f"|  | Current (gas) |\n|--|--|\n"
-            f"| Cooktop | {therms:.0f} therms/yr (~{_kwh_eq(therms):,.0f} kWh-eq) |\n"
-        )
-    else:
-        kwh = _est_induction(cooktop_induction_kwh_per_meal.value, cooktop_meals_per_week.value)
-        solara.Markdown(
-            f"|  | Current (electric) |\n|--|--|\n"
-            f"| Cooktop | {kwh:.0f} kWh/yr |\n"
-        )
-
-    solara.Markdown("---")
-    if is_gas:
-        solara.Markdown("**Current: Gas Cooktop**")
-        SliderWithDefault("Therms/meal", cooktop_gas_therms_per_meal,
-                          _DEFAULTS["cooktop_gas_therms_per_meal"],
-                          0.03, 0.10, 0.01, fmt="{v:.2f}")
-    else:
-        solara.Markdown("**Current: Induction Cooktop**")
-        SliderWithDefault("kWh/meal", cooktop_induction_kwh_per_meal,
-                          _DEFAULTS["cooktop_induction_kwh_per_meal"],
-                          0.6, 1.4, 0.1, fmt="{v:.1f}")
-    SliderWithDefault("Meals/week", cooktop_meals_per_week, _DEFAULTS["cooktop_meals_per_week"],
-                      3, 21, 1, unit=" /wk")
-
-    if cooktop_swap_planned.value and is_gas:
-        solara.Markdown("---")
-        solara.Markdown("**Replacement: Induction Cooktop**")
-        kwh = _est_induction(cooktop_induction_kwh_per_meal.value, cooktop_meals_per_week.value)
-        solara.Markdown(f"Est. consumption: **{kwh:.0f} kWh/yr**")
-        SliderWithDefault("kWh/meal", cooktop_induction_kwh_per_meal,
-                          _DEFAULTS["cooktop_induction_kwh_per_meal"],
-                          0.6, 1.4, 0.1, fmt="{v:.1f}")
-        solara.InputInt("Install cost $", value=cooktop_install_cost)
-        solara.InputInt("Rebate $", value=cooktop_rebate)
-        solara.Text(f"Net cost: ${cooktop_install_cost.value - cooktop_rebate.value:,}",
-                    style="color:#1976D2; font-weight:600")
+    else:  # none
+        with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
+            with solara.Column(style=_LEFT_COL):
+                _DS("Current: No Water Heater")
+                solara.Text("No baseline WH installed.", style="font-size:0.85em; color:#888")
+            with solara.Column(style=_RIGHT_COL):
+                _DS("Adding: Heat Pump Water Heater")
+                kwh = _est_hpwh(hpwh_uef.value, gal, inlet, setp)
+                solara.Markdown(f"Est: **{kwh:.0f} kWh/yr**")
+                _DSl("HPWH UEF", hpwh_uef, _DEFAULTS["hpwh_uef"],
+                     2.5, 4.0, 0.1, fmt="{v:.1f}")
+                solara.Select(
+                    f"Tank size: {hpwh_tank_gallons.value} gal",
+                    value=hpwh_tank_gallons,
+                    values=[50, 65, 80],
+                )
+                solara.ToggleButtonsSingle(
+                    value=hpwh_ambient_location,
+                    values=["conditioned", "unconditioned"],
+                )
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    "<div style='font-size:0.75em; color:#999; margin-top:6px;'>"
+                    "Preview uses UEF + load only. Ambient COP degradation "
+                    "applied in simulation.</div>"
+                ))
+        if wh_swap_planned.value:
+            _DetailCosts(wh_install_cost, wh_rebate)
 
 
 @solara.component
 def EVDetail():
-    annual_kwh = _est_ev_kwh(ev_miles_per_year.value,
-                              ev_kwh_per_mile.value,
+    """EV charger detail — two-column per §25.4.5."""
+    state      = ev_starting_state.value
+    annual_kwh = _est_ev_kwh(ev_miles_per_year.value, ev_kwh_per_mile.value,
                               ev_charging_efficiency.value)
-    solara.Markdown("**Estimated consumption**")
-    solara.Markdown(
-        f"|  | After adding EV |\n|--|--|\n"
-        f"| EV charging | **{annual_kwh:,.0f} kWh/yr** "
-        f"({ev_miles_per_year.value:,} mi × {ev_kwh_per_mile.value} kWh/mi ÷ "
-        f"{ev_charging_efficiency.value} eff.) |\n"
-    )
-    solara.Text("(Not in do-nothing baseline — absent until you add the EV)",
-                style="font-size:0.80em; color:#888")
 
-    if ev_swap_planned.value:
-        solara.Markdown("---")
-        solara.Markdown("**EV Charger (L2)**")
+    with solara.Row(gap="8px", style=_TOP_ROW):
+        with solara.Column(style="min-width:110px"):
+            solara.Select("Starting state", value=ev_starting_state,
+                          values=["none", "electric"])
+        if state == "none":
+            with solara.Column(style="min-width:80px"):
+                solara.Checkbox(label="Plan to add", value=ev_swap_planned)
+        if state == "none" and ev_swap_planned.value:
+            yr = ev_swap_year.value
+            cal_yr = sim_start_year.value + yr - 1
+            with solara.Column(style="min-width:170px"):
+                solara.SliderInt(f"Yr {yr} ({cal_yr})", value=ev_swap_year, min=1, max=25)
 
-        SliderWithDefault(
-            "Annual miles", ev_miles_per_year,
-            _DEFAULTS["ev_miles_per_year"],
-            1000, 30000, step=500, unit=" mi/yr",
-        )
+    with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
+        with solara.Column(style=_LEFT_COL):
+            _DS("Vehicle")
+            _DSl("Annual miles", ev_miles_per_year, _DEFAULTS["ev_miles_per_year"],
+                 1000, 30000, step=500, unit=" mi/yr")
+            _DSl("Efficiency", ev_kwh_per_mile, _DEFAULTS["ev_kwh_per_mile"],
+                 0.23, 0.45, step=0.01, unit=" kWh/mi", fmt="{v:.2f}")
+            with solara.Row(gap="3px", style="flex-wrap:wrap; margin-top:4px"):
+                for lbl, val in [("Efficient (0.23)", 0.23), ("Average (0.30)", 0.30),
+                                  ("Large SUV (0.45)", 0.45)]:
+                    is_sel = abs(ev_kwh_per_mile.value - val) < 0.01
+                    solara.Button(
+                        lbl,
+                        on_click=lambda v=val: ev_kwh_per_mile.set(v),
+                        style=(
+                            "font-size:0.75em; padding:2px 8px; border-radius:10px;"
+                            " cursor:pointer; margin:2px;"
+                            + (" background:#C5CAE9; border:1px solid #7986CB; color:#3949AB;"
+                               if is_sel else
+                               " background:#F5F5F5; border:1px solid #DDD; color:#555;")
+                        ),
+                    )
+        with solara.Column(style=_RIGHT_COL):
+            _DS("Charger")
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                "<div style='font-size:0.85em; color:#555; margin-bottom:8px;'>"
+                "<strong>L2 charger</strong> (240 V, 7.2 kW)</div>"
+            ))
+            _DSl("Charging efficiency", ev_charging_efficiency,
+                 _DEFAULTS["ev_charging_efficiency"], 0.80, 0.98, step=0.01, fmt="{v:.2f}")
+            solara.Markdown(
+                f"Est. consumption: **{annual_kwh:,.0f} kWh/yr**  \n"
+                f"({ev_miles_per_year.value:,} mi × {ev_kwh_per_mile.value:.2f} kWh/mi ÷ "
+                f"{ev_charging_efficiency.value:.2f} eff.)"
+            )
 
-        SliderWithDefault(
-            "Vehicle efficiency", ev_kwh_per_mile,
-            _DEFAULTS["ev_kwh_per_mile"],
-            0.23, 0.45, step=0.01, unit=" kWh/mi", fmt="{v:.2f}",
-        )
-        with solara.Row(gap="6px", style="flex-wrap:wrap; margin:-4px 0 4px 0"):
-            for label in ("Efficient", "Average", "Large"):
-                solara.Button(
-                    label,
-                    on_click=lambda l=label: _apply_ev_efficiency_preset(l),
-                    style=(
-                        "font-size:0.78em; padding:2px 8px;"
-                        " border-radius:12px; cursor:pointer;"
-                        " background:#E8EAF6; border:1px solid #C5CAE9;"
-                        " color:#3949AB;"
-                    ),
-                )
+    if state == "none" and ev_swap_planned.value:
+        _DetailCosts(ev_install_cost, ev_rebate)
 
-        SliderWithDefault(
-            "Charging efficiency", ev_charging_efficiency,
-            _DEFAULTS["ev_charging_efficiency"],
-            0.80, 0.98, step=0.01, fmt="{v:.2f}",
-        )
 
-        est = _est_ev_kwh(ev_miles_per_year.value,
-                          ev_kwh_per_mile.value,
-                          ev_charging_efficiency.value)
-        solara.Text(f"Est. consumption: ~{est:,.0f} kWh/yr",
-                    style="font-size:0.85em; color:#1976D2; font-weight:600")
+@solara.component
+def CooktopDetail():
+    """Cooktop detail — two-column per §25.4.6."""
+    state = cooktop_starting_state.value
 
-        solara.InputInt("Install cost $", value=ev_install_cost)
-        solara.InputInt("Rebate $", value=ev_rebate)
-        solara.Text(f"Net cost: ${ev_install_cost.value - ev_rebate.value:,}",
-                    style="color:#1976D2; font-weight:600")
+    with solara.Row(gap="8px", style=_TOP_ROW):
+        with solara.Column(style="min-width:110px"):
+            solara.Select("Starting state", value=cooktop_starting_state,
+                          values=["gas", "electric", "none"])
+        if state != "electric":
+            with solara.Column(style="min-width:70px"):
+                solara.Checkbox(label="Plan swap", value=cooktop_swap_planned)
+        if state != "electric" and cooktop_swap_planned.value:
+            yr = cooktop_swap_year.value
+            cal_yr = sim_start_year.value + yr - 1
+            with solara.Column(style="min-width:170px"):
+                solara.SliderInt(f"Yr {yr} ({cal_yr})", value=cooktop_swap_year, min=1, max=25)
+
+    if state == "gas":
+        with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
+            with solara.Column(style=_LEFT_COL):
+                _DS("Current: Gas Cooktop")
+                therms = _est_gas_cooktop(cooktop_gas_therms_per_meal.value,
+                                          cooktop_meals_per_week.value)
+                solara.Markdown(
+                    f"~**{therms:.0f} therms/yr** ≈ {_kwh_eq(therms):,.0f} kWh-eq")
+                _DSl("Therms/meal", cooktop_gas_therms_per_meal,
+                     _DEFAULTS["cooktop_gas_therms_per_meal"], 0.03, 0.10, 0.01, fmt="{v:.2f}")
+                _DSl("Meals/week", cooktop_meals_per_week, _DEFAULTS["cooktop_meals_per_week"],
+                     3, 21, 1, unit=" /wk")
+            with solara.Column(style=_RIGHT_COL):
+                _DS("Replacement: Induction Cooktop")
+                kwh = _est_induction(cooktop_induction_kwh_per_meal.value,
+                                     cooktop_meals_per_week.value)
+                solara.Markdown(f"~**{kwh:.0f} kWh/yr**")
+                _DSl("kWh/meal", cooktop_induction_kwh_per_meal,
+                     _DEFAULTS["cooktop_induction_kwh_per_meal"], 0.6, 1.4, 0.1, fmt="{v:.1f}")
+        if cooktop_swap_planned.value:
+            _DetailCosts(cooktop_install_cost, cooktop_rebate)
+
+    elif state == "electric":
+        _DS("Current: Induction Cooktop")
+        kwh = _est_induction(cooktop_induction_kwh_per_meal.value, cooktop_meals_per_week.value)
+        solara.Markdown(f"~**{kwh:.0f} kWh/yr**")
+        _DSl("kWh/meal", cooktop_induction_kwh_per_meal,
+             _DEFAULTS["cooktop_induction_kwh_per_meal"], 0.6, 1.4, 0.1, fmt="{v:.1f}")
+        _DSl("Meals/week", cooktop_meals_per_week, _DEFAULTS["cooktop_meals_per_week"],
+             3, 21, 1, unit=" /wk")
+        solara.Markdown("<small style='color:#2E7D32'>✓ Already electrified</small>")
+
+    else:  # none
+        with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
+            with solara.Column(style=_LEFT_COL):
+                _DS("Current: No Cooktop")
+                solara.Text("No baseline cooktop.", style="font-size:0.85em; color:#888")
+            with solara.Column(style=_RIGHT_COL):
+                _DS("Adding: Induction Cooktop")
+                kwh = _est_induction(cooktop_induction_kwh_per_meal.value,
+                                     cooktop_meals_per_week.value)
+                solara.Markdown(f"Est: **{kwh:.0f} kWh/yr**")
+                _DSl("kWh/meal", cooktop_induction_kwh_per_meal,
+                     _DEFAULTS["cooktop_induction_kwh_per_meal"], 0.6, 1.4, 0.1, fmt="{v:.1f}")
+        if cooktop_swap_planned.value:
+            _DetailCosts(cooktop_install_cost, cooktop_rebate)
+
+
+@solara.component
+def DryerDetail():
+    """Dryer detail — two-column per §25.4.7."""
+    state = dryer_starting_state.value
+
+    with solara.Row(gap="8px", style=_TOP_ROW):
+        with solara.Column(style="min-width:110px"):
+            solara.Select("Starting state", value=dryer_starting_state,
+                          values=["gas", "electric", "none"])
+        if state != "electric":
+            with solara.Column(style="min-width:70px"):
+                solara.Checkbox(label="Plan swap", value=dryer_swap_planned)
+        if state != "electric" and dryer_swap_planned.value:
+            yr = dryer_swap_year.value
+            cal_yr = sim_start_year.value + yr - 1
+            with solara.Column(style="min-width:170px"):
+                solara.SliderInt(f"Yr {yr} ({cal_yr})", value=dryer_swap_year, min=1, max=25)
+
+    if state == "gas":
+        with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
+            with solara.Column(style=_LEFT_COL):
+                _DS("Current: Gas Dryer")
+                therms = _est_gas_dryer(dryer_gas_therms_per_cycle.value,
+                                        dryer_loads_per_week.value)
+                solara.Markdown(
+                    f"~**{therms:.0f} therms/yr** ≈ {_kwh_eq(therms):,.0f} kWh-eq")
+                _DSl("Therms/cycle", dryer_gas_therms_per_cycle,
+                     _DEFAULTS["dryer_gas_therms_per_cycle"], 0.15, 0.35, 0.01, fmt="{v:.2f}")
+                _DSl("Loads/week", dryer_loads_per_week, _DEFAULTS["dryer_loads_per_week"],
+                     1, 14, 1, unit=" /wk")
+            with solara.Column(style=_RIGHT_COL):
+                _DS("Replacement: Heat Pump Dryer")
+                kwh = _est_hp_dryer(dryer_hp_kwh_per_cycle.value, dryer_loads_per_week.value)
+                solara.Markdown(f"~**{kwh:.0f} kWh/yr**")
+                _DSl("kWh/cycle", dryer_hp_kwh_per_cycle,
+                     _DEFAULTS["dryer_hp_kwh_per_cycle"], 1.2, 2.5, 0.1, fmt="{v:.1f}")
+        if dryer_swap_planned.value:
+            _DetailCosts(dryer_install_cost, dryer_rebate)
+
+    elif state == "electric":
+        _DS("Current: Heat Pump Dryer")
+        kwh = _est_hp_dryer(dryer_hp_kwh_per_cycle.value, dryer_loads_per_week.value)
+        solara.Markdown(f"~**{kwh:.0f} kWh/yr**")
+        _DSl("kWh/cycle", dryer_hp_kwh_per_cycle, _DEFAULTS["dryer_hp_kwh_per_cycle"],
+             1.2, 2.5, 0.1, fmt="{v:.1f}")
+        _DSl("Loads/week", dryer_loads_per_week, _DEFAULTS["dryer_loads_per_week"],
+             1, 14, 1, unit=" /wk")
+        solara.Markdown("<small style='color:#2E7D32'>✓ Already electrified</small>")
+
+    else:  # none
+        with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
+            with solara.Column(style=_LEFT_COL):
+                _DS("Current: No Dryer")
+                solara.Text("No baseline dryer.", style="font-size:0.85em; color:#888")
+            with solara.Column(style=_RIGHT_COL):
+                _DS("Adding: Heat Pump Dryer")
+                kwh = _est_hp_dryer(dryer_hp_kwh_per_cycle.value, dryer_loads_per_week.value)
+                solara.Markdown(f"Est: **{kwh:.0f} kWh/yr**")
+                _DSl("kWh/cycle", dryer_hp_kwh_per_cycle,
+                     _DEFAULTS["dryer_hp_kwh_per_cycle"], 1.2, 2.5, 0.1, fmt="{v:.1f}")
+        if dryer_swap_planned.value:
+            _DetailCosts(dryer_install_cost, dryer_rebate)
+
+
+@solara.component
+def ElecPanelDetail():
+    """Electrical panel upgrade detail — single column per §25.4.8."""
+    planned = panel_upgrade_planned.value
+
+    with solara.Row(gap="8px", style=_TOP_ROW):
+        solara.Checkbox(label="Plan 200A panel upgrade", value=panel_upgrade_planned)
+        if planned:
+            yr = panel_upgrade_year.value
+            cal_yr = sim_start_year.value + yr - 1
+            with solara.Column(style="min-width:170px"):
+                solara.SliderInt(f"Yr {yr} ({cal_yr})", value=panel_upgrade_year, min=1, max=25)
+
+    solara.HTML(tag="div", unsafe_innerHTML=(
+        "<div style='font-size:0.85em; color:#666; margin-bottom:10px;'>"
+        "Often required when adding an EV charger (L2) or heat pump to older "
+        "homes with 100A panels. Pure capital cost — no energy savings modelled.</div>"
+    ))
+    _DSl("Install cost", panel_upgrade_cost, _DEFAULTS["panel_upgrade_cost"],
+         2000, 10000, step=500, unit=" $")
+    if planned:
+        _DetailCosts(panel_upgrade_cost, panel_upgrade_rebate)
 
 
 @solara.component
 def BaseloadDetail():
-    """Expanded detail for the Lights & Appliances row."""
-    bl_before = compute_baseload_kwh(
-        square_footage.value, num_bedrooms.value, baseload_constant_before.value
-    )
-
-    solara.Markdown("**Estimated consumption**")
+    """Baseload & lights detail — single column per §25.4.9."""
+    bl_before = compute_baseload_kwh(square_footage.value, num_bedrooms.value,
+                                     baseload_constant_before.value)
+    _DS("Current: Lights & Appliances")
     solara.Markdown(
-        f"|  | Current |\n|--|--|\n"
-        f"| Lights & appliances | **{bl_before:,.0f} kWh/yr** |\n"
-        f"| Formula | {square_footage.value:,} sqft × 0.45 + "
-        f"{num_bedrooms.value} bed × 200 + {baseload_constant_before.value} |\n"
-    )
-
-    solara.Markdown("---")
-    solara.Markdown("**Always-on appliances (constant term)**")
-    SliderWithDefault(
-        "Always-on", baseload_constant_before,
-        _DEFAULTS["baseload_constant_before"],
-        0, 1500, step=50, unit=" kWh/yr",
-    )
-    solara.Markdown(
-        f"<small style='color:#555'>→ Estimated total baseload: "
-        f"**{bl_before:,.0f} kWh/yr** "
+        f"Est: **{bl_before:,.0f} kWh/yr** "
         f"({square_footage.value:,} sqft × 0.45 + {num_bedrooms.value} bed × 200 "
-        f"+ {baseload_constant_before.value})</small>"
+        f"+ {baseload_constant_before.value})"
     )
-
+    _DSl("Always-on constant", baseload_constant_before,
+         _DEFAULTS["baseload_constant_before"], 0, 1500, step=50, unit=" kWh/yr")
+    solara.Markdown("---")
+    with solara.Row(gap="8px", style="align-items:center; flex-wrap:wrap; padding:4px 0"):
+        solara.Checkbox(label="Plan efficiency upgrade (LED, smart plugs…)",
+                        value=baseload_swap_planned)
+        if baseload_swap_planned.value:
+            yr = baseload_swap_year.value
+            cal_yr = sim_start_year.value + yr - 1
+            with solara.Column(style="min-width:170px"):
+                solara.SliderInt(f"Yr {yr} ({cal_yr})", value=baseload_swap_year, min=1, max=25)
     if baseload_swap_planned.value:
-        bl_after = compute_baseload_kwh(
-            square_footage.value, num_bedrooms.value, baseload_constant_after.value
-        )
-        annual_saving_kwh = bl_before - bl_after
-        elec_rate = 0.386
-        annual_saving_usd = annual_saving_kwh * elec_rate
-        net_cost = baseload_install_cost.value - baseload_rebate.value
-        payback = (net_cost / annual_saving_usd) if annual_saving_usd > 0 else None
-        pb_str = f"~{payback:.1f} yrs" if payback is not None else "N/A"
-
-        solara.Markdown("---")
-        solara.Markdown("**After efficiency upgrade (LED, smart plugs, etc.)**")
-        SliderWithDefault(
-            "After-upgrade always-on", baseload_constant_after,
-            _DEFAULTS["baseload_constant_after"],
-            0, 1500, step=50, unit=" kWh/yr",
-        )
+        bl_after = compute_baseload_kwh(square_footage.value, num_bedrooms.value,
+                                        baseload_constant_after.value)
+        saving           = bl_before - bl_after
+        annual_saving_usd = saving * 0.386
+        net_cost         = baseload_install_cost.value - baseload_rebate.value
+        pb = (net_cost / annual_saving_usd) if annual_saving_usd > 0 else None
+        _DSl("After-upgrade always-on", baseload_constant_after,
+             _DEFAULTS["baseload_constant_after"], 0, 1500, step=50, unit=" kWh/yr")
         solara.Markdown(
-            f"<small style='color:#555'>→ Total after: **{bl_after:,.0f} kWh/yr** "
-            f"&nbsp;·&nbsp; Saving: **{annual_saving_kwh:,.0f} kWh/yr ≈ "
-            f"${annual_saving_usd:,.0f}/yr**</small>"
+            f"After: **{bl_after:,.0f} kWh/yr**  ·  "
+            f"Save: **{saving:,.0f} kWh/yr ≈ ${annual_saving_usd:,.0f}/yr**  ·  "
+            f"Payback: **{'~'+f'{pb:.1f} yrs' if pb else 'N/A'}**"
         )
-        solara.Markdown(
-            f"<small style='color:#555'>"
-            f"Net cost: **${net_cost:,}** &nbsp;·&nbsp; "
-            f"Simple payback: **{pb_str}**"
-            f"</small>"
-        )
+        _DetailCosts(baseload_install_cost, baseload_rebate)
 
 
 @solara.component
-def SolarBatteryPanel(model):
-    with solara.Card(margin=0, elevation=1, style="overflow:hidden"):
-        with solara.Row(style=(
-            "background-color:#F0F0F0; padding:6px 12px;"
-            " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
-        )):
-            solara.Text("☀️🔋 Solar + Battery", style="font-weight:600; font-size:0.95em")
-        solara.Checkbox(label="Adding solar + battery to my journey",
-                        value=solar_planned)
+def HomeDetail():
+    """Home profile detail — single column per §25.4.10."""
+    _DS("Location & Home")
+    solara.InputText("ZIP code", value=zip_code)
+    solara.Select("Climate zone", value=climate_zone, values=_CZ_OPTIONS)
+    solara.Select("Bedrooms", value=num_bedrooms, values=[1, 2, 3, 4, 5])
+    solara.InputInt("Square footage", value=square_footage)
+    solara.InputInt("Year built", value=year_built)
+    solara.Markdown("---")
+    _DS("Building Performance")
+    solara.Select("Insulation quality", value=insulation_quality,
+                  values=["poor", "average", "good"])
+    ua = UA_MAP[insulation_quality.value]
+    solara.HTML(tag="div", unsafe_innerHTML=(
+        f"<div style='font-size:0.82em; color:#666; margin-top:4px;'>"
+        f"UA = {ua} BTU/hr/°F  ·  Annual HDD = 1,910 (Bay Area TMY3)</div>"
+    ))
 
-        if not solar_planned.value:
-            return
 
-        cal_yr = sim_start_year.value + solar_install_year.value - 1
-        solara.SliderInt(
-            f"Install in year {solar_install_year.value}  ({cal_yr})",
-            value=solar_install_year, min=1, max=25,
-        )
-        solara.SliderInt(
-            f"% of electricity covered: {solar_coverage_pct.value}%",
-            value=solar_coverage_pct, min=0, max=100, step=5,
-        )
-        solara.Text("(Phase 3 will compute this from system size + usage)",
-                    style="font-size:0.78em; color:#888")
+@solara.component
+def SolarDetail(model):
+    """Solar + battery detail — two-column per §25.4.11."""
+    planned = solar_planned.value
+    gross = (
+        (solar_panels_cost.value  if solar_include_panels.value  else 0)
+        + (solar_battery_cost.value if solar_include_battery.value else 0)
+        + (solar_install_cost_item.value if solar_include_install.value else 0)
+    )
+    net = gross - solar_rebate.value
 
-        gross_cost = (
-            (solar_panels_cost.value if solar_include_panels.value else 0)
-            + (solar_battery_cost.value if solar_include_battery.value else 0)
-            + (solar_install_cost_item.value if solar_include_install.value else 0)
-        )
-        net_cost = gross_cost - solar_rebate.value
+    with solara.Row(gap="8px", style=_TOP_ROW):
+        solara.Checkbox(label="Adding solar to my journey", value=solar_planned)
+        if planned:
+            yr = solar_install_year.value
+            cal_yr = sim_start_year.value + yr - 1
+            with solara.Column(style="min-width:170px"):
+                solara.SliderInt(f"Install yr {yr} ({cal_yr})",
+                                 value=solar_install_year, min=1, max=25)
 
-        # ── Collapsible cost row (same style as appliance rows) ───────────────
-        cost_expanded = solar_cost_expanded.value
-        cost_chevron  = "▼" if cost_expanded else "▶"
-        with solara.Row(
-            gap="8px",
-            style="align-items:center; flex-wrap:wrap; padding:6px 0; border-top:1px solid #EEEEEE;",
-        ):
+    if not planned:
+        solara.Text("Enable solar above to configure options.",
+                    style="font-size:0.85em; color:#888")
+        return
+
+    with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
+        with solara.Column(style=_LEFT_COL):
+            _DS("Solar Panels")
+            solara.Checkbox(label="Include solar panels (10 kW)", value=solar_include_panels)
+            if solar_include_panels.value:
+                solara.InputInt("Panel cost $", value=solar_panels_cost)
+            solara.Checkbox(label="Include installation & permitting",
+                            value=solar_include_install)
+            if solar_include_install.value:
+                solara.InputInt("Install cost $", value=solar_install_cost_item)
+            with solara.Column(style="min-width:180px"):
+                solara.SliderInt(
+                    f"{solar_coverage_pct.value}% electricity covered",
+                    value=solar_coverage_pct, min=0, max=100, step=5,
+                )
+            solara.Text("(Phase 3: auto-compute from system size + usage)",
+                        style="font-size:0.78em; color:#888")
+
+        with solara.Column(style=_RIGHT_COL):
+            _DS("Battery Storage")
+            solara.Checkbox(label="Include battery (13.5 kWh)", value=solar_include_battery)
+            if solar_include_battery.value:
+                solara.InputInt("Battery cost $", value=solar_battery_cost)
+            else:
+                solara.Text("No battery selected.", style="font-size:0.85em; color:#888")
+            solara.Markdown("---")
+            solara.Markdown(
+                f"| Item | Amount |\n|--|--|\n"
+                f"| Gross cost | **${gross:,}** |\n"
+                f"| Rebate | **-${solar_rebate.value:,}** |\n"
+                f"| **Net cost** | **${net:,}** |\n"
+                f"| Lifespan | 25 years |"
+            )
+            if model is not None and model.journey_home.solar_savings_history:
+                annual = model.journey_home.solar_savings_history[0]
+                if annual > 0 and net > 0:
+                    solara.Markdown(
+                        f"Est. annual saving: **${annual:,.0f}/yr**  \n"
+                        f"Est. payback: **~{net / annual:.1f} yrs**"
+                    )
+
+    with solara.Column(style=_COSTS_BOX):
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            "<div style='font-weight:700; font-size:0.9em; color:#0D47A1;"
+            " border-bottom:1px solid #C5CAE9; padding-bottom:4px;"
+            " margin-bottom:8px;'>Costs &amp; Rebates</div>"
+        ))
+        with solara.Row(gap="12px", style="flex-wrap:wrap; align-items:center"):
+            with solara.Column(style="min-width:120px"):
+                solara.InputInt("Rebate $", value=solar_rebate)
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                f"<div style='font-size:1.05em; font-weight:700; color:#1976D2;'>"
+                f"Net ${net:,}</div>"
+            ))
+
+
+def _fuel_model_block(heading: str, color: str,
+                       model_rv, cagr_rv, acc_cagr_rv,
+                       model_options: list, cagr_max: int):
+    """Fuel rate model section: toggle buttons + conditional CAGR or ACC-base slider."""
+    solara.HTML(tag="div", unsafe_innerHTML=(
+        f"<div style='font-weight:600; font-size:0.84em; color:{color};"
+        " margin:8px 0 4px'>" + heading + "</div>"
+    ))
+    with solara.Row(gap="6px", style="flex-wrap:wrap"):
+        for key, display in model_options:
+            is_active = model_rv.value == key
             solara.Button(
-                cost_chevron,
-                on_click=lambda: solar_cost_expanded.set(not solar_cost_expanded.value),
+                display,
+                on_click=lambda k=key: model_rv.set(k),
                 style=(
-                    "background:none; border:none; cursor:pointer; color:#78909C;"
-                    " font-size:0.9em; padding:0 4px 0 0; min-width:14px; flex-shrink:0;"
+                    f"background:{color}; color:white; border:none;"
+                    " border-radius:4px; padding:3px 10px; font-size:0.80em; cursor:pointer;"
+                    if is_active else
+                    "background:#F5F5F5; color:#444; border:1px solid #CCC;"
+                    " border-radius:4px; padding:3px 10px; font-size:0.80em; cursor:pointer;"
                 ),
             )
-            solara.Text("Cost items", style="font-weight:500; font-size:0.9em; min-width:100px")
-            solara.Text(
-                f"Net ${net_cost:,}",
-                style="color:#1976D2; font-weight:600; font-size:0.85em",
-            )
-
-        if cost_expanded:
-            with solara.Column(
-                style=(
-                    "margin:0 0 8px 24px; padding:10px 14px;"
-                    " background:#F8F9FA; border-radius:8px;"
-                    " border-left:3px solid #C5CAE9;"
-                )
-            ):
-                with solara.Row(gap="8px", style="align-items:center; flex-wrap:wrap"):
-                    solara.Checkbox(label="Solar panels (10 kW)", value=solar_include_panels)
-                    if solar_include_panels.value:
-                        solara.InputInt("$", value=solar_panels_cost)
-
-                with solara.Row(gap="8px", style="align-items:center; flex-wrap:wrap"):
-                    solara.Checkbox(label="Battery storage (13.5 kWh)", value=solar_include_battery)
-                    if solar_include_battery.value:
-                        solara.InputInt("$", value=solar_battery_cost)
-
-                with solara.Row(gap="8px", style="align-items:center; flex-wrap:wrap"):
-                    solara.Checkbox(label="Installation & permitting", value=solar_include_install)
-                    if solar_include_install.value:
-                        solara.InputInt("$", value=solar_install_cost_item)
-
-                solara.InputInt("Rebate $", value=solar_rebate)
-                solara.Markdown(
-                    f"| | |\n|--|--|\n"
-                    f"| Gross cost | **${gross_cost:,}** |\n"
-                    f"| Rebate | **-${solar_rebate.value:,}** |\n"
-                    f"| **Net cost** | **${net_cost:,}** |\n"
-                    f"| Lifespan | 25 years |\n"
-                )
-
-        if model is not None and model.journey_home.solar_savings_history:
-            annual_saving = model.journey_home.solar_savings_history[0]
-            if annual_saving > 0 and net_cost > 0:
-                payback = net_cost / annual_saving
-                solara.Markdown(
-                    f"Est. annual saving: **${annual_saving:,.0f}/yr**  \n"
-                    f"Est. simple payback: **~{payback:.1f} yrs**  \n"
-                    f"<small style='color:#888'>"
-                    f"(Payback improves as electric rates rise over time)</small>"
-                )
-            elif annual_saving <= 0:
-                solara.Text("No electric loads to offset in year 1.",
-                            style="font-size:0.82em; color:#888")
+    if model_rv.value == "cagr_flat":
+        solara.SliderInt(
+            f"+{cagr_rv.value}%/yr",
+            value=cagr_rv, min=0, max=cagr_max,
+        )
+    else:
+        # ACC mode: expose base escalation slider
+        solara.SliderInt(
+            f"Base escalation (ACC shape applied on top): +{acc_cagr_rv.value}%/yr",
+            value=acc_cagr_rv, min=0, max=cagr_max,
+        )
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            "<div style='font-size:0.75em; color:#546E7A; margin:1px 0 4px'>"
+            "ACC shape redistributes costs within each year. "
+            "This slider sets the overall rate trajectory.</div>"
+        ))
 
 
 @solara.component
-def PanelDetail():
-    """Expanded detail for the Electrical Panel Upgrade row."""
-    solara.Markdown(
-        "<small style='color:#888'>Often required when adding an EV charger (L2) "
-        "or heat pump to older homes with 100A panels.</small>"
-    )
-    SliderWithDefault(
-        "Install cost", panel_upgrade_cost,
-        _DEFAULTS["panel_upgrade_cost"],
-        2000, 10000, step=500, unit=" $",
-    )
-    solara.InputInt("Rebate $", value=panel_upgrade_rebate)
-    net = panel_upgrade_cost.value - panel_upgrade_rebate.value
-    solara.Markdown(
-        f"<small style='color:#555'>"
-        f"Net cost: **${net:,}** &nbsp;·&nbsp; Lifespan: **25 years**"
-        f"</small>"
-    )
+def RatesDetail():
+    """Rate scenarios detail panel."""
+    _DS("Scenario A")
+    _fuel_model_block("⚡ Electricity Rate Model", C_RATE_ELEC,
+                       elec_rate_model_a, elec_cagr_pct_a, acc_elec_cagr_a,
+                       [("cagr_flat", "CAGR Flat"), ("acc_shaped", "ACC-Shaped")], 15)
+    _fuel_model_block("🔥 Gas Rate Model", C_RATE_GAS,
+                       gas_rate_model_a, gas_cagr_pct_a, acc_gas_cagr_a,
+                       [("cagr_flat", "CAGR Flat"), ("acc_seasonal", "ACC Seasonal")], 20)
 
+    solara.HTML(tag="div", unsafe_innerHTML=(
+        "<div style='border-top:1px solid #E0E0E0; margin:10px 0 6px'></div>"
+    ))
+    _DS("Timeline")
+    solara.SliderInt(f"Years to model: {years.value}", value=years, min=5, max=30)
+
+    solara.HTML(tag="div", unsafe_innerHTML=(
+        "<div style='border-top:1px solid #E0E0E0; margin:10px 0 6px'></div>"
+    ))
+    solara.Checkbox(label="Compare two scenarios (A vs B)", value=comparison_mode)
+    if comparison_mode.value:
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            "<div style='font-size:0.80em; color:#888; margin:4px 0 2px'>"
+            "Scenario A above — solid lines on charts</div>"
+        ))
+        _DS("Scenario B  (dashed lines)")
+        _fuel_model_block("⚡ Electricity Rate Model", C_RATE_ELEC,
+                           elec_rate_model_b, elec_cagr_pct_b, acc_elec_cagr_b,
+                           [("cagr_flat", "CAGR Flat"), ("acc_shaped", "ACC-Shaped")], 15)
+        _fuel_model_block("🔥 Gas Rate Model", C_RATE_GAS,
+                           gas_rate_model_b, gas_cagr_pct_b, acc_gas_cagr_b,
+                           [("cagr_flat", "CAGR Flat"), ("acc_seasonal", "ACC Seasonal")], 20)
+
+
+# ── §25 Summary panel components ─────────────────────────────────────────────
 
 @solara.component
 def JourneyPlannerPanel():
@@ -1783,110 +2548,29 @@ def JourneyPlannerPanel():
         )):
             solara.Text("🗺️ Your Electrification Journey",
                         style="font-weight:600; font-size:0.95em")
-        with solara.Row(gap="8px",
-                        style="padding:2px 0 4px 0; font-size:0.76em; color:#999"):
-            solara.Text(" ",           style="min-width:14px")
-            solara.Text("Appliance",   style="min-width:100px; max-width:100px; font-weight:600")
-            solara.Text("State",       style="min-width:90px;  max-width:90px")
-            solara.Text("Plan swap?",  style="min-width:60px;  max-width:60px")
-            solara.Text("Year / Cost", style="flex:1")
-
-        ExpandableSlotRow("HVAC",
-                          hvac_starting_state, hvac_swap_planned,
-                          hvac_swap_year, hvac_install_cost, hvac_rebate,
-                          hvac_expanded, lambda: HVACDetail())
-        ExpandableSlotRow("Water Heater",
-                          wh_starting_state, wh_swap_planned,
-                          wh_swap_year, wh_install_cost, wh_rebate,
-                          wh_expanded, lambda: WaterHeaterDetail())
-        ExpandableSlotRow("Dryer",
-                          dryer_starting_state, dryer_swap_planned,
-                          dryer_swap_year, dryer_install_cost, dryer_rebate,
-                          dryer_expanded, lambda: DryerDetail())
-        ExpandableSlotRow("Cooktop",
-                          cooktop_starting_state, cooktop_swap_planned,
-                          cooktop_swap_year, cooktop_install_cost, cooktop_rebate,
-                          cooktop_expanded, lambda: CooktopDetail())
-        ExpandableSlotRow("EV Charger",
-                          ev_starting_state, ev_swap_planned,
-                          ev_swap_year, ev_install_cost, ev_rebate,
-                          ev_expanded, lambda: EVDetail())
-        ExpandableSlotRow("Elec. Panel",
-                          _panel_state, panel_upgrade_planned,
-                          panel_upgrade_year, panel_upgrade_cost, panel_upgrade_rebate,
-                          panel_expanded, lambda: PanelDetail(),
-                          is_upgrade_slot=True)
-        ExpandableSlotRow("Lights & Appliances",
-                          _baseload_state, baseload_swap_planned,
-                          baseload_swap_year, baseload_install_cost, baseload_rebate,
-                          baseload_expanded, lambda: BaseloadDetail(),
-                          is_upgrade_slot=True)
-
+        HVACSummaryCard()
+        WHSummaryCard()
+        EVSummaryCard()
+        CooktopSummaryCard()
+        DryerSummaryCard()
+        PanelSummaryCard()
+        BaseloadSummaryCard()
         solara.Markdown(
-            "<small style='color:#888'>ℹ️ <em>\"Do nothing\" baseline runs automatically: "
-            "gas devices stay gas; already-done devices stay electric; "
-            "</em></small>"
+            "<small style='color:#888'>ℹ️ <em>Click ⋮ on any item to see full details.  "
+            "\"Do nothing\" baseline preserves all current states.</em></small>"
         )
 
 
 @solara.component
 def HomeProfilePanel():
-    expanded = home_profile_details_expanded.value
-    chevron  = "▼" if expanded else "▶"
-
     with solara.Card(margin=0, elevation=1, style="overflow:hidden"):
         with solara.Row(style=(
             "background-color:#F0F0F0; padding:6px 12px;"
             " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
         )):
-            solara.Text("🏠 Home Profile", style="font-weight:600; font-size:0.95em")
-        # Always-visible fields
-        solara.InputText("ZIP code", value=zip_code)
-        solara.Select("Bedrooms", value=num_bedrooms, values=_BR_OPTIONS)
-        solara.InputInt("Square footage", value=square_footage)
-
-        # Expand/collapse toggle
-        solara.Button(
-            f"{chevron} More details...",
-            on_click=lambda: home_profile_details_expanded.set(not expanded),
-            style=(
-                "background:none; border:none; cursor:pointer;"
-                " color:#546E7A; font-size:0.85em; padding:4px 0;"
-                " text-align:left; display:block;"
-            ),
-        )
-
-        if expanded:
-            solara.Select("Climate zone", value=climate_zone, values=_CZ_OPTIONS)
-            solara.InputInt("Year built", value=year_built)
-            solara.Markdown("**Building Performance**")
-            solara.Select("Insulation quality", value=insulation_quality,
-                          values=["poor", "average", "good"])
-            solara.Markdown(
-                "<small style='color:#888'>Device specs live in each appliance row "
-                "(click ▶ to expand).</small>"
-            )
-
-
-def _preset_buttons(gas_rv, elec_rv, apply_fn):
-    active = _current_preset_label(gas_rv.value, elec_rv.value)
-    with solara.Row(gap="4px", style="flex-wrap:wrap"):
-        for key, display in _PRESET_DISPLAY.items():
-            is_active = active.lower() == key
-            solara.Button(
-                display,
-                on_click=lambda k=key: apply_fn(k),
-                style=(
-                    f"background:{C_NAVY}; color:white; border:none;"
-                    " border-radius:4px; padding:4px 10px; font-size:0.80em; cursor:pointer;"
-                    if is_active else
-                    "background:#F5F5F5; color:#444; border:1px solid #CCCCCC;"
-                    " border-radius:4px; padding:4px 10px; font-size:0.80em; cursor:pointer;"
-                ),
-            )
-        if active == "Custom":
-            solara.Text("⚙️ Custom",
-                        style="color:#888; font-size:0.80em; align-self:center")
+            solara.Text("🏠 Home + Solar", style="font-weight:600; font-size:0.95em")
+        HomeSummaryCard()
+        SolarSummaryCard()
 
 
 @solara.component
@@ -1897,54 +2581,59 @@ def EnergyPricesPanel():
             " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
         )):
             solara.Text("📈 Energy & Prices", style="font-weight:600; font-size:0.95em")
-        solara.Markdown("**Quick presets**")
-        _preset_buttons(gas_cagr_pct_a, elec_cagr_pct_a, _apply_preset_a)
+        RatesSummaryCard()
 
-        solara.HTML(tag="div", unsafe_innerHTML=(
-            f"<div style='color:{C_RED}; font-size:0.83em; margin:8px 0 -4px 0; font-weight:500'>"
-            "🔴 Gas escalation</div>"
-        ))
-        solara.SliderInt(f"+{gas_cagr_pct_a.value}%/yr",
-                         value=gas_cagr_pct_a, min=0, max=20)
 
-        solara.HTML(tag="div", unsafe_innerHTML=(
-            f"<div style='color:{C_NAVY}; font-size:0.83em; margin:4px 0 -4px 0; font-weight:500'>"
-            "🔵 Electricity escalation</div>"
-        ))
-        solara.SliderInt(f"+{elec_cagr_pct_a.value}%/yr",
-                         value=elec_cagr_pct_a, min=0, max=15)
+# ── §25.6 Bottom zone routing ─────────────────────────────────────────────────
 
-        solara.Markdown(
-            "<small style='color:#888'>💡 Gas typically rises faster than "
-            "electricity as grid decarbonises.</small>"
-        )
+@solara.component
+def DetailView(item: str, model):
+    """Full-width detail card — title bar left+right, two-column body for appliances."""
+    with solara.Card(margin=0, elevation=2, style="overflow:hidden"):
+        DetailTitleBar(_DETAIL_TITLES[item])
+        with solara.Column(classes=["detail-body"], style="padding:8px 12px"):
+            if item == "hvac":
+                HVACDetail()
+            elif item == "water_heater":
+                WaterHeaterDetail()
+            elif item == "ev":
+                EVDetail()
+            elif item == "cooktop":
+                CooktopDetail()
+            elif item == "dryer":
+                DryerDetail()
+            elif item == "panel":
+                ElecPanelDetail()
+            elif item == "baseload":
+                BaseloadDetail()
+            elif item == "home":
+                HomeDetail()
+            elif item == "solar":
+                SolarDetail(model)
+            elif item == "rates":
+                RatesDetail()
 
-        solara.Markdown("**Scenario Comparison**")
-        solara.Checkbox(label="Compare two rate scenarios", value=comparison_mode)
-        if comparison_mode.value:
-            solara.Markdown("*Scenario B*")
-            _preset_buttons(gas_cagr_pct_b, elec_cagr_pct_b, _apply_preset_b)
 
-            solara.HTML(tag="div", unsafe_innerHTML=(
-                f"<div style='color:{C_RED}; font-size:0.83em; margin:8px 0 -4px 0; font-weight:500'>"
-                "🔴 Gas escalation (B)</div>"
-            ))
-            solara.SliderInt(f"+{gas_cagr_pct_b.value}%/yr",
-                             value=gas_cagr_pct_b, min=0, max=20)
+@solara.component
+def SummaryView():
+    """Static 3-col summary layout — all panels visible, compact SummaryCards."""
+    with solara.Row(gap="12px", style="align-items:flex-start; flex-wrap:wrap"):
+        with solara.Column(style="flex:2; min-width:300px"):
+            JourneyPlannerPanel()
+        with solara.Column(style="flex:1; min-width:240px"):
+            HomeProfilePanel()
+        with solara.Column(style="flex:1; min-width:220px"):
+            EnergyPricesPanel()
 
-            solara.HTML(tag="div", unsafe_innerHTML=(
-                f"<div style='color:{C_NAVY}; font-size:0.83em; margin:4px 0 -4px 0; font-weight:500'>"
-                "🔵 Electricity escalation (B)</div>"
-            ))
-            solara.SliderInt(f"+{elec_cagr_pct_b.value}%/yr",
-                             value=elec_cagr_pct_b, min=0, max=15)
 
-            solara.Markdown(
-                "<small style='color:#888'>Charts: solid = A, dashed = B</small>"
-            )
-
-        solara.Markdown("**Timeline**")
-        solara.SliderInt("Years to model", value=years, min=5, max=30)
+@solara.component
+def BottomZone(model):
+    """Shows SummaryView when no detail is open, DetailView otherwise."""
+    dopen = detail_open.value
+    if dopen is None:
+        SummaryView()
+    else:
+        DetailView(dopen, model)
 
 
 # ── Main Page ──────────────────────────────────────────────────────────────────
@@ -1985,10 +2674,14 @@ def Page():
         solar_include_battery.value, solar_battery_cost.value,
         solar_include_install.value, solar_install_cost_item.value,
         solar_rebate.value,
-        gas_cagr_pct_a.value, elec_cagr_pct_a.value,
+        elec_rate_model_a.value, elec_cagr_pct_a.value, acc_elec_cagr_a.value,
+        gas_rate_model_a.value,  gas_cagr_pct_a.value,  acc_gas_cagr_a.value,
         comparison_mode.value,
-        gas_cagr_pct_b.value, elec_cagr_pct_b.value,
+        elec_rate_model_b.value, elec_cagr_pct_b.value, acc_elec_cagr_b.value,
+        gas_rate_model_b.value,  gas_cagr_pct_b.value,  acc_gas_cagr_b.value,
         years.value, sim_start_year.value,
+        wh_inlet_temp_f.value, wh_setpoint_f.value,
+        gas_wh_tank_gallons.value, hpwh_tank_gallons.value, hpwh_ambient_location.value,
     ])
 
     n = years.value
@@ -2002,6 +2695,26 @@ def Page():
                 "<style>"
                 ".chart-header-sel .v-input__icon--append .v-icon"
                 "{font-size:28px!important}"
+                "</style>"
+            ),
+            style="display:none",
+        )
+
+        # §25.8.2/3 — suppress Vuetify default form margins in cards and detail body
+        solara.HTML(
+            tag="div",
+            unsafe_innerHTML=(
+                "<style>"
+                ".summary-card .v-input{margin-bottom:0!important}"
+                ".summary-card .v-text-field{margin-top:0!important}"
+                ".summary-card .v-input__details{min-height:0!important;padding:0!important}"
+                ".summary-card .v-messages{min-height:0!important}"
+                ".summary-card .v-slider{margin-top:0!important;margin-bottom:0!important}"
+                ".summary-card .v-checkbox{margin-top:0!important;margin-bottom:0!important}"
+                ".summary-card .v-select{margin-top:0!important}"
+                ".detail-body .v-input{margin-bottom:2px!important}"
+                ".detail-body .v-input__details{min-height:0!important}"
+                ".detail-body .v-slider{margin-top:4px!important;margin-bottom:2px!important}"
                 "</style>"
             ),
             style="display:none",
@@ -2081,15 +2794,8 @@ def Page():
                 )
             solara.Markdown(leg)
 
-        # ── Control panels ──────────────────────────────────────────────────────
-        with solara.Row(gap="12px", style="align-items:flex-start; flex-wrap:wrap"):
-            with solara.Column(style="flex:2; min-width:300px"):
-                JourneyPlannerPanel()
-            with solara.Column(style="flex:1; min-width:240px"):
-                HomeProfilePanel()
-                SolarBatteryPanel(model)
-            with solara.Column(style="flex:1; min-width:220px"):
-                EnergyPricesPanel()
+        # ── Bottom zone — summary or detail view (§25) ─────────────────────────
+        BottomZone(model)
 
         # ── Footer — ECHo branding ──────────────────────────────────────────────
         echo_svg      = _read_svg(_ECHO_LOGO,  height_px=36)

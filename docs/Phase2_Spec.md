@@ -1,4 +1,4 @@
-# WhyWatt — Phase 2 Development Spec
+ # WhyWatt — Phase 2 Development Spec
 
 **Status:** Phase 2 implemented through Objective 6; §9 bug fixes, §10 rate decoupling, §11 per-device charts, §12 baseload formula, §13 appliance detail expand/collapse, §14-17 v2.7 additions
 **Follows:** Phase 1 complete (Mesa + Solara, 42 unit tests, dual-home simulation)
@@ -4832,6 +4832,2375 @@ Run solara run src/app.py and verify:
     works unchanged.
 ```
 
+
+---
+
+## 19. Panel Expand-to-Full-Width Layout (Phase 2.8)
+
+### 19.1 Problem Statement
+
+The three-column control panel row (Journey × 2 cols, Home Profile × 1, Energy & Prices × 1)
+becomes increasingly dense as panels grow richer. When a panel is expanded (e.g. Journey's
+per-device rows are all open), the column stays narrow and the content stacks vertically to
+an uncomfortable height. The charts above are pushed off-screen.
+
+The two chart panels at the top must remain visible at all times. The control panels below
+must be able to expand horizontally, not just vertically.
+
+### 19.2 Behaviour
+
+**Collapsed (default — identical to current layout):**
+```
+[ Chart Left          ]  [ Chart Right         ]   ← always visible, full width
+[ Journey (2 cols)    ]  [ Home Profile ]  [ Energy & Prices ]
+```
+
+**When a panel header is clicked to expand:**
+```
+[ Chart Left          ]  [ Chart Right         ]   ← unchanged
+[ Journey — EXPANDED, full 4-column width     ]  [🏠][📈]  ← collapsed strips
+```
+
+- The active/expanded panel grows to fill all available horizontal space (CSS `flex: 4`
+  or equivalent wide proportion).
+- The other two inactive panels shrink to **collapsed header strips** — showing only
+  their title bar (icon + label), with no content visible.
+- Clicking a collapsed strip header activates that panel and collapses the others.
+- Clicking the currently-active panel's header toggles it back to the default 3-column
+  layout (all panels at their normal widths, no panel in "expanded" state).
+- The charts row is not affected by any panel expand/collapse action.
+
+**Collapsed strip appearance:**
+```
+┌────────┐
+│ 🏠     │   ← icon only, or icon + short label if space permits
+└────────┘
+```
+The strip is tall enough to be clickable (min 60px), uses the same grey title-bar
+background (#F0F0F0) as the existing panel headers.
+
+### 19.3 Reactive State
+
+```python
+# None = all panels at normal width; "journey" | "home" | "prices" = that panel is expanded
+active_panel = solara.reactive(None)   # add to _DEFAULTS and reset_to_defaults()
+```
+
+### 19.4 Layout Implementation
+
+Replace the current static 3-column Row with a dynamic Row whose column `style` attributes
+are driven by `active_panel.value`:
+
+```python
+def _panel_flex(panel_name: str, active: str | None) -> str:
+    """Return flex style string for a panel column."""
+    if active is None:
+        # Default widths — same as current layout
+        return {"journey": "flex:2; min-width:300px",
+                "home":    "flex:1; min-width:240px",
+                "prices":  "flex:1; min-width:220px"}[panel_name]
+    if panel_name == active:
+        return "flex:4; min-width:300px"   # expanded — takes most of the row
+    return "flex:0 0 56px; overflow:hidden"  # collapsed strip — 56px wide
+
+@solara.component
+def PanelStrip(panel_name: str, icon: str, label: str):
+    """Collapsed header strip shown when another panel is active."""
+    solara.Button(
+        f"{icon}",
+        on_click=lambda: active_panel.set(panel_name),
+        style=(
+            "width:56px; height:100%; min-height:60px;"
+            " background:#F0F0F0; border:none; cursor:pointer;"
+            " font-size:1.2em; border-radius:4px;"
+            " display:flex; align-items:center; justify-content:center;"
+        ),
+    )
+```
+
+**Panel header toggle button** — each panel's title bar gets a click handler:
+
+```python
+# In JourneyPlannerPanel header row:
+solara.Button(
+    "⛏ Journey Planner" if active_panel.value != "journey" else "⛏ Journey Planner ✕",
+    on_click=lambda: active_panel.set(
+        None if active_panel.value == "journey" else "journey"
+    ),
+    style="background:none; border:none; cursor:pointer; font-weight:600; ...",
+)
+```
+
+**Control panel row:**
+
+```python
+active = active_panel.value
+with solara.Row(gap="8px", style="align-items:flex-start; flex-wrap:nowrap"):
+    if active in (None, "journey"):
+        with solara.Column(style=_panel_flex("journey", active)):
+            JourneyPlannerPanel()
+    else:
+        PanelStrip("journey", "⛏", "Journey")
+
+    if active in (None, "home"):
+        with solara.Column(style=_panel_flex("home", active)):
+            HomeProfilePanel()
+            SolarBatteryPanel(model)
+    else:
+        PanelStrip("home", "🏠", "Home")
+
+    if active in (None, "prices"):
+        with solara.Column(style=_panel_flex("prices", active)):
+            EnergyPricesPanel()
+    else:
+        PanelStrip("prices", "📈", "Prices")
+```
+
+### 19.5 Transition Polish
+
+Add a CSS transition to the panel columns so the expand/collapse animates smoothly:
+
+```python
+solara.HTML(
+    tag="div",
+    unsafe_innerHTML=(
+        "<style>"
+        ".panel-col { transition: flex 0.25s ease, min-width 0.25s ease; }"
+        "</style>"
+    ),
+    style="display:none",
+)
+```
+
+Apply `classes=["panel-col"]` to each panel `solara.Column`.
+
+### 19.6 Verification
+
+- Default state: 3-col layout identical to current §18 output.
+- Click Journey header: Journey expands to ~75% width; Home and Prices show as 56px strips.
+- Click Home strip: Home expands, Journey and Prices collapse to strips.
+- Click active panel header again: returns to default 3-col.
+- Charts row unchanged in all states.
+- `reset_to_defaults()` sets `active_panel` to `None`.
+
+### 19.7 Claude Code Prompt — UI Panel Expand
+
+```
+Implement §19 (Panel Expand-to-Full-Width Layout) of docs/Phase2_Spec.md.
+
+Step 1 — Add reactive state:
+  Add active_panel = solara.reactive(None) at module level.
+  Add to _DEFAULTS dict as "active_panel": None.
+  Add to reset_to_defaults(): active_panel.set(_DEFAULTS["active_panel"]).
+
+Step 2 — Add helper function _panel_flex(panel_name, active) as specified in §19.4.
+  Add PanelStrip component as specified.
+
+Step 3 — Update each panel's title-bar Row to include a toggle button/click handler
+  that sets active_panel to the panel's name (or None if already active).
+
+Step 4 — Replace the current 3-column control panel Row with the dynamic Row
+  from §19.4 that conditionally renders PanelStrip vs full panel based on active_panel.
+
+Step 5 — Add the CSS transition block (§19.5) to the Page() component.
+
+Run solara run src/app.py and verify:
+  - Default 3-col layout unchanged.
+  - Click Journey → Journey is wide, others are 56px strips.
+  - Click strip → that panel expands, others collapse.
+  - Click active header → 3-col restored.
+  - Charts always visible above panels.
+```
+
+---
+
+## 20. Water Heater Model Improvements (Phase 2.8)
+
+### 20.1 Problem Statement
+
+Both `GasWaterHeater` and `HeatPumpWaterHeater` in `physics.py` compute energy correctly
+but are missing two physically important parameters:
+
+1. **Tank size (gallons)** — affects standby losses and user's recognisable sizing choice.
+   Currently only `daily_gallons` (hot water draw) is exposed; the tank's physical volume
+   is implicit. Both devices need explicit `tank_gallons` parameter.
+
+2. **HPWH ambient temperature effect** — HPWHs extract heat from surrounding air. In a
+   cold garage or basement in winter, the COP degrades materially. Currently `uef=3.5`
+   is a fixed annual constant; the model should degrade COP in cold months.
+
+Tankless water heater is deferred to Phase 3.
+
+### 20.2 GasWaterHeater — Tank Size Parameter
+
+Add `tank_gallons: float = 50` to `GasWaterHeater.__init__`. Stored as an attribute for
+UI display and future standby-loss refinement. Physics formula is unchanged.
+
+```python
+class GasWaterHeater(PhysicsDevice):
+    fuel_type = "gas"
+
+    def __init__(self, model, *,
+                 uef: float = 0.65,
+                 daily_gallons: float = 65,
+                 tank_gallons: float = 50,      # NEW — physical tank size
+                 setpoint_f: float = 120,
+                 monthly_inlet_temp_f: np.ndarray,
+                 **kwargs):
+        super().__init__(model, **kwargs)
+        self.uef = uef
+        self.daily_gallons = daily_gallons
+        self.tank_gallons = tank_gallons        # stored, shown in UI
+        self.setpoint_f = setpoint_f
+        self._inlet = np.asarray(monthly_inlet_temp_f, dtype=float)
+```
+
+**Default tank sizes by bedrooms:**
+
+| Bedrooms | Gas tank default (gal) | HPWH tank default (gal) |
+|----------|------------------------|--------------------------|
+| 1–2      | 40                     | 50                        |
+| 3        | 50                     | 65                        |
+| 4+       | 80                     | 80                        |
+
+HPWH tanks default one size larger than gas tanks — more thermal storage supports
+load-shifting and compensates for slower heat-up rate.
+
+**Sizing guidance hint** (UI info text, no auto-change):
+- < 2 people → 30–40 gal suggested
+- 2–3 people → 40–50 gal suggested
+- 3–5 people → 50–80 gal suggested
+- > 5 people → 80 gal suggested
+
+### 20.3 HeatPumpWaterHeater — Tank Size + Ambient COP Degradation
+
+Add `tank_gallons: float = 65` and `ambient_location: str = "conditioned"` to
+`HeatPumpWaterHeater.__init__`.
+
+**Ambient location options:**
+- `"conditioned"` — heated living space (~65–70°F year-round). No COP penalty.
+- `"unconditioned"` — unheated garage or outdoor-adjacent space. Tracks outdoor temps.
+
+**Ambient temperature arrays (module-level in `physics.py`):**
+
+```python
+# Monthly outdoor temps for PG&E CZ12 reference (°F) — used for unconditioned spaces
+_CZ12_MONTHLY_OUTDOOR_F = np.array([
+    47, 52, 57, 63, 70, 78, 84, 82, 76, 65, 53, 46
+], dtype=float)
+
+# Conditioned space assumption — nearly flat
+_CONDITIONED_MONTHLY_F = np.array([
+    68, 68, 68, 68, 70, 72, 74, 74, 72, 70, 68, 68
+], dtype=float)
+```
+
+**COP degradation formula** — linear fit from NEEA/PNNL field data:
+```
+cop_factor[m] = clip(1 - max(0, (65 - ambient_f[m]) × 0.012), 0.5, 1.0)
+effective_uef[m] = uef × cop_factor[m]
+```
+
+At 65°F: factor = 1.0 (no penalty).
+At 45°F: factor ≈ 0.76 (garage in cold January).
+At 35°F: factor ≈ 0.64 (minimum clip at 0.50 for extreme cold).
+
+```python
+class HeatPumpWaterHeater(PhysicsDevice):
+    fuel_type = "electricity"
+
+    def __init__(self, model, *,
+                 uef: float = 3.5,
+                 daily_gallons: float = 65,
+                 tank_gallons: float = 65,                     # NEW
+                 setpoint_f: float = 120,
+                 ambient_location: str = "conditioned",        # NEW
+                 monthly_inlet_temp_f: np.ndarray,
+                 monthly_ambient_temp_f: np.ndarray | None = None,  # override
+                 **kwargs):
+        super().__init__(model, **kwargs)
+        self.uef = uef
+        self.daily_gallons = daily_gallons
+        self.tank_gallons = tank_gallons
+        self.setpoint_f = setpoint_f
+        self.ambient_location = ambient_location
+        self._inlet = np.asarray(monthly_inlet_temp_f, dtype=float)
+        if monthly_ambient_temp_f is not None:
+            self._ambient = np.asarray(monthly_ambient_temp_f, dtype=float)
+        elif ambient_location == "unconditioned":
+            self._ambient = _CZ12_MONTHLY_OUTDOOR_F.copy()
+        else:
+            self._ambient = _CONDITIONED_MONTHLY_F.copy()
+
+    def monthly_consumption(self) -> np.ndarray:
+        delta_t = self.setpoint_f - self._inlet
+        cop_factors = np.clip(1.0 - np.maximum(0.0, (65.0 - self._ambient) * 0.012), 0.5, 1.0)
+        effective_uef = self.uef * cop_factors
+        return self.daily_gallons * _DAYS * 8.33 * delta_t / (3412.0 * effective_uef)
+```
+
+### 20.4 UI Changes — Water Heater Slot
+
+In the Water Heater expandable row (§13), add to the Gas sub-panel:
+```
+Tank size    [ 50 ▾ ]  gal    (values: 30, 40, 50, 65, 80)
+```
+Add to the HPWH sub-panel:
+```
+Tank size    [ 65 ▾ ]  gal    (values: 50, 65, 80)
+Install location   ( ● Conditioned )  ( ○ Unconditioned/garage )
+```
+
+**New reactive variables:**
+```python
+gas_wh_tank_gallons    = solara.reactive(50)
+hpwh_tank_gallons      = solara.reactive(65)
+hpwh_ambient_location  = solara.reactive("conditioned")
+```
+Add to `_DEFAULTS`, `reset_to_defaults()`, and `run_simulation` dependency list.
+
+### 20.5 Verification
+
+- HPWH `unconditioned` in cold climate: ~10–20% higher annual kWh than `conditioned`.
+- HPWH `conditioned`: result matches current model within rounding (no regression).
+- Tank size selectors appear in Water Heater expanded row for both devices.
+- Gas WH formula unchanged — tank_gallons stored only.
+
+### 20.6 Claude Code Prompt — Water Heater
+
+```
+Implement §20 (Water Heater Model Improvements) of docs/Phase2_Spec.md.
+
+Step 1 — physics.py:
+  Add _CZ12_MONTHLY_OUTDOOR_F and _CONDITIONED_MONTHLY_F module-level arrays.
+  Add tank_gallons to GasWaterHeater.__init__ (stored, no formula change).
+  Rewrite HeatPumpWaterHeater per §20.3: add tank_gallons, ambient_location,
+    monthly_ambient_temp_f; update monthly_consumption() with COP degradation.
+
+Step 2 — app.py reactive variables:
+  Add gas_wh_tank_gallons = solara.reactive(50)
+  Add hpwh_tank_gallons = solara.reactive(65)
+  Add hpwh_ambient_location = solara.reactive("conditioned")
+  Add all to _DEFAULTS, reset_to_defaults(), run_simulation deps.
+
+Step 3 — UI: Water Heater slot expanded row:
+  Gas sub-panel: solara.Select tank size values=[30,40,50,65,80].
+  HPWH sub-panel: solara.Select tank size values=[50,65,80].
+  HPWH sub-panel: solara.ToggleButtonsSingle or solara.Select for ambient_location.
+
+Step 4 — home_config.py: pass tank_gallons and ambient_location to constructors.
+
+Verify: unconditioned HPWH uses more kWh in winter months than conditioned.
+```
+
+---
+
+## 21. ACC-Based Time-Varying Rate Model (Phase 2.8)
+
+### 21.1 Overview and Design Decisions
+
+**What the ACC is:**
+The CA PUC Avoided Cost Calculator (2024 version, maintained by E3) is the regulatory
+standard for valuing distributed energy resources in California. It provides:
+
+- **Electric model:** 8,760 hourly $/kWh values per year for 30 years, by IOU (PG&E /
+  SCE / SDG&E) and climate zone. Components: wholesale energy (SERVM), generation
+  capacity, ancillary services, T&D capacity, GHG/carbon.
+- **Gas model:** Monthly $/therm values by IOU and customer type. Components: gas
+  commodity (NYMEX-based), marginal distribution cost, GHG value. **The gas model is
+  monthly, not hourly.** Gas avoided costs vary by season, not by time of day.
+
+**The scaling challenge — why we cannot use ACC values as retail rates:**
+ACC values are *utility marginal avoided costs*, not retail rates. 2024 ACC electric
+values run ~$0.05–$0.15/kWh; PG&E E-1 retail is ~$0.32–$0.45/kWh. The gap covers
+fixed infrastructure recovery, cross-subsidies, and public purpose programs. The same
+gap exists for gas: ACC gas ≈ $0.60–$0.90/therm; PG&E G-1 retail ≈ $1.80–$2.20/therm.
+
+**Design decision — Option A: Shape retail rates with ACC:**
+Use the ACC's *relative hourly shape* to redistribute the existing retail monthly rate
+from `RateLoader` across hours. Monthly bill totals are preserved (revenue-neutral).
+Device-specific effective rates differ because each device runs at different hours.
+
+```
+acc_shape[month][hour] = acc_value[month][hour] / mean(acc_value[month])
+  → normalised shape, mean = 1.0
+
+effective_rate[month][hour] = retail_monthly_rate[month] × acc_shape[month][hour]
+
+device_effective_rate[month] = Σ_h ( load_profile[device][h] × effective_rate[month][h] )
+                              = retail_monthly_rate[month]
+                                × Σ_h ( load_profile[device][h] × acc_shape[month][h] )
+                              = retail_monthly_rate[month] × weighted_factor[device][month]
+```
+
+For gas: the ACC monthly shape factor redistributes the retail gas rate seasonally,
+replacing the flat CAGR monthly projection with a seasonally-varying rate.
+
+**One shape, per-device load profiles:**
+We use a single set of ACC hourly shape values (PG&E reference) combined with
+per-device-category 24-hour load profiles. This produces distinct effective monthly
+rates per device category without requiring per-device ACC extractions.
+
+### 21.2 Data Files to Create
+
+#### `data/rates/acc_electric_shape_pge_2024.json`
+
+12-month × 24-hour normalised shape array, extracted from 2024 ACC Electric Model
+(PG&E, residential primary, CZ12 reference). Mean of each month's 24-hour row = 1.0.
+
+```json
+{
+  "source": "2024 CPUC ACC Electric Model v1b, PG&E residential, CZ12, normalised to monthly mean",
+  "note": "PLACEHOLDER — replace with real ACC extraction per §21.6",
+  "shape_24h_by_month": [
+    [0.72,0.68,0.65,0.64,0.66,0.70,0.78,0.92,1.05,1.08,1.07,1.10,
+     1.15,1.12,1.08,1.05,1.10,1.25,1.38,1.32,1.22,1.10,0.95,0.80],
+    ...12 rows of 24 values...
+  ]
+}
+```
+
+Known qualitative ACC patterns (used to validate placeholder values):
+- Overnight hours (12am–6am): below-average cost (low demand, solar charging storage)
+- Morning ramp (7–9am): rising sharply
+- Midday (10am–2pm): lower in summer (solar over-generation suppresses prices)
+- Evening peak (5–9pm): highest cost across all months (duck curve peak)
+- Winter evenings higher in absolute terms than summer due to gas-fired heating on grid
+
+#### `data/rates/acc_gas_shape_pge_2024.json`
+
+12 monthly shape factors, normalised to annual mean = 1.0. From 2024 ACC Gas Model
+PG&E residential core customer values.
+
+```json
+{
+  "source": "2024 CPUC ACC Gas Model v1b, PG&E residential core, normalised",
+  "note": "PLACEHOLDER — replace with real ACC extraction per §21.6",
+  "monthly_shape": [1.18, 1.12, 0.98, 0.88, 0.82, 0.80, 0.82, 0.85, 0.90, 0.95, 1.08, 1.20]
+}
+```
+
+Pattern: winter (Jan/Feb/Dec) high, spring/summer (Apr–Aug) low — mirrors NYMEX gas
+forward curve seasonality.
+
+#### `data/rates/device_load_shapes.json`
+
+24-hour fractional load profiles per device category (values sum to 1.0).
+
+```json
+{
+  "source_notes": {
+    "hpwh": "PNNL 2021 field study, 147 HPWHs Pacific Northwest — morning/evening peaks",
+    "hvac_heat": "DOE BTO residential heating — morning and evening ramp",
+    "hvac_cool": "CPUC ACC electrification end-use — afternoon peak",
+    "ev": "NREL EVI-Pro CA residential L2 charging — overnight dominant",
+    "baseload": "Uniform flat — 1/24 each hour",
+    "flat": "Uniform flat — 1/24 each hour"
+  },
+  "profiles": {
+    "hpwh":      [0.02,0.02,0.02,0.02,0.02,0.03,0.06,0.09,0.08,0.06,0.05,0.05,
+                  0.04,0.04,0.04,0.04,0.04,0.05,0.07,0.08,0.07,0.06,0.04,0.03],
+    "hvac_heat": [0.07,0.07,0.06,0.05,0.04,0.04,0.04,0.04,0.04,0.05,0.06,0.06,
+                  0.06,0.06,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.06,0.06],
+    "hvac_cool": [0.01,0.01,0.01,0.01,0.01,0.02,0.03,0.05,0.07,0.09,0.10,0.10,
+                  0.09,0.09,0.09,0.09,0.09,0.08,0.07,0.05,0.02,0.01,0.01,0.01],
+    "ev":        [0.06,0.08,0.09,0.09,0.08,0.06,0.04,0.03,0.02,0.01,0.01,0.01,
+                  0.01,0.01,0.01,0.01,0.01,0.02,0.04,0.06,0.07,0.08,0.08,0.07],
+    "baseload":  [0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,
+                  0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,
+                  0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417],
+    "flat":      [0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,
+                  0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,
+                  0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417]
+  }
+}
+```
+
+### 21.3 ACCRateLoader Class
+
+Add to `src/rate_loader.py`:
+
+```python
+class ACCRateLoader:
+    """
+    Applies ACC hourly shape × device load profile to retail monthly rates,
+    producing a device-specific effective monthly rate.
+
+    Electric: retail_rate[m] × dot(load_profile[device], acc_shape[m])
+    Gas:      retail_rate[m] × acc_gas_shape[m]
+
+    Revenue-neutral: if device load profile is flat (uniform 1/24 each hour),
+    the weighted_factor equals 1.0 and the result is the same as RateLoader.
+    """
+
+    def __init__(self, base_loader: RateLoader):
+        self._base = base_loader
+
+        shape_path = _RATES_DIR / "acc_electric_shape_pge_2024.json"
+        with open(shape_path) as f:
+            elec_data = json.load(f)
+        self._elec_shape = np.array(elec_data["shape_24h_by_month"], dtype=float)
+        assert self._elec_shape.shape == (12, 24), "Expected 12 months × 24 hours"
+
+        gas_path = _RATES_DIR / "acc_gas_shape_pge_2024.json"
+        with open(gas_path) as f:
+            gas_data = json.load(f)
+        self._gas_shape = np.array(gas_data["monthly_shape"], dtype=float)
+        assert self._gas_shape.shape == (12,)
+
+        profiles_path = _RATES_DIR / "device_load_shapes.json"
+        with open(profiles_path) as f:
+            prof_data = json.load(f)
+        self._profiles = {k: np.array(v, dtype=float)
+                          for k, v in prof_data["profiles"].items()}
+
+    def get_device_rate(self, fuel: str, month: int, year: int,
+                        device_category: str = "flat",
+                        scenario: str = "moderate",
+                        custom_cagr: float | None = None) -> float:
+        retail = self._base.get_rate(fuel, year, month, scenario, custom_cagr)
+        if fuel == "gas":
+            return retail * float(self._gas_shape[month - 1])
+        profile = self._profiles.get(device_category, self._profiles["flat"])
+        weighted = float(np.dot(profile, self._elec_shape[month - 1]))
+        return retail * weighted
+
+    def get_annual_monthly_rates(self, fuel: str, sim_start_year: int,
+                                  n_years: int, device_category: str = "flat",
+                                  scenario: str = "moderate",
+                                  custom_cagr: float | None = None) -> np.ndarray:
+        rates = np.empty((n_years, 12), dtype=float)
+        for yr_idx in range(n_years):
+            year = sim_start_year + yr_idx
+            for mo in range(1, 13):
+                rates[yr_idx, mo - 1] = self.get_device_rate(
+                    fuel, mo, year, device_category, scenario, custom_cagr)
+        return rates
+```
+
+### 21.4 Device Category Mapping
+
+| Device class | ACC `device_category` |
+|---|---|
+| `HeatPumpWaterHeater` | `"hpwh"` |
+| `GasWaterHeater` | `"flat"` (gas fuel → uses gas shape, not electric profile) |
+| `HeatPumpHVAC` (heating) | `"hvac_heat"` |
+| `HeatPumpHVAC` (cooling) | `"hvac_cool"` |
+| `GasFurnace` | `"flat"` (gas fuel) |
+| `CentralAC` | `"hvac_cool"` |
+| `EVCharger` | `"ev"` |
+| `LightsAndPlugs`, `Dishwasher`, `ElectricOven` | `"baseload"` |
+| `HeatPumpDryer`, `InductionCooktop` | `"baseload"` |
+| `GasDryer`, `GasCooktop` | `"flat"` (gas fuel) |
+
+Note on HVAC: the `HeatPumpHVAC` device produces a single `monthly_consumption()` array
+combining heating and cooling. For ACC rate purposes, a simpler approach is to assign
+`"baseload"` to HVAC and note that split heating/cooling category dispatch is a Phase 3
+refinement. Alternatively, use `"hvac_heat"` as the category (heating dominates annual
+cost in most CA climates).
+
+### 21.5 UI — Rate Model Selector
+
+In `EnergyPricesPanel`, add above "Quick presets":
+
+```
+┌─ Rate model ──────────────────────────────────────┐
+│  ( ● Flat E-1 )   ( ○ Time-Varying / ACC-based )  │
+│                                                     │
+│  ℹ️ ACC mode: electricity rates vary by hour       │
+│  based on CA PUC Avoided Cost Calculator shape.    │
+│  Gas rates vary seasonally. Monthly totals remain  │
+│  the same — devices that run off-peak cost less.   │
+└────────────────────────────────────────────────────┘
+```
+
+New reactive variable:
+```python
+rate_model = solara.reactive("flat")   # "flat" | "acc"
+```
+Add to `_DEFAULTS`, `reset_to_defaults()`, and `run_simulation` dependency list.
+
+In `run_simulation`: instantiate `ACCRateLoader(base_loader)` when `rate_model == "acc"`;
+use base `RateLoader` when `"flat"`.
+
+### 21.6 Data Extraction Procedure (one-time, pre-implementation)
+
+The 2024 ACC Electric Model Excel workbook is available from E3
+(https://www.ethree.com/public_proceedings/energy-efficiency-calculator/).
+Extraction is a one-time pre-processing step. Extracted JSON files are committed to the
+repository; the large Excel files are not.
+
+Write `scripts/extract_acc_shapes.py`:
+
+```
+1. Load 2024 ACC Electric Model with pandas/openpyxl.
+2. Select PG&E, residential primary voltage, CZ12, start year 2025, 1-year levelization.
+3. Extract 8,760 "Total Levelized Values" ($/kWh).
+4. Group by month; for each month compute 24-hour average (mean over all days in month).
+5. Normalise each month's 24-hour array: divide by mean → shape factors.
+6. Write to acc_electric_shape_pge_2024.json.
+
+7. Load 2024 ACC Gas Model.
+8. Extract monthly $/therm for PG&E residential core, 2025.
+9. Normalise to annual mean = 1.0.
+10. Write to acc_gas_shape_pge_2024.json.
+```
+
+Until the script is run, use the placeholder JSON values from §21.2 — they are
+qualitatively correct and allow end-to-end code testing.
+
+### 21.7 Verification
+
+- `rate_model = "flat"`: identical results to pre-§21 simulation. Zero regression.
+- `rate_model = "acc"`: EV annual electricity cost decreases (overnight profile hits
+  cheap ACC hours). HVAC cooling cost increases slightly in summer. HPWH cost close
+  to flat (moderate hours). Gas costs show seasonal variation (higher Jan/Dec).
+- Annual bill totals in ACC mode within ±5% of flat mode (revenue-neutral design).
+- All existing chart options and data schema unchanged.
+
+### 21.8 What This Is Not
+
+- Not a TOU rate model (that is Phase 3 — adds actual tiered peak/off-peak pricing).
+- Not billing simulation — output remains annual operating cost, not monthly utility bill.
+- Not NEM3 / solar export valuation — Phase 3.
+- Not multi-IOU — only PG&E data for v2.8; architecture supports SCE/SDG&E as Phase 3.
+
+### 21.9 Claude Code Prompt — ACC Rate Model
+
+```
+Implement §21 (ACC-Based Time-Varying Rate Model) of docs/Phase2_Spec.md.
+
+Pre-condition: Three JSON data files must exist in data/rates/:
+  acc_electric_shape_pge_2024.json   (12×24 shape array, monthly mean = 1.0)
+  acc_gas_shape_pge_2024.json        (12 monthly shape factors, annual mean = 1.0)
+  device_load_shapes.json            (per-device 24h profiles, each summing to 1.0)
+
+If real ACC extraction (§21.6) has not yet been done, create placeholder files using
+the illustrative values from §21.2 with a "note": "PLACEHOLDER" field in the JSON.
+
+Step 1 — src/rate_loader.py: add ACCRateLoader class per §21.3.
+
+Step 2 — app.py: add rate_model = solara.reactive("flat").
+  Add to _DEFAULTS, reset_to_defaults(), run_simulation deps.
+
+Step 3 — EnergyPricesPanel: add rate model selector per §21.5.
+
+Step 4 — run_simulation / home_config.py:
+  When rate_model == "acc": instantiate ACCRateLoader(base_loader); use
+    get_annual_monthly_rates(device_category=...) for each device slot.
+  When rate_model == "flat": unchanged behaviour.
+  Implement device category mapping from §21.4.
+
+Step 5 — Create scripts/extract_acc_shapes.py implementing §21.6 steps.
+  (Code skeleton only if ACC Excel not available; add TODO comments.)
+
+Verify per §21.7: flat mode = no change; acc mode = EV cheaper, HVAC cooling pricier,
+gas seasonal. Chart schema unchanged.
+```
+
+
+---
+
+## 22. Unified Scenario Model — Rate Model per Scenario (Phase 2.8)
+
+### 22.1 The Problem with Separate Dimensions
+
+After §21 introduces the ACC rate model, the app has two independently-selectable
+dimensions in the Energy & Prices panel:
+
+1. **Escalation scenario** — gas CAGR + electricity CAGR (the existing A/B comparison)
+2. **Rate model** — Flat E-1 vs. ACC-shaped (the new §21 addition)
+
+If these remain orthogonal controls, comparison mode would require running up to four
+simulations (A-flat, A-acc, B-flat, B-acc) and the UI would need to display four lines
+on every chart. That is too complex to be useful.
+
+More importantly, we expect to introduce additional rate models in Phase 3
+(E-TOU-C, NEM3 export valuation, SCE/SDG&E tariffs). Each new rate model added as a
+separate axis multiplies complexity further. The architecture needs to absorb new rate
+models without growing new UI dimensions.
+
+### 22.2 The Solution — Scenario as a Named Bundle
+
+**A Scenario is a named bundle of three parameters:**
+```
+Scenario = {
+    gas_cagr:    float    # annual gas price escalation rate
+    elec_cagr:   float    # annual electricity escalation rate
+    rate_model:  str      # "flat" | "acc" | (future: "e_tou_c" | "nem3" | ...)
+}
+```
+
+Comparing two scenarios naturally covers all three dimensions at once. The user can set:
+
+```
+Scenario A:  Gas +8%/yr  |  Elec +7%/yr  |  Flat E-1
+Scenario B:  Gas +8%/yr  |  Elec +7%/yr  |  ACC-shaped
+```
+→ This isolates the effect of rate model, with escalation held constant.
+
+```
+Scenario A:  Gas +8%/yr   |  Elec +7%/yr   |  ACC-shaped
+Scenario B:  Gas +12%/yr  |  Elec +10%/yr  |  ACC-shaped
+```
+→ This compares two escalation paths, both using ACC shaping.
+
+```
+Scenario A:  Gas +8%/yr   |  Elec +7%/yr  |  Flat E-1
+Scenario B:  Gas +12%/yr  |  Elec +10%/yr |  ACC-shaped
+```
+→ Combined comparison — the most general case.
+
+This design is **closed under addition of new rate models**: adding E-TOU-C in Phase 3
+means adding `"e_tou_c"` to the `rate_model` option list. No new UI dimensions needed.
+
+### 22.3 Architecture Changes
+
+#### 22.3.1 `model.py` — `HESModel` constructor
+
+Replace:
+```python
+# BEFORE (§21 initial design):
+def __init__(self, ..., rate_model: str = "flat", ...):
+```
+
+With:
+```python
+# AFTER (§22 unified design):
+def __init__(self, ...,
+             rate_model_a: str = "flat",   # rate model for Scenario A
+             rate_model_b: str = "flat",   # rate model for Scenario B (comparison_mode only)
+             ...):
+```
+
+The `RateLoader` / `ACCRateLoader` selection is made once per scenario at model init:
+
+```python
+def _make_rate_loader(base_loader: RateLoader, rate_model: str):
+    """Return the appropriate loader for the given rate model string."""
+    if rate_model == "acc":
+        return ACCRateLoader(base_loader)
+    # Future: elif rate_model == "e_tou_c": return ETOURateLoader(base_loader)
+    return base_loader   # "flat" — returns base loader unchanged
+
+rl = RateLoader()
+
+loader_a = _make_rate_loader(rl, rate_model_a)
+self.elec_rates   = loader_a.get_annual_monthly_rates("electricity", ...)
+self.gas_rates    = loader_a.get_annual_monthly_rates("gas", ...)
+
+if comparison_mode:
+    loader_b = _make_rate_loader(rl, rate_model_b)
+    self.elec_rates_b = loader_b.get_annual_monthly_rates("electricity", ...)
+    self.gas_rates_b  = loader_b.get_annual_monthly_rates("gas", ...)
+```
+
+Note: when `ACCRateLoader.get_annual_monthly_rates()` is called without a
+`device_category` argument, it defaults to `"flat"` (uniform 24h profile → neutral
+shaping). Per-device category dispatch is handled at a later stage (see §22.3.2).
+
+#### 22.3.2 Per-Device Rate Arrays
+
+The per-device ACC shaping from §21.4 requires that each device's rate array is built
+with the correct `device_category`. This happens in the slot-building step in `model.py`
+where `JourneyHome` instances are constructed.
+
+The `_make_rate_loader` function returns a loader that exposes `get_annual_monthly_rates`
+with an optional `device_category` kwarg. For the flat `RateLoader`, this kwarg is
+accepted but ignored (all devices get the same flat rate). For `ACCRateLoader`, the
+kwarg selects the load profile.
+
+The device category mapping from §21.4 is defined in `model.py` as a module-level dict:
+
+```python
+DEVICE_ACC_CATEGORY = {
+    "GasWaterHeater":       "flat",       # gas — uses gas shape regardless
+    "HeatPumpWaterHeater":  "hpwh",
+    "GasFurnace":           "flat",       # gas
+    "HeatPumpHVAC":         "hvac_heat",  # simplified — dominant load in CA
+    "CentralAC":            "hvac_cool",
+    "GasDryer":             "flat",       # gas
+    "HeatPumpDryer":        "baseload",
+    "GasCooktop":           "flat",       # gas
+    "InductionCooktop":     "baseload",
+    "PhysicsEVCharger":     "ev",
+    "EVCharger":            "ev",
+    "LightsAndPlugs":       "baseload",
+}
+```
+
+When building rate arrays for each slot, the appropriate category is looked up from
+the slot's active device class name.
+
+#### 22.3.3 `RateLoader` interface compatibility
+
+The base `RateLoader.get_annual_monthly_rates()` signature gains an optional
+`device_category` kwarg (accepted, ignored) so it can be used interchangeably with
+`ACCRateLoader`:
+
+```python
+# In RateLoader:
+def get_annual_monthly_rates(self, fuel, sim_start_year, n_years,
+                              scenario="moderate", custom_cagr=None,
+                              device_category=None):   # NEW — ignored, for API compat
+    ...
+```
+
+#### 22.3.4 `_make_rate_loader` — module-level factory
+
+```python
+# In model.py — module level
+_RATE_MODEL_REGISTRY: dict[str, type] = {
+    "flat": None,   # None → use base RateLoader
+    "acc":  None,   # populated at first use with ACCRateLoader
+    # Phase 3 additions go here
+}
+
+def _make_rate_loader(base_loader: RateLoader, rate_model: str):
+    from rate_loader import ACCRateLoader
+    if rate_model == "acc":
+        return ACCRateLoader(base_loader)
+    if rate_model not in _RATE_MODEL_REGISTRY:
+        raise ValueError(f"Unknown rate_model: {rate_model!r}. "
+                         f"Known: {list(_RATE_MODEL_REGISTRY)}")
+    return base_loader
+```
+
+The registry serves as both a validation list and a future extension point — Phase 3
+adds `"e_tou_c"` to the dict and returns the appropriate loader class.
+
+### 22.4 `app.py` Reactive State Changes
+
+#### Remove:
+```python
+rate_model = solara.reactive("flat")   # the single §21 global — REMOVED
+```
+
+#### Add:
+```python
+rate_model_a = solara.reactive("flat")   # Scenario A rate model
+rate_model_b = solara.reactive("flat")   # Scenario B rate model
+```
+
+Add both to `_DEFAULTS`:
+```python
+"rate_model_a": "flat",
+"rate_model_b": "acc",   # default B to acc so comparing A vs B is immediately useful
+```
+
+Add both to `reset_to_defaults()` and to the `run_simulation` dependency list.
+
+Pass both to `HESModel`:
+```python
+m = HESModel(
+    ...,
+    rate_model_a=rate_model_a.value,
+    rate_model_b=rate_model_b.value,
+    ...
+)
+```
+
+### 22.5 UI — `EnergyPricesPanel` Redesign
+
+The panel is restructured so each scenario (A and B) has its own self-contained block
+with CAGR sliders **and** a rate model selector.
+
+**Single scenario (comparison_mode = False):**
+```
+┌─ Energy & Prices ─────────────────────────────────┐
+│                                                     │
+│  Quick presets  [ Conservative ] [ Moderate ] [ Stress ] │
+│                                                     │
+│  🔴 Gas escalation      ──●────────  +8%/yr        │
+│  🔵 Electricity         ────●──────  +7%/yr        │
+│                                                     │
+│  Rate model                                         │
+│  ( ● Flat E-1 )   ( ○ ACC-shaped )                 │
+│                                                     │
+│  💡 ACC-shaped: electricity varies by hour based   │
+│     on CA PUC Avoided Cost Calculator. Gas varies  │
+│     seasonally. Monthly totals unchanged.          │
+│                                                     │
+│  ─────────────────────────────────────────────     │
+│  [ ] Compare two scenarios                          │
+│                                                     │
+│  Years to model  ──────●──────  20                 │
+└────────────────────────────────────────────────────┘
+```
+
+**With comparison enabled (comparison_mode = True):**
+```
+┌─ Energy & Prices ─────────────────────────────────┐
+│                                                     │
+│  ── Scenario A (solid lines) ──────────────────    │
+│  Quick presets  [ Conservative ] [●Moderate] [Stress] │
+│  🔴 Gas +8%/yr   🔵 Elec +7%/yr                   │
+│  Rate model:  ( ● Flat E-1 )  ( ○ ACC-shaped )     │
+│                                                     │
+│  ── Scenario B (dashed lines) ─────────────────    │
+│  Quick presets  [ Conservative ] [ Moderate ] [Stress] │
+│  🔴 Gas +8%/yr   🔵 Elec +7%/yr                   │
+│  Rate model:  ( ○ Flat E-1 )  ( ● ACC-shaped )     │
+│                                                     │
+│  → Comparing: same CAGR, Flat E-1 vs. ACC-shaped   │
+│                                                     │
+│  [ ✓ ] Compare two scenarios                        │
+│  Years to model  ──────●──────  20                 │
+└────────────────────────────────────────────────────┘
+```
+
+The "smart label" line (→ Comparing: ...) auto-generates a description of what differs
+between A and B:
+- Same CAGR, different rate model → "Comparing rate model impact (same escalation)"
+- Same rate model, different CAGR → "Comparing escalation scenarios (same rate model)"
+- Both differ → "Comparing escalation + rate model"
+- Identical → warn "Scenarios A and B are identical"
+
+#### Rate model selector component:
+
+```python
+_RATE_MODEL_OPTIONS = [
+    ("flat", "Flat E-1",     "Standard flat retail rate with CAGR escalation"),
+    ("acc",  "ACC-shaped",   "CA PUC Avoided Cost Calculator hourly shape applied to retail rate"),
+    # Phase 3: ("e_tou_c", "E-TOU-C", "Time-of-use rate with peak/off-peak tiers")
+]
+
+@solara.component
+def RateModelSelector(rate_model_rv):
+    current = rate_model_rv.value
+    with solara.Column(gap="4px"):
+        solara.Text("Rate model", style="font-size:0.82em; font-weight:600; color:#546E7A")
+        with solara.Row(gap="6px", style="flex-wrap:wrap"):
+            for key, label, tooltip in _RATE_MODEL_OPTIONS:
+                is_active = current == key
+                solara.Button(
+                    label,
+                    on_click=lambda k=key: rate_model_rv.set(k),
+                    style=(
+                        f"background:{C_NAVY}; color:white; border:none;"
+                        " border-radius:4px; padding:3px 10px;"
+                        " font-size:0.80em; cursor:pointer;"
+                        if is_active else
+                        "background:#F5F5F5; color:#444; border:1px solid #CCC;"
+                        " border-radius:4px; padding:3px 10px;"
+                        " font-size:0.80em; cursor:pointer;"
+                    ),
+                )
+        if current == "acc":
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                "<div style='font-size:0.78em; color:#546E7A; margin-top:2px'>"
+                "ℹ️ Rates vary by hour (electric) and season (gas). "
+                "Monthly totals unchanged — devices running off-peak cost less."
+                "</div>"
+            ))
+```
+
+### 22.6 Comparison Smart Label
+
+```python
+def _comparison_label(gas_a, elec_a, model_a, gas_b, elec_b, model_b) -> str:
+    same_cagr  = (gas_a == gas_b) and (elec_a == elec_b)
+    same_model = model_a == model_b
+    if same_cagr and same_model:
+        return "⚠️ Scenarios A and B are identical"
+    if same_cagr:
+        return f"→ Isolating rate model: {model_a} vs {model_b} (same escalation)"
+    if same_model:
+        return f"→ Isolating escalation: same {model_a} rate model"
+    return f"→ Combined: escalation + rate model differ"
+```
+
+Render this below the Scenario B block in `EnergyPricesPanel` when `comparison_mode` is
+True.
+
+### 22.7 Legend Update
+
+The chart legend currently says "■ Do nothing (A)" / "■ Your journey (A)". With unified
+scenarios, the label should include the rate model when A ≠ B:
+
+```python
+def _scenario_label(suffix: str, gas_cagr: int, elec_cagr: int,
+                    rate_model: str, show_model: bool) -> str:
+    """Build a legend label like 'A (Flat)' or just 'A' if models are same."""
+    model_str = {"flat": "Flat", "acc": "ACC"}.get(rate_model, rate_model)
+    if show_model:
+        return f"({suffix}, {model_str})"
+    return f"({suffix})"
+```
+
+`show_model = True` when `rate_model_a.value != rate_model_b.value`.
+
+### 22.8 Updating §21 — Superseded Items
+
+The following items from §21 are superseded by §22 and should not be implemented as
+originally written in §21:
+
+| §21 item | Superseded by |
+|---|---|
+| §21.5 — single `rate_model` reactive variable | §22.4 — `rate_model_a` + `rate_model_b` |
+| §21.5 — rate model selector in `EnergyPricesPanel` above Quick presets | §22.5 — `RateModelSelector` inside each scenario block |
+| §21.9 Step 2 — `rate_model = solara.reactive("flat")` | §22.4 — two variables |
+| §21.9 Step 4 — single `rate_model` passed to `HESModel` | §22.3.1 — `rate_model_a/b` |
+
+All other §21 items (data files, `ACCRateLoader` class, device category mapping,
+data extraction procedure, verification) remain valid and unchanged.
+
+### 22.9 Future Rate Models — Extension Protocol
+
+Adding a new rate model (e.g. E-TOU-C in Phase 3) requires:
+
+1. Implement the loader class (e.g. `ETOURateLoader` in `rate_loader.py`).
+2. Add `"e_tou_c"` to `_RATE_MODEL_REGISTRY` in `model.py`.
+3. Add `("e_tou_c", "E-TOU-C", "description")` to `_RATE_MODEL_OPTIONS` in `app.py`.
+4. Add any required data files to `data/rates/`.
+
+No changes to `HESModel` constructor, `JourneyHome`, `DeviceSlot`, or chart code.
+The comparison framework automatically handles any pair of rate models.
+
+### 22.10 Claude Code Prompt — Unified Scenario Model
+
+```
+Implement §22 (Unified Scenario Model) of docs/Phase2_Spec.md.
+This section supersedes parts of §21 — read both before starting.
+
+Pre-condition: ACCRateLoader from §21 must be implemented in rate_loader.py.
+If not yet done, implement §21 first (Steps 1, 3, 4, 5 only — skip §21 Step 2
+which is replaced here).
+
+Step 1 — rate_loader.py:
+  Add device_category=None kwarg to RateLoader.get_annual_monthly_rates()
+  (accepted, ignored — for API compatibility with ACCRateLoader).
+
+Step 2 — model.py:
+  Add _RATE_MODEL_REGISTRY and _make_rate_loader() factory per §22.3.4.
+  Add DEVICE_ACC_CATEGORY mapping per §22.3.2.
+  Replace single rate_model param with rate_model_a + rate_model_b in HESModel.__init__().
+  Use _make_rate_loader() to select loader_a and loader_b.
+  Build per-device rate arrays using DEVICE_ACC_CATEGORY lookup.
+
+Step 3 — app.py reactive state (§22.4):
+  Replace rate_model = solara.reactive("flat") with:
+    rate_model_a = solara.reactive("flat")
+    rate_model_b = solara.reactive("acc")
+  Add to _DEFAULTS: "rate_model_a": "flat", "rate_model_b": "acc".
+  Add to reset_to_defaults() and run_simulation deps.
+  Pass rate_model_a.value and rate_model_b.value to HESModel.
+
+Step 4 — app.py UI (§22.5):
+  Add _RATE_MODEL_OPTIONS list and RateModelSelector component.
+  Add _comparison_label() function (§22.6).
+  Restructure EnergyPricesPanel:
+    - Single mode: rate model selector below CAGR sliders, above comparison checkbox.
+    - Comparison mode: Scenario A block (presets + sliders + rate selector) then
+      Scenario B block (same), then comparison smart label.
+  Update chart legend to show rate model in label when A != B (§22.7).
+
+Step 5 — Verify:
+  - Flat/flat: identical results to pre-§21 code.
+  - Flat A vs ACC B: four lines on cumulative chart, legend shows "(A, Flat)" and "(B, ACC)".
+  - Smart label correctly identifies what differs.
+  - Adding a third option to _RATE_MODEL_OPTIONS renders a third button with no
+    other code changes.
+```
+
+---
+
+## 23. Rate Model Architecture Revision (Phase 2.8)
+
+### 23.1 Revised Mental Model
+
+This section supersedes the scenario/rate-model design in §21.5 and §22. After
+discussion, the correct mental model is:
+
+**Rate model is a property of each fuel, not of the scenario shell.**
+
+```
+ElecRateModel — pick one:
+  "cagr_flat"   params: { elec_cagr_pct: int }   user sets %, default 7
+  "acc_shaped"  params: none                      pre-computed 30-yr ACC values;
+                                                  ACC embeds its own escalation path
+
+GasRateModel — pick one:
+  "cagr_flat"   params: { gas_cagr_pct: int }    user sets %, default 8
+  "acc_seasonal"params: none                      pre-computed 30-yr ACC monthly values
+
+Scenario = { elec_rate_model, gas_rate_model }
+         = one pair of (elec, gas) rate model selections + their parameters
+
+Comparison = Scenario A  vs  Scenario B   (Scenario B only when comparison_mode=True)
+```
+
+**Key properties:**
+- CAGR % is a parameter *of the CAGR Flat model*, not a top-level control. It only
+  appears in the UI when CAGR Flat is selected for that fuel.
+- ACC models carry no user-editable parameters for v2.8. The ACC 30-year projection
+  covers the full simulation horizon without extrapolation. A scaling factor is a
+  possible future parameter (Phase 3) if the user wants to adjust the ACC level.
+- Elec and gas models are selected **independently** — valid to mix, e.g.
+  ACC-shaped electricity + CAGR flat gas.
+- Quick presets (Conservative / Moderate / Stress) set the CAGR % parameters only.
+  They do not change the rate model selection. If ACC is selected, presets are greyed
+  out for that fuel (no CAGR to set).
+
+### 23.2 Reactive State
+
+Replace the existing `gas_cagr_pct_a/b` and `elec_cagr_pct_a/b` flat variables with
+a structured per-scenario, per-fuel model:
+
+```python
+# Scenario A
+elec_rate_model_a = solara.reactive("cagr_flat")    # "cagr_flat" | "acc_shaped"
+elec_cagr_pct_a   = solara.reactive(7)              # only used when model = "cagr_flat"
+gas_rate_model_a  = solara.reactive("cagr_flat")    # "cagr_flat" | "acc_seasonal"
+gas_cagr_pct_a    = solara.reactive(8)              # only used when model = "cagr_flat"
+
+# Scenario B (used only when comparison_mode = True)
+elec_rate_model_b = solara.reactive("acc_shaped")   # default B to acc for contrast
+elec_cagr_pct_b   = solara.reactive(7)
+gas_rate_model_b  = solara.reactive("acc_seasonal")
+gas_cagr_pct_b    = solara.reactive(8)
+
+comparison_mode   = solara.reactive(False)          # unchanged
+```
+
+Add all to `_DEFAULTS` and `reset_to_defaults()`. Add all to `run_simulation` deps.
+
+Default for Scenario B is `acc_shaped` / `acc_seasonal` so that enabling comparison
+immediately produces a meaningful result: Scenario A = flat CAGR, Scenario B = ACC —
+the most natural first comparison.
+
+### 23.3 `model.py` — `HESModel` constructor
+
+Replace the existing `gas_cagr_a/b` and `elec_cagr_a/b` parameters with the new
+per-fuel model parameters:
+
+```python
+def __init__(self, ...,
+             elec_rate_model_a: str = "cagr_flat",
+             elec_cagr_a: float = 0.07,
+             gas_rate_model_a: str = "cagr_flat",
+             gas_cagr_a: float = 0.08,
+             elec_rate_model_b: str = "acc_shaped",
+             elec_cagr_b: float = 0.07,
+             gas_rate_model_b: str = "acc_seasonal",
+             gas_cagr_b: float = 0.08,
+             comparison_mode: bool = False,
+             ...):
+```
+
+Rate array construction uses `_make_loader()` per fuel per scenario:
+
+```python
+def _make_loader(base_rl: RateLoader, fuel: str, model: str) -> RateLoader:
+    """Return the appropriate loader for (fuel, model) pair."""
+    if model in ("acc_shaped", "acc_seasonal"):
+        from rate_loader import ACCRateLoader
+        return ACCRateLoader(base_rl)
+    return base_rl   # "cagr_flat" — base loader unchanged
+
+# cagr is passed as custom_cagr when model == "cagr_flat"; None otherwise
+def _cagr_for(model: str, cagr: float) -> float | None:
+    return cagr if model == "cagr_flat" else None
+
+rl = RateLoader()
+
+elec_loader_a = _make_loader(rl, "electricity", elec_rate_model_a)
+gas_loader_a  = _make_loader(rl, "gas",          gas_rate_model_a)
+
+self.elec_rates = elec_loader_a.get_annual_monthly_rates(
+    "electricity", sim_start_year, n_years,
+    custom_cagr=_cagr_for(elec_rate_model_a, elec_cagr_a))
+self.gas_rates  = gas_loader_a.get_annual_monthly_rates(
+    "gas", sim_start_year, n_years,
+    custom_cagr=_cagr_for(gas_rate_model_a, gas_cagr_a))
+```
+
+`ACCRateLoader.get_annual_monthly_rates()` ignores `custom_cagr` — it uses the
+ACC 30-year values directly with no CAGR projection applied.
+
+Device category dispatch (§22.3.2) applies whenever the electric loader is an
+`ACCRateLoader` instance; the base loader ignores `device_category`.
+
+### 23.4 `EnergyPricesPanel` UI Redesign
+
+Each fuel gets its own model selector + conditional parameters.
+The CAGR slider only appears when `cagr_flat` is selected for that fuel.
+Presets are disabled (greyed) when ACC is selected for that fuel.
+
+```
+┌─ 📈 Energy & Prices ──────────────────────────────────┐
+│                                                         │
+│  ── Electricity ───────────────────────────────────    │
+│  ( ● CAGR Flat )  ( ○ ACC-Shaped )                     │
+│  🔵 +7%/yr  ────●──────────────────────────            │
+│  Presets: [ Conservative ] [●Moderate] [ Stress ]       │
+│                                                         │
+│  ── Gas ───────────────────────────────────────────    │
+│  ( ● CAGR Flat )  ( ○ ACC Seasonal )                   │
+│  🔴 +8%/yr  ──●────────────────────────────            │
+│  Presets: [ Conservative ] [●Moderate] [ Stress ]       │
+│                                                         │
+│  ────────────────────────────────────────────────      │
+│  [ ] Compare two scenarios                              │
+│                                                         │
+│  Years to model  ──────●──────  20                     │
+└────────────────────────────────────────────────────────┘
+```
+
+When comparison_mode = True, the panel shows Scenario A block then Scenario B block:
+
+```
+│  ── Scenario A (solid lines) ─────────────────────    │
+│    Electricity: ( ● CAGR Flat )  ( ○ ACC-Shaped )      │
+│    🔵 +7%/yr  ────●──────────                          │
+│    Gas:        ( ● CAGR Flat )  ( ○ ACC Seasonal )     │
+│    🔴 +8%/yr  ──●──────────                            │
+│                                                         │
+│  ── Scenario B (dashed lines) ────────────────────    │
+│    Electricity: ( ○ CAGR Flat )  ( ● ACC-Shaped )      │
+│    Gas:         ( ○ CAGR Flat )  ( ● ACC Seasonal )    │
+│    ℹ️ ACC: pre-computed 30-yr trajectory               │
+│                                                         │
+│  → Isolating rate model (same CAGR params)             │
+```
+
+**Comparison smart label** — auto-generated description (§22.6 logic applies):
+
+| Condition | Label |
+|---|---|
+| Same model, same CAGR | ⚠️ Scenarios A and B are identical |
+| Same model, different CAGR | → Comparing escalation rates (same rate model) |
+| Different model, same CAGR | → Isolating rate model impact (same escalation params) |
+| Different model, different CAGR | → Comparing escalation + rate model |
+
+**`FuelModelSelector` component:**
+
+```python
+_ELEC_MODELS = [
+    ("cagr_flat",  "CAGR Flat"),
+    ("acc_shaped", "ACC-Shaped"),
+]
+_GAS_MODELS = [
+    ("cagr_flat",    "CAGR Flat"),
+    ("acc_seasonal", "ACC Seasonal"),
+]
+
+@solara.component
+def FuelModelSelector(fuel: str, model_rv, cagr_rv,
+                      apply_preset_fn, color: str):
+    """Model selector + conditional CAGR slider + presets for one fuel."""
+    model_options = _ELEC_MODELS if fuel == "electricity" else _GAS_MODELS
+    current_model = model_rv.value
+    is_acc = current_model != "cagr_flat"
+
+    # Model toggle buttons
+    with solara.Row(gap="6px", style="flex-wrap:wrap; margin-bottom:4px"):
+        for key, label in model_options:
+            is_active = current_model == key
+            solara.Button(
+                label,
+                on_click=lambda k=key: model_rv.set(k),
+                style=(
+                    f"background:{color}; color:white; border:none;"
+                    " border-radius:4px; padding:3px 10px; font-size:0.80em; cursor:pointer;"
+                    if is_active else
+                    "background:#F5F5F5; color:#444; border:1px solid #CCC;"
+                    " border-radius:4px; padding:3px 10px; font-size:0.80em; cursor:pointer;"
+                ),
+            )
+
+    if is_acc:
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            "<div style='font-size:0.78em; color:#546E7A; margin:2px 0 4px'>"
+            "ℹ️ Pre-computed 30-yr ACC trajectory — no CAGR parameter."
+            "</div>"
+        ))
+    else:
+        # CAGR slider — only shown for cagr_flat
+        solara.SliderInt(
+            f"+{cagr_rv.value}%/yr",
+            value=cagr_rv, min=0, max=20
+        )
+        # Presets (only active when cagr_flat selected)
+        with solara.Row(gap="4px", style="flex-wrap:wrap; margin-top:2px"):
+            active = _current_preset_label_fuel(fuel, cagr_rv.value)
+            for key, display in _PRESET_DISPLAY.items():
+                is_active_preset = active.lower() == key
+                solara.Button(
+                    display,
+                    on_click=lambda k=key: apply_preset_fn(fuel, k, cagr_rv),
+                    style=(
+                        f"background:{color}; color:white; border:none;"
+                        " border-radius:4px; padding:3px 9px; font-size:0.78em; cursor:pointer;"
+                        if is_active_preset else
+                        "background:#F5F5F5; color:#444; border:1px solid #CCC;"
+                        " border-radius:4px; padding:3px 9px; font-size:0.78em; cursor:pointer;"
+                    ),
+                )
+```
+
+**`_current_preset_label_fuel(fuel, cagr_pct)`** checks only the relevant fuel's CAGR
+against presets, rather than requiring both fuels to match.
+
+**`_apply_preset_fuel(fuel, preset, cagr_rv)`** sets `cagr_rv` from the preset's
+fuel-specific value:
+```python
+def _apply_preset_fuel(fuel: str, preset: str, cagr_rv):
+    p = SCENARIO_PRESETS[preset]
+    cagr_rv.set(int(p[fuel[:3]] * 100))   # "gas" or "ele" prefix lookup
+```
+
+### 23.5 Existing Chart Impacts
+
+**"Electricity Price Trend" and "Gas Price Trend" charts:**
+
+These currently display the annual average rate from `df["Elec Rate"]`. In ACC mode the
+rate varies by device and by month — the chart should show the **annual average across
+all devices and all months** as a single representative line. Label changes:
+
+| Mode | Chart label |
+|---|---|
+| CAGR Flat | `Elec +7%/yr (CAGR)` |
+| ACC-Shaped | `Electricity (ACC-shaped)` |
+
+No change to data collection — `model.current_elec_rates` already averages to a
+single float per year in the `DataCollector`. The label is the only change.
+
+### 23.6 Superseded Items
+
+| Superseded | By |
+|---|---|
+| §21.5 — single `rate_model` reactive + UI above presets | §23.2 + §23.4 |
+| §22.4 — `rate_model_a` + `rate_model_b` reactives | §23.2 — four fuel-specific reactives |
+| §22.5 — `RateModelSelector` component | §23.4 — `FuelModelSelector` component |
+| §22.9 — extension protocol using `_RATE_MODEL_REGISTRY` | §23 — extend `_ELEC_MODELS` / `_GAS_MODELS` lists and `_make_loader()` |
+| §22.10 — Claude Code Prompt | §23.7 below |
+
+§21.1–§21.4, §21.6–§21.8 (data files, `ACCRateLoader`, device categories,
+extraction procedure) are **unchanged** and remain valid.
+
+### 23.7 Claude Code Prompt — Rate Model Architecture
+
+```
+Implement §23 (Rate Model Architecture Revision) of docs/Phase2_Spec.md.
+Read §21 (ACC data files, ACCRateLoader) and §23 together. §23 supersedes §21.5,
+§22.4, §22.5, §22.9, §22.10.
+
+Step 1 — rate_loader.py:
+  Implement ACCRateLoader per §21.3 if not already done.
+  Add device_category=None kwarg to RateLoader.get_annual_monthly_rates()
+  (accepted, ignored — API compatibility).
+  ACCRateLoader.get_annual_monthly_rates() ignores custom_cagr entirely.
+
+Step 2 — model.py:
+  Add _make_loader(base_rl, fuel, model) and _cagr_for(model, cagr) per §23.3.
+  Replace gas_cagr_a/b + elec_cagr_a/b params with the six new params per §23.3.
+  Build elec_rates and gas_rates using _make_loader() + _cagr_for() per §23.3.
+  Keep DEVICE_ACC_CATEGORY mapping from §22.3.2 for per-device dispatch.
+
+Step 3 — app.py reactive state (§23.2):
+  Replace gas_cagr_pct_a/b + elec_cagr_pct_a/b with the four new reactives.
+  Add elec_rate_model_a/b and gas_rate_model_a/b.
+  Add all eight to _DEFAULTS, reset_to_defaults(), run_simulation deps.
+  Pass all to HESModel.
+
+Step 4 — app.py UI (§23.4):
+  Add _ELEC_MODELS, _GAS_MODELS lists.
+  Add FuelModelSelector component.
+  Add _apply_preset_fuel() and _current_preset_label_fuel() helpers.
+  Restructure EnergyPricesPanel:
+    Single mode: Electricity section (FuelModelSelector) then Gas section
+      (FuelModelSelector) then comparison checkbox then years slider.
+    Comparison mode: Scenario A block (elec + gas FuelModelSelectors) then
+      Scenario B block, then smart label, then years slider.
+
+Step 5 — Update chart labels (§23.5) for Electricity Price Trend and Gas Price Trend
+  to show model name instead of just CAGR %.
+
+Step 6 — Verify:
+  - CAGR flat for both fuels: identical results to pre-§21 code.
+  - ACC elec + CAGR gas: elec costs differ by device (HPWH cheaper, EV cheaper,
+    HVAC cooling pricier); gas costs follow CAGR flat.
+  - Comparison with A=flat/flat, B=acc/acc: four lines on cumulative chart.
+  - Switching to ACC hides CAGR slider and presets for that fuel.
+  - Preset buttons still work when CAGR flat is selected.
+```
+
+---
+
+## 24. New Charts — ACC Rate Shape and Rate Trajectory (Phase 2.8)
+
+### 24.1 Overview
+
+Two new chart options are added to `CHART_OPTIONS`:
+
+```python
+CHART_OPTIONS = [
+    ...existing options...,
+    "Electricity Rate Shape",   # ACC 12×24 heatmap
+    "Rate Trajectory",          # annual avg $/kWh and $/therm, both scenarios
+]
+```
+
+Both charts are added to `CHART_FNS` and rendered via the existing `ChartPane`
+component — no changes to the chart selection UI.
+
+### 24.2 "Electricity Rate Shape" — ACC Heatmap
+
+#### 24.2.1 What it shows
+
+A 12-row × 24-column heatmap of the ACC electric shape factors for PG&E residential,
+for a user-selected simulation year. Color intensity encodes the shape factor value
+(relative to monthly mean = 1.0):
+
+- Dark amber/orange = expensive hours (evening peak, high generation capacity value)
+- Light yellow = near-average hours
+- Light blue = cheap hours (overnight, midday solar over-generation)
+
+The x-axis is hour of day (0–23). The y-axis is month (Jan–Dec). A colorbar shows
+the shape factor scale.
+
+#### 24.2.2 Year slider
+
+A small year selector appears below the chart (not in the chart card title bar —
+it lives in the chart body). Default: year 1. Range: 1 to `years.value`.
+
+The selected year maps to `sim_start_year + selected_year - 1` for display label.
+The ACC shape array is indexed by `(year - 2025)` clamped to `[0, 29]` — the 2024
+ACC covers 2025–2054.
+
+For v2.8, the shape data file `acc_electric_shape_pge_2024.json` stores a single
+representative year (2025 values). The year slider is implemented in the UI but
+the shape does not change with year until multi-year ACC data is extracted (Phase 3).
+The slider label shows the calendar year for correctness; add a note:
+*"Shape shown for 2025 reference year — multi-year ACC data in Phase 3."*
+
+#### 24.2.3 Placeholder when ACC not selected
+
+When neither Scenario A nor Scenario B uses `acc_shaped` electricity:
+
+```python
+def make_acc_rate_shape(df, model, n):
+    uses_acc = (model.elec_rate_model_a == "acc_shaped" or
+                (model.comparison_mode and model.elec_rate_model_b == "acc_shaped"))
+    if not uses_acc:
+        fig = _new_fig()
+        ax  = fig.add_subplot(111)
+        ax.text(0.5, 0.5,
+                "Select ACC-Shaped electricity\nto see the hourly rate shape",
+                ha="center", va="center", fontsize=11, color="#9E9E9E",
+                transform=ax.transAxes)
+        ax.set_axis_off()
+        fig.tight_layout()
+        return fig
+    ...
+```
+
+#### 24.2.4 Implementation
+
+Use `matplotlib.pyplot.imshow` or `ax.pcolormesh` on the 12×24 shape array.
+
+```python
+def make_acc_rate_shape(df, model, n):
+    uses_acc = (model.elec_rate_model_a == "acc_shaped" or
+                (model.comparison_mode and model.elec_rate_model_b == "acc_shaped"))
+    if not uses_acc:
+        # placeholder — see §24.2.3
+        ...
+
+    # Load shape data
+    import json
+    from pathlib import Path
+    shape_path = Path(__file__).parent.parent / "data/rates/acc_electric_shape_pge_2024.json"
+    with open(shape_path) as f:
+        shape_data = json.load(f)
+    shape = np.array(shape_data["shape_24h_by_month"], dtype=float)  # (12, 24)
+
+    year_idx = getattr(model, "_acc_shape_year_idx", 0)   # set by year slider reactive
+    # For v2.8 single-year data: shape is always the same; year_idx reserved for future
+
+    fig = _new_fig(wide=True)
+    fig.set_size_inches(10, 4)
+    ax  = fig.add_subplot(111)
+
+    im = ax.pcolormesh(
+        np.arange(25),           # 0–24 hour edges
+        np.arange(13),           # 0–12 month edges
+        shape,
+        cmap="RdYlBu_r",         # red=expensive, blue=cheap
+        vmin=0.5, vmax=1.8,      # typical ACC shape range
+        shading="flat",
+    )
+    fig.colorbar(im, ax=ax, label="Rate shape factor\n(1.0 = monthly average)")
+
+    ax.set_xticks(np.arange(24) + 0.5)
+    ax.set_xticklabels(
+        ["12a","1","2","3","4","5","6","7","8","9","10","11",
+         "12p","1","2","3","4","5","6","7","8","9","10","11"],
+        fontsize=7
+    )
+    ax.set_yticks(np.arange(12) + 0.5)
+    ax.set_yticklabels(
+        ["Jan","Feb","Mar","Apr","May","Jun",
+         "Jul","Aug","Sep","Oct","Nov","Dec"],
+        fontsize=8
+    )
+    ax.set_xlabel("Hour of day")
+    ax.set_ylabel("Month")
+    cal_year = model.sim_start_year   # v2.8: always shows 2025 shape
+    ax.set_title(
+        f"ACC Electric Rate Shape — PG&E Residential  ({cal_year} reference)",
+        fontsize=10, fontweight="bold"
+    )
+    ax.text(0.01, -0.18,
+            "Phase 3: multi-year shape evolution as solar penetration grows.",
+            transform=ax.transAxes, fontsize=7, color="#9E9E9E")
+    _style(ax)
+    fig.tight_layout(pad=1.2)
+    return fig
+```
+
+**Year slider reactive:**
+
+```python
+acc_shape_year = solara.reactive(1)   # 1-based sim year; add to _DEFAULTS
+```
+
+The `ChartPane` component for `"Electricity Rate Shape"` renders the year slider
+below the figure:
+
+```python
+if chart_name == "Electricity Rate Shape":
+    fig = make_acc_rate_shape(df, model, n)
+    solara.FigureMatplotlib(fig)
+    cal = sim_start_year.value + acc_shape_year.value - 1
+    solara.SliderInt(
+        f"Year {acc_shape_year.value}  ({cal})",
+        value=acc_shape_year, min=1, max=n,
+    )
+    solara.Text(
+        "Shape shown for 2025 reference year — multi-year ACC data in Phase 3.",
+        style="font-size:0.76em; color:#9E9E9E"
+    )
+```
+
+### 24.3 "Rate Trajectory" Chart
+
+#### 24.3.1 What it shows
+
+Two subplots stacked vertically:
+- **Top:** Annual average electricity rate ($/kWh) over simulation years
+- **Bottom:** Annual average gas rate ($/therm) over simulation years
+
+Each subplot shows:
+- Scenario A as a solid line
+- Scenario B as a dashed line (when `comparison_mode = True`)
+
+The chart works for all rate model combinations — CAGR mode produces the familiar
+smooth escalating curve; ACC mode shows the ACC 30-year trajectory (which is not a
+smooth exponential — it reflects IRP modeling, grid evolution, and carbon pricing).
+
+#### 24.3.2 Rate data source
+
+Average rate per year is already collected in the `DataCollector`:
+```
+"Elec Rate"   → np.mean(model.current_elec_rates)  per year step
+"Gas Rate"    → np.mean(model.current_gas_rates)   per year step
+"Elec Rate B" → np.mean(model.current_elec_rates_b) per year (comparison only)
+"Gas Rate B"  → np.mean(model.current_gas_rates_b)  per year (comparison only)
+```
+
+These fields already exist — no DataCollector changes needed.
+
+#### 24.3.3 Chart labels
+
+The legend label reflects what the line represents:
+
+```python
+def _rate_label(fuel: str, elec_model: str, gas_model: str,
+                elec_cagr: int, gas_cagr: int, suffix: str) -> str:
+    if fuel == "electricity":
+        if elec_model == "cagr_flat":
+            return f"Elec +{elec_cagr}%/yr{suffix}"
+        return f"Electricity ACC-shaped{suffix}"
+    else:
+        if gas_model == "cagr_flat":
+            return f"Gas +{gas_cagr}%/yr{suffix}"
+        return f"Gas ACC seasonal{suffix}"
+```
+
+#### 24.3.4 Implementation
+
+```python
+def make_rate_trajectory(df, model, n):
+    fig = Figure(figsize=(7, 5), dpi=100)
+    fig.patch.set_facecolor("#F9F9F9")
+    ax_elec = fig.add_subplot(211)
+    ax_gas  = fig.add_subplot(212)
+    x = np.arange(1, n + 1)
+    cal_x = model.sim_start_year + x - 1
+
+    # ── Electricity subplot ────────────────────────────────────────────────
+    lbl_a = _rate_label("electricity",
+                         model.elec_rate_model_a, model.gas_rate_model_a,
+                         model.elec_cagr_a_pct, model.gas_cagr_a_pct, " (A)")
+    ax_elec.plot(cal_x, df["Elec Rate"].values, color=C_NAVY, lw=2.5, label=lbl_a)
+    if model.comparison_mode and "Elec Rate B" in df.columns:
+        lbl_b = _rate_label("electricity",
+                             model.elec_rate_model_b, model.gas_rate_model_b,
+                             model.elec_cagr_b_pct, model.gas_cagr_b_pct, " (B)")
+        ax_elec.plot(cal_x, df["Elec Rate B"].values,
+                     color=C_NAVY, lw=2.0, linestyle="--", label=lbl_b)
+        ax_elec.legend(fontsize=8)
+    ax_elec.yaxis.set_major_formatter(
+        matplotlib.ticker.FuncFormatter(lambda v, _: f"${v:.3f}"))
+    ax_elec.set_ylabel("$/kWh")
+    ax_elec.set_title("Rate Trajectory", fontsize=10, fontweight="bold")
+    _style(ax_elec)
+
+    # ── Gas subplot ────────────────────────────────────────────────────────
+    lbl_a_g = _rate_label("gas",
+                            model.elec_rate_model_a, model.gas_rate_model_a,
+                            model.elec_cagr_a_pct, model.gas_cagr_a_pct, " (A)")
+    ax_gas.plot(cal_x, df["Gas Rate"].values, color="#EF6C00", lw=2.5, label=lbl_a_g)
+    if model.comparison_mode and "Gas Rate B" in df.columns:
+        lbl_b_g = _rate_label("gas",
+                               model.elec_rate_model_b, model.gas_rate_model_b,
+                               model.elec_cagr_b_pct, model.gas_cagr_b_pct, " (B)")
+        ax_gas.plot(cal_x, df["Gas Rate B"].values,
+                    color="#EF6C00", lw=2.0, linestyle="--", label=lbl_b_g)
+        ax_gas.legend(fontsize=8)
+    ax_gas.yaxis.set_major_formatter(
+        matplotlib.ticker.FuncFormatter(lambda v, _: f"${v:.2f}"))
+    ax_gas.set_ylabel("$/therm")
+    ax_gas.set_xlabel("Year")
+    _style(ax_gas)
+
+    fig.tight_layout(pad=1.2)
+    return fig
+```
+
+**`HESModel` must expose the rate model strings as attributes** for use in chart labels:
+
+```python
+# In HESModel.__init__ — store for chart access
+self.elec_rate_model_a = elec_rate_model_a
+self.gas_rate_model_a  = gas_rate_model_a
+self.elec_rate_model_b = elec_rate_model_b
+self.gas_rate_model_b  = gas_rate_model_b
+self.elec_cagr_a_pct   = int(elec_cagr_a * 100)
+self.gas_cagr_a_pct    = int(gas_cagr_a  * 100)
+self.elec_cagr_b_pct   = int(elec_cagr_b * 100)
+self.gas_cagr_b_pct    = int(gas_cagr_b  * 100)
+```
+
+### 24.4 CHART_FNS Registration
+
+```python
+CHART_FNS = {
+    ...existing entries...,
+    "Electricity Rate Shape": make_acc_rate_shape,
+    "Rate Trajectory":        make_rate_trajectory,
+}
+```
+
+The existing `ChartPane` component handles `"Electricity Rate Shape"` as a special
+case (adds year slider below figure). All other chart names pass straight through
+to `CHART_FNS[chart_name](df, model, n)`.
+
+### 24.5 Verification
+
+- CAGR flat for both fuels: "Electricity Rate Shape" shows placeholder message.
+- ACC-shaped electricity selected: heatmap renders with correct color pattern
+  (evening peak red, overnight/midday blue).
+- Year slider changes the displayed calendar year label; shape unchanged (v2.8
+  single-year data — Phase 3 adds year-varying shapes).
+- "Rate Trajectory" with CAGR flat: smooth exponential curves in both subplots.
+- "Rate Trajectory" with ACC: non-smooth 30-year trajectory visible in both subplots.
+- Comparison mode: dashed lines appear in both subplots of Rate Trajectory.
+- Changing `years` slider updates x-axis range of Rate Trajectory.
+
+### 24.6 Claude Code Prompt — New Charts
+
+```
+Implement §24 (New Charts) of docs/Phase2_Spec.md.
+Requires §23 (rate model reactives on HESModel) to be complete first.
+
+Step 1 — Add to CHART_OPTIONS in app.py:
+  "Electricity Rate Shape"
+  "Rate Trajectory"
+
+Step 2 — Add acc_shape_year = solara.reactive(1) to app.py.
+  Add to _DEFAULTS ("acc_shape_year": 1) and reset_to_defaults().
+  Do NOT add to run_simulation deps — it drives chart rendering only, not simulation.
+
+Step 3 — Implement make_acc_rate_shape(df, model, n) per §24.2.
+  Loads acc_electric_shape_pge_2024.json. Uses pcolormesh with RdYlBu_r colormap.
+  Shows placeholder when ACC not selected.
+
+Step 4 — Implement make_rate_trajectory(df, model, n) per §24.3.
+  Two stacked subplots (electricity top, gas bottom).
+  Uses df["Elec Rate"], df["Gas Rate"] (and B variants if comparison_mode).
+  Uses _rate_label() to build legend strings.
+  Uses model.elec_rate_model_a/b etc. for label logic.
+
+Step 5 — Update ChartPane to handle "Electricity Rate Shape" specially:
+  Render the figure, then render the year slider below it, then the note text.
+
+Step 6 — Add to CHART_FNS:
+  "Electricity Rate Shape": make_acc_rate_shape,
+  "Rate Trajectory":        make_rate_trajectory,
+
+Step 7 — Ensure HESModel stores elec_rate_model_a/b, gas_rate_model_a/b,
+  elec_cagr_a/b_pct, gas_cagr_a/b_pct as instance attributes per §24.3.4.
+
+Verify per §24.5.
+```
+
+---
+
+## 19. Panel Expand-to-Full-Width Layout (Phase 2.8)
+
+### 19.1 Problem Statement
+
+The three-column control panel row (Journey × 2 cols, Home Profile × 1, Energy & Prices × 1)
+becomes increasingly dense as panels grow richer. When a panel is expanded (e.g. Journey's
+per-device rows are all open), the column stays narrow and the content stacks vertically to
+an uncomfortable height. The charts above are pushed off-screen.
+
+The two chart panels at the top must remain visible at all times. The control panels below
+must be able to expand horizontally, not just vertically.
+
+### 19.2 Behaviour
+
+**Collapsed (default — identical to current layout):**
+```
+[ Chart Left          ]  [ Chart Right         ]   ← always visible, full width
+[ Journey (2 cols)    ]  [ Home Profile ]  [ Energy & Prices ]
+```
+
+**When a panel header is clicked to expand:**
+```
+[ Chart Left          ]  [ Chart Right         ]   ← unchanged
+[ Journey — EXPANDED, full 4-column width     ]  [🏠][📈]  ← collapsed strips
+```
+
+- The active/expanded panel grows to fill all available horizontal space (`flex:4`).
+- The other two inactive panels shrink to **collapsed header strips** — icon + label only.
+- Clicking a collapsed strip activates that panel and collapses the others.
+- Clicking the currently-active panel's header toggles back to default 3-col layout.
+- The charts row is not affected by any panel expand/collapse action.
+
+**Collapsed strip appearance:** tall enough to be clickable (min 60px), same grey
+title-bar background (#F0F0F0) as existing panel headers.
+
+### 19.3 Reactive State
+
+```python
+# None = all panels at normal width; "journey" | "home" | "prices" = expanded
+active_panel = solara.reactive(None)   # add to _DEFAULTS and reset_to_defaults()
+```
+
+### 19.4 Layout Implementation
+
+```python
+def _panel_flex(panel_name: str, active: str | None) -> str:
+    if active is None:
+        return {"journey": "flex:2; min-width:300px",
+                "home":    "flex:1; min-width:240px",
+                "prices":  "flex:1; min-width:220px"}[panel_name]
+    if panel_name == active:
+        return "flex:4; min-width:300px"
+    return "flex:0 0 56px; overflow:hidden"
+
+@solara.component
+def PanelStrip(panel_name: str, icon: str):
+    solara.Button(
+        icon,
+        on_click=lambda: active_panel.set(panel_name),
+        style=(
+            "width:56px; height:100%; min-height:60px;"
+            " background:#F0F0F0; border:none; cursor:pointer;"
+            " font-size:1.2em; border-radius:4px;"
+            " display:flex; align-items:center; justify-content:center;"
+        ),
+    )
+```
+
+Each panel's title bar gets a click handler toggling `active_panel`. Control panel row:
+
+```python
+active = active_panel.value
+with solara.Row(gap="8px", style="align-items:flex-start; flex-wrap:nowrap"):
+    if active in (None, "journey"):
+        with solara.Column(style=_panel_flex("journey", active)):
+            JourneyPlannerPanel()
+    else:
+        PanelStrip("journey", "⛏")
+
+    if active in (None, "home"):
+        with solara.Column(style=_panel_flex("home", active)):
+            HomeProfilePanel()
+            SolarBatteryPanel(model)
+    else:
+        PanelStrip("home", "🏠")
+
+    if active in (None, "prices"):
+        with solara.Column(style=_panel_flex("prices", active)):
+            EnergyPricesPanel()
+    else:
+        PanelStrip("prices", "📈")
+```
+
+Add CSS transition: `.panel-col { transition: flex 0.25s ease, min-width 0.25s ease; }`
+
+### 19.5 Claude Code Prompt — Panel Expand
+
+```
+Implement §19 (Panel Expand-to-Full-Width Layout) of docs/Phase2_Spec.md.
+
+Step 1: Add active_panel = solara.reactive(None). Add to _DEFAULTS and reset_to_defaults().
+Step 2: Add _panel_flex() helper and PanelStrip component per §19.4.
+Step 3: Update each panel title-bar to toggle active_panel on click.
+Step 4: Replace static 3-col Row with dynamic Row per §19.4.
+Step 5: Add CSS transition block to Page().
+
+Verify: default 3-col unchanged; click Journey → wide + strips; click strip → switches;
+click active header → returns to 3-col; charts always visible.
+```
+
+---
+
+## 20. Water Heater Model Improvements (Phase 2.8)
+
+### 20.1 Changes
+
+1. **Tank size** — add `tank_gallons` to both `GasWaterHeater` and `HeatPumpWaterHeater`.
+   Stored as attribute and shown in UI. Physics formula unchanged for gas (standby loss
+   refinement deferred to Phase 3). Tankless deferred to Phase 3.
+
+2. **HPWH ambient COP degradation** — HPWHs extract heat from surrounding air. Add
+   `ambient_location: str = "conditioned"` ("conditioned" | "unconditioned") with COP
+   degradation in cold months for unconditioned installs.
+
+### 20.2 GasWaterHeater
+
+```python
+class GasWaterHeater(PhysicsDevice):
+    def __init__(self, model, *, uef=0.65, daily_gallons=65,
+                 tank_gallons=50,   # NEW — stored only, no formula change
+                 setpoint_f=120, monthly_inlet_temp_f, **kwargs):
+        ...
+        self.tank_gallons = tank_gallons
+```
+
+Default tank by bedrooms: 1–2 bd → 40 gal, 3 bd → 50 gal, 4+ bd → 80 gal.
+
+### 20.3 HeatPumpWaterHeater
+
+```python
+# Module-level reference arrays in physics.py
+_CZ12_MONTHLY_OUTDOOR_F = np.array([47,52,57,63,70,78,84,82,76,65,53,46], dtype=float)
+_CONDITIONED_MONTHLY_F  = np.array([68,68,68,68,70,72,74,74,72,70,68,68], dtype=float)
+
+class HeatPumpWaterHeater(PhysicsDevice):
+    def __init__(self, model, *, uef=3.5, daily_gallons=65,
+                 tank_gallons=65,                      # NEW
+                 ambient_location="conditioned",        # NEW: "conditioned"|"unconditioned"
+                 monthly_inlet_temp_f, monthly_ambient_temp_f=None, **kwargs):
+        ...
+        self._ambient = (np.asarray(monthly_ambient_temp_f) if monthly_ambient_temp_f
+                         else (_CZ12_MONTHLY_OUTDOOR_F if ambient_location=="unconditioned"
+                               else _CONDITIONED_MONTHLY_F))
+
+    def monthly_consumption(self):
+        delta_t = self.setpoint_f - self._inlet
+        cop_factors = np.clip(1.0 - np.maximum(0.0, (65.0 - self._ambient) * 0.012), 0.5, 1.0)
+        return self.daily_gallons * _DAYS * 8.33 * delta_t / (3412.0 * self.uef * cop_factors)
+```
+
+COP degradation: at 65°F ambient → no penalty; at 45°F → ~24% penalty; floor 0.5.
+HPWH defaults one size larger than gas (more thermal storage for load-shifting):
+1–2 bd → 50 gal, 3 bd → 65 gal, 4+ bd → 80 gal.
+
+### 20.4 New Reactive Variables
+
+```python
+gas_wh_tank_gallons    = solara.reactive(50)
+hpwh_tank_gallons      = solara.reactive(65)
+hpwh_ambient_location  = solara.reactive("conditioned")
+```
+
+Add to `_DEFAULTS`, `reset_to_defaults()`, `run_simulation` deps, and pass to constructors
+via `home_config.py`.
+
+### 20.5 UI — Water Heater Slot
+
+Gas sub-panel: `solara.Select("Tank size (gal)", values=[30,40,50,65,80])`.
+HPWH sub-panel: `solara.Select("Tank size (gal)", values=[50,65,80])` and
+`solara.Select("Install location", values=["conditioned","unconditioned"])`.
+
+### 20.6 Claude Code Prompt — Water Heater
+
+```
+Implement §20 (Water Heater Model Improvements) of docs/Phase2_Spec.md.
+
+Step 1: physics.py — add _CZ12_MONTHLY_OUTDOOR_F and _CONDITIONED_MONTHLY_F arrays.
+  Add tank_gallons to GasWaterHeater (stored, no formula change).
+  Rewrite HeatPumpWaterHeater per §20.3 with tank_gallons, ambient_location,
+  monthly_ambient_temp_f, and COP degradation in monthly_consumption().
+Step 2: app.py — add gas_wh_tank_gallons, hpwh_tank_gallons, hpwh_ambient_location
+  reactives. Add to _DEFAULTS, reset_to_defaults(), run_simulation deps.
+Step 3: UI — add tank size selectors and install location selector in WH expanded row.
+Step 4: home_config.py — pass new params to both constructors.
+
+Verify: HPWH unconditioned shows ~10-20% higher kWh in cold climate vs conditioned.
+HPWH conditioned matches current model within rounding. Gas formula unchanged.
+```
+
+---
+
+## 21. ACC-Based Time-Varying Rate Model (Phase 2.8)
+
+### 21.1 What the ACC Provides
+
+The CA PUC Avoided Cost Calculator (2024, maintained by E3) is the regulatory standard
+for valuing DERs in California:
+
+- **Electric model:** 8,760 hourly $/kWh × 30 years, by IOU and climate zone. Components:
+  wholesale energy (SERVM), generation capacity, ancillary services, T&D capacity, GHG.
+- **Gas model:** Monthly $/therm × 30 years by IOU and customer type. Components: gas
+  commodity (NYMEX), marginal distribution, GHG. **Monthly resolution, not hourly.**
+
+The ACC already embeds a 30-year escalation trajectory based on IRP modeling and grid
+decarbonization — no external CAGR needed when ACC is selected.
+
+### 21.2 Scaling: Why ACC ≠ Retail
+
+ACC values are utility *marginal avoided costs*, not retail rates:
+- 2024 ACC electric: ~$0.05–$0.15/kWh vs PG&E E-1 retail ~$0.32–$0.45/kWh
+- 2024 ACC gas: ~$0.60–$0.90/therm vs PG&E G-1 retail ~$1.80–$2.20/therm
+
+**Design decision — shape retail rates with ACC (Option A):**
+Use the ACC's relative hourly shape to redistribute the retail monthly rate across hours.
+Monthly bill totals are preserved (revenue-neutral). Per-device effective rates differ
+based on when each device typically runs.
+
+```
+acc_shape[month][hour] = acc_value[month][hour] / mean(acc_value[month])
+device_effective_rate[month] = retail_rate[month]
+                               × Σ_h(load_profile[device][h] × acc_shape[month][h])
+```
+
+For gas: ACC monthly shape factor modulates retail gas rate seasonally.
+
+### 21.3 Data Files
+
+#### `data/rates/acc_electric_shape_pge_2024.json`
+12 months × 24 hours, normalised shape (mean per month = 1.0).
+Extracted from 2024 ACC Electric Model, PG&E residential, CZ12 reference.
+
+```json
+{
+  "source": "2024 CPUC ACC Electric Model v1b, PG&E residential CZ12, normalised",
+  "note": "PLACEHOLDER — replace with real extraction per §21.6",
+  "shape_24h_by_month": [
+    [0.72,0.68,0.65,0.64,0.66,0.70,0.78,0.92,1.05,1.08,1.07,1.10,
+     1.15,1.12,1.08,1.05,1.10,1.25,1.38,1.32,1.22,1.10,0.95,0.80],
+    "...11 more rows..."
+  ]
+}
+```
+
+Known qualitative patterns: overnight cheap, midday dip (solar), evening peak expensive.
+
+#### `data/rates/acc_gas_shape_pge_2024.json`
+12 monthly shape factors, annual mean = 1.0.
+
+```json
+{
+  "source": "2024 CPUC ACC Gas Model v1b, PG&E residential core, normalised",
+  "note": "PLACEHOLDER",
+  "monthly_shape": [1.18,1.12,0.98,0.88,0.82,0.80,0.82,0.85,0.90,0.95,1.08,1.20]
+}
+```
+
+Pattern: Jan/Feb/Dec high (heating season), Apr–Aug low.
+
+#### `data/rates/device_load_shapes.json`
+24-hour fractional profiles per device (sum = 1.0). Sources: PNNL 2021 (HPWH),
+DOE BTO (HVAC), NREL EVI-Pro CA (EV).
+
+```json
+{
+  "profiles": {
+    "hpwh":      [0.02,0.02,0.02,0.02,0.02,0.03,0.06,0.09,0.08,0.06,0.05,0.05,
+                  0.04,0.04,0.04,0.04,0.04,0.05,0.07,0.08,0.07,0.06,0.04,0.03],
+    "hvac_heat": [0.07,0.07,0.06,0.05,0.04,0.04,0.04,0.04,0.04,0.05,0.06,0.06,
+                  0.06,0.06,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.06,0.06],
+    "hvac_cool": [0.01,0.01,0.01,0.01,0.01,0.02,0.03,0.05,0.07,0.09,0.10,0.10,
+                  0.09,0.09,0.09,0.09,0.09,0.08,0.07,0.05,0.02,0.01,0.01,0.01],
+    "ev":        [0.06,0.08,0.09,0.09,0.08,0.06,0.04,0.03,0.02,0.01,0.01,0.01,
+                  0.01,0.01,0.01,0.01,0.01,0.02,0.04,0.06,0.07,0.08,0.08,0.07],
+    "baseload":  [0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,
+                  0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,
+                  0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417],
+    "flat":      [0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,
+                  0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,
+                  0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417]
+  }
+}
+```
+
+### 21.4 ACCRateLoader
+
+```python
+class ACCRateLoader:
+    """Applies ACC shape × device load profile to retail monthly rates."""
+
+    def __init__(self, base_loader: RateLoader):
+        self._base = base_loader
+        shape_path = _RATES_DIR / "acc_electric_shape_pge_2024.json"
+        with open(shape_path) as f:
+            self._elec_shape = np.array(json.load(f)["shape_24h_by_month"])  # (12,24)
+        gas_path = _RATES_DIR / "acc_gas_shape_pge_2024.json"
+        with open(gas_path) as f:
+            self._gas_shape = np.array(json.load(f)["monthly_shape"])        # (12,)
+        prof_path = _RATES_DIR / "device_load_shapes.json"
+        with open(prof_path) as f:
+            self._profiles = {k: np.array(v)
+                              for k, v in json.load(f)["profiles"].items()}
+
+    def get_annual_monthly_rates(self, fuel, sim_start_year, n_years,
+                                  device_category="flat",
+                                  scenario="moderate", custom_cagr=None) -> np.ndarray:
+        """custom_cagr ignored — ACC provides its own 30-yr trajectory."""
+        rates = np.empty((n_years, 12))
+        for yr_idx in range(n_years):
+            year = sim_start_year + yr_idx
+            for mo in range(1, 13):
+                retail = self._base.get_rate(fuel, year, mo, scenario)
+                if fuel == "gas":
+                    rates[yr_idx, mo-1] = retail * self._gas_shape[mo-1]
+                else:
+                    profile = self._profiles.get(device_category, self._profiles["flat"])
+                    rates[yr_idx, mo-1] = retail * float(np.dot(profile,
+                                                                  self._elec_shape[mo-1]))
+        return rates
+```
+
+### 21.5 Device Category Mapping
+
+| Device class | `device_category` |
+|---|---|
+| `HeatPumpWaterHeater` | `"hpwh"` |
+| `GasWaterHeater` | `"flat"` (gas fuel) |
+| `HeatPumpHVAC` | `"hvac_heat"` |
+| `GasFurnace` | `"flat"` (gas fuel) |
+| `CentralAC` | `"hvac_cool"` |
+| `PhysicsEVCharger` / `EVCharger` | `"ev"` |
+| `LightsAndPlugs`, `HeatPumpDryer`, `InductionCooktop`, `Dishwasher` | `"baseload"` |
+| `GasDryer`, `GasCooktop` | `"flat"` (gas fuel) |
+
+### 21.6 Data Extraction (one-time)
+
+Write `scripts/extract_acc_shapes.py`:
+1. Load 2024 ACC Electric Model (Excel, from E3 website).
+2. Select PG&E, residential primary, CZ12, start 2025, 1-yr levelization.
+3. Extract 8,760 "Total Levelized Values" ($/kWh).
+4. Group by month → compute 24-hr average → normalise (mean=1.0) → save JSON.
+5. Load 2024 ACC Gas Model → extract PG&E residential core monthly $/therm →
+   normalise → save JSON.
+
+Until script is run, placeholder values in §21.3 allow end-to-end code testing.
+
+### 21.7 What This Is Not
+
+Not a TOU rate model (Phase 3). Not billing simulation. Not NEM3. Not multi-IOU
+(PG&E only for v2.8; architecture supports SCE/SDG&E as Phase 3 addition).
+
+---
+
+## 22. Unified Scenario Model (Phase 2.8) — superseded by §23
+
+See §23. §21.1–§21.6 remain valid. The UI and reactive state design in §22 is replaced
+by the cleaner per-fuel model architecture in §23.
+
+---
+
+## 23. Rate Model Architecture (Phase 2.8)
+
+### 23.1 Mental Model
+
+**Rate model is a property of each fuel, not of the scenario shell.**
+
+```
+ElecRateModel — pick one:
+  "cagr_flat"    params: { elec_cagr_pct }   user sets %, default 7
+  "acc_shaped"   params: none                 pre-computed 30-yr ACC trajectory
+
+GasRateModel — pick one:
+  "cagr_flat"    params: { gas_cagr_pct }    user sets %, default 8
+  "acc_seasonal" params: none                 pre-computed 30-yr ACC monthly values
+
+Scenario = { elec_rate_model, gas_rate_model }   ← one pair
+
+Comparison = Scenario A  vs  Scenario B   (B only when comparison_mode=True)
+```
+
+**Key properties:**
+- CAGR % is a parameter *of the CAGR Flat model*, not a top-level control. It only
+  appears in the UI when CAGR Flat is selected for that fuel.
+- ACC models carry no user-editable parameters for v2.8. The ACC 30-year projection
+  covers the full simulation horizon; no CAGR extrapolation is applied.
+- Elec and gas models are selected **independently** — valid to mix, e.g.
+  ACC-shaped electricity + CAGR flat gas.
+- Quick presets set CAGR % only; disabled (greyed) for a fuel when ACC is selected.
+- Default Scenario B = `acc_shaped` / `acc_seasonal` so enabling comparison immediately
+  produces a meaningful result: flat CAGR vs ACC.
+
+### 23.2 Reactive State
+
+```python
+# Scenario A
+elec_rate_model_a = solara.reactive("cagr_flat")
+elec_cagr_pct_a   = solara.reactive(7)
+gas_rate_model_a  = solara.reactive("cagr_flat")
+gas_cagr_pct_a    = solara.reactive(8)
+
+# Scenario B
+elec_rate_model_b = solara.reactive("acc_shaped")    # default: contrast with A
+elec_cagr_pct_b   = solara.reactive(7)
+gas_rate_model_b  = solara.reactive("acc_seasonal")
+gas_cagr_pct_b    = solara.reactive(8)
+
+comparison_mode   = solara.reactive(False)
+```
+
+Add all to `_DEFAULTS`, `reset_to_defaults()`, `run_simulation` deps.
+
+### 23.3 `model.py` Changes
+
+```python
+def _make_loader(base_rl: RateLoader, model: str):
+    if model in ("acc_shaped", "acc_seasonal"):
+        from rate_loader import ACCRateLoader
+        return ACCRateLoader(base_rl)
+    return base_rl
+
+def _cagr_for(model: str, cagr: float) -> float | None:
+    return cagr if model == "cagr_flat" else None
+
+# In HESModel.__init__:
+rl = RateLoader()
+elec_loader_a = _make_loader(rl, elec_rate_model_a)
+gas_loader_a  = _make_loader(rl, gas_rate_model_a)
+self.elec_rates = elec_loader_a.get_annual_monthly_rates(
+    "electricity", sim_start_year, n_years,
+    custom_cagr=_cagr_for(elec_rate_model_a, elec_cagr_a))
+self.gas_rates  = gas_loader_a.get_annual_monthly_rates(
+    "gas", sim_start_year, n_years,
+    custom_cagr=_cagr_for(gas_rate_model_a, gas_cagr_a))
+
+# Store for chart access
+self.elec_rate_model_a = elec_rate_model_a
+self.gas_rate_model_a  = gas_rate_model_a
+self.elec_rate_model_b = elec_rate_model_b
+self.gas_rate_model_b  = gas_rate_model_b
+self.elec_cagr_a_pct   = int(elec_cagr_a * 100)
+self.gas_cagr_a_pct    = int(gas_cagr_a  * 100)
+self.elec_cagr_b_pct   = int(elec_cagr_b * 100)
+self.gas_cagr_b_pct    = int(gas_cagr_b  * 100)
+```
+
+`RateLoader.get_annual_monthly_rates()` gains `device_category=None` kwarg (accepted,
+ignored) for API compatibility with `ACCRateLoader`.
+
+`DEVICE_ACC_CATEGORY` mapping (§21.5) used when building per-device rate arrays.
+
+Adding a new rate model in Phase 3: add one `elif` to `_make_loader()`, add an entry
+to `_ELEC_MODELS` or `_GAS_MODELS` in `app.py`, implement the loader class.
+
+### 23.4 `EnergyPricesPanel` UI
+
+**Single scenario mode:**
+```
+── Electricity ──────────────────────────────────────
+( ● CAGR Flat )  ( ○ ACC-Shaped )
+🔵 +7%/yr  ────●──────────────
+Presets: [ Conservative ] [●Moderate] [ Stress ]
+
+── Gas ──────────────────────────────────────────────
+( ● CAGR Flat )  ( ○ ACC Seasonal )
+🔴 +8%/yr  ──●──────────────────
+Presets: [ Conservative ] [●Moderate] [ Stress ]
+
+[ ] Compare two scenarios        Years: ──●──  20
+```
+
+When ACC selected for a fuel: CAGR slider and presets disappear; replaced by
+`ℹ️ Pre-computed 30-yr ACC trajectory — no CAGR parameter.`
+
+**`FuelModelSelector` component** wraps model toggle buttons + conditional CAGR slider
++ preset buttons for one fuel. Used four times: elec-A, gas-A, elec-B, gas-B.
+
+**Comparison mode** shows Scenario A block then Scenario B block then smart label:
+
+| Condition | Smart label |
+|---|---|
+| Same model + same CAGR | ⚠️ Scenarios A and B are identical |
+| Same model, different CAGR | → Comparing escalation rates (same rate model) |
+| Different model, same CAGR | → Isolating rate model impact (same CAGR params) |
+| Both differ | → Comparing escalation + rate model |
+
+### 23.5 Existing Chart Label Updates
+
+`make_elec_price` and `make_gas_price`: label changes from `"+7%/yr"` to either
+`"Elec +7%/yr (CAGR)"` or `"Electricity (ACC-shaped)"` depending on `model.elec_rate_model_a`.
+
+### 23.6 Claude Code Prompt — Rate Model Architecture
+
+```
+Implement §23 (Rate Model Architecture) of docs/Phase2_Spec.md.
+Read §21 (ACCRateLoader, data files) alongside §23. §23 supersedes §21.5 UI design.
+
+Step 1 — rate_loader.py:
+  Implement ACCRateLoader per §21.4.
+  Add device_category=None kwarg to RateLoader.get_annual_monthly_rates() (ignored).
+  ACCRateLoader.get_annual_monthly_rates() ignores custom_cagr entirely.
+
+Step 2 — model.py:
+  Add _make_loader() and _cagr_for() per §23.3.
+  Replace gas_cagr_a/b + elec_cagr_a/b params with the new per-fuel model params.
+  Build rate arrays using _make_loader() + _cagr_for() per §23.3.
+  Store model strings and CAGR ints as instance attributes per §23.3.
+  Add DEVICE_ACC_CATEGORY mapping per §21.5.
+
+Step 3 — app.py reactive state:
+  Replace existing cagr reactives with the eight new reactives per §23.2.
+  Add to _DEFAULTS, reset_to_defaults(), run_simulation deps, HESModel call.
+
+Step 4 — app.py UI:
+  Add _ELEC_MODELS = [("cagr_flat","CAGR Flat"),("acc_shaped","ACC-Shaped")].
+  Add _GAS_MODELS  = [("cagr_flat","CAGR Flat"),("acc_seasonal","ACC Seasonal")].
+  Implement FuelModelSelector component per §23.4.
+  Restructure EnergyPricesPanel per §23.4.
+
+Step 5 — Update make_elec_price and make_gas_price labels per §23.5.
+
+Verify: CAGR flat/flat → identical to pre-§21 results. ACC elec → HPWH/EV cheaper,
+HVAC cooling pricier. Comparison A=flat/flat B=acc/acc → four chart lines.
+Switching to ACC hides CAGR slider and presets for that fuel.
+```
+
+---
+
+## 24. New Charts — ACC Rate Shape and Rate Trajectory (Phase 2.8)
+
+### 24.1 New Chart Options
+
+```python
+CHART_OPTIONS = [
+    ...existing...,
+    "Electricity Rate Shape",   # ACC 12×24 heatmap
+    "Rate Trajectory",          # annual avg $/kWh and $/therm, both scenarios
+]
+```
+
+### 24.2 "Electricity Rate Shape" — ACC Heatmap
+
+12-row × 24-column `pcolormesh` heatmap of ACC electric shape factors.
+Colormap: `RdYlBu_r` (red = expensive evening peak, blue = cheap overnight/midday).
+X-axis: hour of day 0–23. Y-axis: month Jan–Dec. Colorbar: shape factor scale.
+
+**Year slider** renders below the figure inside `ChartPane` (not in title bar):
+
+```python
+acc_shape_year = solara.reactive(1)   # add to _DEFAULTS; NOT in run_simulation deps
+```
+
+v2.8 uses single 2025 reference shape — slider changes calendar year label only.
+Note: *"Shape shown for 2025 reference year — multi-year ACC data in Phase 3."*
+
+**Placeholder when ACC not selected:**
+
+```python
+uses_acc = (model.elec_rate_model_a == "acc_shaped" or
+            (model.comparison_mode and model.elec_rate_model_b == "acc_shaped"))
+if not uses_acc:
+    # blank axes with centered text message
+    ax.text(0.5, 0.5,
+            "Select ACC-Shaped electricity\nto see the hourly rate shape",
+            ha="center", va="center", fontsize=11, color="#9E9E9E",
+            transform=ax.transAxes)
+    ax.set_axis_off()
+```
+
+**Implementation:**
+
+```python
+shape = np.array(shape_data["shape_24h_by_month"])  # (12, 24)
+im = ax.pcolormesh(np.arange(25), np.arange(13), shape,
+                   cmap="RdYlBu_r", vmin=0.5, vmax=1.8, shading="flat")
+fig.colorbar(im, ax=ax, label="Rate shape factor\n(1.0 = monthly average)")
+ax.set_xticks(np.arange(24) + 0.5)
+ax.set_xticklabels(["12a","1","2","3","4","5","6","7","8","9","10","11",
+                    "12p","1","2","3","4","5","6","7","8","9","10","11"], fontsize=7)
+ax.set_yticks(np.arange(12) + 0.5)
+ax.set_yticklabels(["Jan","Feb","Mar","Apr","May","Jun",
+                    "Jul","Aug","Sep","Oct","Nov","Dec"], fontsize=8)
+```
+
+### 24.3 "Rate Trajectory" Chart
+
+Two stacked subplots (electricity top, gas bottom). Each shows annual average rate
+over simulation years. Scenario A = solid, Scenario B = dashed when comparison on.
+
+Uses existing DataCollector fields: `"Elec Rate"`, `"Gas Rate"`, `"Elec Rate B"`,
+`"Gas Rate B"` — no DataCollector changes needed.
+
+**Legend labels** via `_rate_label(fuel, model, cagr_pct, suffix)`:
+- CAGR flat → `"Elec +7%/yr (A)"` / `"Gas +8%/yr (A)"`
+- ACC → `"Electricity ACC-shaped (A)"` / `"Gas ACC seasonal (A)"`
+
+Y-axis formats: electricity `"${v:.3f}"`, gas `"${v:.2f}"`.
+
+### 24.4 `ChartPane` Special Case
+
+```python
+if chart_name == "Electricity Rate Shape":
+    fig = make_acc_rate_shape(df, model, n)
+    solara.FigureMatplotlib(fig)
+    cal = sim_start_year.value + acc_shape_year.value - 1
+    solara.SliderInt(f"Year {acc_shape_year.value} ({cal})",
+                     value=acc_shape_year, min=1, max=n)
+    solara.Text("Shape shown for 2025 reference year — multi-year ACC in Phase 3.",
+                style="font-size:0.76em; color:#9E9E9E")
+```
+
+### 24.5 Claude Code Prompt — New Charts
+
+```
+Implement §24 (New Charts) of docs/Phase2_Spec.md.
+Requires §23 complete (model stores elec_rate_model_a/b, gas_rate_model_a/b etc.).
+
+Step 1: Add "Electricity Rate Shape" and "Rate Trajectory" to CHART_OPTIONS.
+Step 2: Add acc_shape_year = solara.reactive(1) to app.py.
+  Add to _DEFAULTS. Do NOT add to run_simulation deps.
+Step 3: Implement make_acc_rate_shape(df, model, n) per §24.2.
+  Loads acc_electric_shape_pge_2024.json. pcolormesh with RdYlBu_r.
+  Placeholder when ACC not selected.
+Step 4: Implement make_rate_trajectory(df, model, n) per §24.3.
+  Two stacked subplots. Uses df["Elec Rate"/"Gas Rate"] and B variants.
+  _rate_label() for legend strings.
+Step 5: Update ChartPane for "Electricity Rate Shape" special case per §24.4.
+Step 6: Add both to CHART_FNS.
+
+Verify: Rate Shape shows placeholder when flat; heatmap with correct colors when ACC.
+Rate Trajectory smooth curves for CAGR; non-smooth for ACC. Dashed lines in comparison.
+Year slider updates label; does not re-run simulation.
+```
+
 ---
 
 ## 7. Deferred to Phase 3
@@ -4850,3 +7219,96 @@ Run solara run src/app.py and verify:
 | Multi-journey comparison | Two user-defined journeys side by side |
 | Session save / load | `json.dump` / `json.load` using §2.5 schema; Load/Save buttons in UI |
 | ZIP → climate zone auto-derive | Zip-to-CZ lookup table; auto-populate climate_zone field |
+---
+
+## 25. ACC Base Rate Escalation (Phase 2.9)
+
+### 25.1 Motivation
+
+The ACC shape redistributes costs within each year (peak vs off-peak) but does
+not change the overall rate trajectory. The base CAGR % determines whether
+electrification saves money long-term. Today that base is hardcoded to the
+"moderate" preset (7% elec, 8% gas). Phase 2.9 exposes it as a user-controlled
+slider so advocates can ask: "what if gas escalates at 12% but we're on ACC
+pricing?" — a scenario not otherwise possible.
+
+### 25.2 Backend Change (rate_loader.py — 1 line)
+
+`ACCRateLoader` currently hard-passes `custom_cagr=None` to the base loader,
+locking the base trajectory to the scenario default. Change to pass it through:
+
+```python
+# Before (Phase 2.8):
+retail = self._base.get_rate(fuel, year, mo, scenario, custom_cagr=None)
+
+# After (Phase 2.9):
+retail = self._base.get_rate(fuel, year, mo, scenario, custom_cagr)
+```
+
+No other logic changes. The ACC shape multiplication is unchanged.
+
+### 25.3 New Reactive State
+
+```python
+# Scenario A — ACC base escalation (used only when acc_shaped / acc_seasonal selected)
+acc_elec_cagr_a = solara.reactive(7)    # % default = moderate
+acc_gas_cagr_a  = solara.reactive(8)    # % default = moderate
+
+# Scenario B
+acc_elec_cagr_b = solara.reactive(7)
+acc_gas_cagr_b  = solara.reactive(8)
+```
+
+Add all four to `_DEFAULTS` and `reset_to_defaults()`.
+Add all four to `run_simulation` dependency list.
+
+### 25.4 model.py Changes
+
+Add four new params to `HESModel.__init__()`:
+
+```python
+acc_elec_cagr_a: float = 0.07,
+acc_gas_cagr_a:  float = 0.08,
+acc_elec_cagr_b: float = 0.07,
+acc_gas_cagr_b:  float = 0.08,
+```
+
+In rate array construction, pass the acc_cagr when ACC model is selected:
+
+```python
+# Scenario A
+elec_cagr_for_loader = acc_elec_cagr_a if elec_rate_model_a == "acc_shaped"  \
+                        else _cagr_for(elec_rate_model_a, elec_cagr_a)
+gas_cagr_for_loader  = acc_gas_cagr_a  if gas_rate_model_a == "acc_seasonal" \
+                        else _cagr_for(gas_rate_model_a, gas_cagr_a)
+```
+
+### 25.5 UI — Detail Panel Only
+
+The slider appears **only in the detail panel** (`RatesDetail` component), inside
+the `_fuel_model_block()` helper, when ACC model is selected for that fuel.
+
+```
+── Electricity ─────────────────────────────────────────
+  [ CAGR Flat ]  [ ● ACC-Shaped ]
+  ⚡ Base escalation (ACC shape applied on top): +7 %/yr
+    ────●────────────────  range 0–15 %  step 1
+```
+
+Label:  `"Base escalation (ACC shape applied on top): +{n}%/yr"`
+Color:  `C_RATE_ELEC` (electric) / `C_RATE_GAS` (gas)
+Range:  0–15 %, step 1
+Default: 7 % (electric), 8 % (gas)
+
+The summary card (top page) does NOT show this slider. The existing top-page
+toggle buttons (CAGR / ACC) are unchanged.
+
+### 25.6 Validation
+
+| Test | Expected |
+|------|----------|
+| ACC elec @ 0%/yr | Rates flat in nominal terms; shape still applies ✓ |
+| ACC elec @ 12%/yr | Costs visibly higher than 7% baseline ✓ |
+| ACC gas @ 12%/yr | Gas costs accelerate; electrification looks better ✓ |
+| Comparison A=ACC@7% vs B=ACC@12% | Two diverging lines on ACC Rate Projection chart ✓ |
+| CAGR-flat: acc_cagr params have no effect | Behavior unchanged ✓ |
