@@ -1,6 +1,17 @@
 {
   "source": "2024 CPUC ACC Gas Model v1b, PG&E residential core, normalised to annual mean = 1.0",
   "note": "Extracted by scripts/extract_acc_shapes.py from 2024-ACC-Gas-Model-v1b_October-Update.xlsx",
+  "methodology": {
+    "workbook_sheet": "Output (dashboard layout — sparse key/value format, not tabular)",
+    "location": "Rows 16-27 (January-December), column B = Levelized monthly $/therm",
+    "config": {"utility": "PG&E", "class": "Residential", "end_use": "Small Boiler (<100 MMBtu/Hr)", "start_year": 2024, "levelization_period": 1},
+    "cross_check": "Column C (Annual Average) = $1.7634/therm; confirmed equal to mean of 12 monthly values",
+    "units_before_normalisation": "$/therm at the meter (commodity + T&D + GHG components)",
+    "normalisation": "Each monthly value divided by the 12-month mean → dimensionless multiplier (annual mean=1.0)",
+    "annual_mean_2024": 1.7634,
+    "simulation_usage": "effective_gas_rate[m] = retail_cagr_rate[m] x monthly_shape[m]",
+    "seasonal_pattern": "Winter (Jan/Dec) ~1.20x, summer (Jun-Aug) ~0.87x — mirrors NYMEX seasonal forward curve"
+  },
   "monthly_shape": [
     1.1973,
     1.1908,

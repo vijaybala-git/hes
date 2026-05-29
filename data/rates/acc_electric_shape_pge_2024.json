@@ -2,6 +2,24 @@
   "source": "2024 CPUC ACC Electric Model v1b, PG&E residential, CZ12, normalised to monthly mean",
   "note": "Extracted by scripts/extract_acc_shapes.py from 2024-ACC-Electric-Model-v1b.xlsb",
   "data_year": 2018,
+  "methodology": {
+    "workbook_sheet": "Detailed Output",
+    "column_extracted": "Total Levelized Value ($/MWh at the meter)",
+    "components_summed": [
+      "Generation Capacity", "Transmission Capacity", "Distribution Capacity",
+      "Energy (wholesale)", "Avoided AS Procurement", "Losses",
+      "GHG Adder (Marginal Emissions)", "GHG Cap and Trade",
+      "GHG Portfolio Rebalancing", "Methane Leakage", "Air Quality Adder"
+    ],
+    "config": {"IOU": "PG&E", "climate_zone": "CZ12", "start_year": 2024, "n_years": 20},
+    "rows": "8,760 hourly rows for base meteorological year 2018",
+    "aggregation": "Mean of all days within each (month, hour) cell → 12x24 matrix",
+    "normalisation": "Each month row divided by its 24-hour mean → dimensionless multiplier (mean=1.0 per month)",
+    "units_before_normalisation": "$/MWh at the meter (inclusive of T&D losses)",
+    "simulation_usage": "effective_rate[m] = retail_cagr_rate[m] x dot(device_load_profile_24h, shape[m,:])",
+    "revenue_neutral": "A uniform (flat) device profile yields dot product = 1.0, so ACC = CAGR for flat loads",
+    "known_anomaly": "Apr/May overnight hours elevated above Jan/Feb — 2018 cold-spring artifact; preserved as official CPUC data"
+  },
   "shape_24h_by_month": [
     [
       1.3164,

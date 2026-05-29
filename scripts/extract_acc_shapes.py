@@ -3,6 +3,109 @@ scripts/extract_acc_shapes.py
 ─────────────────────────────
 One-time extraction of ACC shape arrays from the 2024 CPUC ACC Excel workbooks.
 
+═══════════════════════════════════════════════════════════════════════════
+METHODOLOGY — How spreadsheet values become simulation $/kWh and $/therm
+═══════════════════════════════════════════════════════════════════════════
+
+SOURCE DATA
+───────────
+The 2024 CPUC Avoided Cost Calculator (ACC), published by Energy + Environmental
+Economics (E3) on behalf of the California Public Utilities Commission.
+Download: https://www.ethree.com/public_proceedings/energy-efficiency-calculator/
+
+The ACC represents the long-run marginal cost of supplying (or avoiding) one
+additional unit of electricity or gas to the grid at a specific hour and month.
+It is used in California to value demand-side resources (efficiency, electrification,
+demand response) in cost-effectiveness tests.
+
+ELECTRIC MODEL  (2024-ACC-Electric-Model-v1b.xlsb)
+────────────────────────────────────────────────────
+Sheet:    "Detailed Output"
+Column:   "Total Levelized Value" ($/MWh at the meter)
+Rows:     8,760 hourly rows — one per hour of a representative year
+Config:   IOU = PG&E, Climate Zone = CZ12 (Sacramento Valley proxy for Bay Area),
+          Start Year = 2024, Number of Years = 20
+Data year: 2018 (the base meteorological year used by the workbook)
+
+The "Total Levelized Value" column sums all ACC components:
+  Generation Capacity + Transmission Capacity + Distribution Capacity
+  + Energy (wholesale) + Avoided AS Procurement + Losses
+  + GHG Adder (Marginal Emissions) + GHG Cap and Trade
+  + GHG Portfolio Rebalancing + Methane Leakage + Air Quality Adder
+The result is in $/MWh at the meter — i.e., already adjusted for T&D losses,
+so it represents the full societal avoided cost for one kWh of end-use load.
+
+EXTRACTION STEPS — ELECTRIC
+  1. Read all 8,760 rows; decode the Excel date serial to (month, hour).
+     Excel serial = days since 1899-12-30; fractional part × 24 = hour-of-day.
+  2. For each (month 1-12, hour 0-23) cell, average all days in that month.
+     Result: 12×24 matrix of average $/MWh values.
+  3. Convert $/MWh → $/kWh by dividing by 1,000.  (Not done here — shape only.)
+  4. Normalise each month's row to mean = 1.0:
+       shape[m, h] = raw_avg[m, h] / mean(raw_avg[m, :])
+     This produces a dimensionless multiplier. A device running at hour h in month m
+     faces an effective rate of:
+       effective_rate[m] = retail_cagr_rate[m] × dot(device_load_profile_24h, shape[m, :])
+     For a flat (uniform) device profile the dot product equals 1.0, so the effective
+     rate equals the base CAGR rate — the ACC shape is revenue-neutral for flat loads.
+
+WHY NORMALISE?
+  The ACC $/MWh absolute values encode a specific policy scenario and discount rate
+  chosen by E3/CPUC. By normalising to a shape (relative multiplier), we decouple
+  the time-of-use pattern from the rate level. The rate level comes from the user's
+  chosen CAGR escalation or a future absolute ACC trajectory (Phase 3). This keeps
+  the simulation auditable: the shape captures "when is it expensive?" while the
+  CAGR captures "how fast are rates rising overall?"
+
+KNOWN ANOMALIES
+  April/May overnight hours (0–4am) show elevated shape values (~1.6–2.1×) that
+  exceed winter overnight values, which is physically implausible for Bay Area.
+  This is a 2018 base-year artifact — that year had an unusually cold spring in
+  California. The values are preserved as-is (official CPUC model output).
+  Multi-year averaging in Phase 3 will smooth this anomaly.
+
+GAS MODEL  (2024-ACC-Gas-Model-v1b_October-Update.xlsx)
+────────────────────────────────────────────────────────
+Sheet:    "Output" (dashboard layout — sparse, not a data table)
+Location: Rows 16–27 (January–December), column B = levelized monthly $/therm
+Config:   Utility = PG&E, Class = Residential, End Use = Small Boiler
+          Start Year = 2024, Levelization Period = 1 year
+Column C: Annual average $/therm (same value repeated — used as cross-check)
+
+The gas ACC values represent the avoided cost of one therm of natural gas not
+consumed, including commodity, T&D, and GHG components.
+Units: $/therm (already at the meter).
+
+EXTRACTION STEPS — GAS
+  1. Read 12 monthly $/therm values directly from rows 16–27, column B.
+     Verified: mean of 12 values matches the annual average in column C.
+  2. Normalise to annual mean = 1.0:
+       shape[m] = monthly_value[m] / mean(monthly_values)
+     Annual mean = $1.7634/therm for PG&E residential 2024.
+  3. In simulation: effective_gas_rate[m] = retail_cagr_rate[m] × shape[m]
+     Winter months (Jan/Dec) shape ≈ 1.20 (20% premium)
+     Summer months (Jun–Aug) shape ≈ 0.87 (13% discount)
+     Pattern: mirrors NYMEX gas seasonal forward curve.
+
+OUTPUTS
+  acc_electric_shape_pge_2024.json
+    shape_24h_by_month: 12 × 24 array, each row mean = 1.0
+    Used by ACCRateLoader to compute per-device effective monthly rates.
+
+  acc_gas_shape_pge_2024.json
+    monthly_shape: 12 values, mean = 1.0
+    Applied uniformly to all gas devices regardless of end-use type.
+
+SIMULATION USAGE (src/rate_loader.py — ACCRateLoader)
+  Electric effective rate for device category C in month m:
+    rate[m] = retail_cagr_rate[m] × Σ_h ( load_profile_C[h] × shape[m,h] )
+  Gas effective rate in month m:
+    rate[m] = retail_cagr_rate[m] × gas_shape[m]
+  Where retail_cagr_rate comes from RateLoader (PG&E E-1 / G-1 historical +
+  CAGR projection). Device load profiles are in data/rates/device_load_shapes.json.
+
+═══════════════════════════════════════════════════════════════════════════
+
 PRE-CONDITION — Electric model must be recalculated for PG&E / CZ12:
   1. Open downloads/2024-ACC-Electric-Model-v1b.xlsb in Excel
   2. On the "Dashboard Viewer" sheet, set:
