@@ -26,7 +26,8 @@
       "Bash(start *)",
       "Bash(python -c \"import app; print\\('import OK'\\)\")",
       "Bash(python -c \"import src.app\")",
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(.venv/Scripts/python -c ' *)"
     ]
   }
 }

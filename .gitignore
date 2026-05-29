@@ -19,3 +19,7 @@ pytest-cache-files-*/
 # OS
 .DS_Store
 Thumbs.db
+
+# ACC source Excel files (large, not committed)
+scripts/downloads/
+downloads/
