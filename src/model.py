@@ -68,17 +68,19 @@ def _cagr_for(rate_model: str, cagr: float) -> float | None:
 
 def _build_elec_rates_by_class(acc_loader: ACCRateLoader,
                                 sim_start_year: int, n_years: int,
-                                scenario: str) -> dict[str, np.ndarray]:
+                                scenario: str,
+                                custom_cagr: float | None = None) -> dict[str, np.ndarray]:
     """
     Pre-compute (n_years, 12) rate arrays for every device class that uses electricity.
     Keys are device class names (matching DEVICE_ACC_CATEGORY).
+    custom_cagr: the ACC base escalation rate (from acc_elec_cagr_a/b slider).
     """
     # First build category→array mapping
     cat_arrays: dict[str, np.ndarray] = {}
     for cat in _ELEC_ACC_CATEGORIES:
         cat_arrays[cat] = acc_loader.get_annual_monthly_rates(
             "electricity", sim_start_year, n_years,
-            device_category=cat, scenario=scenario, custom_cagr=None)
+            device_category=cat, scenario=scenario, custom_cagr=custom_cagr)
 
     # Then map device class → array via DEVICE_ACC_CATEGORY
     return {
@@ -359,7 +361,8 @@ class HESModel(mesa.Model):
         elec_by_cls_a = None
         if elec_rate_model_a == "acc_shaped" and isinstance(elec_loader_a, ACCRateLoader):
             elec_by_cls_a = _build_elec_rates_by_class(
-                elec_loader_a, sim_start_year, n_years, scenario_a)
+                elec_loader_a, sim_start_year, n_years, scenario_a,
+                custom_cagr=elec_cagr_a_eff)
 
         # ── Two JourneyHome instances — Scenario A ────────────────────────────
         journey_slots  = _build_slots(slot_configs, False, self, **device_kw)
@@ -394,7 +397,8 @@ class HESModel(mesa.Model):
             elec_by_cls_b = None
             if elec_rate_model_b == "acc_shaped" and isinstance(elec_loader_b, ACCRateLoader):
                 elec_by_cls_b = _build_elec_rates_by_class(
-                    elec_loader_b, sim_start_year, n_years, scenario_b)
+                    elec_loader_b, sim_start_year, n_years, scenario_b,
+                    custom_cagr=elec_cagr_b_eff)
 
             journey_slots_b  = _build_slots(slot_configs, False, self, **device_kw)
             baseline_slots_b = _build_slots(slot_configs, True,  self, **device_kw)
