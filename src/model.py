@@ -17,7 +17,7 @@ import numpy as np
 
 from home_config import HomeConfig, compute_baseload_kwh, HOT_WATER_GAL_PER_DAY
 from journey import JourneyHome, DeviceSlot, CapExOnlySlot, CATEGORY_ORDER, CATEGORY_LABELS
-from rate_loader import RateLoader
+from rate_loader import RateLoader, ACCRateLoader
 from devices.physics  import GasFurnace, HeatPumpHVAC, GasWaterHeater, HeatPumpWaterHeater, CentralAC
 from devices.seasonal import GasDryer, HeatPumpDryer, GasCooktop, InductionCooktop, LightsAndPlugs
 from devices.schedule import EVCharger, PhysicsEVCharger
@@ -30,6 +30,63 @@ SCENARIO_PRESETS = {
     "moderate":     {"elec": 0.07, "gas": 0.08},
     "stress":       {"elec": 0.10, "gas": 0.12},
 }
+
+# Maps device class name → ACC device_category for load-profile-weighted rate lookup.
+# Gas devices always use "flat" (gas shape is applied uniformly regardless of category).
+DEVICE_ACC_CATEGORY: dict[str, str] = {
+    "HeatPumpWaterHeater": "hpwh",
+    "GasWaterHeater":      "flat",
+    "HeatPumpHVAC":        "hvac_heat",   # heating dominates; Phase 3 splits heat/cool
+    "GasFurnace":          "flat",
+    "CentralAC":           "hvac_cool",
+    "EVCharger":           "ev",
+    "PhysicsEVCharger":    "ev",
+    "LightsAndPlugs":      "baseload",
+    "HeatPumpDryer":       "baseload",
+    "InductionCooktop":    "baseload",
+    "GasDryer":            "flat",
+    "GasCooktop":          "flat",
+    "ElectricOven":        "baseload",
+    "Dishwasher":          "baseload",
+}
+
+# All electric ACC categories that need pre-computed rate arrays
+_ELEC_ACC_CATEGORIES = ["hpwh", "hvac_heat", "hvac_cool", "ev", "baseload", "flat"]
+
+
+def _make_loader(base_rl: RateLoader, rate_model: str) -> object:
+    """Return ACCRateLoader for ACC models; base RateLoader for CAGR flat."""
+    if rate_model in ("acc_shaped", "acc_seasonal"):
+        return ACCRateLoader(base_rl)
+    return base_rl
+
+
+def _cagr_for(rate_model: str, cagr: float) -> float | None:
+    """Return cagr when CAGR model selected; None for ACC (ignores user CAGR)."""
+    return cagr if rate_model == "cagr_flat" else None
+
+
+def _build_elec_rates_by_class(acc_loader: ACCRateLoader,
+                                sim_start_year: int, n_years: int,
+                                scenario: str) -> dict[str, np.ndarray]:
+    """
+    Pre-compute (n_years, 12) rate arrays for every device class that uses electricity.
+    Keys are device class names (matching DEVICE_ACC_CATEGORY).
+    """
+    # First build category→array mapping
+    cat_arrays: dict[str, np.ndarray] = {}
+    for cat in _ELEC_ACC_CATEGORIES:
+        cat_arrays[cat] = acc_loader.get_annual_monthly_rates(
+            "electricity", sim_start_year, n_years,
+            device_category=cat, scenario=scenario, custom_cagr=None)
+
+    # Then map device class → array via DEVICE_ACC_CATEGORY
+    return {
+        cls: cat_arrays[cat]
+        for cls, cat in DEVICE_ACC_CATEGORY.items()
+        if cat in cat_arrays and cls not in ("GasWaterHeater", "GasFurnace",
+                                              "GasDryer", "GasCooktop")
+    }
 
 
 def _make_device(spec: dict, mesa_model: mesa.Model, *,
@@ -199,8 +256,17 @@ class HESModel(mesa.Model):
                  sim_start_year:   int  = 2025,
                  slot_configs:     list | None = None,
                  capex_only_slots: list | None = None,
-                 solar_coverage_pct: float = 0.0):
+                 solar_coverage_pct: float = 0.0,
+                 # §23 rate model selections — stored, wired when ACCRateLoader is added
+                 elec_rate_model_a: str = "cagr_flat",
+                 gas_rate_model_a:  str = "cagr_flat",
+                 elec_rate_model_b: str = "acc_shaped",
+                 gas_rate_model_b:  str = "acc_seasonal"):
         super().__init__()
+        self.elec_rate_model_a = elec_rate_model_a
+        self.gas_rate_model_a  = gas_rate_model_a
+        self.elec_rate_model_b = elec_rate_model_b
+        self.gas_rate_model_b  = gas_rate_model_b
 
         self.rate_scenario   = scenario_a
         self.n_years         = n_years
@@ -268,15 +334,26 @@ class HESModel(mesa.Model):
 
         # ── Rate arrays — Scenario A ──────────────────────────────────────────
         rl = RateLoader()
-        self.elec_rates = rl.get_annual_monthly_rates(
-            "electricity", sim_start_year, n_years, scenario_a,
-            custom_cagr=elec_cagr_a)   # (n_years, 12)
-        self.gas_rates  = rl.get_annual_monthly_rates(
-            "gas",         sim_start_year, n_years, scenario_a,
-            custom_cagr=gas_cagr_a)    # (n_years, 12)
+        elec_loader_a = _make_loader(rl, elec_rate_model_a)
+        gas_loader_a  = _make_loader(rl, gas_rate_model_a)
+
+        self.elec_rates = elec_loader_a.get_annual_monthly_rates(
+            "electricity", sim_start_year, n_years,
+            scenario=scenario_a,
+            custom_cagr=_cagr_for(elec_rate_model_a, elec_cagr_a))   # (n_years, 12)
+        self.gas_rates  = gas_loader_a.get_annual_monthly_rates(
+            "gas", sim_start_year, n_years,
+            scenario=scenario_a,
+            custom_cagr=_cagr_for(gas_rate_model_a, gas_cagr_a))     # (n_years, 12)
 
         self.current_elec_rates = self.elec_rates[0]
         self.current_gas_rates  = self.gas_rates[0]
+
+        # ACC mode: pre-compute per-device-class effective rate arrays
+        elec_by_cls_a = None
+        if elec_rate_model_a == "acc_shaped" and isinstance(elec_loader_a, ACCRateLoader):
+            elec_by_cls_a = _build_elec_rates_by_class(
+                elec_loader_a, sim_start_year, n_years, scenario_a)
 
         # ── Two JourneyHome instances — Scenario A ────────────────────────────
         journey_slots  = _build_slots(slot_configs, False, self, **device_kw)
@@ -284,27 +361,43 @@ class HESModel(mesa.Model):
 
         self.journey_home  = JourneyHome(self, journey_slots,  self.elec_rates, self.gas_rates,
                                          is_baseline_home=False, capex_only_slots=capex_only_slots,
-                                         solar_coverage_pct=solar_coverage_pct)
+                                         solar_coverage_pct=solar_coverage_pct,
+                                         elec_rates_by_category=elec_by_cls_a)
         self.baseline_home = JourneyHome(self, baseline_slots, self.elec_rates, self.gas_rates,
-                                         is_baseline_home=True)
+                                         is_baseline_home=True,
+                                         elec_rates_by_category=elec_by_cls_a)
 
         # ── Scenario B (lazy — only when comparison_mode=True) ────────────────
         if comparison_mode:
-            self.elec_rates_b = rl.get_annual_monthly_rates(
-                "electricity", sim_start_year, n_years, scenario_b,
-                custom_cagr=elec_cagr_b)
-            self.gas_rates_b  = rl.get_annual_monthly_rates(
-                "gas",         sim_start_year, n_years, scenario_b,
-                custom_cagr=gas_cagr_b)
+            elec_loader_b = _make_loader(rl, elec_rate_model_b)
+            gas_loader_b  = _make_loader(rl, gas_rate_model_b)
+
+            self.elec_rates_b = elec_loader_b.get_annual_monthly_rates(
+                "electricity", sim_start_year, n_years,
+                scenario=scenario_b,
+                custom_cagr=_cagr_for(elec_rate_model_b, elec_cagr_b))
+            self.gas_rates_b  = gas_loader_b.get_annual_monthly_rates(
+                "gas", sim_start_year, n_years,
+                scenario=scenario_b,
+                custom_cagr=_cagr_for(gas_rate_model_b, gas_cagr_b))
 
             self.current_elec_rates_b = self.elec_rates_b[0]
             self.current_gas_rates_b  = self.gas_rates_b[0]
 
+            elec_by_cls_b = None
+            if elec_rate_model_b == "acc_shaped" and isinstance(elec_loader_b, ACCRateLoader):
+                elec_by_cls_b = _build_elec_rates_by_class(
+                    elec_loader_b, sim_start_year, n_years, scenario_b)
+
             journey_slots_b  = _build_slots(slot_configs, False, self, **device_kw)
             baseline_slots_b = _build_slots(slot_configs, True,  self, **device_kw)
 
-            self.journey_home_b  = JourneyHome(self, journey_slots_b,  self.elec_rates_b, self.gas_rates_b, is_baseline_home=False)
-            self.baseline_home_b = JourneyHome(self, baseline_slots_b, self.elec_rates_b, self.gas_rates_b, is_baseline_home=True)
+            self.journey_home_b  = JourneyHome(self, journey_slots_b,  self.elec_rates_b, self.gas_rates_b,
+                                               is_baseline_home=False,
+                                               elec_rates_by_category=elec_by_cls_b)
+            self.baseline_home_b = JourneyHome(self, baseline_slots_b, self.elec_rates_b, self.gas_rates_b,
+                                               is_baseline_home=True,
+                                               elec_rates_by_category=elec_by_cls_b)
 
         # ── DataCollector ─────────────────────────────────────────────────────
         reporters = {

@@ -70,10 +70,16 @@ class DeviceSlot:
     def step(self, current_year: int,
              elec_rates: np.ndarray,
              gas_rates:  np.ndarray,
-             is_baseline_home: bool = False) -> float:
+             is_baseline_home: bool = False,
+             elec_rates_by_category: dict | None = None) -> float:
         """
         Step the slot for one simulation year.
         Returns the total OpEx cost for this slot in this year.
+
+        elec_rates_by_category: optional dict {device_class_name: (12,) array}.
+          When provided (ACC mode), each electric device uses its category-specific
+          effective rate rather than the shared flat rate.  Gas devices always use
+          gas_rates regardless of this dict.
         """
         self._last_active_device = None   # reset; set below after active_list is known
 
@@ -93,7 +99,13 @@ class DeviceSlot:
         # ── Run active devices, accumulate step cost ──────────────────────────
         step_cost = 0.0
         for active in active_list:
-            rates = elec_rates if active.fuel_type == "electricity" else gas_rates
+            if active.fuel_type == "electricity" and elec_rates_by_category is not None:
+                cls_name = type(active).__name__
+                rates = elec_rates_by_category.get(cls_name, elec_rates)
+            elif active.fuel_type == "electricity":
+                rates = elec_rates
+            else:
+                rates = gas_rates
             active.step(rates)
             step_cost += active.history["cost"][-1]
 
@@ -125,11 +137,19 @@ class JourneyHome(mesa.Agent):
                  gas_rates:  np.ndarray,
                  is_baseline_home: bool = False,
                  capex_only_slots: list | None = None,
-                 solar_coverage_pct: float = 0.0):
+                 solar_coverage_pct: float = 0.0,
+                 elec_rates_by_category: dict | None = None):
+        """
+        elec_rates_by_category: optional dict {device_class_name: (n_years, 12) array}.
+          Provided in ACC mode; each electric device uses its category-specific effective
+          rate.  None in CAGR mode — all devices share the flat elec_rates array.
+        """
         super().__init__(model)
         self.slots = slots
         self._elec_rates = elec_rates   # shape (n_years, 12)
         self._gas_rates  = gas_rates    # shape (n_years, 12)
+        # ACC mode: per-device-class rate arrays indexed as [n_years, 12]
+        self._elec_rates_by_category = elec_rates_by_category  # dict | None
         self.is_baseline_home = is_baseline_home
         self.capex_only_slots: list = capex_only_slots or []
         self.solar_coverage_pct = solar_coverage_pct
@@ -150,6 +170,14 @@ class JourneyHome(mesa.Agent):
         elec_r = self._elec_rates[year_idx]
         gas_r  = self._gas_rates[year_idx]
 
+        # ACC mode: slice per-device rate arrays for this year
+        elec_by_cat_yr = None
+        if self._elec_rates_by_category is not None:
+            elec_by_cat_yr = {
+                cls: arr[year_idx]
+                for cls, arr in self._elec_rates_by_category.items()
+            }
+
         # Sum costs per category first, then append once — fixes Phase 1 bug
         year_category_costs = {cat: 0.0 for cat in CATEGORY_ORDER}
         year_opex      = 0.0
@@ -157,7 +185,8 @@ class JourneyHome(mesa.Agent):
         year_capex     = 0.0
 
         for slot in self.slots:
-            cost = slot.step(current_year, elec_r, gas_r, self.is_baseline_home)
+            cost = slot.step(current_year, elec_r, gas_r, self.is_baseline_home,
+                             elec_rates_by_category=elec_by_cat_yr)
             year_opex += cost
             cat = slot.category if slot.category in year_category_costs else "Baseload"
             year_category_costs[cat] += cost
