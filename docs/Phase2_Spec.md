@@ -1,9 +1,39 @@
- # WhyWatt — Phase 2 Development Spec
+# WhyWatt — Phase 2 Development Spec
 
-**Status:** Phase 2 implemented through Objective 6; §9 bug fixes, §10 rate decoupling, §11 per-device charts, §12 baseload formula, §13 appliance detail expand/collapse, §14-17 v2.7 additions
+**Status:** ✅ CLOSED — Phase 2 complete. Entered user testing & evaluation 2026-05-29.
 **Follows:** Phase 1 complete (Mesa + Solara, 42 unit tests, dual-home simulation)
 **Project rename:** HES → **WhyWatt?** (update all UI titles, headers, doc references)
-**Last updated:** §14 EV physics, §15 Panel Upgrade, §16 Baseload as full slot, §17 Solar+Battery (Phase 2.7)
+**Last updated:** 2026-05-29 — Phase 2 closed. All objectives + extensions delivered.
+
+## Phase 2 Delivery Summary
+
+| Section | Feature | Status |
+|---------|---------|--------|
+| §0  | Branding — WhyWatt rename, logo placeholders | ✅ Done |
+| §1–7 | Journey model, physics devices, rate loader, dual scenario | ✅ Done |
+| §8  | Objective 6 — Solara UI redesign (journey planner, home profile) | ✅ Done |
+| §9  | Bug fixes (HVAC compounding, bedroom scaling, cost accumulation) | ✅ Done |
+| §10 | Rate model decoupling (CAGR flat / historical / ACC) | ✅ Done |
+| §11 | Per-device energy & cost breakdown charts | ✅ Done |
+| §12 | Baseload formula correction | ✅ Done |
+| §13 | Appliance detail expand/collapse panel | ✅ Done |
+| §14 | EV physics device (schedule-driven kWh) | ✅ Done |
+| §15 | Panel upgrade slot | ✅ Done |
+| §16 | Baseload as full DeviceSlot (LightsAndPlugs) | ✅ Done |
+| §17 | Solar + Battery (net-of-solar opex, payback) | ✅ Done |
+| §18–22 | ACC shape extraction (CPUC 2024 E3 Electric CZ12 + Gas PG&E) | ✅ Done |
+| §23 | ACC wired into simulation (per-device effective rates) | ✅ Done |
+| §24 | ACC Rate Projection chart (band + seasonal lines) | ✅ Done |
+| §25 | ACC base rate escalation slider (detail panel) | ✅ Done |
+| §26 | Summary bar chart (journey vs baseline, payback + savings callout) | ✅ Done |
+
+**Known deferred items → Phase 3:**
+- Income-qualified rebates
+- Monte Carlo uncertainty bands
+- HomeConfig JSON save/load
+- Multi-utility support (SCE, SDG&E)
+
+---
 
 ---
 

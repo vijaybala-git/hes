@@ -1355,7 +1355,6 @@ def HomeInfoBar():
 def SummaryStats(df, n, model):
     delta_vals = df["Opex Delta"].values
     delta_cum  = float(delta_vals[-1])
-    direction  = "saves" if delta_cum >= 0 else "costs extra vs. do-nothing"
 
     payback_yr = None
     for i, d in enumerate(delta_vals):
@@ -1363,36 +1362,121 @@ def SummaryStats(df, n, model):
             payback_yr = i + 1
             break
 
-    if payback_yr is not None:
-        cal_pb = sim_start_year.value + payback_yr - 1
-        pb_str = f"Payback: year {payback_yr}  ({cal_pb})"
+    journey_cum  = float(df["Journey Cum Cost"].iloc[-1])
+    baseline_cum = float(df["Baseline Cum Cost"].iloc[-1])
+
+    # ── Scenario B (comparison mode) ──────────────────────────────────────────
+    has_B = model.comparison_mode and "Baseline Cum Cost B" in df.columns
+    if has_B:
+        bB = float(df["Baseline Cum Cost B"].iloc[-1])
+        eB = float(df["Journey Cum Cost B"].iloc[-1])
+        dB = bB - eB
+        pb_B = None
+        for i, (b, e) in enumerate(zip(df["Baseline Cum Cost B"].values,
+                                        df["Journey Cum Cost B"].values)):
+            if b > e:
+                pb_B = i + 1
+                break
+
+    # ── Build figure (bars only, no in-plot text) ─────────────────────────────
+    fig_h = 1.55 if not has_B else 2.6
+    fig = Figure(figsize=(5.8, fig_h))
+    fig.patch.set_facecolor("none")
+    ax = fig.add_subplot(111)
+    ax.set_facecolor("none")
+
+    bar_h = 0.42
+    gap   = 0.68
+    yticks, y_tick_labels = [], []
+
+    def _draw_bars(y_top, journey_val, baseline_val, label_suffix=""):
+        ax.barh(y_top,       journey_val,  height=bar_h, color=C_NAVY, alpha=0.85, zorder=3)
+        ax.barh(y_top - gap, baseline_val, height=bar_h, color=C_RED,  alpha=0.72, zorder=3)
+        sfx = f"  {label_suffix}" if label_suffix else ""
+        yticks.extend([y_top, y_top - gap])
+        y_tick_labels.extend([
+            f"Your Electrification Journey{sfx}",
+            f"Do-Nothing Baseline{sfx}",
+        ])
+        return max(journey_val, baseline_val)
+
+    if has_B:
+        x1 = _draw_bars(2.8,       journey_cum,  baseline_cum, "(A)")
+        x2 = _draw_bars(2.8 - 1.5, eB,           bB,           "(B)")
+        x_end = max(x1, x2)
     else:
-        pb_str = f"No payback within {n} years"
+        x_end = _draw_bars(1.0, journey_cum, baseline_cum)
 
-    color = "#2E7D32" if delta_cum >= 0 else "#C62828"
-    with solara.Row(gap="24px", style="flex-wrap:wrap; margin:4px 0"):
-        solara.Markdown(
-            f"**Journey {direction}:** **${abs(delta_cum):,.0f}** over {n} yrs (Scenario A)",
-            style={"color": color, "font-size": "1.05em"},
-        )
-        solara.Markdown(f"**{pb_str}**", style={"color": "#555"})
+    ax.set_xlim(0, x_end * 1.08)
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(y_tick_labels, fontsize=8.8)
+    ax.tick_params(axis="y", length=0, pad=4)
+    ax.xaxis.set_visible(False)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    x_ticks = np.linspace(0, x_end, 5)
+    for xv in x_ticks[1:]:
+        ax.axvline(xv, color="#ccc", linewidth=0.5, zorder=1)
+    fig.tight_layout(pad=0.3)
 
-        if model.comparison_mode and "Baseline Cum Cost B" in df.columns:
-            bB   = float(df["Baseline Cum Cost B"].iloc[-1])
-            eB   = float(df["Journey Cum Cost B"].iloc[-1])
-            dB   = bB - eB
-            dB_d = "saves" if dB >= 0 else "costs extra"
-            pb_B = None
-            for i, (b, e) in enumerate(zip(df["Baseline Cum Cost B"].values,
-                                            df["Journey Cum Cost B"].values)):
-                if b > e:
-                    pb_B = i + 1
-                    break
-            pb_B_str = (f"Payback yr {pb_B} ({sim_start_year.value + pb_B - 1})"
-                        if pb_B else f"No payback in {n} yrs")
-            solara.Markdown(
-                f"**Scenario B: {dB_d} ${abs(dB):,.0f}** — {pb_B_str}",
-                style={"color": "#1565C0"},
+    # ── Right-side text panel ─────────────────────────────────────────────────
+    if payback_yr is not None:
+        cal_pb   = sim_start_year.value + payback_yr - 1
+        pb_line1 = f"Payback year {payback_yr}"
+        pb_line2 = f"({cal_pb})"
+    else:
+        pb_line1 = "No payback"
+        pb_line2 = f"within {n} yrs"
+
+    sav_color = "#2E7D32" if delta_cum >= 0 else "#B71C1C"
+    sign      = "+" if delta_cum >= 0 else "−"
+    sav_line1 = f"{sign}${abs(delta_cum):,.0f}"
+    sav_line2 = f"over {n} yrs"
+
+    # Scenario B right-panel text
+    if has_B:
+        if pb_B is not None:
+            pb_B_line1 = f"Payback yr {pb_B}  ({sim_start_year.value + pb_B - 1})"
+        else:
+            pb_B_line1 = f"No payback in {n} yrs"
+        dB_sign     = "+" if dB >= 0 else "−"
+        dB_color    = "#2E7D32" if dB >= 0 else "#B71C1C"
+        sav_B_line1 = f"{dB_sign}${abs(dB):,.0f}"
+
+    with solara.Row(
+        style="justify-content:center; align-items:center; gap:0px; margin:2px 0 0 0"
+    ):
+        solara.FigureMatplotlib(fig, dependencies=[df, n])
+
+        # Stat box to the right
+        with solara.Column(
+            gap="0px",
+            style=(
+                "min-width:148px; padding:6px 14px;"
+                " border-left:2px solid #E0E0E0;"
+                " justify-content:center;"
+            ),
+        ):
+            # Journey payback (blue)
+            solara.HTML(
+                tag="div",
+                unsafe_innerHTML=(
+                    f"<div style='color:{C_NAVY};font-size:1.25em;"
+                    f"font-weight:700;line-height:1.15'>{pb_line1}</div>"
+                    f"<div style='color:{C_NAVY};font-size:1.05em;"
+                    f"font-weight:600;line-height:1.2;margin-bottom:10px'>{pb_line2}</div>"
+                    f"<div style='color:{sav_color};font-size:1.45em;"
+                    f"font-weight:800;line-height:1.1'>{sav_line1}</div>"
+                    f"<div style='color:#555;font-size:0.82em;line-height:1.3'>{sav_line2}</div>"
+                    + (
+                        f"<div style='margin-top:10px;border-top:1px solid #ddd;padding-top:6px;"
+                        f"color:#1565C0;font-size:0.85em;font-weight:600'>"
+                        f"B: {pb_B_line1}<br>"
+                        f"<span style='color:{dB_color};font-size:1.1em;font-weight:700'>"
+                        f"{sav_B_line1}</span></div>"
+                        if has_B else ""
+                    )
+                ),
             )
 
 

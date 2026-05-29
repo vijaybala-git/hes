@@ -1,6 +1,6 @@
 # WhyWatt — Project Brain (Claude Code reads this automatically)
 
-> Keep this file current after each phase. Last updated: Phase 2 spec updated — HomeConfig, DeviceSlot starting_state, HVAC compound baseline, bedroom scaling, UI redesign.
+> Keep this file current after each phase. Last updated: 2026-05-29 — Phase 2 closed, entering user testing & evaluation.
 
 ---
 
@@ -16,11 +16,15 @@ Primary audience: electrification advocates running sessions with homeowners.
 
 ---
 
-## Current phase: PHASE 2 — Objective 0 (not started)
+## Current phase: USER TESTING & EVALUATION (post Phase 2)
 
-See `docs/Phase2_Spec.md` for full scope and Claude Code prompts per objective.
-Implement objectives in order: 0 → 1 → 2 → 3 → 4 → 5 → 6.
-Do not start Objective N+1 until all tests for N pass.
+Phase 2 is **complete and closed** as of 2026-05-29. See `docs/Phase2_Spec.md` for the full delivery record.
+
+Next development phase (Phase 3) has not been scoped. Items deferred from Phase 2:
+- Income-qualified rebates
+- Monte Carlo uncertainty bands
+- HomeConfig JSON save/load (user sessions)
+- Multi-utility support (SCE, SDG&E)
 
 ---
 
