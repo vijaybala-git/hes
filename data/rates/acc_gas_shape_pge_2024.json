@@ -1,0 +1,18 @@
+{
+  "source": "2024 CPUC ACC Gas Model v1b, PG&E residential core, normalised to annual mean = 1.0",
+  "note": "Extracted by scripts/extract_acc_shapes.py from 2024-ACC-Gas-Model-v1b_October-Update.xlsx",
+  "monthly_shape": [
+    1.1973,
+    1.1908,
+    1.1664,
+    0.8499,
+    0.8593,
+    0.8666,
+    0.869,
+    0.8668,
+    0.8709,
+    0.8693,
+    1.1956,
+    1.1981
+  ]
+}
