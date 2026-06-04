@@ -1,5 +1,5 @@
 """
-WhyWatt? — Solara UI (Phase 2 / Objective 6 — Journey Planner)
+WhyWatt? — Solara UI (Phase 3 / Objective 1 — Help System)
 """
 import os
 import json
@@ -15,6 +15,7 @@ from matplotlib.figure import Figure
 from model import HESModel
 from home_config import HomeConfig, compute_baseload_kwh
 from journey import CATEGORY_ORDER, CATEGORY_LABELS, CapExOnlySlot
+from help_utils import HelpButton, ChartHelpButton, HelpPopupOverlay, open_help
 
 # ── Asset paths ───────────────────────────────────────────────────────────────
 _HERE         = os.path.dirname(os.path.abspath(__file__))
@@ -1633,9 +1634,25 @@ def _DetailCosts(inst_rv, reb_rv):
 # ── §25.2 Summary card helpers ────────────────────────────────────────────────
 
 def _card_header(key: str, title: str):
-    """Title bar + ⋮ button — the only navigation trigger."""
+    """Title bar + [?] help button + ⋮ expand button."""
+    # Map device card keys to help topic keys
+    _HELP_KEY = {
+        "hvac":         "hvac",
+        "water_heater": "water_heater",
+        "ev":           "ev_charger",
+        "cooktop":      "cooktop",
+        "dryer":        "dryer",
+        "panel":        "panel_upgrade",
+        "baseload":     "baseload",
+        "home":         "home_profile",
+        "solar":        "solar",
+        "rates":        "rates",
+    }
     with solara.Row(style="align-items:center; margin-bottom:4px"):
         solara.Text(title, style="font-weight:600; font-size:0.88em; flex:1; color:#1A237E")
+        help_key = _HELP_KEY.get(key, "")
+        if help_key:
+            HelpButton(help_key, style="margin-right:4px")
         solara.Button(
             "⋮",
             on_click=lambda k=key: detail_open.set(
@@ -2629,9 +2646,11 @@ def JourneyPlannerPanel():
         with solara.Row(style=(
             "background-color:#F0F0F0; padding:6px 12px;"
             " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
+            " align-items:center;"
         )):
             solara.Text("🗺️ Your Electrification Journey",
-                        style="font-weight:600; font-size:0.95em")
+                        style="font-weight:600; font-size:0.95em; flex:1")
+            HelpButton("journey_planner")
         HVACSummaryCard()
         WHSummaryCard()
         EVSummaryCard()
@@ -2651,8 +2670,10 @@ def HomeProfilePanel():
         with solara.Row(style=(
             "background-color:#F0F0F0; padding:6px 12px;"
             " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
+            " align-items:center;"
         )):
-            solara.Text("🏠 Home + Solar", style="font-weight:600; font-size:0.95em")
+            solara.Text("🏠 Home + Solar", style="font-weight:600; font-size:0.95em; flex:1")
+            HelpButton("home_profile")
         HomeSummaryCard()
         SolarSummaryCard()
 
@@ -2663,8 +2684,10 @@ def EnergyPricesPanel():
         with solara.Row(style=(
             "background-color:#F0F0F0; padding:6px 12px;"
             " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
+            " align-items:center;"
         )):
-            solara.Text("📈 Energy & Prices", style="font-weight:600; font-size:0.95em")
+            solara.Text("📈 Energy & Prices", style="font-weight:600; font-size:0.95em; flex:1")
+            HelpButton("energy_prices")
         RatesSummaryCard()
 
 
@@ -2725,6 +2748,7 @@ def BottomZone(model):
 @solara.component
 def Page():
     solara.Title("WhyWatt?")
+    HelpPopupOverlay()
 
     model, df = solara.use_memo(run_simulation, dependencies=[
         zip_code.value, climate_zone.value, num_bedrooms.value,
@@ -2833,6 +2857,19 @@ def Page():
                     " transition:all 0.15s;"
                 ),
             )
+            # Help button — opens help index in browser
+            solara.Button(
+                "Help 📖",
+                on_click=lambda: open_help("index.html"),
+                style=(
+                    "background:transparent; color:#5C6BC0;"
+                    " border:1.5px solid #9FA8DA;"
+                    " border-radius:6px; padding:5px 12px;"
+                    " font-size:0.80em; cursor:pointer;"
+                    " white-space:nowrap; flex-shrink:0;"
+                    " transition:all 0.15s; margin-left:6px;"
+                ),
+            )
 
         # ── Summary stats ───────────────────────────────────────────────────────
         SummaryStats(df, n, model)
@@ -2846,9 +2883,11 @@ def Page():
                     style=(
                         "background-color:#F0F0F0; padding:6px 12px;"
                         " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
+                        " align-items:center;"
                     ),
                 ):
                     solara.Select("", value=chart_left, values=CHART_OPTIONS)
+                    ChartHelpButton(chart_left.value)
                 ChartPane(chart_left.value, model, df, n)
             with solara.Card(margin=0, elevation=1,
                              style="flex:1; min-width:300px; overflow:hidden"):
@@ -2857,9 +2896,11 @@ def Page():
                     style=(
                         "background-color:#F0F0F0; padding:6px 12px;"
                         " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
+                        " align-items:center;"
                     ),
                 ):
                     solara.Select("", value=chart_right, values=CHART_OPTIONS)
+                    ChartHelpButton(chart_right.value)
                 ChartPane(chart_right.value, model, df, n)
 
         # ── Legend ──────────────────────────────────────────────────────────────
