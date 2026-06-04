@@ -2,29 +2,34 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>WhyWatt Help — About</title>
+  <title>WhyWatt Help — About WhyWatt</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-           max-width: 760px; margin: 2rem auto; padding: 0 1.5rem;
-           color: #222; line-height: 1.65; }
-    header { display: flex; align-items: center; gap: 1rem;
-             border-bottom: 2px solid #E8EAF6; padding-bottom: 1rem; margin-bottom: 1rem; }
-    header img { height: 40px; }
-    header h1 { margin: 0; font-size: 1.4rem; color: #1A237E; }
-    nav { font-size: 0.88rem; margin-bottom: 1.5rem; }
-    nav a { color: #3F51B5; margin-right: 1.2rem; text-decoration: none; }
-    nav a:hover { text-decoration: underline; }
-    h2 { margin-top: 2rem; padding-bottom: 0.3rem;
-         border-bottom: 1px solid #E8EAF6; color: #283593; font-size: 1.1rem; }
-    p  { margin: 0.6rem 0; }
-    .note { background: #FFF8E1; border-left: 4px solid #FFC107;
-            padding: 0.6rem 1rem; margin: 1rem 0; border-radius: 0 4px 4px 0; }
-    table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.9rem; }
-    th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #E8EAF6; }
-    th { background: #F5F5F5; color: #283593; font-weight: 600; }
-    footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #E8EAF6;
-             font-size: 0.78rem; color: #9E9E9E; }
-    footer a { color: #9E9E9E; }
+               max-width: 760px; margin: 2rem auto; padding: 0 1.5rem;
+               color: #222; line-height: 1.65; }
+        header { display: flex; align-items: center; gap: 1rem;
+                 border-bottom: 2px solid #E8EAF6; padding-bottom: 1rem; margin-bottom: 1rem; }
+        header img { height: 40px; }
+        header h1 { margin: 0; font-size: 1.4rem; color: #1A237E; }
+        nav { font-size: 0.88rem; margin-bottom: 1.5rem; }
+        nav a { color: #3F51B5; margin-right: 1.2rem; text-decoration: none; }
+        nav a:hover { text-decoration: underline; }
+        h2 { margin-top: 2rem; padding-bottom: 0.3rem;
+             border-bottom: 1px solid #E8EAF6; color: #283593; font-size: 1.1rem; }
+        p  { margin: 0.6rem 0; }
+        ul { margin: 0.4rem 0 0.8rem 0; padding-left: 1.5rem; }
+        li { margin: 0.3rem 0; }
+        .note { background: #FFF8E1; border-left: 4px solid #FFC107;
+                padding: 0.6rem 1rem; margin: 1rem 0; border-radius: 0 4px 4px 0; }
+        .formula { background: #F3F4F6; border-left: 4px solid #9FA8DA;
+                   padding: 0.6rem 1rem; margin: 1rem 0; font-family: monospace;
+                   font-size: 0.88em; border-radius: 0 4px 4px 0; white-space: pre-wrap; }
+        footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #E8EAF6;
+                 font-size: 0.78rem; color: #9E9E9E; display: flex;
+                 justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+        .section-tag { background: #E8EAF6; color: #5C6BC0; border-radius: 4px;
+                       padding: 2px 8px; font-size: 0.76rem; font-weight: 600;
+                       white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -38,110 +43,45 @@
   </nav>
   <main>
 
-    <h2 id="what-is-it">What WhyWatt is</h2>
-    <p>
-      <strong>WhyWatt?</strong> is a home electrification cost simulator for California
-      community advocates. It shows the long-term cost of an electrification journey —
-      replacing gas appliances with electric alternatives over time — compared to doing
-      nothing for 20 years.
-    </p>
-    <p>
-      The primary audience is electrification advocates running sessions with homeowners:
-      people who want to show, with real numbers, what switching to heat pumps, induction,
-      and electric vehicles actually costs and saves over time.
-    </p>
+    <h2 id="what-whywatt-is">What WhyWatt is</h2>
+    <p>WhyWatt is a home electrification cost simulator for California community advocates. It shows the long-term cost of an electrification journey — replacing gas appliances with electric alternatives over time — compared to doing nothing for 20 years.</p>
+<p>The primary audience is electrification advocates running sessions with homeowners: people who want to show, with real numbers, what switching to heat pumps, induction, and electric vehicles actually costs and saves.</p>
 
     <h2 id="what-it-models">What it models</h2>
     <p>WhyWatt simulates a single home running two scenarios in parallel:</p>
-    <ul>
-      <li><strong>Your Journey</strong> — you choose which appliances to swap, and in which year.</li>
-      <li><strong>Do Nothing</strong> — all current appliances stay in place for 20 years.</li>
-    </ul>
-    <p>For each year of the simulation, WhyWatt calculates:</p>
-    <ul>
-      <li>Energy consumption for each appliance (kWh for electricity, therms for gas)</li>
-      <li>Energy cost using PG&amp;E tariff rates projected forward with escalation scenarios</li>
-      <li>Capital expenditure when appliances are swapped (install cost minus rebates)</li>
-      <li>Solar and battery savings (net of electricity purchased from the grid)</li>
-    </ul>
+<ul>
+<li>Your Journey — you choose which appliances to swap, and in which year</li>
+<li>Do Nothing — all current appliances stay in place for 20 years</li>
+</ul>
+<p>For each year WhyWatt calculates energy consumption, utility costs with escalation, capital expenditure for appliance swaps, and solar savings.</p>
 
-    <h2 id="data-sources">Data sources and vintage</h2>
-    <table>
-      <tr><th>Data</th><th>Source</th><th>Vintage</th></tr>
-      <tr>
-        <td>PG&amp;E electricity rate (E-1)</td>
-        <td>Cal Advocates Q2 2025 report; PG&amp;E Advice Letter</td>
-        <td>2025</td>
-      </tr>
-      <tr>
-        <td>PG&amp;E gas rate (G-1)</td>
-        <td>PG&amp;E Advice Letter 5014-G1</td>
-        <td>January 2025</td>
-      </tr>
-      <tr>
-        <td>ACC rate shape</td>
-        <td>CPUC / E3 Avoided Cost Calculator, Electric CZ12 + PG&amp;E Gas</td>
-        <td>2024</td>
-      </tr>
-      <tr>
-        <td>Climate data (HDD/CDD)</td>
-        <td>NOAA TMY3, San Jose Mineta (Station 724945)</td>
-        <td>1991–2005 composite</td>
-      </tr>
-      <tr>
-        <td>Appliance efficiency specs</td>
-        <td>ENERGY STAR, AGA, AHRI reference data</td>
-        <td>2024</td>
-      </tr>
-      <tr>
-        <td>Bedroom scaling factors</td>
-        <td>DOE/ENERGY STAR occupancy proxy</td>
-        <td>2023</td>
-      </tr>
-    </table>
-
-    <h2 id="methodology">Methodology</h2>
-    <p>
-      WhyWatt uses a Mesa agent-based simulation framework stepping annually for 20 years.
-      All energy quantities are in native physical units: kilowatt-hours (kWh) for
-      electricity and therms for gas. Monthly sub-calculations are used for HVAC and
-      water heating to preserve seasonal accuracy.
-    </p>
-    <p>
-      Rate escalation uses compound annual growth rates (CAGR) applied to published
-      base rates. Three scenarios are offered: conservative (4%/yr elec, 4%/yr gas),
-      moderate (7%/yr elec, 8%/yr gas — the default, matching 10-year historical averages),
-      and stress (10%/yr elec, 12%/yr gas, per CEC projections).
-    </p>
-
-    <h2 id="limitations">Limitations and what WhyWatt does not model</h2>
+    <h2 id="data-sources">Data sources</h2>
     <ul>
-      <li>Appliance lifespan and end-of-life replacement (only scheduled swaps are modeled)</li>
-      <li>Time-of-use rate optimization (flat rates are used; ACC shape is an option)</li>
-      <li>Income-qualified rebate programs (coming in a future release)</li>
-      <li>Monte Carlo uncertainty bands (deterministic model; future release)</li>
-      <li>Multi-utility support beyond PG&amp;E (future release)</li>
-    </ul>
+<li>PG&E electricity rate (E-1): Cal Advocates Q2 2025, $0.386/kWh</li>
+<li>PG&E gas rate (G-1): PG&E Advice Letter 5014-G1 Jan 2025, $2.08/therm</li>
+<li>ACC rate shape: CPUC/E3 Avoided Cost Calculator 2024</li>
+<li>Climate data: NOAA TMY3, San Jose Mineta (Station 724945), 1991-2005 composite</li>
+<li>Appliance efficiency: ENERGY STAR and AGA reference data (2024)</li>
+<li>Bedroom scaling: DOE/ENERGY STAR occupancy proxy</li>
+</ul>
+
+    <h2 id="limitations">Limitations</h2>
+    <ul>
+<li>Appliance end-of-life replacement is not modeled beyond scheduled swaps</li>
+<li>Income-qualified rebate programs are coming in a future release</li>
+<li>Monte Carlo uncertainty bands are coming in a future release</li>
+<li>Only PG&E rates are currently supported (SCE, SDG&E in a future release)</li>
+</ul>
 
     <h2 id="disclaimer">Disclaimer</h2>
-    <div class="note">
-      <strong>WhyWatt is a planning tool, not a financial guarantee.</strong>
-      Actual costs depend on your specific appliances, usage patterns, utility rate
-      changes, local rebate availability, and many other factors. Consult a licensed
-      contractor before making purchasing decisions. Energy rate projections are
-      scenarios, not predictions.
-    </div>
+    <p>WhyWatt is a planning tool, not a financial guarantee. Actual costs depend on your specific appliances, usage patterns, utility rate changes, local rebate availability, and many other factors. Consult a licensed contractor before making purchasing decisions. Energy rate projections are scenarios, not predictions.</p>
 
     <h2 id="team">Team</h2>
-    <p>
-      Developed with support from the
-      <strong>Electrification Collaboration (ECHo)</strong> —
-      helping California communities make the switch.
-    </p>
-
+    <p>Developed with support from the Electrification Collaboration (ECHo) — helping California communities make the switch.</p>
   </main>
   <footer>
-    WhyWatt v3.0 &middot; Data vintage: 2025 &middot; <a href="about.html">About this tool</a>
+    <span>WhyWatt v3.0 &middot; <a href="about.html" style="color:#9E9E9E">About</a></span>
+    <span class="section-tag">§15 · About WhyWatt &middot; edit help_content.md §15</span>
   </footer>
 </body>
 </html>

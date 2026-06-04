@@ -2,31 +2,34 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>WhyWatt Help — Charts</title>
+  <title>WhyWatt Help — Charts Reference</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-           max-width: 760px; margin: 2rem auto; padding: 0 1.5rem;
-           color: #222; line-height: 1.65; }
-    header { display: flex; align-items: center; gap: 1rem;
-             border-bottom: 2px solid #E8EAF6; padding-bottom: 1rem; margin-bottom: 1rem; }
-    header img { height: 40px; }
-    header h1 { margin: 0; font-size: 1.4rem; color: #1A237E; }
-    nav { font-size: 0.88rem; margin-bottom: 1.5rem; }
-    nav a { color: #3F51B5; margin-right: 1.2rem; text-decoration: none; }
-    nav a:hover { text-decoration: underline; }
-    h2 { margin-top: 2.5rem; padding-bottom: 0.3rem;
-         border-bottom: 2px solid #E8EAF6; color: #1A237E; font-size: 1.15rem; }
-    h3 { margin-top: 1.5rem; color: #283593; font-size: 1rem; }
-    p  { margin: 0.6rem 0; }
-    .group-label { display: inline-block; background: #E8EAF6; color: #283593;
-                   font-size: 0.78rem; font-weight: 700; padding: 2px 8px;
-                   border-radius: 10px; margin-bottom: 0.5rem; }
-    .stub { background: #FFF8E1; border-left: 4px solid #FFC107;
-            padding: 0.5rem 1rem; margin: 0.8rem 0; border-radius: 0 4px 4px 0;
-            font-size: 0.88rem; color: #6D4C41; }
-    footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #E8EAF6;
-             font-size: 0.78rem; color: #9E9E9E; }
-    footer a { color: #9E9E9E; }
+               max-width: 760px; margin: 2rem auto; padding: 0 1.5rem;
+               color: #222; line-height: 1.65; }
+        header { display: flex; align-items: center; gap: 1rem;
+                 border-bottom: 2px solid #E8EAF6; padding-bottom: 1rem; margin-bottom: 1rem; }
+        header img { height: 40px; }
+        header h1 { margin: 0; font-size: 1.4rem; color: #1A237E; }
+        nav { font-size: 0.88rem; margin-bottom: 1.5rem; }
+        nav a { color: #3F51B5; margin-right: 1.2rem; text-decoration: none; }
+        nav a:hover { text-decoration: underline; }
+        h2 { margin-top: 2rem; padding-bottom: 0.3rem;
+             border-bottom: 1px solid #E8EAF6; color: #283593; font-size: 1.1rem; }
+        p  { margin: 0.6rem 0; }
+        ul { margin: 0.4rem 0 0.8rem 0; padding-left: 1.5rem; }
+        li { margin: 0.3rem 0; }
+        .note { background: #FFF8E1; border-left: 4px solid #FFC107;
+                padding: 0.6rem 1rem; margin: 1rem 0; border-radius: 0 4px 4px 0; }
+        .formula { background: #F3F4F6; border-left: 4px solid #9FA8DA;
+                   padding: 0.6rem 1rem; margin: 1rem 0; font-family: monospace;
+                   font-size: 0.88em; border-radius: 0 4px 4px 0; white-space: pre-wrap; }
+        footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #E8EAF6;
+                 font-size: 0.78rem; color: #9E9E9E; display: flex;
+                 justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+        .section-tag { background: #E8EAF6; color: #5C6BC0; border-radius: 4px;
+                       padding: 2px 8px; font-size: 0.76rem; font-weight: 600;
+                       white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -37,90 +40,27 @@
   </header>
   <nav>
     <a href="index.html">← Help Index</a>
-    <a href="journey.html">Journey model</a>
-    <a href="rates.html">Rates</a>
   </nav>
   <main>
 
-    <p>WhyWatt's charts are organized into three groups. Select any chart from the
-    dropdown in each chart panel. Use the <strong>[?]</strong> button next to the
-    dropdown for a quick summary.</p>
+    <h2 id="journey-costs-jc">Journey Costs (JC)</h2>
+    <p>JC-1 Annual Cost — Your Journey vs. Do Nothing Shows the total energy bill (electricity + gas) for each year of the simulation, for both scenarios side by side. The gap in a given year is your annual saving or cost.</p>
+<p>JC-2 Cumulative Cost & Payback Crossover Adds up every year's total bill from year 1 onward. The crossover point — where the Journey line dips below Do Nothing — is your payback year. This is often the most compelling chart to show homeowners.</p>
+<p>JC-3 20-Year Summary Bar A single side-by-side bar showing total 20-year spend for each scenario. The difference is your estimated lifetime savings from electrification.</p>
+<p>JC-4 Annual Cost Breakdown by Appliance A stacked bar where each segment is one appliance's share of the annual energy bill. Watch across years to see which swaps have the biggest impact.</p>
 
-    <!-- ── Journey Costs ──────────────────────────────────────────────────── -->
-    <h2 id="journey-costs">Journey Costs (JC)</h2>
-    <p><em>Answers: "What will this cost, and is the journey worth it?"</em></p>
+    <h2 id="rates-r">Rates (R)</h2>
+    <p>R-1 Rate Projection Electricity and gas rates projected forward from today's PG&E tariff using your chosen escalation scenario (conservative / moderate / stress).</p>
+<p>R-2 ACC Seasonal Rate Shape Monthly variation in the effective electricity rate under the CPUC Avoided Cost Calculator framework. Summer afternoon peak hours carry the highest effective rate.</p>
 
-    <h3 id="jc1">JC-1 — Annual Cost: Your Journey vs. Do Nothing</h3>
-    <span class="group-label">Journey Costs</span>
-    <p>Shows the total energy bill (electricity + gas) for each year of the simulation,
-    for both scenarios side by side. The gap between bars in a given year is your annual
-    saving (if your journey bar is shorter) or annual premium (if it's taller).</p>
-    <p>In early years, your journey may cost more because of install costs. In later years,
-    lower operating costs take over — this is the payback dynamic.</p>
-    <div class="stub">Full chart documentation coming in a future release.</div>
-
-    <h3 id="jc2">JC-2 — Cumulative Cost &amp; Payback Crossover</h3>
-    <span class="group-label">Journey Costs</span>
-    <p>Adds up every year's total bill (operating + CapEx) from year 1 onward. The point
-    where the Journey line dips below the Do Nothing line is the <strong>payback year</strong>
-    — from that year forward, your journey has spent less in total than doing nothing.</p>
-    <p>This is often the most compelling chart to show homeowners: "By year 8, you've
-    broken even, and everything after that is savings."</p>
-    <div class="stub">Full chart documentation coming in a future release.</div>
-
-    <h3 id="jc3">JC-3 — 20-Year Summary Bar</h3>
-    <span class="group-label">Journey Costs</span>
-    <p>A single side-by-side bar showing the total 20-year spend for each scenario.
-    The difference is your estimated lifetime savings from electrification.</p>
-    <div class="stub">Full chart documentation coming in a future release.</div>
-
-    <h3 id="jc4">JC-4 — Annual Cost Breakdown by Appliance</h3>
-    <span class="group-label">Journey Costs</span>
-    <p>A stacked bar chart where each segment represents one appliance's share of the
-    annual energy bill. Watch this chart across years to see which swaps have the
-    biggest cost impact — the segment for that appliance shrinks in its swap year.</p>
-    <div class="stub">Full chart documentation coming in a future release.</div>
-
-    <!-- ── Rates ──────────────────────────────────────────────────────────── -->
-    <h2 id="rates-charts">Rates (R)</h2>
-    <p><em>Answers: "Where do energy prices come from, and how do they change?"</em></p>
-
-    <h3 id="r1">R-1 — Rate Projection</h3>
-    <span class="group-label">Rates</span>
-    <p>Shows electricity and gas rates projected forward from today's PG&amp;E tariff
-    using a compound annual growth rate (CAGR). Three scenarios are available:
-    conservative, moderate (default), and stress. See <a href="rates.html">Rates</a>
-    for the CAGR values and their sources.</p>
-    <div class="stub">Full chart documentation coming in a future release.</div>
-
-    <h3 id="r2">R-2 — ACC Seasonal Rate Shape</h3>
-    <span class="group-label">Rates</span>
-    <p>Shows the monthly variation in the effective electricity rate under the CPUC's
-    Avoided Cost Calculator (ACC) framework. Summer afternoon peak hours carry the
-    highest effective rate; winter nights carry the lowest. See <a href="acc.html">ACC</a>
-    for methodology details.</p>
-    <div class="stub">Full chart documentation coming in a future release.</div>
-
-    <!-- ── Energy Use ─────────────────────────────────────────────────────── -->
-    <h2 id="energy-use">Energy Use (EU)</h2>
-    <p><em>Answers: "How much energy does each appliance actually use?"</em></p>
-
-    <h3 id="eu1">EU-1 — Annual Energy Consumption by Fuel</h3>
-    <span class="group-label">Energy Use</span>
-    <p>Shows total annual energy consumption in physical units — kilowatt-hours (kWh)
-    for electricity and therms for gas. This shows <em>energy quantity before pricing</em>;
-    changes here directly drive the cost charts above.</p>
-    <div class="stub">Full chart documentation coming in a future release.</div>
-
-    <h3 id="eu2">EU-2 — Per-Appliance Energy Breakdown</h3>
-    <span class="group-label">Energy Use</span>
-    <p>A stacked breakdown of energy consumption by appliance. Compare your journey vs.
-    do-nothing to see which appliance swaps reduce energy use most, and by how much.</p>
-    <div class="stub">Full chart documentation coming in a future release.</div>
-
+    <h2 id="energy-use-eu">Energy Use (EU)</h2>
+    <p>EU-1 Annual Energy Consumption by Fuel Total annual energy in physical units — kWh for electricity, therms for gas. Shows energy quantity before pricing is applied.</p>
+<p>EU-2 Per-Appliance Energy Breakdown Stacked breakdown of energy consumption by appliance. Compare journey vs. do-nothing to see which swaps reduce energy use most.</p>
+<p>---</p>
   </main>
   <footer>
-    WhyWatt v3.0 &middot; Data vintage: 2025 &middot; <a href="about.html">About this tool</a>
+    <span>WhyWatt v3.0 &middot; <a href="about.html" style="color:#9E9E9E">About</a></span>
+    <span class="section-tag">§14 · Charts Reference &middot; edit help_content.md §14</span>
   </footer>
 </body>
 </html>

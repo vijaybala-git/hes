@@ -1,147 +1,153 @@
 """
-help_content.py — Short-form popup text for every [?] button in the WhyWatt UI.
-
-Each entry: (popup_text: str, learn_more_page: str)
-learn_more_page is a filename (optionally with #anchor) relative to docs/help/,
-e.g. "hvac.html" or "charts.html#jc1".
+help_content.py — GENERATED FILE. Do not edit manually.
+Source: docs/help/help_content.md
+Regenerate: python scripts/build_help.py
 """
 
 HELP_POPUPS: dict[str, tuple[str, str]] = {
 
-    # ── Main panel headers ─────────────────────────────────────────────────────
+    # ── Panel headers & device rows (from help_content.md) ───────────────────
     "journey_planner": (
-        "The Journey Planner lets you schedule when each gas appliance gets replaced "
-        "with an electric alternative. A 'Do Nothing' baseline runs in parallel so you "
-        "can see the cost difference year by year over 20 years.",
+        "The Journey Planner lets you schedule when each gas appliance gets"
+        " replaced with an electric alternative. A \"Do Nothing\" baseline runs in"
+        " parallel so you can see the cost difference year by year over 20 years.",
         "journey.html",
     ),
     "home_profile": (
-        "Home details — size, insulation quality, solar, and location — affect how much "
-        "energy each appliance uses. Better insulation means less heating and cooling energy.",
+        "Home details — size, insulation quality, and location — affect how much"
+        " energy each appliance uses. Your ZIP code sets the climate zone, which"
+        " drives the heating and cooling calculations.",
+        "climate.html",
+    ),
+    "zip_code": (
+        "Home details — size, insulation quality, and location — affect how much"
+        " energy each appliance uses. Your ZIP code sets the climate zone, which"
+        " drives the heating and cooling calculations.",
         "climate.html",
     ),
     "energy_prices": (
-        "Energy prices are based on current PG&E tariff rates with a projected escalation "
-        "rate applied each year. You can adjust the escalation scenario in the Rate details.",
+        "Energy prices are based on current PG&E tariff rates with a projected"
+        " escalation rate applied each year. You can adjust the escalation"
+        " scenario in the Rate details panel.",
         "rates.html",
     ),
-
-    # ── Device sub-panel rows ──────────────────────────────────────────────────
+    "rates": (
+        "Energy prices are based on current PG&E tariff rates with a projected"
+        " escalation rate applied each year. You can adjust the escalation"
+        " scenario in the Rate details panel.",
+        "rates.html",
+    ),
     "hvac": (
-        "Heating and cooling energy is calculated from monthly degree-days for your "
-        "climate zone, your home's insulation level, and the heat pump's efficiency "
-        "rating (COP for heating, SEER for cooling).",
+        "Heating and cooling energy is calculated from monthly degree-days for"
+        " your climate zone, your home's insulation level, and the heat pump's"
+        " efficiency rating (COP for heating, SEER for cooling).",
         "hvac.html",
     ),
     "water_heater": (
-        "Water heating energy depends on how much hot water your household uses, the "
-        "temperature of incoming cold water (varies by season and location), and the "
-        "appliance's efficiency rating (UEF).",
+        "Water heating energy depends on how much hot water your household uses,"
+        " the temperature of incoming cold water (varies by season and location),"
+        " and the appliance's efficiency rating (UEF).",
         "water_heating.html",
     ),
     "dryer": (
-        "Dryer energy is based on loads per week and energy per load. Heat pump dryers "
-        "use roughly one-third the energy of gas dryers for the same number of loads.",
+        "Dryer energy is based on loads per week and energy per load. Heat pump"
+        " dryers use roughly one-third the energy of gas dryers for the same"
+        " number of loads.",
         "dryer.html",
     ),
     "cooktop": (
-        "Cooking energy is estimated from daily cook time. Gas burners convert only "
-        "about 40% of combustion energy to heat; induction transfers about 85% directly "
-        "to the cookware.",
+        "Cooking energy is estimated from daily cook time. Gas burners convert"
+        " only about 40% of combustion energy to heat; induction transfers about"
+        " 85% directly to the cookware.",
         "cooktop.html",
     ),
     "ev_charger": (
-        "EV charging energy is estimated from your average daily miles driven and your "
-        "vehicle's efficiency. Level 2 home charging is assumed.",
+        "EV charging energy is estimated from your average daily miles driven and"
+        " your vehicle's efficiency. Level 2 home charging (240V) is assumed.",
         "ev.html",
     ),
     "solar": (
-        "Solar savings are modeled as a reduction in net electricity purchased from the "
-        "grid each year. Battery storage shifts solar generation to evening hours.",
+        "Solar savings are modeled as a reduction in net electricity purchased"
+        " from the grid each year. Battery storage shifts solar generation to"
+        " evening hours.",
         "solar.html",
     ),
     "baseload": (
-        "Baseload covers lights, outlets, refrigerator, and other always-on electricity "
-        "uses. It scales with the number of bedrooms using DOE occupancy data.",
+        "Baseload covers lights, outlets, refrigerator, and other always-on"
+        " electricity uses. It scales with the number of bedrooms using DOE"
+        " occupancy data.",
         "baseload.html",
     ),
     "panel_upgrade": (
-        "A panel upgrade may be needed when adding high-draw appliances like a heat pump "
-        "or EV charger to an older 100A service. The Panel Load callout shows "
-        "whether your planned journey requires one.",
+        "A panel upgrade may be needed when adding high-draw appliances like a"
+        " heat pump or EV charger to an older 100A service. The Panel Load callout"
+        " shows whether your planned journey requires one.",
         "panel.html",
     ),
-    "rates": (
-        "Energy rates are based on PG&E tariff data from CPUC filings. You can choose "
-        "a conservative, moderate, or stress escalation scenario for how rates grow "
-        "over the 20-year simulation.",
-        "rates.html",
-    ),
 
-    # ── Chart title bars ───────────────────────────────────────────────────────
+    # ── Chart title bars (stable — not from help_content.md) ─────────────────
     "chart_jc1": (
-        "Annual cost is the total energy bill for that simulation year — electricity plus "
-        "gas — for your journey home vs. the do-nothing baseline. The gap between the "
-        "lines is your annual saving (or cost) in that year.",
+        "Annual cost is the total energy bill for that simulation year —"
+        " electricity plus gas — for your journey home vs. the do-nothing"
+        " baseline. The gap between the lines is your annual saving (or cost) in"
+        " that year.",
         "charts.html#jc1",
     ),
     "chart_jc2": (
-        "Cumulative cost adds up every year's bill from year 1 onward. The crossover "
-        "point — where the journey line dips below do-nothing — is your payback year.",
+        "Cumulative cost adds up every year's bill from year 1 onward. The"
+        " crossover point — where the journey line dips below do-nothing — is your"
+        " payback year.",
         "charts.html#jc2",
     ),
     "chart_jc3": (
-        "The summary bar shows total 20-year spend for each scenario side by side. "
-        "The difference is your estimated lifetime savings from electrification.",
+        "The summary bar shows total 20-year spend for each scenario side by"
+        " side. The difference is your estimated lifetime savings from"
+        " electrification.",
         "charts.html#jc3",
     ),
     "chart_jc4": (
-        "Each segment shows one appliance's share of the annual energy bill. Watching "
-        "this chart across years shows which swaps have the biggest cost impact.",
+        "Each segment shows one appliance's share of the annual energy bill."
+        " Watching this chart across years shows which swaps have the biggest cost"
+        " impact.",
         "charts.html#jc4",
     ),
     "chart_r1": (
-        "Rates are projected forward from today's PG&E tariff using a compound annual "
-        "growth rate (CAGR). You can choose conservative, moderate, or stress scenarios.",
+        "Rates are projected forward from today's PG&E tariff using a compound"
+        " annual growth rate (CAGR). You can choose conservative, moderate, or"
+        " stress scenarios.",
         "rates.html#projection",
     ),
     "chart_r2": (
-        "The ACC (Avoided Cost of Carbon) seasonal shape shows how the effective "
-        "electricity rate varies by month under the CPUC's avoided-cost framework. "
-        "Summer peak hours carry the highest effective rate.",
+        "The ACC (Avoided Cost of Carbon) seasonal shape shows how the effective"
+        " electricity rate varies by month under the CPUC's avoided-cost"
+        " framework. Summer peak hours carry the highest effective rate.",
         "acc.html",
     ),
     "chart_eu1": (
-        "Annual energy consumption in physical units — kilowatt-hours for electricity "
-        "and therms for gas. This shows how much energy is used before applying rates.",
+        "Annual energy consumption in physical units — kilowatt-hours for"
+        " electricity and therms for gas. This shows how much energy is used"
+        " before applying rates.",
         "charts.html#eu1",
     ),
     "chart_eu2": (
-        "Each segment shows one appliance's share of total energy consumption. "
-        "Compare journey vs. do-nothing to see which swaps reduce energy use most.",
+        "Each segment shows one appliance's share of total energy consumption."
+        " Compare journey vs. do-nothing to see which swaps reduce energy use"
+        " most.",
         "charts.html#eu2",
     ),
 
-    # ── Chart selector: map chart option name → topic key ─────────────────────
-    # Used by ChartHelpButton to look up the right popup from the selected chart name.
-    "_chart_name_to_key": {  # type: ignore[assignment]  # value is a dict, not a tuple
-        "Cumulative Energy Costs":    "chart_jc2",
-        "Annual Cost by Year":        "chart_jc1",
+    # ── Chart name → key mapping (stable) ────────────────────────────────────
+    "_chart_name_to_key": {  # type: ignore[assignment]
+        "Cumulative Energy Costs": "chart_jc2",
+        "Annual Cost by Year": "chart_jc1",
         "Cost Breakdown by Category": "chart_jc4",
-        "Cost by Device":             "chart_jc4",
-        "Summary":                    "chart_jc3",
-        "ACC Rate Projection":        "chart_r2",
-        "Energy Use by Device":       "chart_eu2",
+        "Cost by Device": "chart_jc4",
+        "Summary": "chart_jc3",
+        "ACC Rate Projection": "chart_r2",
+        "Energy Use by Device": "chart_eu2",
     },
 
-    # ── Input field inline icons ───────────────────────────────────────────────
-    "zip_code": (
-        "Your ZIP code determines your CEC Building Climate Zone, which sets the "
-        "monthly heating and cooling degree-days used in the HVAC calculation. "
-        "California uses 16 official climate zones for building energy codes.",
-        "climate.html",
-    ),
 }
 
-# Convenience: the chart-name→key mapping extracted cleanly
+# Convenience export
 CHART_NAME_TO_HELP_KEY: dict[str, str] = HELP_POPUPS["_chart_name_to_key"]  # type: ignore[assignment]
