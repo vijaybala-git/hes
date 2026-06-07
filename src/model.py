@@ -100,13 +100,19 @@ def _make_device(spec: dict, mesa_model: mesa.Model, *,
     age   = spec.get("age", 0)
     ls    = spec.get("lifespan", 15)
     cost  = spec.get("installation_cost", 0.0)
+    # Electrical nameplate (Phase 3 §2.5) — inert; 0 for gas/unset → rated_va == 0
+    elec  = dict(
+        circuit_volts=spec.get("circuit_volts", 0),
+        circuit_amps=spec.get("circuit_amps", 0),
+        continuous=spec.get("continuous", False),
+    )
 
     if cls == "GasFurnace":
         return GasFurnace(mesa_model,
                           afue=spec.get("afue", 0.80),
                           ua_btu_hr_f=ua,
                           monthly_hdd=hdd,
-                          age=age, lifespan=ls, installation_cost=cost)
+                          age=age, lifespan=ls, installation_cost=cost, **elec)
 
     if cls == "HeatPumpHVAC":
         return HeatPumpHVAC(mesa_model,
@@ -114,7 +120,7 @@ def _make_device(spec: dict, mesa_model: mesa.Model, *,
                             seer_cooling=spec.get("seer_cooling", 22),
                             ua_btu_hr_f=ua,
                             monthly_hdd=hdd, monthly_cdd=cdd,
-                            age=age, lifespan=ls, installation_cost=cost)
+                            age=age, lifespan=ls, installation_cost=cost, **elec)
 
     if cls == "GasWaterHeater":
         daily_gal = spec.get("daily_gallons_override") or hw_gallons
@@ -122,7 +128,7 @@ def _make_device(spec: dict, mesa_model: mesa.Model, *,
                               uef=spec.get("uef", 0.65),
                               daily_gallons=daily_gal,
                               monthly_inlet_temp_f=inlet_temp,
-                              age=age, lifespan=ls, installation_cost=cost)
+                              age=age, lifespan=ls, installation_cost=cost, **elec)
 
     if cls == "HeatPumpWaterHeater":
         daily_gal = spec.get("daily_gallons_override") or hw_gallons
@@ -130,56 +136,56 @@ def _make_device(spec: dict, mesa_model: mesa.Model, *,
                                    uef=spec.get("uef", 3.5),
                                    daily_gallons=daily_gal,
                                    monthly_inlet_temp_f=inlet_temp,
-                                   age=age, lifespan=ls, installation_cost=cost)
+                                   age=age, lifespan=ls, installation_cost=cost, **elec)
 
     if cls == "GasDryer":
         return GasDryer(mesa_model,
                         therms_per_cycle=spec.get("therms_per_cycle", 0.22),
                         cycles_per_week=spec.get("cycles_per_week", 5),
-                        age=age, lifespan=ls, installation_cost=cost)
+                        age=age, lifespan=ls, installation_cost=cost, **elec)
 
     if cls == "HeatPumpDryer":
         return HeatPumpDryer(mesa_model,
                              kwh_per_cycle=spec.get("kwh_per_cycle", 1.8),
                              cycles_per_week=spec.get("cycles_per_week", 5),
-                             age=age, lifespan=ls, installation_cost=cost)
+                             age=age, lifespan=ls, installation_cost=cost, **elec)
 
     if cls == "GasCooktop":
         return GasCooktop(mesa_model,
                           therms_per_meal=spec.get("therms_per_meal", 0.05),
                           meals_per_week=spec.get("meals_per_week", 14),
-                          age=age, lifespan=ls, installation_cost=cost)
+                          age=age, lifespan=ls, installation_cost=cost, **elec)
 
     if cls == "InductionCooktop":
         return InductionCooktop(mesa_model,
                                 kwh_per_meal=spec.get("kwh_per_meal", 0.9),
                                 meals_per_week=spec.get("meals_per_week", 14),
-                                age=age, lifespan=ls, installation_cost=cost)
+                                age=age, lifespan=ls, installation_cost=cost, **elec)
 
     if cls == "LightsAndPlugs":
         return LightsAndPlugs(mesa_model,
                               annual_kwh=spec.get("annual_kwh", baseload_kwh),
-                              age=age, lifespan=ls, installation_cost=cost)
+                              age=age, lifespan=ls, installation_cost=cost, **elec)
 
     if cls == "EVCharger":
         monthly_override = spec.get("monthly_kwh_override")
         kwh_list = [monthly_override] * 12 if monthly_override is not None else None
         return EVCharger(mesa_model, monthly_kwh=kwh_list,
-                         age=age, lifespan=ls, installation_cost=cost)
+                         age=age, lifespan=ls, installation_cost=cost, **elec)
 
     if cls == "PhysicsEVCharger":
         return PhysicsEVCharger(mesa_model,
                                 miles_per_year=spec.get("miles_per_year", 7000),
                                 kwh_per_mile=spec.get("kwh_per_mile", 0.30),
                                 charging_efficiency=spec.get("charging_efficiency", 0.90),
-                                age=age, lifespan=ls, installation_cost=cost)
+                                age=age, lifespan=ls, installation_cost=cost, **elec)
 
     if cls == "CentralAC":
         return CentralAC(mesa_model,
                          seer_cooling=spec.get("seer_cooling", 14),
                          ua_btu_hr_f=ua,
                          monthly_cdd=cdd,
-                         age=age, lifespan=ls, installation_cost=cost)
+                         age=age, lifespan=ls, installation_cost=cost, **elec)
 
     raise ValueError(f"Unknown device class: {cls!r}")
 

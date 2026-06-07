@@ -79,9 +79,19 @@ HELP_POPUPS: dict[str, tuple[str, str]] = {
         "baseload.html",
     ),
     "panel_upgrade": (
-        "A panel upgrade may be needed when adding high-draw appliances like a"
-        " heat pump or EV charger to an older 100A service. The Panel Load callout"
-        " shows whether your planned journey requires one.",
+        "The Estimated Electrical Load uses the NEC Article 220 method to size"
+        " your service from your home's square footage and the electric appliances"
+        " in your journey. A panel upgrade may be needed when high-draw appliances"
+        " (heat pump, EV charger, induction) push an older 100A panel past its"
+        " limit.",
+        "panel.html",
+    ),
+    "panel_assessment": (
+        "The Estimated Electrical Load uses the NEC Article 220 method to size"
+        " your service from your home's square footage and the electric appliances"
+        " in your journey. A panel upgrade may be needed when high-draw appliances"
+        " (heat pump, EV charger, induction) push an older 100A panel past its"
+        " limit.",
         "panel.html",
     ),
 

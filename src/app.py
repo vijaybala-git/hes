@@ -15,6 +15,7 @@ from matplotlib.figure import Figure
 from model import HESModel
 from home_config import HomeConfig, compute_baseload_kwh
 from journey import CATEGORY_ORDER, CATEGORY_LABELS, CapExOnlySlot
+from panel_assessor import PanelAssessor
 from help_utils import HelpButton, ChartHelpButton, HelpPopupOverlay, open_help
 
 # ── Asset paths ───────────────────────────────────────────────────────────────
@@ -135,6 +136,13 @@ _DEFAULTS = {
     "square_footage":         1800,
     "year_built":             1985,
     "insulation_quality":     "average",
+    "panel_amps":             200,
+    # Electrical nameplate sizing (Phase 3 §2.5)
+    "hvac_tonnage":           3.0,
+    "ev_charger_amps":        32,
+    "induction_amps":         40,
+    "hpwh_amps":              15,
+    "dryer_amps":             30,
     # Baseline device specs
     "furnace_afue":           0.80,
     "gas_wh_uef":             0.65,
@@ -263,6 +271,14 @@ num_bedrooms       = solara.reactive(3)
 square_footage     = solara.reactive(1800)
 year_built         = solara.reactive(1985)
 insulation_quality = solara.reactive("average")
+panel_amps         = solara.reactive(200)        # Phase 3 §5 — service size 100/150/200
+
+# Electrical nameplate sizing (Phase 3 §2.5) — drive panel assessment, inert for energy
+hvac_tonnage    = solara.reactive(3.0)   # slider 2.0–5.0; amps = tonnage × 10
+ev_charger_amps = solara.reactive(32)    # selector 32 / 48
+induction_amps  = solara.reactive(40)    # editable input
+hpwh_amps       = solara.reactive(15)    # editable input
+dryer_amps      = solara.reactive(30)    # editable input
 
 # Baseline device specs
 furnace_afue     = solara.reactive(0.80)
@@ -423,6 +439,12 @@ def reset_to_defaults():
     square_footage.set(_DEFAULTS["square_footage"])
     year_built.set(_DEFAULTS["year_built"])
     insulation_quality.set(_DEFAULTS["insulation_quality"])
+    panel_amps.set(_DEFAULTS["panel_amps"])
+    hvac_tonnage.set(_DEFAULTS["hvac_tonnage"])
+    ev_charger_amps.set(_DEFAULTS["ev_charger_amps"])
+    induction_amps.set(_DEFAULTS["induction_amps"])
+    hpwh_amps.set(_DEFAULTS["hpwh_amps"])
+    dryer_amps.set(_DEFAULTS["dryer_amps"])
     furnace_afue.set(_DEFAULTS["furnace_afue"])
     gas_wh_uef.set(_DEFAULTS["gas_wh_uef"])
     hvac_has_cooling.set(_DEFAULTS["hvac_has_cooling"])
@@ -555,6 +577,7 @@ def _build_slot_configs() -> list:
             "seer_cooling": hvac_ac_seer.value,
             "age": hvac_ac_age.value,
             "installation_cost": 5000,
+            "circuit_volts": 240, "circuit_amps": 20, "continuous": False,
         })
     hw_override = hw_daily_gallons.value if hw_gallons_user_override.value else None
     return [
@@ -569,6 +592,9 @@ def _build_slot_configs() -> list:
                 "cop_heating": hp_cop_heating.value,
                 "seer_cooling": hp_seer_cooling.value,
                 "lifespan": 15, "installation_cost": 14000,
+                "circuit_volts": 240,
+                "circuit_amps": int(hvac_tonnage.value * 10),
+                "continuous": True,
             },
             "swap_year": _eff_swap_year(hvac_starting_state.value,
                                         hvac_swap_planned.value, hvac_swap_year.value),
@@ -599,6 +625,7 @@ def _build_slot_configs() -> list:
                 "ambient_location": hpwh_ambient_location.value,
                 "setpoint_f": wh_setpoint_f.value,
                 "inlet_temp_f": wh_inlet_temp_f.value,
+                "circuit_volts": 240, "circuit_amps": hpwh_amps.value, "continuous": False,
             },
             "swap_year": _eff_swap_year(wh_starting_state.value,
                                         wh_swap_planned.value, wh_swap_year.value),
@@ -621,6 +648,7 @@ def _build_slot_configs() -> list:
                 "kwh_per_cycle":   dryer_hp_kwh_per_cycle.value,
                 "cycles_per_week": dryer_loads_per_week.value,
                 "lifespan": 15, "installation_cost": 1200,
+                "circuit_volts": 240, "circuit_amps": dryer_amps.value, "continuous": False,
             },
             "swap_year": _eff_swap_year(dryer_starting_state.value,
                                         dryer_swap_planned.value, dryer_swap_year.value),
@@ -643,6 +671,7 @@ def _build_slot_configs() -> list:
                 "kwh_per_meal":  cooktop_induction_kwh_per_meal.value,
                 "meals_per_week": cooktop_meals_per_week.value,
                 "lifespan": 20, "installation_cost": 1500,
+                "circuit_volts": 240, "circuit_amps": induction_amps.value, "continuous": False,
             },
             "swap_year": _eff_swap_year(cooktop_starting_state.value,
                                         cooktop_swap_planned.value, cooktop_swap_year.value),
@@ -661,6 +690,7 @@ def _build_slot_configs() -> list:
                 "kwh_per_mile":        ev_kwh_per_mile.value,
                 "charging_efficiency": ev_charging_efficiency.value,
                 "lifespan": 20, "installation_cost": 800,
+                "circuit_volts": 240, "circuit_amps": ev_charger_amps.value, "continuous": True,
             },
             "swap_year": _eff_swap_year(ev_starting_state.value,
                                         ev_swap_planned.value, ev_swap_year.value),
@@ -700,6 +730,7 @@ def run_simulation():
         baseload_rebate=baseload_rebate.value,
         hot_water_daily_gallons=(hw_daily_gallons.value
                                   if hw_gallons_user_override.value else None),
+        panel_amps=panel_amps.value,
     )
     capex_slots = []
     if panel_upgrade_planned.value:
@@ -1352,6 +1383,103 @@ def HomeInfoBar():
     )
 
 
+_PANEL_STATUS_COLOR = {
+    "green":  "#2E7D32",
+    "yellow": "#F9A825",
+    "orange": "#FB8C00",
+    "red":    "#C62828",
+}
+_PANEL_STATUS_ICON = {
+    "green": "✅", "yellow": "⚠", "orange": "⚠", "red": "⛔",
+}
+
+
+def _panel_bar_html(amps, util_pct, panel_a, status, label):
+    """One compact load bar row for the Estimated Electrical Load callout."""
+    color = _PANEL_STATUS_COLOR[status]
+    icon  = _PANEL_STATUS_ICON[status]
+    fill  = min(100.0, util_pct)
+    return (
+        f"<div style='display:flex; align-items:center; gap:10px; margin:3px 0;'>"
+        f"<span style='min-width:54px; font-weight:700; color:{color};'>{label}</span>"
+        f"<span style='min-width:46px; font-weight:700;'>{amps:.0f}A</span>"
+        f"<span style='flex:1; max-width:220px; height:14px; background:#ECEFF1;"
+        f" border-radius:7px; overflow:hidden; position:relative;'>"
+        f"<span style='position:absolute; left:0; top:0; bottom:0; width:{fill:.0f}%;"
+        f" background:{color};'></span></span>"
+        f"<span style='min-width:140px; font-size:0.88em; color:#455A64;'>"
+        f"{util_pct:.0f}% of {panel_a}A panel {icon}</span>"
+        f"</div>"
+    )
+
+
+@solara.component
+def PanelLoadCallout(model):
+    """Estimated Electrical Load — top-line callout (Phase 3 §5.6)."""
+    hc = model.home_config
+    assessor = PanelAssessor(hc.square_footage, hc.panel_amps)
+    timeline = assessor.journey_load_timeline(model.journey_home, model.n_years)
+    if not timeline:
+        return
+    yr1  = timeline[0]
+    peak = max(timeline, key=lambda t: t.service_amps)
+    upgrade_years = assessor.upgrade_needed_years(timeline)
+
+    rows = _panel_bar_html(yr1.service_amps, yr1.utilization_pct, hc.panel_amps,
+                           yr1.status, "Year 1")
+    peak_note = ""
+    if peak.year != yr1.year:
+        dev = f", {peak.new_device}" if peak.new_device else ""
+        peak_note = f"  (Year {peak.year}{dev})"
+    rows += _panel_bar_html(peak.service_amps, peak.utilization_pct, hc.panel_amps,
+                            peak.status, "Peak")
+
+    with solara.Card(margin=0, elevation=1, style="overflow:hidden; margin-bottom:4px"):
+        with solara.Row(style=(
+            "background-color:#F0F0F0; padding:6px 12px;"
+            " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
+            " align-items:center;"
+        )):
+            solara.Text("⚡ Estimated Electrical Load",
+                        style="font-weight:600; font-size:0.95em; flex:1")
+            HelpButton("panel_assessment")
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            f"<div style='font-size:0.9em;'>{rows}"
+            + (f"<div style='font-size:0.86em; color:#90A4AE; margin-top:2px;'>"
+               f"Peak occurs in Year {peak.year}{peak_note[2:] if peak_note else ''}</div>"
+               if peak.year != yr1.year else "")
+            + "</div>"
+        ))
+        # Milestone strip — years where a device is added (Phase 3 §5.5)
+        milestones = [t for t in timeline if t.new_device is not None]
+        if milestones:
+            chips = ""
+            for t in milestones:
+                color = _PANEL_STATUS_COLOR[t.status]
+                cal_yr = sim_start_year.value + t.year - 1
+                chips += (
+                    f"<span style='display:inline-block; margin:2px 4px 0 0;"
+                    f" padding:2px 8px; border-radius:10px; font-size:0.78em;"
+                    f" background:#F5F5F5; border:1px solid #E0E0E0;'>"
+                    f"Yr {t.year} ({cal_yr}) <strong>+{t.new_device}</strong> → "
+                    f"<span style='color:{color}; font-weight:700;'>"
+                    f"{t.service_amps:.0f}A · {t.utilization_pct:.0f}%</span></span>"
+                )
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                f"<div style='margin-top:6px;'>{chips}</div>"
+            ))
+
+        if upgrade_years:
+            first = upgrade_years[0]
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                f"<div style='background:#FDECEA; border-left:4px solid #C62828;"
+                f" padding:6px 10px; margin-top:6px; border-radius:0 4px 4px 0;"
+                f" font-size:0.86em; color:#B71C1C;'>"
+                f"Panel upgrade likely needed by year {first} — consider adding a "
+                f"Panel Upgrade to your journey.</div>"
+            ))
+
+
 @solara.component
 def SummaryStats(df, n, model):
     delta_vals = df["Opex Delta"].values
@@ -1602,6 +1730,34 @@ def _DSl(label, rv, default, lo, hi, step=1, unit="", fmt="{v}"):
     """DetailSlider — wraps SliderWithDefault for use inside detail columns."""
     with solara.Column(gap="0px", style="margin-bottom:4px"):
         SliderWithDefault(label, rv, default, lo, hi, step, unit=unit, fmt=fmt)
+
+
+def _elec_display(volts: int, amps: int):
+    """Read-only Electrical nameplate row (Phase 3 §2.5)."""
+    va = volts * amps
+    solara.HTML(
+        tag="div",
+        unsafe_innerHTML=(
+            f"<div style='font-size:0.82em; color:#455A64; margin-top:4px;"
+            f" padding-top:4px; border-top:1px dashed #CFD8DC;'>"
+            f"<strong>Electrical</strong>&nbsp;&nbsp;{volts} V · {amps} A · "
+            f"{va:,} VA</div>"
+        ),
+    )
+
+
+@solara.component
+def _ElecAmpsInput(label, amps_rv, volts: int = 240):
+    """Editable amps input + live VA readout for an electric appliance (Phase 3 §2.5)."""
+    with solara.Row(gap="8px", style="align-items:center; margin-top:4px;"
+                                     " padding-top:4px; border-top:1px dashed #CFD8DC;"):
+        with solara.Column(style="min-width:130px"):
+            solara.InputInt(label, value=amps_rv)
+        solara.HTML(tag="span", unsafe_innerHTML=(
+            f"<span style='font-size:0.82em; color:#455A64;'>"
+            f"{volts} V · {amps_rv.value} A · "
+            f"<strong>{volts * amps_rv.value:,} VA</strong></span>"
+        ))
 
 
 @solara.component
@@ -2008,6 +2164,13 @@ def HVACDetail():
             with solara.Column(style="min-width:170px"):
                 solara.SliderInt(f"Yr {yr} ({cal_yr})", value=hvac_swap_year, min=1, max=25)
 
+    # ── Heat pump electrical sizing (Phase 3 §2.5) ────────────────────────────
+    _tons = hvac_tonnage.value
+    _amps = int(_tons * 10)
+    _DSl("Heat pump size", hvac_tonnage, _DEFAULTS["hvac_tonnage"],
+         2.0, 5.0, 0.5, unit=" ton", fmt="{v:.1f}")
+    _elec_display(240, _amps)
+
     if state == "gas":
         with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
             with solara.Column(style=_LEFT_COL):
@@ -2098,6 +2261,8 @@ def WaterHeaterDetail():
             cal_yr = sim_start_year.value + yr - 1
             with solara.Column(style="min-width:170px"):
                 solara.SliderInt(f"Yr {yr} ({cal_yr})", value=wh_swap_year, min=1, max=25)
+
+    _ElecAmpsInput("HPWH breaker A", hpwh_amps)
 
     # Shared full-width parameters (affect both gas and HPWH estimates)
     def _set_gal(v):
@@ -2255,8 +2420,24 @@ def EVDetail():
             _DS("Charger")
             solara.HTML(tag="div", unsafe_innerHTML=(
                 "<div style='font-size:0.85em; color:#555; margin-bottom:8px;'>"
-                "<strong>L2 charger</strong> (240 V, 7.2 kW)</div>"
+                "<strong>L2 charger</strong> (240 V)</div>"
             ))
+            # Amperage selector (Phase 3 §2.5) — drives panel load
+            with solara.Row(gap="4px", style="margin-bottom:4px; align-items:center"):
+                for lbl, amps in [("32 A (7.7 kW)", 32), ("48 A (11.5 kW)", 48)]:
+                    is_sel = ev_charger_amps.value == amps
+                    solara.Button(
+                        lbl,
+                        on_click=lambda a=amps: ev_charger_amps.set(a),
+                        style=(
+                            "font-size:0.74em; padding:2px 8px; border-radius:10px;"
+                            " cursor:pointer;"
+                            + (" background:#C5CAE9; border:1px solid #7986CB; color:#3949AB;"
+                               if is_sel else
+                               " background:#F5F5F5; border:1px solid #DDD; color:#555;")
+                        ),
+                    )
+            _elec_display(240, ev_charger_amps.value)
             _DSl("Charging efficiency", ev_charging_efficiency,
                  _DEFAULTS["ev_charging_efficiency"], 0.80, 0.98, step=0.01, fmt="{v:.2f}")
             solara.Markdown(
@@ -2286,6 +2467,8 @@ def CooktopDetail():
             cal_yr = sim_start_year.value + yr - 1
             with solara.Column(style="min-width:170px"):
                 solara.SliderInt(f"Yr {yr} ({cal_yr})", value=cooktop_swap_year, min=1, max=25)
+
+    _ElecAmpsInput("Induction breaker A", induction_amps)
 
     if state == "gas":
         with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
@@ -2353,6 +2536,8 @@ def DryerDetail():
             with solara.Column(style="min-width:170px"):
                 solara.SliderInt(f"Yr {yr} ({cal_yr})", value=dryer_swap_year, min=1, max=25)
 
+    _ElecAmpsInput("HP dryer breaker A", dryer_amps)
+
     if state == "gas":
         with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
             with solara.Column(style=_LEFT_COL):
@@ -2417,6 +2602,9 @@ def ElecPanelDetail():
         "Often required when adding an EV charger (L2) or heat pump to older "
         "homes with 100A panels. Pure capital cost — no energy savings modelled.</div>"
     ))
+    # Current panel size — drives the Estimated Electrical Load assessment (Phase 3 §5)
+    with solara.Column(style="max-width:220px; margin-bottom:8px"):
+        solara.Select("Current panel size (A)", value=panel_amps, values=[100, 150, 200])
     _DSl("Install cost", panel_upgrade_cost, _DEFAULTS["panel_upgrade_cost"],
          2000, 10000, step=500, unit=" $")
     if planned:
@@ -2436,6 +2624,15 @@ def BaseloadDetail():
     )
     _DSl("Always-on constant", baseload_constant_before,
          _DEFAULTS["baseload_constant_before"], 0, 1500, step=50, unit=" kWh/yr")
+    # Effective A (Phase 3 §2.5.3) — informational; NOT used by PanelAssessor
+    _eff_a = bl_before * 1000 / 8760 / 120
+    solara.HTML(tag="div", unsafe_innerHTML=(
+        f"<div style='font-size:0.82em; color:#455A64; margin-top:4px;"
+        f" padding-top:4px; border-top:1px dashed #CFD8DC;'>"
+        f"<strong>Electrical</strong>&nbsp;&nbsp;120 V · ~{_eff_a:.0f} A effective"
+        f"<br><span style='color:#90A4AE; font-size:0.9em;'>"
+        f"(avg across all circuits)</span></div>"
+    ))
     solara.Markdown("---")
     with solara.Row(gap="8px", style="align-items:center; flex-wrap:wrap; padding:4px 0"):
         solara.Checkbox(label="Plan efficiency upgrade (LED, smart plugs…)",
@@ -2790,6 +2987,9 @@ def Page():
         years.value, sim_start_year.value,
         wh_inlet_temp_f.value, wh_setpoint_f.value,
         gas_wh_tank_gallons.value, hpwh_tank_gallons.value, hpwh_ambient_location.value,
+        # Phase 3 §5 — panel sizing inputs
+        panel_amps.value, hvac_tonnage.value, ev_charger_amps.value,
+        induction_amps.value, hpwh_amps.value, dryer_amps.value,
     ])
 
     n = years.value
@@ -2873,6 +3073,9 @@ def Page():
 
         # ── Summary stats ───────────────────────────────────────────────────────
         SummaryStats(df, n, model)
+
+        # ── Estimated Electrical Load (Phase 3 §5) ──────────────────────────────
+        PanelLoadCallout(model)
 
         # ── Dual chart panes (selector in grey title bar inside each card) ──────
         with solara.Row(gap="8px", style="align-items:stretch"):

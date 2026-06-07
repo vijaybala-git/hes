@@ -1,0 +1,10 @@
+{
+  "_comment": "Phase 3 §2.5 — nameplate electrical defaults per device class. Gas devices and LightsAndPlugs are intentionally absent (no electrical load). rated_va = circuit_volts * circuit_amps.",
+  "HeatPumpHVAC":        {"circuit_volts": 240, "circuit_amps": 30, "continuous": true},
+  "CentralAC":           {"circuit_volts": 240, "circuit_amps": 20, "continuous": false},
+  "HeatPumpWaterHeater": {"circuit_volts": 240, "circuit_amps": 15, "continuous": false},
+  "PhysicsEVCharger":    {"circuit_volts": 240, "circuit_amps": 32, "continuous": true},
+  "EVCharger":           {"circuit_volts": 240, "circuit_amps": 32, "continuous": true},
+  "InductionCooktop":    {"circuit_volts": 240, "circuit_amps": 40, "continuous": false},
+  "HeatPumpDryer":       {"circuit_volts": 240, "circuit_amps": 30, "continuous": false}
+}

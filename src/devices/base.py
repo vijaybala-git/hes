@@ -13,13 +13,25 @@ class EnergyConsumer(mesa.Agent):
     def __init__(self, model: mesa.Model, *,
                  lifespan: int = 15,
                  installation_cost: float = 0.0,
-                 age: int = 0):
+                 age: int = 0,
+                 circuit_volts: int = 0,
+                 circuit_amps: int = 0,
+                 continuous: bool = False):
         super().__init__(model)
         self.lifespan = lifespan
         self.installation_cost = installation_cost
         self.age = age
+        # ── Electrical nameplate (Phase 3 §2.5) — inert; never affects energy/cost ──
+        self.circuit_volts = circuit_volts
+        self.circuit_amps  = circuit_amps
+        self.continuous    = continuous
         self.capex_events: list = []
         self.history: dict = {"consumption": [], "cost": []}
+
+    @property
+    def rated_va(self) -> float:
+        """Nameplate VA = volts × amps. Gas devices leave volts/amps at 0 → 0 VA."""
+        return float(self.circuit_volts * self.circuit_amps)
 
     @abstractmethod
     def monthly_consumption(self) -> np.ndarray:
