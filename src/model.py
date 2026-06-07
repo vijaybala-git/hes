@@ -16,6 +16,7 @@ import mesa
 import numpy as np
 
 from home_config import HomeConfig, compute_baseload_kwh, HOT_WATER_GAL_PER_DAY
+from social_cost import SocialCostConfig
 from journey import JourneyHome, DeviceSlot, CapExOnlySlot, CATEGORY_ORDER, CATEGORY_LABELS
 from rate_loader import RateLoader, ACCRateLoader
 from devices.physics  import GasFurnace, HeatPumpHVAC, GasWaterHeater, HeatPumpWaterHeater, CentralAC
@@ -265,6 +266,7 @@ class HESModel(mesa.Model):
                  slot_configs:     list | None = None,
                  capex_only_slots: list | None = None,
                  solar_coverage_pct: float = 0.0,
+                 social_cost_config: SocialCostConfig | None = None,
                  # §23 rate model selections — stored, wired when ACCRateLoader is added
                  elec_rate_model_a: str = "cagr_flat",
                  gas_rate_model_a:  str = "cagr_flat",
@@ -294,6 +296,8 @@ class HESModel(mesa.Model):
         if home_config is None:
             home_config = HomeConfig()
         self.home_config = home_config
+
+        self.social_cost_config = social_cost_config or SocialCostConfig()
 
         # ── Climate constants ─────────────────────────────────────────────────
         with open(_DATA / "climate/bayarea_tmy3.json") as f:
@@ -428,6 +432,15 @@ class HESModel(mesa.Model):
             "Gas Rate":            lambda m: float(np.mean(m.current_gas_rates)),
             "Solar Saving":        lambda m: (m.journey_home.solar_savings_history[-1]
                                               if m.journey_home.solar_savings_history else 0.0),
+            # Social & Health cost of gas (Phase 3 §6) — Scenario A; informational
+            "Journey Social Climate":  lambda m: (m.journey_home.gas_therms_history[-1]
+                                                  * m.social_cost_config.climate_eff),
+            "Journey Social Health":   lambda m: (m.journey_home.gas_therms_history[-1]
+                                                  * m.social_cost_config.health_eff),
+            "Baseline Social Climate": lambda m: (m.baseline_home.gas_therms_history[-1]
+                                                  * m.social_cost_config.climate_eff),
+            "Baseline Social Health":  lambda m: (m.baseline_home.gas_therms_history[-1]
+                                                  * m.social_cost_config.health_eff),
         }
         if comparison_mode:
             reporters.update({

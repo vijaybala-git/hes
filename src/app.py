@@ -16,6 +16,7 @@ from model import HESModel
 from home_config import HomeConfig, compute_baseload_kwh
 from journey import CATEGORY_ORDER, CATEGORY_LABELS, CapExOnlySlot
 from panel_assessor import PanelAssessor
+from social_cost import SocialCostConfig
 from help_utils import HelpButton, ChartHelpButton, HelpPopupOverlay, open_help
 
 # ── Asset paths ───────────────────────────────────────────────────────────────
@@ -254,6 +255,11 @@ _DEFAULTS = {
     "acc_gas_cagr_b":         8,
     "years":                  20,
     "sim_start_year":         2025,
+    # Social & Health cost of gas (Phase 3 §6)
+    "social_climate_enabled": True,
+    "social_climate_rate":    1.07,
+    "social_health_enabled":  True,
+    "social_health_rate":     1.23,
     # Charts
     "chart_left":             "Cumulative Energy Costs",
     "chart_right":            "Cost Breakdown by Category",
@@ -423,6 +429,12 @@ acc_gas_cagr_b    = solara.reactive(8)
 years             = solara.reactive(20)
 sim_start_year   = solara.reactive(2025)
 
+# Social & Health cost of gas (Phase 3 §6)
+social_climate_enabled = solara.reactive(True)
+social_climate_rate    = solara.reactive(1.07)   # $/therm — EPA 2023 + 2% leakage
+social_health_enabled  = solara.reactive(True)
+social_health_rate     = solara.reactive(1.23)   # $/therm — CPUC D.24-07-015 / E3 2022
+
 # Chart selection
 chart_left  = solara.reactive("Cumulative Energy Costs")
 chart_right = solara.reactive("Cost Breakdown by Category")
@@ -540,6 +552,10 @@ def reset_to_defaults():
     acc_gas_cagr_b.set(_DEFAULTS["acc_gas_cagr_b"])
     years.set(_DEFAULTS["years"])
     sim_start_year.set(_DEFAULTS["sim_start_year"])
+    social_climate_enabled.set(_DEFAULTS["social_climate_enabled"])
+    social_climate_rate.set(_DEFAULTS["social_climate_rate"])
+    social_health_enabled.set(_DEFAULTS["social_health_enabled"])
+    social_health_rate.set(_DEFAULTS["social_health_rate"])
     chart_left.set(_DEFAULTS["chart_left"])
     chart_right.set(_DEFAULTS["chart_right"])
     device_chart_home.set(_DEFAULTS["device_chart_home"])
@@ -780,6 +796,12 @@ def run_simulation():
         acc_gas_cagr_a=acc_gas_cagr_a.value   / 100.0,
         acc_elec_cagr_b=acc_elec_cagr_b.value / 100.0,
         acc_gas_cagr_b=acc_gas_cagr_b.value   / 100.0,
+        social_cost_config=SocialCostConfig(
+            climate_enabled=social_climate_enabled.value,
+            climate_rate=social_climate_rate.value,
+            health_enabled=social_health_enabled.value,
+            health_rate=social_health_rate.value,
+        ),
     )
     m.run_all()
     df = m.datacollector.get_model_vars_dataframe()
@@ -840,6 +862,19 @@ def make_cumulative_opex(df, model, n):
         eB = df["Journey Cum Cost B"].values
         ax.plot(x, bB, color=C_BASE, lw=2.0, linestyle="--", label="Do nothing (B)")
         ax.plot(x, eB, color=C_ELEC, lw=2.0, linestyle="--", label="Your journey (B)")
+    # Social & health cost overlay (Phase 3 §6) — Scenario A, dotted
+    cfg = getattr(model, "social_cost_config", None)
+    if (cfg is not None and cfg.total_rate > 0
+            and "Journey Social Climate" in df.columns):
+        j_social = np.cumsum(df["Journey Social Climate"].values
+                             + df["Journey Social Health"].values)
+        b_social = np.cumsum(df["Baseline Social Climate"].values
+                             + df["Baseline Social Health"].values)
+        ax.plot(x, b + b_social, color=C_BASE, lw=1.5, linestyle=":",
+                alpha=0.9, label="Do nothing + social")
+        ax.plot(x, df["Journey Cum Cost"].values + j_social, color=C_ELEC, lw=1.5,
+                linestyle=":", alpha=0.9, label="Your journey + social")
+
     ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(_money))
     ax.set_xlabel("Year")
     ax.set_ylabel("Cumulative Energy Cost")
@@ -902,6 +937,22 @@ def make_cost_breakdown(df, model, n):
                             color=color, alpha=0.85, label=CATEGORY_LABELS[cat])
             ax.plot(x, bottom + cum, color=color, lw=0.5, alpha=0.5)
             bottom = bottom + cum
+
+        # Social & health cost layers (Phase 3 §6) — stacked above market categories
+        cfg = getattr(model, "social_cost_config", None)
+        therms = np.array(home.gas_therms_history[:n], dtype=float)
+        if cfg is not None and len(therms):
+            if cfg.climate_eff > 0:
+                cum = np.cumsum(therms * cfg.climate_eff)
+                ax.fill_between(x, bottom, bottom + cum, color="#FB8C00",
+                                alpha=0.80, label="Climate cost")
+                bottom = bottom + cum
+            if cfg.health_eff > 0:
+                cum = np.cumsum(therms * cfg.health_eff)
+                ax.fill_between(x, bottom, bottom + cum, color="#C62828",
+                                alpha=0.80, label="Health cost")
+                bottom = bottom + cum
+
         ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(_money))
         ax.set_xlabel("Year")
         ax.set_ylabel("Cumulative Cost")
@@ -2888,6 +2939,68 @@ def EnergyPricesPanel():
         RatesSummaryCard()
 
 
+@solara.component
+def SocialCostPanel():
+    """Social & Health Cost of Gas (Phase 3 §6) — informational adders on gas therms."""
+    climate_on = social_climate_enabled.value
+    health_on  = social_health_enabled.value
+    total = (social_climate_rate.value if climate_on else 0.0) \
+          + (social_health_rate.value  if health_on  else 0.0)
+
+    with solara.Card(margin=0, elevation=1, style="overflow:hidden"):
+        with solara.Row(style=(
+            "background-color:#F0F0F0; padding:6px 12px;"
+            " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
+            " align-items:center;"
+        )):
+            solara.Text("♻️ Social & Health Cost of Gas",
+                        style="font-weight:600; font-size:0.95em; flex:1")
+            HelpButton("social_cost")
+
+        # ── Climate cost ──────────────────────────────────────────────────────
+        solara.Checkbox(label="Climate cost (CO₂ + methane)", value=social_climate_enabled)
+        if climate_on:
+            SliderWithDefault("Climate", social_climate_rate,
+                              _DEFAULTS["social_climate_rate"], 1.00, 2.00, 0.01,
+                              unit=" $/therm", fmt="{v:.2f}")
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                "<div style='display:flex; justify-content:space-between;"
+                " font-size:0.72em; color:#90A4AE; margin-top:-2px;'>"
+                "<span>$1.00</span><span>$2.00</span></div>"
+            ))
+
+        # ── Health cost ───────────────────────────────────────────────────────
+        solara.Checkbox(label="Health cost (air quality)", value=social_health_enabled)
+        if health_on:
+            SliderWithDefault("Health", social_health_rate,
+                              _DEFAULTS["social_health_rate"], 0.50, 2.00, 0.01,
+                              unit=" $/therm", fmt="{v:.2f}")
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                "<div style='display:flex; justify-content:space-between;"
+                " font-size:0.72em; color:#90A4AE; margin-top:-2px;'>"
+                "<span>$0.50</span><span>$2.00</span></div>"
+            ))
+
+        # ── Total + disclosure ────────────────────────────────────────────────
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            f"<div style='margin-top:6px; padding-top:6px; border-top:1px solid #E0E0E0;"
+            f" font-size:0.86em; color:#37474F;'>"
+            f"Total social cost: <strong>${total:.2f}/therm</strong>"
+            f"<span style='color:#90A4AE;'> (market gas ≈ $2.08)</span></div>"
+        ))
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            "<div style='font-size:0.76em; color:#90A4AE; margin-top:4px; font-style:italic;'>"
+            "These costs do not appear on your utility bill. They represent damage to "
+            "public health and the climate caused by burning natural gas.</div>"
+        ))
+        solara.Button(
+            "Learn more →",
+            on_click=lambda: open_help("social_cost.html"),
+            style=("background:transparent; color:#3F51B5; border:none; padding:2px 0;"
+                   " font-size:0.8em; cursor:pointer; text-decoration:underline;"),
+        )
+
+
 # ── §25.6 Bottom zone routing ─────────────────────────────────────────────────
 
 @solara.component
@@ -2928,6 +3041,7 @@ def SummaryView():
             HomeProfilePanel()
         with solara.Column(style="flex:1; min-width:220px"):
             EnergyPricesPanel()
+            SocialCostPanel()
 
 
 @solara.component
@@ -2990,6 +3104,9 @@ def Page():
         # Phase 3 §5 — panel sizing inputs
         panel_amps.value, hvac_tonnage.value, ev_charger_amps.value,
         induction_amps.value, hpwh_amps.value, dryer_amps.value,
+        # Phase 3 §6 — social & health cost of gas
+        social_climate_enabled.value, social_climate_rate.value,
+        social_health_enabled.value, social_health_rate.value,
     ])
 
     n = years.value

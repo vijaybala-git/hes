@@ -552,7 +552,7 @@ air conditioning in July costs more per kWh than heating in January.
 
 ## §13 · Social & Health Cost of Gas
 @file: social_cost.html
-@keys:
+@keys: social_cost
 @popup: These costs represent damage to public health and the climate
   caused by burning natural gas — costs that do not appear on your
   utility bill but are real and quantified by official sources.

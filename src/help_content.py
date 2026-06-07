@@ -94,6 +94,12 @@ HELP_POPUPS: dict[str, tuple[str, str]] = {
         " limit.",
         "panel.html",
     ),
+    "social_cost": (
+        "These costs represent damage to public health and the climate caused by"
+        " burning natural gas — costs that do not appear on your utility bill but"
+        " are real and quantified by official sources.",
+        "social_cost.html",
+    ),
 
     # ── Chart title bars (stable — not from help_content.md) ─────────────────
     "chart_jc1": (

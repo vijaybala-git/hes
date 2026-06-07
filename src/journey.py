@@ -82,6 +82,7 @@ class DeviceSlot:
           gas_rates regardless of this dict.
         """
         self._last_active_device = None   # reset; set below after active_list is known
+        self._last_gas_therms = 0.0       # gas therms consumed this slot this year
 
         # ── Determine which devices are active this year ──────────────────────
         if self.starting_state == "electric":
@@ -110,6 +111,13 @@ class DeviceSlot:
             step_cost += active.history["cost"][-1]
 
         self._last_active_device = active_list[0] if active_list else None
+
+        # Gas therms across ALL active gas devices (e.g. furnace, not the AC beside it)
+        self._last_gas_therms = sum(
+            a.history["consumption"][-1]
+            for a in active_list
+            if a.fuel_type == "gas"
+        )
 
         # ── CapEx: swap install OR per-device end-of-life replacement ─────────
         if (self.swap_year is not None
@@ -159,6 +167,7 @@ class JourneyHome(mesa.Agent):
         self.capex_by_year: dict = {}
         self.solar_savings_history: list = []
         self.cost_history_by_category:    dict = {cat: []  for cat in CATEGORY_ORDER}
+        self.gas_therms_history:          list = []   # annual gas therms (all gas slots)
         self.cost_history_by_slot:        dict = {s.name: [] for s in slots}
         self.consumption_history_by_slot: dict = {s.name: [] for s in slots}
         self.fuel_history_by_slot:        dict = {s.name: [] for s in slots}
@@ -180,9 +189,10 @@ class JourneyHome(mesa.Agent):
 
         # Sum costs per category first, then append once — fixes Phase 1 bug
         year_category_costs = {cat: 0.0 for cat in CATEGORY_ORDER}
-        year_opex      = 0.0
-        year_elec_opex = 0.0
-        year_capex     = 0.0
+        year_opex       = 0.0
+        year_elec_opex  = 0.0
+        year_capex      = 0.0
+        year_gas_therms = 0.0
 
         for slot in self.slots:
             cost = slot.step(current_year, elec_r, gas_r, self.is_baseline_home,
@@ -190,6 +200,8 @@ class JourneyHome(mesa.Agent):
             year_opex += cost
             cat = slot.category if slot.category in year_category_costs else "Baseload"
             year_category_costs[cat] += cost
+
+            year_gas_therms += getattr(slot, "_last_gas_therms", 0.0)
 
             self.cost_history_by_slot[slot.name].append(cost)
             active_dev = slot._last_active_device
@@ -217,6 +229,9 @@ class JourneyHome(mesa.Agent):
         # Append exactly once per category per step (sum-then-append fix)
         for cat in CATEGORY_ORDER:
             self.cost_history_by_category[cat].append(year_category_costs[cat])
+
+        # Annual gas therms — pure physics, independent of social-cost rates
+        self.gas_therms_history.append(year_gas_therms)
 
         if year_capex > 0:
             self.capex_by_year[current_year] = (
