@@ -446,8 +446,11 @@ Nothing is displayed in their detail panel for electrical specs.
 
 - Label: **"Electrical"**
 - Format: `{volts} V · {amps} A · {rated_va:,.0f} VA`
-- Read-only in Phase 3. (Advanced users can override `circuit_amps` in a future phase
-  if they know their specific unit's nameplate; the VA recalculates automatically.)
+- **Editable in Phase 3** (decision resolved): base nameplate variables get inputs.
+  HVAC uses a **tonnage slider** (2.0–5.0 ton, default 3.0) that derives amps via
+  `amps = tonnage × 10` (so 3.0 ton → 30 A → 7,200 VA). EV charger uses a **32/48 A
+  selector**. Induction / HPWH / Dryer use an editable amps input prefilled with the
+  JSON default. VA recalculates automatically from volts × amps.
 - Gas devices: this row is omitted entirely.
 
 #### 2.5.3 Baseload (LightsAndPlugs) — "Effective A" Treatment
@@ -501,6 +504,28 @@ Defaults stored in `data/appliances/electrical_defaults.json`:
 
 Loaded into each `DeviceSlot` at construction. The `LightsAndPlugs` row has no fixed
 values — its effective amps are recomputed each simulation step from the current kWh.
+
+**Storage decision (resolved):** electrical attributes live on the **device classes**
+(`circuit_volts`, `circuit_amps`, `continuous` on the `EnergyConsumer` base; `rated_va`
+is a derived property). Defaults come from `data/appliances/electrical_defaults.json`,
+threaded through `_make_device()`. `PanelAssessor` reads them off the active device. Gas
+devices never set them → `rated_va == 0`.
+
+**HVAC tonnage → breaker amps table** (used by the tonnage slider; `amps = tonnage × 10`):
+
+| Tonnage | Breaker A | Rated VA (×240) |
+|---------|-----------|-----------------|
+| 2.0 | 20 | 4,800 |
+| 2.5 | 25 | 6,000 |
+| 3.0 | 30 | 7,200 |
+| 3.5 | 35 | 8,400 |
+| 4.0 | 40 | 9,600 |
+| 4.5 | 45 | 10,800 |
+| 5.0 | 50 | 12,000 |
+
+`CentralAC` (existing baseline AC, when `has_cooling_baseline`) also carries an electrical
+spec: 240 V × 20 A = 4,800 VA. It contributes to the panel load whenever it is active
+(see §5.3 scope decision).
 
 ### 2.6 Heat Pump Water Heater — Inlet Temperature Sensitivity
 
@@ -995,11 +1020,23 @@ utilization_pct = service_amps / panel_amps × 100
 - `panel_amps: int` — user-selectable: 100 / 150 / 200 (default 200; user knows this
   from their breaker box cover label)
 
-**From each active `DeviceSlot.electrical_spec` (§2.5):**
+**From each active device's electrical attributes (§2.5):**
 - `circuit_volts`, `circuit_amps`, `rated_va`, `continuous` flag
-- Gas devices: `ElectricalSpec = None` → excluded from NEC calculation
+- Gas devices: `rated_va == 0` → contribute nothing to the NEC calculation
 - Slots with `starting_state = "none"` and not yet activated: excluded until their
   journey swap year
+
+**Scope decision (resolved): assess the JOURNEY HOME ONLY — never the do-nothing
+baseline.** A panel is sized for the home you are actually building toward, not the
+do-nothing case. The assessor walks the journey home's active electric devices each
+year (year 1 → n_years):
+- Year 1 = today's state (= the do-nothing year-1 state, so the label stays accurate).
+- An existing `CentralAC` counts whenever present — the journey keeps it until/unless the
+  HVAC slot is electrified. If no HVAC swap is planned, the AC counts every year.
+- Already-electric appliances count from year 1; "none" appliances (EV) count only from
+  their swap year onward.
+- `PanelAssessor` is a pure read over `journey_home.slots` — it never steps the model or
+  mutates devices.
 
 ### 5.4 Solar Interaction
 
