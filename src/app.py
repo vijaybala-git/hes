@@ -2032,23 +2032,29 @@ def _cost_row(cost_rv, rebate_rv, net: int):
 
 def _appliance_rows(state_rv, planned_rv, year_rv, cost_rv, rebate_rv,
                     state_values=("gas", "electric", "none")):
-    """3-row content for standard appliance summary cards (HVAC, WH, Cooktop, Dryer)."""
+    """Row content for standard appliance summary cards (HVAC, WH, Cooktop, Dryer)."""
     state = state_rv.value
-    # Row 1: state dropdown + plan checkbox + year slider
-    with solara.Row(gap="6px", style=_ROW_CTRL):
+    # Row 1: state dropdown + plan checkbox (+ electrified badge)
+    with solara.Row(gap="8px", style=_ROW_CTRL):
         with solara.Column(style="min-width:90px; max-width:90px"):
             solara.Select("", value=state_rv, values=list(state_values))
         if state != "electric":
             solara.Checkbox(label="Plan", value=planned_rv)
-        if state != "electric" and planned_rv.value:
-            yr = year_rv.value
-            cal_yr = sim_start_year.value + yr - 1
-            with solara.Column(style="min-width:140px"):
-                solara.SliderInt(f"Yr {yr} ({cal_yr})", value=year_rv, min=1, max=25)
         elif state == "electric":
             solara.HTML(tag="span", unsafe_innerHTML=(
                 "<span style='font-size:0.80em; color:#2E7D32; margin-left:4px;'>"
                 "✓ Electrified</span>"
+            ))
+    # Row 2: full-width year slider + subscript caption (only when planned)
+    if state != "electric" and planned_rv.value:
+        yr = year_rv.value
+        cal_yr = sim_start_year.value + yr - 1
+        with solara.Column(style="width:100%"):
+            solara.SliderInt("", value=year_rv, min=1, max=25)
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                f"<div style='font-size:0.72em;color:var(--ink-3,#888);"
+                f"margin-top:-4px;text-align:center'>"
+                f"Yr {yr} &nbsp;·&nbsp; {cal_yr}</div>"
             ))
     # Row 2: install cost + rebate + net — all on one line, compact number inputs
     if state != "electric" and planned_rv.value:
@@ -2087,7 +2093,7 @@ def EVSummaryCard():
     state = ev_starting_state.value
     with solara.Column(classes=["device"]):
         _card_header("ev", "EV Charger")
-        # Row 1: vehicle preset buttons + state + plan + year
+        # Row 1: vehicle presets + state dropdown + plan checkbox
         with solara.Row(gap="4px", style=_ROW_CTRL):
             for lbl, val in [("Eff", 0.23), ("Avg", 0.30), ("SUV", 0.45)]:
                 is_sel = abs(ev_kwh_per_mile.value - val) < 0.01
@@ -2106,14 +2112,20 @@ def EVSummaryCard():
                 solara.Select("", value=ev_starting_state, values=["none", "electric"])
             if state == "none":
                 solara.Checkbox(label="Plan", value=ev_swap_planned)
-            if state == "none" and ev_swap_planned.value:
-                yr = ev_swap_year.value
-                cal_yr = sim_start_year.value + yr - 1
-                with solara.Column(style="min-width:130px"):
-                    solara.SliderInt(f"Yr {yr} ({cal_yr})", value=ev_swap_year, min=1, max=25)
             elif state == "electric":
                 solara.HTML(tag="span", unsafe_innerHTML=(
                     "<span style='font-size:0.80em; color:#2E7D32;'>✓ Installed</span>"
+                ))
+        # Row 2: full-width year slider + subscript (only when planned)
+        if state == "none" and ev_swap_planned.value:
+            yr = ev_swap_year.value
+            cal_yr = sim_start_year.value + yr - 1
+            with solara.Column(style="width:100%"):
+                solara.SliderInt("", value=ev_swap_year, min=1, max=25)
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    f"<div style='font-size:0.72em;color:var(--ink-3,#888);"
+                    f"margin-top:-4px;text-align:center'>"
+                    f"Yr {yr} &nbsp;·&nbsp; {cal_yr}</div>"
                 ))
         # Row 2: charger type
         solara.HTML(tag="div", unsafe_innerHTML=(
@@ -2150,15 +2162,20 @@ def PanelSummaryCard():
     planned = panel_upgrade_planned.value
     with solara.Column(classes=["device"]):
         _card_header("panel", "Panel Upgrade")
-        # Row 1: plan checkbox + year slider
-        with solara.Row(gap="6px", style=_ROW_CTRL):
+        # Row 1: plan checkbox
+        with solara.Row(gap="8px", style=_ROW_CTRL):
             solara.Checkbox(label="Plan 200A upgrade", value=panel_upgrade_planned)
-            if planned:
-                yr = panel_upgrade_year.value
-                cal_yr = sim_start_year.value + yr - 1
-                with solara.Column(style="min-width:140px"):
-                    solara.SliderInt(f"Yr {yr} ({cal_yr})", value=panel_upgrade_year,
-                                     min=1, max=25)
+        # Row 2: full-width year slider + subscript
+        if planned:
+            yr = panel_upgrade_year.value
+            cal_yr = sim_start_year.value + yr - 1
+            with solara.Column(style="width:100%"):
+                solara.SliderInt("", value=panel_upgrade_year, min=1, max=25)
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    f"<div style='font-size:0.72em;color:var(--ink-3,#888);"
+                    f"margin-top:-4px;text-align:center'>"
+                    f"Yr {yr} &nbsp;·&nbsp; {cal_yr}</div>"
+                ))
         # Row 2: install cost + rebate + net (combined) or status
         if planned:
             net = panel_upgrade_cost.value - panel_upgrade_rebate.value
@@ -2238,14 +2255,17 @@ def SolarSummaryCard():
             solara.Checkbox(label="Add solar", value=solar_planned)
             if planned:
                 solara.Checkbox(label="+ Battery", value=solar_include_battery)
-        # Row 2: plan year slider (if planned)
+        # Row 2: full-width install year slider + subscript (if planned)
         if planned:
             yr = solar_install_year.value
             cal_yr = sim_start_year.value + yr - 1
-            with solara.Row(gap="4px", style=_ROW_CTRL):
-                with solara.Column(style="min-width:160px"):
-                    solara.SliderInt(f"Install yr {yr} ({cal_yr})",
-                                     value=solar_install_year, min=1, max=25)
+            with solara.Column(style="width:100%"):
+                solara.SliderInt("", value=solar_install_year, min=1, max=25)
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    f"<div style='font-size:0.72em;color:var(--ink-3,#888);"
+                    f"margin-top:-4px;text-align:center'>"
+                    f"Install &nbsp; Yr {yr} &nbsp;·&nbsp; {cal_yr}</div>"
+                ))
         else:
             solara.HTML(tag="div", unsafe_innerHTML=(
                 "<div style='font-size:0.80em; color:#AAAAAA; margin-top:3px;'>"
@@ -2253,11 +2273,13 @@ def SolarSummaryCard():
             ))
         # Row 3: % coverage slider (if planned)
         if planned:
-            with solara.Column(style="min-width:160px"):
-                solara.SliderInt(
-                    f"{solar_coverage_pct.value}% electricity covered",
-                    value=solar_coverage_pct, min=0, max=100, step=5,
-                )
+            with solara.Column(style="width:100%"):
+                solara.SliderInt("", value=solar_coverage_pct, min=0, max=100, step=5)
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    f"<div style='font-size:0.72em;color:var(--ink-3,#888);"
+                    f"margin-top:-4px;text-align:center'>"
+                    f"{solar_coverage_pct.value}% electricity covered</div>"
+                ))
 
 
 def _model_toggle(label: str, rv, options: list, color: str):
