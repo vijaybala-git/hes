@@ -77,6 +77,13 @@ C_ELEC  = C_NAVY
 C_RATE_ELEC = "#0288D1"   # light blue — electricity rate
 C_RATE_GAS  = "#E65100"   # deep orange — gas rate
 
+# ── Chart design tokens (D6 — design system series colors + transparent bg) ───
+_CC_J    = "#3B6FD4"   # journey series (design token)
+_CC_B    = "#D2785F"   # baseline series (design token)
+_CC_GRID = "#EBEDF1"
+_CC_TICK = "#5A6273"
+_CC_SOLAR = "#00897B"
+
 CATEGORY_COLORS = {
     "Baseload":     ("#BDBDBD", "#BBDEFB"),
     "WaterHeating": ("#9E9E9E", C_SKY),
@@ -837,20 +844,25 @@ def _money(v, _):
     return f"${v:,.0f}"
 
 def _style(ax):
-    ax.set_facecolor("#F9F9F9")
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.grid(True, alpha=0.2, color="#CCCCCC")
+    ax.set_facecolor("none")
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_color(_CC_GRID)
+    ax.spines["bottom"].set_color(_CC_GRID)
+    ax.grid(True, axis="y", color=_CC_GRID, linewidth=0.7, zorder=0)
+    ax.tick_params(colors=_CC_TICK, labelsize=8)
+    ax.yaxis.label.set_color(_CC_TICK)
+    ax.xaxis.label.set_color(_CC_TICK)
 
 def _new_fig(wide=False):
     w = 12 if wide else 6
     fig = Figure(figsize=(w, 3.8), dpi=100)
-    fig.patch.set_facecolor("#F9F9F9")
+    fig.patch.set_alpha(0)
     return fig
 
 
 # Chart 1 — Cumulative Energy Costs
 def make_cumulative_opex(df, model, n):
-    C_SOLAR = "#00897B"
     fig = _new_fig()
     ax  = fig.add_subplot(111)
     x = np.arange(1, n + 1)
@@ -860,32 +872,30 @@ def make_cumulative_opex(df, model, n):
     has_solar = solar_planned.value and "Solar Saving" in df.columns
 
     if has_solar:
-        # Journey Cum Cost already has solar deducted; reconstruct no-solar line
         solar_savings_cum = np.cumsum(df["Solar Saving"].values)
         e_no_solar = df["Journey Cum Cost"].values + solar_savings_cum
         e_solar    = df["Journey Cum Cost"].values
-        ax.plot(x, b,         color=C_BASE,  lw=2.5, label=f"Do nothing{lbl_a}")
-        ax.plot(x, e_no_solar, color=C_ELEC, lw=2.0, linestyle="--",
+        ax.plot(x, b,          color=_CC_B,     lw=2.5, label=f"Do nothing{lbl_a}")
+        ax.plot(x, e_no_solar, color=_CC_J,     lw=2.0, linestyle="--",
                 label=f"Your journey{lbl_a}")
-        ax.plot(x, e_solar,   color=C_SOLAR, lw=2.5,
+        ax.plot(x, e_solar,    color=_CC_SOLAR, lw=2.5,
                 label=f"Your journey + Solar{lbl_a}")
-        ax.fill_between(x, b, e_solar, where=(b >= e_solar),
-                        color=C_SOLAR, alpha=0.10, label="Journey + Solar saves")
+        ax.fill_between(x, b, e_solar,    where=(b >= e_solar),
+                        color=_CC_SOLAR, alpha=0.10, label="Journey + Solar saves")
         ax.fill_between(x, e_solar, e_no_solar, where=(e_no_solar > e_solar),
-                        color=C_ELEC, alpha=0.07, label="Solar adds")
+                        color=_CC_J,    alpha=0.07, label="Solar adds")
     else:
         e = df["Journey Cum Cost"].values
-        ax.plot(x, b, color=C_BASE, lw=2.5, label=f"Do nothing{lbl_a}")
-        ax.plot(x, e, color=C_ELEC, lw=2.5, label=f"Your journey{lbl_a}")
-        ax.fill_between(x, b, e, where=(b >= e), color=C_ELEC, alpha=0.12, label="Journey saves")
-        ax.fill_between(x, b, e, where=(b <  e), color=C_BASE, alpha=0.12, label="Gas saves")
+        ax.plot(x, b, color=_CC_B, lw=2.5, label=f"Do nothing{lbl_a}")
+        ax.plot(x, e, color=_CC_J, lw=2.5, label=f"Your journey{lbl_a}")
+        ax.fill_between(x, b, e, where=(b >= e), color=_CC_J, alpha=0.12, label="Journey saves")
+        ax.fill_between(x, b, e, where=(b <  e), color=_CC_B, alpha=0.12, label="Gas saves")
 
     if model.comparison_mode:
         bB = df["Baseline Cum Cost B"].values
         eB = df["Journey Cum Cost B"].values
-        ax.plot(x, bB, color=C_BASE, lw=2.0, linestyle="--", label="Do nothing (B)")
-        ax.plot(x, eB, color=C_ELEC, lw=2.0, linestyle="--", label="Your journey (B)")
-    # Social & health cost overlay (Phase 3 §6) — Scenario A, dotted
+        ax.plot(x, bB, color=_CC_B, lw=2.0, linestyle="--", label="Do nothing (B)")
+        ax.plot(x, eB, color=_CC_J, lw=2.0, linestyle="--", label="Your journey (B)")
     cfg = getattr(model, "social_cost_config", None)
     if (cfg is not None and cfg.total_rate > 0
             and "Journey Social Climate" in df.columns):
@@ -893,16 +903,16 @@ def make_cumulative_opex(df, model, n):
                              + df["Journey Social Health"].values)
         b_social = np.cumsum(df["Baseline Social Climate"].values
                              + df["Baseline Social Health"].values)
-        ax.plot(x, b + b_social, color=C_BASE, lw=1.5, linestyle=":",
+        ax.plot(x, b + b_social, color=_CC_B, lw=1.5, linestyle=":",
                 alpha=0.9, label="Do nothing + social")
-        ax.plot(x, df["Journey Cum Cost"].values + j_social, color=C_ELEC, lw=1.5,
+        ax.plot(x, df["Journey Cum Cost"].values + j_social, color=_CC_J, lw=1.5,
                 linestyle=":", alpha=0.9, label="Your journey + social")
 
     ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(_money))
     ax.set_xlabel("Year")
     ax.set_ylabel("Cumulative Energy Cost")
-    ax.legend(fontsize=8, framealpha=0.8)
-    ax.set_title("Cumulative Energy Costs", fontsize=10, fontweight="bold")
+    ax.legend(fontsize=8, framealpha=0.6)
+    ax.set_title("Cumulative Energy Costs", fontsize=10, fontweight="bold", color=_CC_TICK)
     _style(ax)
     fig.tight_layout(pad=1.0)
     return fig
@@ -915,21 +925,21 @@ def make_annual_cost(df, model, n):
     x = np.arange(1, n + 1)
     if model.comparison_mode and "Baseline Annual Cost B" in df.columns:
         w = 0.18
-        ax.bar(x - 1.5 * w, df["Baseline Annual Cost"].values,   w, color=C_BASE, label="Do nothing (A)",   zorder=3)
-        ax.bar(x - 0.5 * w, df["Journey Annual Cost"].values,    w, color=C_ELEC, label="Your journey (A)", zorder=3)
-        ax.bar(x + 0.5 * w, df["Baseline Annual Cost B"].values,  w, color=C_BASE, alpha=0.55,
+        ax.bar(x - 1.5 * w, df["Baseline Annual Cost"].values,  w, color=_CC_B, label="Do nothing (A)",   zorder=3)
+        ax.bar(x - 0.5 * w, df["Journey Annual Cost"].values,   w, color=_CC_J, label="Your journey (A)", zorder=3)
+        ax.bar(x + 0.5 * w, df["Baseline Annual Cost B"].values, w, color=_CC_B, alpha=0.55,
                label="Do nothing (B)", zorder=3, hatch="//")
-        ax.bar(x + 1.5 * w, df["Journey Annual Cost B"].values,   w, color=C_ELEC, alpha=0.55,
+        ax.bar(x + 1.5 * w, df["Journey Annual Cost B"].values,  w, color=_CC_J, alpha=0.55,
                label="Your journey (B)", zorder=3, hatch="//")
     else:
         w = 0.35
-        ax.bar(x - w / 2, df["Baseline Annual Cost"].values, w, color=C_BASE, label="Do nothing",   zorder=3)
-        ax.bar(x + w / 2, df["Journey Annual Cost"].values,  w, color=C_ELEC, label="Your journey", zorder=3)
+        ax.bar(x - w / 2, df["Baseline Annual Cost"].values, w, color=_CC_B, label="Do nothing",   zorder=3)
+        ax.bar(x + w / 2, df["Journey Annual Cost"].values,  w, color=_CC_J, label="Your journey", zorder=3)
     ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(_money))
     ax.set_xlabel("Year")
     ax.set_ylabel("Annual Energy Cost")
     ax.legend(fontsize=8)
-    ax.set_title("Annual Cost by Year", fontsize=10, fontweight="bold")
+    ax.set_title("Annual Cost by Year", fontsize=10, fontweight="bold", color=_CC_TICK)
     _style(ax)
     fig.tight_layout(pad=1.0)
     return fig
@@ -942,7 +952,7 @@ def make_cost_breakdown(df, model, n):
     title = "Cumulative Cost by Category"
     if model.comparison_mode:
         title += " — Scenario A"
-    fig.suptitle(title, fontsize=10, fontweight="bold", y=1.01)
+    fig.suptitle(title, fontsize=10, fontweight="bold", y=1.01, color=_CC_TICK)
     homes = [
         (model.baseline_home, "Do Nothing",   0),
         (model.journey_home,  "Your Journey", 1),
@@ -979,7 +989,7 @@ def make_cost_breakdown(df, model, n):
         ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(_money))
         ax.set_xlabel("Year")
         ax.set_ylabel("Cumulative Cost")
-        ax.set_title(title_sub, fontsize=9, fontweight="bold")
+        ax.set_title(title_sub, fontsize=9, fontweight="bold", color=_CC_TICK)
         ax.legend(fontsize=7, framealpha=0.8, loc="upper left")
         _style(ax)
     fig.tight_layout(pad=1.0)
@@ -994,8 +1004,8 @@ def make_capex(df, model, n):
     b_vals = [model.baseline_home.capex_by_year.get(y, 0) for y in yrs]
     e_vals = [model.journey_home.capex_by_year.get(y, 0)  for y in yrs]
     w = 0.35
-    ax.bar(yrs - w / 2, b_vals, w, color=C_BASE, label="Do nothing",   zorder=3)
-    ax.bar(yrs + w / 2, e_vals, w, color=C_ELEC, label="Your journey", zorder=3)
+    ax.bar(yrs - w / 2, b_vals, w, color=_CC_B, label="Do nothing",   zorder=3)
+    ax.bar(yrs + w / 2, e_vals, w, color=_CC_J, label="Your journey", zorder=3)
     ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(_money))
     ax.set_xlabel("Year")
     ax.set_ylabel("Replacement Cost")
@@ -1003,7 +1013,7 @@ def make_capex(df, model, n):
     title = "Equipment Replacements (CapEx)"
     if model.comparison_mode:
         title += " — Scenario A"
-    ax.set_title(title, fontsize=10, fontweight="bold")
+    ax.set_title(title, fontsize=10, fontweight="bold", color=_CC_TICK)
     _style(ax)
     fig.tight_layout(pad=1.0)
     return fig
@@ -1026,14 +1036,14 @@ def make_elec_price(df, model, n):
     ax  = fig.add_subplot(111)
     x = np.arange(1, n + 1)
     lbl_a = _elec_rate_label(model.elec_rate_model_a, elec_cagr_pct_a.value)
-    ax.plot(x, df["Elec Rate"].values, color=C_ELEC, lw=2.5, label=lbl_a)
+    ax.plot(x, df["Elec Rate"].values, color=_CC_J, lw=2.5, label=lbl_a)
     if model.comparison_mode:
         lbl_b = _elec_rate_label(model.elec_rate_model_b, elec_cagr_pct_b.value, " (B)")
-        ax.plot(x, df["Elec Rate B"].values, color=C_ELEC, lw=2.0, linestyle="--", label=lbl_b)
+        ax.plot(x, df["Elec Rate B"].values, color=_CC_J, lw=2.0, linestyle="--", label=lbl_b)
         ax.legend(fontsize=8)
     ax.set_xlabel("Year")
     ax.set_ylabel("Avg Electricity Price  ($/kWh)")
-    ax.set_title("Electric CAGR Projection", fontsize=10, fontweight="bold")
+    ax.set_title("Electric CAGR Projection", fontsize=10, fontweight="bold", color=_CC_TICK)
     _style(ax)
     fig.tight_layout(pad=1.0)
     return fig
@@ -1052,7 +1062,7 @@ def make_gas_price(df, model, n):
         ax.legend(fontsize=8)
     ax.set_xlabel("Year")
     ax.set_ylabel("Avg Gas Price  ($/therm)")
-    ax.set_title("Gas CAGR Projection", fontsize=10, fontweight="bold")
+    ax.set_title("Gas CAGR Projection", fontsize=10, fontweight="bold", color=_CC_TICK)
     _style(ax)
     fig.tight_layout(pad=1.0)
     return fig
@@ -1244,28 +1254,28 @@ def make_journey_timeline(df, model, n):
         net   = slot.install_cost - slot.rebate
 
         if state == "electric":
-            ax.plot([1, n], [y, y], color=C_ELEC, lw=3, solid_capstyle="round", zorder=3)
-            ax.text(n + 0.4, y, "✓ Done", va="center", fontsize=8, color=C_ELEC)
+            ax.plot([1, n], [y, y], color=_CC_J, lw=3, solid_capstyle="round", zorder=3)
+            ax.text(n + 0.4, y, "✓ Done", va="center", fontsize=8, color=_CC_J)
 
         elif state == "none":
             if sw is not None and sw <= n:
-                ax.plot([sw, n], [y, y], color=C_ELEC, lw=3, solid_capstyle="round", zorder=3)
-                ax.plot(sw, y, "o", color=C_ELEC, ms=8, zorder=5)
+                ax.plot([sw, n], [y, y], color=_CC_J, lw=3, solid_capstyle="round", zorder=3)
+                ax.plot(sw, y, "o", color=_CC_J, ms=8, zorder=5)
                 ax.annotate(f"+${net:,.0f}", xy=(sw, y),
-                            xytext=(sw + 0.4, y + 0.3), fontsize=7, color=C_ELEC, zorder=5)
+                            xytext=(sw + 0.4, y + 0.3), fontsize=7, color=_CC_J, zorder=5)
             else:
-                ax.plot([1, n], [y, y], color="#CCCCCC", lw=1.5, linestyle=":", zorder=2)
-                ax.text(n + 0.4, y, "Not adding", va="center", fontsize=7, color="#AAAAAA")
+                ax.plot([1, n], [y, y], color=_CC_GRID, lw=1.5, linestyle=":", zorder=2)
+                ax.text(n + 0.4, y, "Not adding", va="center", fontsize=7, color=_CC_TICK)
 
         else:  # gas
             if sw is not None and sw <= n:
-                ax.plot([1, sw], [y, y], color=C_BASE, lw=2.5, linestyle="--", zorder=3)
-                ax.plot([sw, n], [y, y], color=C_ELEC, lw=2.5, solid_capstyle="round", zorder=3)
-                ax.plot(sw, y, "o", color=C_ELEC, ms=8, zorder=5)
+                ax.plot([1, sw], [y, y], color=_CC_B, lw=2.5, linestyle="--", zorder=3)
+                ax.plot([sw, n], [y, y], color=_CC_J, lw=2.5, solid_capstyle="round", zorder=3)
+                ax.plot(sw, y, "o", color=_CC_J, ms=8, zorder=5)
                 ax.annotate(f"${net:,.0f}", xy=(sw, y),
-                            xytext=(sw + 0.4, y + 0.3), fontsize=7, color="#333333", zorder=5)
+                            xytext=(sw + 0.4, y + 0.3), fontsize=7, color=_CC_TICK, zorder=5)
             else:
-                ax.plot([1, n], [y, y], color=C_BASE, lw=2.5, linestyle="--", zorder=3)
+                ax.plot([1, n], [y, y], color=_CC_B, lw=2.5, linestyle="--", zorder=3)
 
     # CapEx-only slot markers — ⚡ for panel, ☀️ for solar
     panel_color = "#78909C"
@@ -1288,10 +1298,10 @@ def make_journey_timeline(df, model, n):
     ax.set_xlabel("Simulation Year")
     ax.set_xlim(0.5, n + 3.5)
     ax.set_ylim(-0.7, n_rows - 0.3)
-    ax.set_title("Journey Timeline — Swap Schedule", fontsize=10, fontweight="bold")
+    ax.set_title("Journey Timeline — Swap Schedule", fontsize=10, fontweight="bold", color=_CC_TICK)
     handles = [
-        Line2D([0], [0], color=C_BASE, lw=2, linestyle="--", label="Gas device running"),
-        Line2D([0], [0], color=C_ELEC, lw=2, label="Electric device running"),
+        Line2D([0], [0], color=_CC_B, lw=2, linestyle="--", label="Gas device running"),
+        Line2D([0], [0], color=_CC_J, lw=2, label="Electric device running"),
     ]
     if has_panel_marker:
         handles.append(
@@ -1854,36 +1864,75 @@ def _DetailCosts(inst_rv, reb_rv):
 
 # ── §25.2 Summary card helpers ────────────────────────────────────────────────
 
+_DEVICE_ICONS = {
+    "hvac":         ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                     " stroke-linecap='round' stroke-linejoin='round'>"
+                     "<path d='M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4'/>"
+                     "<circle cx='12' cy='12' r='2.4' fill='currentColor' stroke='none'/></svg>"),
+    "water_heater": ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                     " stroke-linecap='round' stroke-linejoin='round'>"
+                     "<rect x='6' y='3' width='12' height='18' rx='3'/>"
+                     "<path d='M9 8h6M12 13v4'/></svg>"),
+    "ev":           ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                     " stroke-linecap='round' stroke-linejoin='round'>"
+                     "<path d='M3 17V8a2 2 0 012-2h7a2 2 0 012 2v9'/>"
+                     "<path d='M2 17h13'/><circle cx='5.5' cy='17.5' r='1.6'/>"
+                     "<circle cx='11.5' cy='17.5' r='1.6'/><path d='M14 9h2.5L19 12v5h-5'/></svg>"),
+    "cooktop":      ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                     " stroke-linecap='round' stroke-linejoin='round'>"
+                     "<path d='M12 2c0 6-6 6-6 12a6 6 0 1012 0c0-6-6-6-6-12z'/></svg>"),
+    "dryer":        ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                     " stroke-linecap='round' stroke-linejoin='round'>"
+                     "<path d='M20.38 3.46 16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.57"
+                     "a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84"
+                     "l.58-3.57a2 2 0 00-1.34-2.23z'/></svg>"),
+    "panel":        ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                     " stroke-linecap='round' stroke-linejoin='round'>"
+                     "<path d='M13 2 4 14h6l-1 8 9-12h-6l1-8z'/></svg>"),
+    "baseload":     ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                     " stroke-linecap='round' stroke-linejoin='round'>"
+                     "<path d='M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 006 8"
+                     "c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5'/>"
+                     "<path d='M9 18h6M10 22h4'/></svg>"),
+    "home":         ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                     " stroke-linecap='round' stroke-linejoin='round'>"
+                     "<path d='M3 11.5 12 4l9 7.5'/><path d='M5 10.5V20h14v-9.5'/></svg>"),
+    "solar":        ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                     " stroke-linecap='round' stroke-linejoin='round'>"
+                     "<circle cx='12' cy='12' r='4'/>"
+                     "<path d='M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2'/>"
+                     "</svg>"),
+    "rates":        ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                     " stroke-linecap='round' stroke-linejoin='round'>"
+                     "<path d='M3 3v18h18'/><path d='M7 14l3-4 3 2 4-6'/></svg>"),
+}
+
+
 def _card_header(key: str, title: str):
-    """Title bar + [?] help button + ⋮ expand button."""
-    # Map device card keys to help topic keys
-    _HELP_KEY = {
-        "hvac":         "hvac",
-        "water_heater": "water_heater",
-        "ev":           "ev_charger",
-        "cooktop":      "cooktop",
-        "dryer":        "dryer",
-        "panel":        "panel_upgrade",
-        "baseload":     "baseload",
-        "home":         "home_profile",
-        "solar":        "solar",
-        "rates":        "rates",
-    }
-    with solara.Row(style="align-items:center; margin-bottom:4px"):
-        solara.Text(title, style="font-weight:600; font-size:0.88em; flex:1; color:#1A237E")
-        help_key = _HELP_KEY.get(key, "")
-        if help_key:
-            HelpButton(help_key, style="margin-right:4px")
+    """Device-hd row: icon chip + name + ⋮ details button (design .device-hd style)."""
+    icon_svg = _DEVICE_ICONS.get(key, "")
+    with solara.Row(classes=["device-hd"], gap="0px",
+                    style="align-items:center; gap:8px"):
+        if icon_svg:
+            solara.HTML(tag="span", unsafe_innerHTML=(
+                f"<span class='di'>{icon_svg}</span>"
+            ))
+        solara.HTML(tag="span", unsafe_innerHTML=(
+            f"<span class='dn'>{title}</span>"
+        ), style="flex:1")
         solara.Button(
-            "⋮",
+            "",
             on_click=lambda k=key: detail_open.set(
                 None if detail_open.value == k else k
             ),
-            style=(
-                "background:none; border:none; cursor:pointer;"
-                " color:#78909C; font-size:1.1em; padding:0 4px;"
-                " border-radius:4px; min-width:24px;"
-            ),
+            classes=["iconbtn"],
+            style="",
+            children=[solara.HTML(tag="span", unsafe_innerHTML=(
+                "<svg viewBox='0 0 24 24' fill='currentColor'>"
+                "<circle cx='5' cy='12' r='1.8'/>"
+                "<circle cx='12' cy='12' r='1.8'/>"
+                "<circle cx='19' cy='12' r='1.8'/></svg>"
+            ))],
         )
 
 
@@ -1931,9 +1980,8 @@ def _appliance_rows(state_rv, planned_rv, year_rv, cost_rv, rebate_rv,
 @solara.component
 def HVACSummaryCard():
     """§25.3.1 — state dropdown + plan year | install cost | rebate."""
-    is_open = detail_open.value == "hvac"
-    with solara.Column(classes=["summary-card"], style=_CARD_OPEN if is_open else _CARD_NORMAL):
-        _card_header("hvac", "🌡️ HVAC")
+    with solara.Column(classes=["device"]):
+        _card_header("hvac", "HVAC")
         _appliance_rows(hvac_starting_state, hvac_swap_planned, hvac_swap_year,
                         hvac_install_cost, hvac_rebate)
 
@@ -1941,9 +1989,8 @@ def HVACSummaryCard():
 @solara.component
 def WHSummaryCard():
     """§25.3.2 — state dropdown + plan year | install cost | rebate."""
-    is_open = detail_open.value == "water_heater"
-    with solara.Column(classes=["summary-card"], style=_CARD_OPEN if is_open else _CARD_NORMAL):
-        _card_header("water_heater", "🚿 Water Heater")
+    with solara.Column(classes=["device"]):
+        _card_header("water_heater", "Water Heater")
         _appliance_rows(wh_starting_state, wh_swap_planned, wh_swap_year,
                         wh_install_cost, wh_rebate)
 
@@ -1951,10 +1998,9 @@ def WHSummaryCard():
 @solara.component
 def EVSummaryCard():
     """§25.3.3 — vehicle preset + plan year | charger L1/L2 | miles/yr."""
-    is_open = detail_open.value == "ev"
-    state   = ev_starting_state.value
-    with solara.Column(classes=["summary-card"], style=_CARD_OPEN if is_open else _CARD_NORMAL):
-        _card_header("ev", "🚗 EV Charger")
+    state = ev_starting_state.value
+    with solara.Column(classes=["device"]):
+        _card_header("ev", "EV Charger")
         # Row 1: vehicle preset buttons + state + plan + year
         with solara.Row(gap="4px", style=_ROW_CTRL):
             for lbl, val in [("Eff", 0.23), ("Avg", 0.30), ("SUV", 0.45)]:
@@ -1997,9 +2043,8 @@ def EVSummaryCard():
 @solara.component
 def CooktopSummaryCard():
     """§25.3.4 — state dropdown + plan year | install cost | rebate."""
-    is_open = detail_open.value == "cooktop"
-    with solara.Column(classes=["summary-card"], style=_CARD_OPEN if is_open else _CARD_NORMAL):
-        _card_header("cooktop", "🍳 Cooktop")
+    with solara.Column(classes=["device"]):
+        _card_header("cooktop", "Cooktop")
         _appliance_rows(cooktop_starting_state, cooktop_swap_planned, cooktop_swap_year,
                         cooktop_install_cost, cooktop_rebate)
 
@@ -2007,9 +2052,8 @@ def CooktopSummaryCard():
 @solara.component
 def DryerSummaryCard():
     """§25.3.5 — state dropdown + plan year | install cost | rebate."""
-    is_open = detail_open.value == "dryer"
-    with solara.Column(classes=["summary-card"], style=_CARD_OPEN if is_open else _CARD_NORMAL):
-        _card_header("dryer", "👕 Dryer")
+    with solara.Column(classes=["device"]):
+        _card_header("dryer", "Dryer")
         _appliance_rows(dryer_starting_state, dryer_swap_planned, dryer_swap_year,
                         dryer_install_cost, dryer_rebate)
 
@@ -2017,10 +2061,9 @@ def DryerSummaryCard():
 @solara.component
 def PanelSummaryCard():
     """§25.3.6 — amperage + plan year | install cost | rebate."""
-    is_open = detail_open.value == "panel"
     planned = panel_upgrade_planned.value
-    with solara.Column(classes=["summary-card"], style=_CARD_OPEN if is_open else _CARD_NORMAL):
-        _card_header("panel", "⚡ Panel Upgrade")
+    with solara.Column(classes=["device"]):
+        _card_header("panel", "Panel Upgrade")
         # Row 1: plan checkbox + year slider
         with solara.Row(gap="6px", style=_ROW_CTRL):
             solara.Checkbox(label="Plan 200A upgrade", value=panel_upgrade_planned)
@@ -2052,11 +2095,10 @@ def PanelSummaryCard():
 @solara.component
 def BaseloadSummaryCard():
     """§25.3.7 — elec kWh/mo | gas therms/mo | growth %/yr."""
-    is_open = detail_open.value == "baseload"
-    bl_kwh  = compute_baseload_kwh(square_footage.value, num_bedrooms.value,
-                                    baseload_constant_before.value)
-    with solara.Column(classes=["summary-card"], style=_CARD_OPEN if is_open else _CARD_NORMAL):
-        _card_header("baseload", "💡 Baseload")
+    bl_kwh = compute_baseload_kwh(square_footage.value, num_bedrooms.value,
+                                   baseload_constant_before.value)
+    with solara.Column(classes=["device"]):
+        _card_header("baseload", "Baseload")
         # Row 1: elec kWh/mo
         solara.HTML(tag="div", unsafe_innerHTML=(
             f"<div style='font-size:0.80em; color:#444; margin-top:3px;'>"
@@ -2089,9 +2131,8 @@ def BaseloadSummaryCard():
 @solara.component
 def HomeSummaryCard():
     """§25.3.8 — zip + bedrooms | sq ft | climate zone."""
-    is_open = detail_open.value == "home"
-    with solara.Column(classes=["summary-card"], style=_CARD_OPEN if is_open else _CARD_NORMAL):
-        _card_header("home", "🏠 Home Profile")
+    with solara.Column(classes=["device"]):
+        _card_header("home", "Home Profile")
         # Row 1: ZIP + bedrooms
         with solara.Row(gap="6px", style=_ROW_CTRL):
             with solara.Column(style="min-width:75px; max-width:75px"):
@@ -2111,9 +2152,8 @@ def HomeSummaryCard():
 @solara.component
 def SolarSummaryCard():
     """§25.3.9 — add solar + add battery checkboxes | plan yr | % coverage slider."""
-    is_open = detail_open.value == "solar"
     planned = solar_planned.value
-    with solara.Column(classes=["summary-card"], style=_CARD_OPEN if is_open else _CARD_NORMAL):
+    with solara.Column(classes=["device"]):
         _card_header("solar", "☀️ Solar + Battery")
         # Row 1: add solar + add battery checkboxes
         with solara.Row(gap="10px", style=_ROW_CTRL):
@@ -2169,11 +2209,10 @@ def _model_toggle(label: str, rv, options: list, color: str):
 @solara.component
 def RatesSummaryCard():
     """Energy & Prices summary — elec model | gas model | timeline."""
-    is_open = detail_open.value == "rates"
     elec_model = elec_rate_model_a.value
     gas_model  = gas_rate_model_a.value
-    with solara.Column(classes=["summary-card"], style=_CARD_OPEN if is_open else _CARD_NORMAL):
-        _card_header("rates", "📈 Rate Scenarios")
+    with solara.Column(classes=["device"]):
+        _card_header("rates", "Rate Scenarios")
         # Row 1: electricity rate model
         solara.HTML(tag="div", unsafe_innerHTML=(
             f"<div style='font-size:0.78em; font-weight:600; color:{C_RATE_ELEC};"
@@ -2904,53 +2943,53 @@ def RatesDetail():
 
 @solara.component
 def JourneyPlannerPanel():
-    with solara.Card(margin=0, elevation=1, style="overflow:hidden"):
-        with solara.Row(style=(
-            "background-color:#F0F0F0; padding:6px 12px;"
-            " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
-            " align-items:center;"
-        )):
-            solara.Text("🗺️ Your Electrification Journey",
-                        style="font-weight:600; font-size:0.95em; flex:1")
+    with solara.Column(classes=["card"]):
+        with solara.Row(classes=["card-hd"]):
+            solara.HTML(tag="span", unsafe_innerHTML=(
+                "<span style='flex:1;font-weight:700;font-size:.9em;color:var(--ink,#1C2333)'>"
+                "Your Electrification Journey</span>"
+            ))
             HelpButton("journey_planner")
-        HVACSummaryCard()
-        WHSummaryCard()
-        EVSummaryCard()
-        CooktopSummaryCard()
-        DryerSummaryCard()
-        PanelSummaryCard()
-        BaseloadSummaryCard()
-        solara.Markdown(
-            "<small style='color:#888'>ℹ️ <em>Click ⋮ on any item to see full details.  "
-            "\"Do nothing\" baseline preserves all current states.</em></small>"
-        )
+        with solara.Column(classes=["card-bd"], gap="6px"):
+            HVACSummaryCard()
+            WHSummaryCard()
+            EVSummaryCard()
+            CooktopSummaryCard()
+            DryerSummaryCard()
+            PanelSummaryCard()
+            BaseloadSummaryCard()
+            solara.HTML(tag="p", unsafe_innerHTML=(
+                "<p style='font-size:.78em;color:#888;margin:6px 0 0'>"
+                "Click ⋮ on any device to see full details. "
+                "The Do-Nothing baseline preserves all current appliances.</p>"
+            ))
 
 
 @solara.component
 def HomeProfilePanel():
-    with solara.Card(margin=0, elevation=1, style="overflow:hidden"):
-        with solara.Row(style=(
-            "background-color:#F0F0F0; padding:6px 12px;"
-            " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
-            " align-items:center;"
-        )):
-            solara.Text("🏠 Home + Solar", style="font-weight:600; font-size:0.95em; flex:1")
+    with solara.Column(classes=["card"]):
+        with solara.Row(classes=["card-hd"]):
+            solara.HTML(tag="span", unsafe_innerHTML=(
+                "<span style='flex:1;font-weight:700;font-size:.9em;color:var(--ink,#1C2333)'>"
+                "Home &amp; Solar</span>"
+            ))
             HelpButton("home_profile")
-        HomeSummaryCard()
-        SolarSummaryCard()
+        with solara.Column(classes=["card-bd"], gap="6px"):
+            HomeSummaryCard()
+            SolarSummaryCard()
 
 
 @solara.component
 def EnergyPricesPanel():
-    with solara.Card(margin=0, elevation=1, style="overflow:hidden"):
-        with solara.Row(style=(
-            "background-color:#F0F0F0; padding:6px 12px;"
-            " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
-            " align-items:center;"
-        )):
-            solara.Text("📈 Energy & Prices", style="font-weight:600; font-size:0.95em; flex:1")
+    with solara.Column(classes=["card"]):
+        with solara.Row(classes=["card-hd"]):
+            solara.HTML(tag="span", unsafe_innerHTML=(
+                "<span style='flex:1;font-weight:700;font-size:.9em;color:var(--ink,#1C2333)'>"
+                "Energy &amp; Prices</span>"
+            ))
             HelpButton("energy_prices")
-        RatesSummaryCard()
+        with solara.Column(classes=["card-bd"], gap="6px"):
+            RatesSummaryCard()
 
 
 @solara.component
@@ -2961,111 +3000,156 @@ def SocialCostPanel():
     total = (social_climate_rate.value if climate_on else 0.0) \
           + (social_health_rate.value  if health_on  else 0.0)
 
-    with solara.Card(margin=0, elevation=1, style="overflow:hidden"):
-        with solara.Row(style=(
-            "background-color:#F0F0F0; padding:6px 12px;"
-            " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
-            " align-items:center;"
-        )):
-            solara.Text("♻️ Social & Health Cost of Gas",
-                        style="font-weight:600; font-size:0.95em; flex:1")
+    with solara.Column(classes=["card"], style="margin-top:8px"):
+        with solara.Row(classes=["card-hd"]):
+            solara.HTML(tag="span", unsafe_innerHTML=(
+                "<span style='flex:1;font-weight:700;font-size:.9em;color:var(--ink,#1C2333)'>"
+                "Social &amp; Health Cost of Gas</span>"
+            ))
             HelpButton("social_cost")
+        with solara.Column(classes=["card-bd"], gap="4px"):
+            # ── Climate cost ─────────────────────────────────────────────────
+            solara.Checkbox(label="Climate cost (CO₂ + methane)", value=social_climate_enabled)
+            if climate_on:
+                SliderWithDefault("Climate", social_climate_rate,
+                                  _DEFAULTS["social_climate_rate"], 1.00, 2.00, 0.01,
+                                  unit=" $/therm", fmt="{v:.2f}")
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    "<div style='display:flex; justify-content:space-between;"
+                    " font-size:0.72em; color:#90A4AE; margin-top:-2px;'>"
+                    "<span>$1.00</span><span>$2.00</span></div>"
+                ))
 
-        # ── Climate cost ──────────────────────────────────────────────────────
-        solara.Checkbox(label="Climate cost (CO₂ + methane)", value=social_climate_enabled)
-        if climate_on:
-            SliderWithDefault("Climate", social_climate_rate,
-                              _DEFAULTS["social_climate_rate"], 1.00, 2.00, 0.01,
-                              unit=" $/therm", fmt="{v:.2f}")
+            # ── Health cost ──────────────────────────────────────────────────
+            solara.Checkbox(label="Health cost (air quality)", value=social_health_enabled)
+            if health_on:
+                SliderWithDefault("Health", social_health_rate,
+                                  _DEFAULTS["social_health_rate"], 0.50, 2.00, 0.01,
+                                  unit=" $/therm", fmt="{v:.2f}")
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    "<div style='display:flex; justify-content:space-between;"
+                    " font-size:0.72em; color:#90A4AE; margin-top:-2px;'>"
+                    "<span>$0.50</span><span>$2.00</span></div>"
+                ))
+
+            # ── Total + disclosure ───────────────────────────────────────────
             solara.HTML(tag="div", unsafe_innerHTML=(
-                "<div style='display:flex; justify-content:space-between;"
-                " font-size:0.72em; color:#90A4AE; margin-top:-2px;'>"
-                "<span>$1.00</span><span>$2.00</span></div>"
+                f"<div style='margin-top:6px; padding-top:6px; border-top:1px solid #E0E0E0;"
+                f" font-size:0.86em; color:#37474F;'>"
+                f"Total social cost: <strong>${total:.2f}/therm</strong>"
+                f"<span style='color:#90A4AE;'> (market gas ≈ $2.08)</span></div>"
             ))
-
-        # ── Health cost ───────────────────────────────────────────────────────
-        solara.Checkbox(label="Health cost (air quality)", value=social_health_enabled)
-        if health_on:
-            SliderWithDefault("Health", social_health_rate,
-                              _DEFAULTS["social_health_rate"], 0.50, 2.00, 0.01,
-                              unit=" $/therm", fmt="{v:.2f}")
             solara.HTML(tag="div", unsafe_innerHTML=(
-                "<div style='display:flex; justify-content:space-between;"
-                " font-size:0.72em; color:#90A4AE; margin-top:-2px;'>"
-                "<span>$0.50</span><span>$2.00</span></div>"
+                "<div style='font-size:0.76em; color:#90A4AE; margin-top:4px; font-style:italic;'>"
+                "These costs do not appear on your utility bill. They represent damage to "
+                "public health and the climate caused by burning natural gas.</div>"
             ))
-
-        # ── Total + disclosure ────────────────────────────────────────────────
-        solara.HTML(tag="div", unsafe_innerHTML=(
-            f"<div style='margin-top:6px; padding-top:6px; border-top:1px solid #E0E0E0;"
-            f" font-size:0.86em; color:#37474F;'>"
-            f"Total social cost: <strong>${total:.2f}/therm</strong>"
-            f"<span style='color:#90A4AE;'> (market gas ≈ $2.08)</span></div>"
-        ))
-        solara.HTML(tag="div", unsafe_innerHTML=(
-            "<div style='font-size:0.76em; color:#90A4AE; margin-top:4px; font-style:italic;'>"
-            "These costs do not appear on your utility bill. They represent damage to "
-            "public health and the climate caused by burning natural gas.</div>"
-        ))
-        solara.Button(
-            "Learn more →",
-            on_click=lambda: open_help("social_cost.html"),
-            style=("background:transparent; color:#3F51B5; border:none; padding:2px 0;"
-                   " font-size:0.8em; cursor:pointer; text-decoration:underline;"),
-        )
+            solara.Button(
+                "Learn more →",
+                on_click=lambda: open_help("social_cost.html"),
+                style=("background:transparent; color:#3F51B5; border:none; padding:2px 0;"
+                       " font-size:0.8em; cursor:pointer; text-decoration:underline;"),
+            )
 
 
 # ── §25.6 Bottom zone routing ─────────────────────────────────────────────────
 
 @solara.component
 def DetailView(item: str, model):
-    """Full-width detail card — title bar left+right, two-column body for appliances."""
-    with solara.Card(margin=0, elevation=2, style="overflow:hidden"):
-        DetailTitleBar(_DETAIL_TITLES[item])
-        with solara.Column(classes=["detail-body"], style="padding:8px 12px"):
-            if item == "hvac":
-                HVACDetail()
-            elif item == "water_heater":
-                WaterHeaterDetail()
-            elif item == "ev":
-                EVDetail()
-            elif item == "cooktop":
-                CooktopDetail()
-            elif item == "dryer":
-                DryerDetail()
-            elif item == "panel":
-                ElecPanelDetail()
-            elif item == "baseload":
-                BaseloadDetail()
-            elif item == "home":
-                HomeDetail()
-            elif item == "solar":
-                SolarDetail(model)
-            elif item == "rates":
-                RatesDetail()
+    """Detail body — rendered inside the modal dialog."""
+    with solara.Column(classes=["detail-body"], style="padding:4px 0"):
+        if item == "hvac":
+            HVACDetail()
+        elif item == "water_heater":
+            WaterHeaterDetail()
+        elif item == "ev":
+            EVDetail()
+        elif item == "cooktop":
+            CooktopDetail()
+        elif item == "dryer":
+            DryerDetail()
+        elif item == "panel":
+            ElecPanelDetail()
+        elif item == "baseload":
+            BaseloadDetail()
+        elif item == "home":
+            HomeDetail()
+        elif item == "solar":
+            SolarDetail(model)
+        elif item == "rates":
+            RatesDetail()
 
 
 @solara.component
 def SummaryView():
-    """Static 3-col summary layout — all panels visible, compact SummaryCards."""
-    with solara.Row(gap="12px", style="align-items:flex-start; flex-wrap:wrap"):
-        with solara.Column(style="flex:2; min-width:300px"):
+    """3-col deck layout — Journey | Home & Solar | Energy & Prices."""
+    with solara.Row(classes=["deck"], style="align-items:flex-start"):
+        with solara.Column(classes=["col"]):
             JourneyPlannerPanel()
-        with solara.Column(style="flex:1; min-width:240px"):
+        with solara.Column(classes=["col"]):
             HomeProfilePanel()
-        with solara.Column(style="flex:1; min-width:220px"):
+        with solara.Column(classes=["col"]):
             EnergyPricesPanel()
             SocialCostPanel()
 
 
 @solara.component
 def BottomZone(model):
-    """Shows SummaryView when no detail is open, DetailView otherwise."""
+    """Always shows SummaryView; opens DetailView in a modal dialog."""
+    SummaryView()
+
     dopen = detail_open.value
-    if dopen is None:
-        SummaryView()
-    else:
-        DetailView(dopen, model)
+    is_open = dopen is not None
+
+    _DETAIL_ICONS = {
+        "hvac":         _DEVICE_ICONS.get("hvac", ""),
+        "water_heater": _DEVICE_ICONS.get("water_heater", ""),
+        "ev":           _DEVICE_ICONS.get("ev", ""),
+        "cooktop":      _DEVICE_ICONS.get("cooktop", ""),
+        "dryer":        _DEVICE_ICONS.get("dryer", ""),
+        "panel":        _DEVICE_ICONS.get("panel", ""),
+        "baseload":     _DEVICE_ICONS.get("baseload", ""),
+        "home":         _DEVICE_ICONS.get("home", ""),
+        "solar":        _DEVICE_ICONS.get("solar", ""),
+        "rates":        _DEVICE_ICONS.get("rates", ""),
+    }
+    icon_svg = _DETAIL_ICONS.get(dopen or "", "")
+    title    = _DETAIL_TITLES.get(dopen or "", "")
+
+    with solara.v.Dialog(
+        v_model=is_open,
+        on_v_model=lambda v: (detail_open.set(None) if not v else None),
+        max_width="860px",
+        scrollable=True,
+    ):
+        with solara.v.Card():
+            # Modal header
+            with solara.Row(classes=["modal-hd"]):
+                if icon_svg:
+                    solara.HTML(tag="div", unsafe_innerHTML=(
+                        f"<div class='modal-di'>{icon_svg}</div>"
+                    ))
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    f"<div class='modal-title'>{title}</div>"
+                ))
+                solara.Button(
+                    "✓ Done",
+                    on_click=lambda: detail_open.set(None),
+                    classes=["btn", "done"],
+                )
+                solara.Button(
+                    "✕",
+                    on_click=lambda: detail_open.set(None),
+                    style=(
+                        "background:none;border:none;cursor:pointer;"
+                        "color:#78909C;font-size:1.1em;padding:2px 8px;"
+                        "border-radius:4px;"
+                    ),
+                )
+            # Modal body
+            with solara.Column(classes=["modal-bd", "detail-body"]):
+                if dopen is not None:
+                    DetailView(dopen, model)
 
 
 # ── Phase 3 redesign — masthead + verdict band ──────────────────────────────────
@@ -3246,9 +3330,55 @@ def Page():
                 ".summary-card .v-slider{margin-top:0!important;margin-bottom:0!important}"
                 ".summary-card .v-checkbox{margin-top:0!important;margin-bottom:0!important}"
                 ".summary-card .v-select{margin-top:0!important}"
+                ".device .v-input{margin-bottom:0!important}"
+                ".device .v-text-field{margin-top:0!important}"
+                ".device .v-input__details{min-height:0!important;padding:0!important}"
+                ".device .v-messages{min-height:0!important}"
+                ".device .v-slider{margin-top:0!important;margin-bottom:0!important}"
+                ".device .v-checkbox{margin-top:0!important;margin-bottom:0!important}"
+                ".device .v-select{margin-top:0!important}"
+                ".panel .v-input{margin-bottom:0!important}"
+                ".panel .v-text-field{margin-top:0!important}"
+                ".panel .v-input__details{min-height:0!important;padding:0!important}"
+                ".panel .v-messages{min-height:0!important}"
+                ".panel .v-slider{margin-top:0!important;margin-bottom:0!important}"
+                ".panel .v-checkbox{margin-top:0!important;margin-bottom:0!important}"
+                ".panel .v-select{margin-top:0!important}"
+                ".deck{display:grid!important;grid-template-columns:2fr 1fr 1fr;gap:12px;align-items:start}"
+                "@media(max-width:860px){.deck{grid-template-columns:1fr!important}}"
+                ".card{background:var(--surface);border:1px solid var(--border);"
+                "border-radius:10px;overflow:hidden}"
+                ".card-hd{display:flex!important;align-items:center;gap:8px;"
+                "padding:10px 14px;background:var(--surface-2,#F4F6FB);"
+                "border-bottom:1px solid var(--border)}"
+                ".card-bd{padding:12px 14px}"
+                ".device-hd{display:flex!important;align-items:center;gap:6px;"
+                "padding:8px 12px;border-bottom:1px solid var(--border,#e2e5ed)}"
+                ".device-hd .di{width:20px;height:20px;color:var(--journey,#3B6FD4);"
+                "flex-shrink:0;display:flex;align-items:center}"
+                ".device-hd .di svg{width:18px;height:18px}"
+                ".device-hd .dn{font-size:.82em;font-weight:600;color:var(--ink,#1C2333);flex:1}"
+                ".iconbtn{background:none!important;border:none!important;box-shadow:none!important;"
+                "min-width:24px!important;width:24px!important;height:24px!important;"
+                "padding:0!important;cursor:pointer;color:#78909C}"
+                ".iconbtn svg{width:16px;height:16px;display:block}"
                 ".detail-body .v-input{margin-bottom:2px!important}"
                 ".detail-body .v-input__details{min-height:0!important}"
                 ".detail-body .v-slider{margin-top:4px!important;margin-bottom:2px!important}"
+                ".modal-hd{display:flex!important;align-items:center;gap:8px;"
+                "padding:14px 18px;border-bottom:1px solid var(--border,#e2e5ed);"
+                "position:sticky;top:0;background:var(--surface,#fff);z-index:1}"
+                ".modal-di{width:28px;height:28px;background:var(--journey,#3B6FD4);"
+                "border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff}"
+                ".modal-di svg{width:18px;height:18px}"
+                ".modal-title{flex:1;font-size:1em;font-weight:700;color:var(--ink,#1C2333)}"
+                ".modal-bd{padding:16px 18px;overflow-y:auto}"
+                ".btn.done{background:var(--positive,#2E7D32)!important;color:#fff!important;"
+                "border:none!important;border-radius:6px!important;padding:4px 14px!important;"
+                "font-size:.84em!important;font-weight:600!important;cursor:pointer!important}"
+                ".foot{margin-top:16px;padding:10px 14px;"
+                "border-top:1px solid var(--border,#e2e5ed);"
+                "background:var(--surface-2,#F4F6FB);border-radius:0 0 8px 8px}"
                 "</style>"
             ),
             style="display:none",
@@ -3263,48 +3393,36 @@ def Page():
         # ── Estimated Electrical Load strip (single line) ────────────────────────
         PanelLoadCallout(model)
 
-        # ── Dual chart panes (selector in grey title bar inside each card) ──────
+        # ── Dual chart panes ─────────────────────────────────────────────────────
         with solara.Row(gap="8px", style="align-items:stretch"):
-            with solara.Card(margin=0, elevation=1,
-                             style="flex:1; min-width:300px; overflow:hidden"):
-                with solara.Row(
-                    classes=["chart-header-sel"],
-                    style=(
-                        "background-color:#F0F0F0; padding:6px 12px;"
-                        " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
-                        " align-items:center;"
-                    ),
-                ):
+            with solara.Column(classes=["card"],
+                               style="flex:1; min-width:300px; overflow:hidden"):
+                with solara.Row(classes=["card-hd", "chart-header-sel"]):
                     solara.Select("", value=chart_left, values=CHART_OPTIONS)
                     ChartHelpButton(chart_left.value)
-                ChartPane(chart_left.value, model, df, n)
-            with solara.Card(margin=0, elevation=1,
-                             style="flex:1; min-width:300px; overflow:hidden"):
-                with solara.Row(
-                    classes=["chart-header-sel"],
-                    style=(
-                        "background-color:#F0F0F0; padding:6px 12px;"
-                        " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
-                        " align-items:center;"
-                    ),
-                ):
+                with solara.Column(style="padding:8px 4px"):
+                    ChartPane(chart_left.value, model, df, n)
+            with solara.Column(classes=["card"],
+                               style="flex:1; min-width:300px; overflow:hidden"):
+                with solara.Row(classes=["card-hd", "chart-header-sel"]):
                     solara.Select("", value=chart_right, values=CHART_OPTIONS)
                     ChartHelpButton(chart_right.value)
-                ChartPane(chart_right.value, model, df, n)
+                with solara.Column(style="padding:8px 4px"):
+                    ChartPane(chart_right.value, model, df, n)
 
         # ── Legend ──────────────────────────────────────────────────────────────
         with solara.Row(gap="24px"):
             leg = (
-                f"<span style='color:{C_BASE};font-weight:bold'>■ Do nothing (A)</span>"
+                f"<span style='color:{_CC_B};font-weight:bold'>■ Do nothing (A)</span>"
                 f"&nbsp;&nbsp;"
-                f"<span style='color:{C_ELEC};font-weight:bold'>■ Your journey (A)</span>"
+                f"<span style='color:{_CC_J};font-weight:bold'>■ Your journey (A)</span>"
             )
             if comparison_mode.value:
                 leg += (
                     f"&nbsp;&nbsp;"
-                    f"<span style='color:{C_BASE};opacity:0.6;font-weight:bold'>┅ Do nothing (B)</span>"
+                    f"<span style='color:{_CC_B};opacity:0.6;font-weight:bold'>┅ Do nothing (B)</span>"
                     f"&nbsp;&nbsp;"
-                    f"<span style='color:{C_ELEC};opacity:0.6;font-weight:bold'>┅ Your journey (B)</span>"
+                    f"<span style='color:{_CC_J};opacity:0.6;font-weight:bold'>┅ Your journey (B)</span>"
                 )
             solara.Markdown(leg)
 
@@ -3312,32 +3430,23 @@ def Page():
         BottomZone(model)
 
         # ── Footer — ECHo branding ──────────────────────────────────────────────
-        echo_svg      = _read_svg(_ECHO_LOGO,  height_px=36)
-        echo_icon_svg = _read_svg(_ECHO_ICON, height_px=36)
-        with solara.Row(
-            style="margin-top:16px; padding:10px 12px;"
-                  " border-top:2px solid #C5CAE9;"
-                  " background:#E8EAF6; border-radius:8px;"
-                  " align-items:center; gap:14px"
-        ):
+        echo_svg      = _read_svg(_ECHO_LOGO,  height_px=32)
+        echo_icon_svg = _read_svg(_ECHO_ICON, height_px=32)
+        with solara.Row(classes=["foot"], style="align-items:center; gap:12px"):
             if echo_svg:
                 solara.HTML(tag="div", unsafe_innerHTML=echo_svg,
-                            style="display:flex; align-items:center")
+                            style="display:flex; align-items:center; flex-shrink:0")
             elif echo_icon_svg:
                 solara.HTML(tag="div", unsafe_innerHTML=echo_icon_svg,
-                            style="display:flex; align-items:center")
-            solara.Markdown(
-                "<small style='color:#546E7A; font-size:0.82em'>"
-                "WhyWatt? is supported by the "
-                "<strong style='color:#50BDF8'>Electrification Collaboration</strong>"
-                " — helping California communities make the switch.</small>"
-            )
-            solara.HTML(
-                tag="div",
-                unsafe_innerHTML=(
-                    "<span style='margin-left:auto; background:#0D47A1; color:white;"
-                    " border-radius:6px; padding:3px 10px; font-size:0.75em;"
-                    " font-weight:700; white-space:nowrap'>WhyWatt? v2.0</span>"
-                ),
-                style="margin-left:auto",
-            )
+                            style="display:flex; align-items:center; flex-shrink:0")
+            solara.HTML(tag="span", unsafe_innerHTML=(
+                "<span style='font-size:.8em;color:#546E7A;flex:1'>"
+                "Estimates are illustrative — adjust assumptions to match your home. "
+                "Supported by the <strong>Electrification Collaboration</strong>."
+                "</span>"
+            ))
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                "<span style='background:#0D47A1;color:#fff;border-radius:6px;"
+                "padding:3px 10px;font-size:.74em;font-weight:700;"
+                "white-space:nowrap'>WhyWatt? v2.0</span>"
+            ))
