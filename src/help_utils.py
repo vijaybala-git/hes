@@ -99,8 +99,8 @@ def HelpPopupOverlay():
     with solara.v.Dialog(
         v_model=is_open,
         on_v_model=on_v_model,
-        max_width="380px",
-        overlay_opacity=0.0,
+        max_width="90vw",
+        overlay_opacity=0.15,
     ):
         if not is_open:
             return
@@ -109,14 +109,14 @@ def HelpPopupOverlay():
         # Human-readable title from the key
         title = key.replace("chart_", "").replace("_", " ").title()
 
-        with solara.v.Card(elevation=6, style_="border-radius:8px; overflow:hidden"):
+        with solara.v.Card(elevation=8, style_="border-radius:10px; overflow:hidden"):
             # Title row
             with solara.v.CardTitle(
                 style_=(
-                    "padding:10px 14px 6px;"
+                    "padding:14px 20px 10px;"
                     " background:#E8EAF6;"
-                    " font-size:0.88rem;"
-                    " font-weight:600;"
+                    " font-size:1rem;"
+                    " font-weight:700;"
                     " color:#283593;"
                     " display:flex;"
                     " align-items:center;"
@@ -128,21 +128,29 @@ def HelpPopupOverlay():
                     "✕",
                     on_click=close,
                     style=(
-                        "min-width:22px; width:22px; height:22px; padding:0;"
+                        "min-width:28px; width:28px; height:28px; padding:0;"
                         " background:transparent; color:#78909C;"
-                        " border:none; cursor:pointer; font-size:0.85em;"
+                        " border:none; cursor:pointer; font-size:1em;"
                         " border-radius:50%;"
                     ),
                 )
-            # Body
-            with solara.v.CardText(style_="padding:10px 14px; font-size:0.84rem; color:#37474F; line-height:1.55"):
-                solara.v.Html(tag="p", children=[text], style_="margin:0 0 10px 0")
+            # Body — min-height ~10 lines at 1.6 line-height × 0.95rem
+            with solara.v.CardText(
+                style_=(
+                    "padding:20px 24px;"
+                    " font-size:0.95rem;"
+                    " color:#37474F;"
+                    " line-height:1.7;"
+                    " min-height:17em;"
+                )
+            ):
+                solara.v.Html(tag="p", children=[text], style_="margin:0 0 16px 0")
                 solara.Button(
                     "Learn more →",
                     on_click=lambda: (_open_topic(learn_more), close()),
                     style=(
                         "background:transparent; color:#3F51B5;"
-                        " border:none; padding:0; font-size:0.82em;"
+                        " border:none; padding:0; font-size:0.9em;"
                         " cursor:pointer; text-decoration:underline;"
                         " font-weight:600;"
                     ),
