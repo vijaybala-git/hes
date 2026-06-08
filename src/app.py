@@ -2012,6 +2012,24 @@ def _panel_hd(panel_key: str, title: str):
     ))
 
 
+def _cost_row(cost_rv, rebate_rv, net: int):
+    """Install $ · Rebate $ · Net — compact single line, box-style, integers only."""
+    net_color = "var(--positive-ink,#2E7D32)" if net >= 0 else "var(--baseline-ink,#B45B3E)"
+    with solara.Row(classes=["cost-row"],
+                    style="align-items:flex-end;gap:8px;flex-wrap:nowrap"):
+        with solara.Column(classes=["cost-field"], style="max-width:88px;min-width:72px"):
+            solara.InputInt("Install $", value=cost_rv)
+        with solara.Column(classes=["cost-field"], style="max-width:88px;min-width:72px"):
+            solara.InputInt("Rebate $", value=rebate_rv)
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            "<div style='padding-bottom:6px;line-height:1'>"
+            "<div style='font-size:0.72em;color:var(--ink-3,#888);margin-bottom:4px'>Net</div>"
+            f"<span style='font-size:0.88em;font-weight:700;color:{net_color};"
+            f"font-family:var(--mono,monospace)'>${abs(net):,}</span>"
+            "</div>"
+        ))
+
+
 def _appliance_rows(state_rv, planned_rv, year_rv, cost_rv, rebate_rv,
                     state_values=("gas", "electric", "none")):
     """3-row content for standard appliance summary cards (HVAC, WH, Cooktop, Dryer)."""
@@ -2032,18 +2050,10 @@ def _appliance_rows(state_rv, planned_rv, year_rv, cost_rv, rebate_rv,
                 "<span style='font-size:0.80em; color:#2E7D32; margin-left:4px;'>"
                 "✓ Electrified</span>"
             ))
-    # Row 2: install cost + rebate + net (combined) or status
+    # Row 2: install cost + rebate + net — all on one line, compact number inputs
     if state != "electric" and planned_rv.value:
         net = cost_rv.value - rebate_rv.value
-        with solara.Row(gap="6px", style=_ROW_CTRL):
-            with solara.Column(style="min-width:110px"):
-                solara.InputInt("Install $", value=cost_rv)
-            with solara.Column(style="min-width:100px"):
-                solara.InputInt("Rebate $", value=rebate_rv)
-            solara.HTML(tag="span", unsafe_innerHTML=(
-                f"<span style='font-size:0.82em; font-weight:600; color:#1976D2;'>"
-                f"Net ${net:,}</span>"
-            ))
+        _cost_row(cost_rv, rebate_rv, net)
     else:
         solara.HTML(tag="div", unsafe_innerHTML=(
             "<div style='font-size:0.80em; color:#AAAAAA; margin-top:3px;'>"
@@ -2152,15 +2162,7 @@ def PanelSummaryCard():
         # Row 2: install cost + rebate + net (combined) or status
         if planned:
             net = panel_upgrade_cost.value - panel_upgrade_rebate.value
-            with solara.Row(gap="6px", style=_ROW_CTRL):
-                with solara.Column(style="min-width:110px"):
-                    solara.InputInt("Cost $", value=panel_upgrade_cost)
-                with solara.Column(style="min-width:100px"):
-                    solara.InputInt("Rebate $", value=panel_upgrade_rebate)
-                solara.HTML(tag="span", unsafe_innerHTML=(
-                    f"<span style='font-size:0.82em; font-weight:600; color:#1976D2;'>"
-                    f"Net ${net:,}</span>"
-                ))
+            _cost_row(panel_upgrade_cost, panel_upgrade_rebate, net)
         else:
             solara.HTML(tag="div", unsafe_innerHTML=(
                 "<div style='font-size:0.80em; color:#AAAAAA; margin-top:3px;'>"
@@ -3490,6 +3492,18 @@ def Page():
                 ".detail-body .v-input{margin-bottom:2px!important}"
                 ".detail-body .v-input__details{min-height:0!important}"
                 ".detail-body .v-slider{margin-top:4px!important;margin-bottom:2px!important}"
+                ".cost-field .v-input__slot::before{display:none!important}"
+                ".cost-field .v-input__slot::after{display:none!important}"
+                ".cost-field .v-input__slot{border:1px solid var(--border,#e2e5ed)!important;"
+                "border-radius:6px!important;padding:0 8px!important;"
+                "background:var(--surface,#fff)!important;min-height:32px!important}"
+                ".cost-field .v-input{margin-bottom:0!important}"
+                ".cost-field .v-text-field{margin-top:0!important}"
+                ".cost-field .v-input__details{display:none!important}"
+                ".cost-field .v-messages{display:none!important}"
+                ".cost-field .v-text-field__slot input{font-size:0.82em!important;"
+                "font-family:var(--mono,monospace)!important;padding:4px 0!important}"
+                ".cost-field label.v-label{font-size:0.72em!important;top:8px!important}"
                 ".modal-hd{display:flex!important;align-items:center;gap:8px;"
                 "padding:14px 18px;border-bottom:1px solid var(--border,#e2e5ed);"
                 "position:sticky;top:0;background:var(--surface,#fff);z-index:1}"
