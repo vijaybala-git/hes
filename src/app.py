@@ -26,6 +26,21 @@ _WHYWATT_LOGO = os.path.join(_ASSETS, "whywatt_logo.svg")
 _ECHO_LOGO    = os.path.join(_ASSETS, "echo_logo.svg")
 _ECHO_ICON    = os.path.join(_ASSETS, "echo_icon.svg")
 
+# Icon-only SVG extracted from whywatt_logo.svg paths (house + bar elements).
+# ViewBox crops to the icon area (x 0-88, y 0-92); fills turned white so the
+# icon renders cleanly on the .brand-mark gradient background.
+_WHYWATT_ICON_SVG = (
+    '<svg viewBox="0 0 88 92" xmlns="http://www.w3.org/2000/svg">'
+    '<path d="M8 84 L8 44 L44 8 L80 44 L80 84 Z"'
+    ' fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.85)"'
+    ' stroke-width="3.5" stroke-linejoin="round"/>'
+    '<rect x="30.973" y="44.513" width="8" height="18" rx="4" fill="#fff"/>'
+    '<rect x="49.895" y="47.27" width="8" height="13" rx="4" fill="#fff"/>'
+    '<path d="M40.487 67 L40.487 72 C43.154 75.333 45.82 75.333 48.487 72'
+    ' L48.487 67 Z" fill="#fff"/>'
+    '</svg>'
+)
+
 # ── Phase 3 redesign design system (injected once via solara.Style in Page) ─────
 _REDESIGN_CSS_PATH = os.path.join(_HERE, "styles_redesign.css")
 try:
@@ -3058,7 +3073,6 @@ def BottomZone(model):
 @solara.component
 def Masthead():
     """Redesign masthead: preserved logo + one-line context pill + Reset/Help."""
-    ww_svg = _read_svg(_WHYWATT_LOGO, height_px=40)
     bl_kwh = compute_baseload_kwh(
         square_footage.value, num_bedrooms.value, baseload_constant_before.value
     )
@@ -3078,9 +3092,12 @@ def Masthead():
         "</div>"
     )
     brand_inner = (
-        f"<div class='brand-mark'>{ww_svg}</div>"
+        f"<div class='brand-mark'>{_WHYWATT_ICON_SVG}</div>"
+        "<div style='display:flex;flex-direction:column;line-height:1.1'>"
         "<div class='brand-name'>Why<b>Watt?</b></div>"
-    ) if ww_svg else "<div class='brand-name'>Why<b>Watt?</b></div>"
+        "<div class='brand-tag'>Home Electrification Simulator</div>"
+        "</div>"
+    )
     with solara.Row(classes=["masthead"], style="gap:16px"):
         solara.HTML(tag="div", unsafe_innerHTML=brand_inner, classes=["brand"],
                     style="display:flex; align-items:center; flex-shrink:0")
