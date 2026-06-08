@@ -1907,6 +1907,39 @@ _DEVICE_ICONS = {
                      "<path d='M3 3v18h18'/><path d='M7 14l3-4 3 2 4-6'/></svg>"),
 }
 
+# ── Card-level header icons (accent-soft .ic chip in .card-hd) ────────────────
+_CARD_IC = {
+    "journey": ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                " stroke-linecap='round' stroke-linejoin='round'>"
+                "<path d='M4 19V5a2 2 0 012-2h9l5 5v11a2 2 0 01-2 2H6a2 2 0 01-2-2z'/>"
+                "<path d='M8 8h5M8 12h8M8 16h8'/></svg>"),
+    "home":    ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                " stroke-linecap='round' stroke-linejoin='round'>"
+                "<path d='M3 11.5 12 4l9 7.5'/><path d='M5 10.5V20h14v-9.5'/></svg>"),
+    "energy":  ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                " stroke-linecap='round' stroke-linejoin='round'>"
+                "<path d='M3 3v18h18'/><path d='M7 14l3-4 3 2 4-6'/></svg>"),
+}
+
+# ── Panel sub-header icons (smaller .ic chip in .panel-hd) ────────────────────
+_PANEL_IC = {
+    "home_profile": ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                     " stroke-linecap='round' stroke-linejoin='round'>"
+                     "<path d='M3 11.5 12 4l9 7.5'/><path d='M5 10.5V20h14v-9.5'/></svg>"),
+    "solar":        ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                     " stroke-linecap='round' stroke-linejoin='round'>"
+                     "<circle cx='12' cy='12' r='4'/>"
+                     "<path d='M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2'/>"
+                     "</svg>"),
+    "rates":        ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                     " stroke-linecap='round' stroke-linejoin='round'>"
+                     "<path d='M3 17l5-5 4 3 7-8'/><path d='M21 7v5h-5'/></svg>"),
+    "social":       ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                     " stroke-linecap='round' stroke-linejoin='round'>"
+                     "<path d='M12 22C6.5 22 2 17.5 2 12S6.5 2 12 2s10 4.5 10 10-4.5 10-10 10z'/>"
+                     "<path d='M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01'/></svg>"),
+}
+
 
 def _card_header(key: str, title: str):
     """Device-hd row: icon chip + name + ⋮ details button (design .device-hd style)."""
@@ -1934,6 +1967,32 @@ def _card_header(key: str, title: str):
                 "<circle cx='19' cy='12' r='1.8'/></svg>"
             ))],
         )
+
+
+def _card_header_main(card_key: str, title: str, help_key: str):
+    """Top-level card header: .ic icon chip + h3 title + spacer + ? help button."""
+    ic_svg = _CARD_IC.get(card_key, "")
+    # Render icon + title as a single HTML block so no extra v-col wrappers split them
+    solara.HTML(tag="div", unsafe_innerHTML=(
+        f"<div style='display:flex;align-items:center;gap:9px;flex:1;min-width:0'>"
+        f"<span class='ic'>{ic_svg}</span>"
+        f"<h3 style='margin:0;font-size:14px;font-weight:700;color:var(--ink,#1C2333);"
+        f"white-space:nowrap;letter-spacing:-0.01em'>{title}</h3>"
+        f"</div>"
+    ))
+    # Help button as Solara component (needs reactive access)
+    HelpButton(help_key)
+
+
+def _panel_hd(panel_key: str, title: str):
+    """Sub-panel header: small .ic chip + h4 title (rendered as HTML, no interactivity needed)."""
+    ic_svg = _PANEL_IC.get(panel_key, "")
+    solara.HTML(tag="div", unsafe_innerHTML=(
+        f"<div class='panel-hd'>"
+        f"<span class='ic'>{ic_svg}</span>"
+        f"<h4 style='margin:0'>{title}</h4>"
+        f"</div>"
+    ))
 
 
 def _appliance_rows(state_rv, planned_rv, year_rv, cost_rv, rebate_rv,
@@ -2130,58 +2189,58 @@ def BaseloadSummaryCard():
 
 @solara.component
 def HomeSummaryCard():
-    """§25.3.8 — zip + bedrooms | sq ft | climate zone."""
-    with solara.Column(classes=["device"]):
-        _card_header("home", "Home Profile")
-        # Row 1: ZIP + bedrooms
-        with solara.Row(gap="6px", style=_ROW_CTRL):
-            with solara.Column(style="min-width:75px; max-width:75px"):
-                solara.InputText("ZIP", value=zip_code)
-            with solara.Column(style="min-width:75px; max-width:75px"):
-                solara.Select("Beds", value=num_bedrooms, values=[1, 2, 3, 4, 5])
-        # Row 2: sq ft
-        with solara.Row(gap="6px", style=_ROW_CTRL):
-            with solara.Column(style="min-width:140px"):
-                solara.InputInt("Sq ft", value=square_footage)
-        # Row 3: climate zone
-        with solara.Row(gap="6px", style=_ROW_CTRL):
-            with solara.Column(style="min-width:120px"):
-                solara.Select("Climate zone", value=climate_zone, values=_CZ_OPTIONS)
+    """§25.3.8 — zip + bedrooms | sq ft | climate zone. Panel sub-section."""
+    with solara.Column(classes=["panel"]):
+        _panel_hd("home_profile", "Home Profile")
+        with solara.Column(classes=["panel-bd"]):
+            # Row 1: ZIP + bedrooms
+            with solara.Row(gap="6px", style=_ROW_CTRL):
+                with solara.Column(style="min-width:75px; max-width:75px"):
+                    solara.InputText("ZIP", value=zip_code)
+                with solara.Column(style="min-width:75px; max-width:75px"):
+                    solara.Select("Beds", value=num_bedrooms, values=[1, 2, 3, 4, 5])
+            # Row 2: sq ft
+            with solara.Row(gap="6px", style=_ROW_CTRL):
+                with solara.Column(style="min-width:140px"):
+                    solara.InputInt("Sq ft", value=square_footage)
+            # Row 3: climate zone
+            with solara.Row(gap="6px", style=_ROW_CTRL):
+                with solara.Column(style="min-width:120px"):
+                    solara.Select("Climate zone", value=climate_zone, values=_CZ_OPTIONS)
 
 
 @solara.component
 def SolarSummaryCard():
     """§25.3.9 — add solar + add battery checkboxes | plan yr | % coverage slider."""
     planned = solar_planned.value
-    with solara.Column(classes=["device"]):
-        _card_header("solar", "☀️ Solar + Battery")
-        # Row 1: add solar + add battery checkboxes
-        with solara.Row(gap="10px", style=_ROW_CTRL):
-            solara.Checkbox(label="Add solar", value=solar_planned)
+    with solara.Column(classes=["panel"]):
+        _panel_hd("solar", "Solar &amp; Battery")
+        with solara.Column(classes=["panel-bd"]):
+            # Row 1: add solar + add battery checkboxes
+            with solara.Row(gap="10px", style=_ROW_CTRL):
+                solara.Checkbox(label="Add solar", value=solar_planned)
+                if planned:
+                    solara.Checkbox(label="+ Battery", value=solar_include_battery)
+            # Row 2: plan year slider (if planned)
             if planned:
-                solara.Checkbox(label="+ Battery", value=solar_include_battery)
-        # Row 2: plan year slider (if planned)
-        if planned:
-            yr = solar_install_year.value
-            cal_yr = sim_start_year.value + yr - 1
-            with solara.Row(gap="4px", style=_ROW_CTRL):
+                yr = solar_install_year.value
+                cal_yr = sim_start_year.value + yr - 1
+                with solara.Row(gap="4px", style=_ROW_CTRL):
+                    with solara.Column(style="min-width:160px"):
+                        solara.SliderInt(f"Install yr {yr} ({cal_yr})",
+                                         value=solar_install_year, min=1, max=25)
+            else:
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    "<div style='font-size:0.80em; color:#AAAAAA; margin-top:3px;'>"
+                    "Not planned</div>"
+                ))
+            # Row 3: % coverage slider (if planned)
+            if planned:
                 with solara.Column(style="min-width:160px"):
-                    solara.SliderInt(f"Install yr {yr} ({cal_yr})",
-                                     value=solar_install_year, min=1, max=25)
-        else:
-            solara.HTML(tag="div", unsafe_innerHTML=(
-                "<div style='font-size:0.80em; color:#AAAAAA; margin-top:3px;'>"
-                "Not planned</div>"
-            ))
-        # Row 3: % coverage slider (if planned)
-        if planned:
-            with solara.Column(style="min-width:160px"):
-                solara.SliderInt(
-                    f"{solar_coverage_pct.value}% electricity covered",
-                    value=solar_coverage_pct, min=0, max=100, step=5,
-                )
-        else:
-            solara.HTML(tag="div", unsafe_innerHTML="<div style='height:6px'></div>")
+                    solara.SliderInt(
+                        f"{solar_coverage_pct.value}% electricity covered",
+                        value=solar_coverage_pct, min=0, max=100, step=5,
+                    )
 
 
 def _model_toggle(label: str, rv, options: list, color: str):
@@ -2211,39 +2270,40 @@ def RatesSummaryCard():
     """Energy & Prices summary — elec model | gas model | timeline."""
     elec_model = elec_rate_model_a.value
     gas_model  = gas_rate_model_a.value
-    with solara.Column(classes=["device"]):
-        _card_header("rates", "Rate Scenarios")
-        # Row 1: electricity rate model
-        solara.HTML(tag="div", unsafe_innerHTML=(
-            f"<div style='font-size:0.78em; font-weight:600; color:{C_RATE_ELEC};"
-            " margin-bottom:2px'>Electricity Rate Model</div>"
-        ))
-        with solara.Row(gap="6px", style="align-items:center; flex-wrap:wrap"):
-            _model_toggle("⚡", elec_rate_model_a,
-                          [("cagr_flat", "CAGR"), ("acc_shaped", "ACC")], C_RATE_ELEC)
-            if elec_model == "cagr_flat":
-                solara.HTML(tag="span", unsafe_innerHTML=(
-                    f"<span style='font-size:0.80em; color:#546E7A;'>"
-                    f"+{elec_cagr_pct_a.value}%/yr</span>"
-                ))
-        # Row 2: gas rate model
-        solara.HTML(tag="div", unsafe_innerHTML=(
-            f"<div style='font-size:0.78em; font-weight:600; color:{C_RATE_GAS};"
-            " margin-bottom:2px; margin-top:4px'>Gas Rate Model</div>"
-        ))
-        with solara.Row(gap="6px", style="align-items:center; flex-wrap:wrap"):
-            _model_toggle("🔥", gas_rate_model_a,
-                          [("cagr_flat", "CAGR"), ("acc_seasonal", "ACC")], C_RATE_GAS)
-            if gas_model == "cagr_flat":
-                solara.HTML(tag="span", unsafe_innerHTML=(
-                    f"<span style='font-size:0.80em; color:#546E7A;'>"
-                    f"+{gas_cagr_pct_a.value}%/yr</span>"
-                ))
-        # Row 3: timeline
-        solara.SliderInt(
-            f"Model: {years.value} yrs",
-            value=years, min=5, max=30,
-        )
+    with solara.Column(classes=["panel"]):
+        _panel_hd("rates", "Rate Scenarios")
+        with solara.Column(classes=["panel-bd"]):
+            # Row 1: electricity rate model
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                f"<div style='font-size:0.78em; font-weight:600; color:{C_RATE_ELEC};"
+                " margin-bottom:2px'>Electricity Rate Model</div>"
+            ))
+            with solara.Row(gap="6px", style="align-items:center; flex-wrap:wrap"):
+                _model_toggle("⚡", elec_rate_model_a,
+                              [("cagr_flat", "CAGR"), ("acc_shaped", "ACC")], C_RATE_ELEC)
+                if elec_model == "cagr_flat":
+                    solara.HTML(tag="span", unsafe_innerHTML=(
+                        f"<span style='font-size:0.80em; color:#546E7A;'>"
+                        f"+{elec_cagr_pct_a.value}%/yr</span>"
+                    ))
+            # Row 2: gas rate model
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                f"<div style='font-size:0.78em; font-weight:600; color:{C_RATE_GAS};"
+                " margin-bottom:2px; margin-top:4px'>Gas Rate Model</div>"
+            ))
+            with solara.Row(gap="6px", style="align-items:center; flex-wrap:wrap"):
+                _model_toggle("🔥", gas_rate_model_a,
+                              [("cagr_flat", "CAGR"), ("acc_seasonal", "ACC")], C_RATE_GAS)
+                if gas_model == "cagr_flat":
+                    solara.HTML(tag="span", unsafe_innerHTML=(
+                        f"<span style='font-size:0.80em; color:#546E7A;'>"
+                        f"+{gas_cagr_pct_a.value}%/yr</span>"
+                    ))
+            # Row 3: timeline
+            solara.SliderInt(
+                f"Model: {years.value} yrs",
+                value=years, min=5, max=30,
+            )
 
 
 # ── §25.4 Detail windows ──────────────────────────────────────────────────────
@@ -2945,12 +3005,8 @@ def RatesDetail():
 def JourneyPlannerPanel():
     with solara.Column(classes=["card"]):
         with solara.Row(classes=["card-hd"]):
-            solara.HTML(tag="span", unsafe_innerHTML=(
-                "<span style='flex:1;font-weight:700;font-size:.9em;color:var(--ink,#1C2333)'>"
-                "Your Electrification Journey</span>"
-            ))
-            HelpButton("journey_planner")
-        with solara.Column(classes=["card-bd"], gap="6px"):
+            _card_header_main("journey", "Your Electrification Journey", "journey_planner")
+        with solara.Column(classes=["card-bd"], gap="8px"):
             HVACSummaryCard()
             WHSummaryCard()
             EVSummaryCard()
@@ -2959,7 +3015,7 @@ def JourneyPlannerPanel():
             PanelSummaryCard()
             BaseloadSummaryCard()
             solara.HTML(tag="p", unsafe_innerHTML=(
-                "<p style='font-size:.78em;color:#888;margin:6px 0 0'>"
+                "<p style='font-size:.78em;color:var(--ink-3,#888);margin:4px 0 0'>"
                 "Click ⋮ on any device to see full details. "
                 "The Do-Nothing baseline preserves all current appliances.</p>"
             ))
@@ -2969,45 +3025,31 @@ def JourneyPlannerPanel():
 def HomeProfilePanel():
     with solara.Column(classes=["card"]):
         with solara.Row(classes=["card-hd"]):
-            solara.HTML(tag="span", unsafe_innerHTML=(
-                "<span style='flex:1;font-weight:700;font-size:.9em;color:var(--ink,#1C2333)'>"
-                "Home &amp; Solar</span>"
-            ))
-            HelpButton("home_profile")
-        with solara.Column(classes=["card-bd"], gap="6px"):
-            HomeSummaryCard()
-            SolarSummaryCard()
+            _card_header_main("home", "Home &amp; Solar", "home_profile")
+        HomeSummaryCard()
+        SolarSummaryCard()
 
 
 @solara.component
 def EnergyPricesPanel():
     with solara.Column(classes=["card"]):
         with solara.Row(classes=["card-hd"]):
-            solara.HTML(tag="span", unsafe_innerHTML=(
-                "<span style='flex:1;font-weight:700;font-size:.9em;color:var(--ink,#1C2333)'>"
-                "Energy &amp; Prices</span>"
-            ))
-            HelpButton("energy_prices")
-        with solara.Column(classes=["card-bd"], gap="6px"):
-            RatesSummaryCard()
+            _card_header_main("energy", "Energy &amp; Prices", "energy_prices")
+        RatesSummaryCard()
+        SocialCostPanel()
 
 
 @solara.component
 def SocialCostPanel():
-    """Social & Health Cost of Gas (Phase 3 §6) — informational adders on gas therms."""
+    """Social & Health Cost of Gas — rendered as a .panel sub-section inside EnergyPricesPanel."""
     climate_on = social_climate_enabled.value
     health_on  = social_health_enabled.value
     total = (social_climate_rate.value if climate_on else 0.0) \
           + (social_health_rate.value  if health_on  else 0.0)
 
-    with solara.Column(classes=["card"], style="margin-top:8px"):
-        with solara.Row(classes=["card-hd"]):
-            solara.HTML(tag="span", unsafe_innerHTML=(
-                "<span style='flex:1;font-weight:700;font-size:.9em;color:var(--ink,#1C2333)'>"
-                "Social &amp; Health Cost of Gas</span>"
-            ))
-            HelpButton("social_cost")
-        with solara.Column(classes=["card-bd"], gap="4px"):
+    with solara.Column(classes=["panel"]):
+        _panel_hd("social", "Social &amp; Health Cost of Gas")
+        with solara.Column(classes=["panel-bd"], gap="4px"):
             # ── Climate cost ─────────────────────────────────────────────────
             solara.Checkbox(label="Climate cost (CO₂ + methane)", value=social_climate_enabled)
             if climate_on:
@@ -3083,14 +3125,13 @@ def DetailView(item: str, model):
 @solara.component
 def SummaryView():
     """3-col deck layout — Journey | Home & Solar | Energy & Prices."""
-    with solara.Row(classes=["deck"], style="align-items:flex-start"):
+    with solara.Row(classes=["deck"]):
         with solara.Column(classes=["col"]):
             JourneyPlannerPanel()
         with solara.Column(classes=["col"]):
             HomeProfilePanel()
         with solara.Column(classes=["col"]):
             EnergyPricesPanel()
-            SocialCostPanel()
 
 
 @solara.component
@@ -3344,24 +3385,54 @@ def Page():
                 ".panel .v-slider{margin-top:0!important;margin-bottom:0!important}"
                 ".panel .v-checkbox{margin-top:0!important;margin-bottom:0!important}"
                 ".panel .v-select{margin-top:0!important}"
-                ".deck{display:grid!important;grid-template-columns:2fr 1fr 1fr;gap:12px;align-items:start}"
-                "@media(max-width:860px){.deck{grid-template-columns:1fr!important}}"
-                ".card{background:var(--surface);border:1px solid var(--border);"
-                "border-radius:10px;overflow:hidden}"
-                ".card-hd{display:flex!important;align-items:center;gap:8px;"
-                "padding:10px 14px;background:var(--surface-2,#F4F6FB);"
-                "border-bottom:1px solid var(--border)}"
-                ".card-bd{padding:12px 14px}"
-                ".device-hd{display:flex!important;align-items:center;gap:6px;"
-                "padding:8px 12px;border-bottom:1px solid var(--border,#e2e5ed)}"
-                ".device-hd .di{width:20px;height:20px;color:var(--journey,#3B6FD4);"
-                "flex-shrink:0;display:flex;align-items:center}"
-                ".device-hd .di svg{width:18px;height:18px}"
-                ".device-hd .dn{font-size:.82em;font-weight:600;color:var(--ink,#1C2333);flex:1}"
+                ".v-col.card{padding:0!important;display:flex!important;flex-direction:column!important}"
+                ".v-col.col{padding:0!important}"
+                ".v-row.deck{margin:0!important;gap:var(--gap,16px)!important;flex-wrap:nowrap!important}"
+                ".v-row.card-hd{margin:0!important;flex-wrap:nowrap!important}"
+                ".card-hd>.v-col{padding:0!important;flex:0 0 auto!important;max-width:none!important}"
+                ".card-hd>.v-col:first-child{flex:1 1 auto!important}"
+                ".v-col.card-bd{padding:0!important}"
+                ".v-col.panel-bd{padding:0!important}"
+                ".v-col.panel{padding:0!important;display:flex!important;flex-direction:column!important}"
+                "@media(max-width:860px){.v-row.deck{flex-wrap:wrap!important}}"
+                ".deck{display:flex!important;gap:var(--gap,16px);align-items:start}"
+                ".col{display:flex;flex-direction:column;gap:var(--gap,16px);flex:1}"
+                ".card{background:var(--surface,#fff)!important;border:1px solid var(--border,#e2e5ed)!important;"
+                "border-radius:var(--r-lg,14px)!important;box-shadow:var(--shadow-sm)!important;"
+                "overflow:hidden!important}"
+                ".card-hd{display:flex!important;align-items:center!important;gap:9px!important;"
+                "padding:13px 16px!important;border-bottom:1px solid var(--border-soft,#eaedf3)!important;"
+                "background:var(--surface,#fff)!important}"
+                ".card-hd .ic{width:26px!important;height:26px!important;border-radius:7px!important;"
+                "flex-shrink:0!important;display:grid!important;place-items:center!important;"
+                "background:var(--accent-soft,#EEF2FC)!important;color:var(--accent-ink,#3355B5)!important}"
+                ".card-hd .ic svg{width:15px!important;height:15px!important}"
+                ".card-bd{padding:var(--pad,16px)!important}"
+                ".panel{display:flex!important;flex-direction:column!important}"
+                ".panel+.panel{border-top:1px solid var(--border-soft,#eaedf3)!important}"
+                ".panel-hd{display:flex!important;align-items:center!important;gap:8px!important;"
+                "padding:12px 16px!important}"
+                ".panel-hd .ic{width:22px!important;height:22px!important;border-radius:6px!important;"
+                "flex-shrink:0!important;display:grid!important;place-items:center!important;"
+                "background:var(--surface-3,#f0f2f7)!important;color:var(--ink-2,#4a5568)!important}"
+                ".panel-hd .ic svg{width:13px!important;height:13px!important}"
+                ".panel-hd h4{font-size:13px!important;font-weight:700!important;"
+                "color:var(--ink,#1C2333)!important;flex:1!important;margin:0!important}"
+                ".panel-bd{padding:0 16px 15px!important;display:flex!important;"
+                "flex-direction:column!important;gap:10px!important}"
+                ".device{border:1px solid var(--border,#e2e5ed)!important;"
+                "border-radius:var(--r,11px)!important;padding:13px!important;"
+                "background:var(--surface-2,#F4F6FB)!important;"
+                "display:flex!important;flex-direction:column!important;gap:10px!important}"
+                ".device-hd{display:flex!important;align-items:center!important;gap:8px!important}"
+                ".device-hd .di{display:inline-flex!important;color:var(--journey-ink,#3355B5)!important}"
+                ".device-hd .di svg{width:15px!important;height:15px!important}"
+                ".device-hd .dn{font-size:13px!important;font-weight:700!important;"
+                "color:var(--ink,#1C2333)!important;flex:1!important}"
                 ".iconbtn{background:none!important;border:none!important;box-shadow:none!important;"
                 "min-width:24px!important;width:24px!important;height:24px!important;"
-                "padding:0!important;cursor:pointer;color:#78909C}"
-                ".iconbtn svg{width:16px;height:16px;display:block}"
+                "padding:0!important;cursor:pointer;color:var(--ink-4,#999)}"
+                ".iconbtn svg{width:15px!important;height:15px!important;display:block}"
                 ".detail-body .v-input{margin-bottom:2px!important}"
                 ".detail-body .v-input__details{min-height:0!important}"
                 ".detail-body .v-slider{margin-top:4px!important;margin-bottom:2px!important}"
