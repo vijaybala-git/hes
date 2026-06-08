@@ -3145,12 +3145,6 @@ def SocialCostPanel():
                 "These costs do not appear on your utility bill — they represent damage "
                 "to public health and the climate from burning gas.</div>"
             ))
-            solara.Button(
-                "Learn more →",
-                on_click=lambda: open_help("social_cost.html"),
-                style=("background:transparent; color:#3F51B5; border:none; padding:2px 0;"
-                       " font-size:0.8em; cursor:pointer; text-decoration:underline;"),
-            )
 
 
 # ── §25.6 Bottom zone routing ─────────────────────────────────────────────────
