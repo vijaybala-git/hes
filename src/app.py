@@ -26,6 +26,14 @@ _WHYWATT_LOGO = os.path.join(_ASSETS, "whywatt_logo.svg")
 _ECHO_LOGO    = os.path.join(_ASSETS, "echo_logo.svg")
 _ECHO_ICON    = os.path.join(_ASSETS, "echo_icon.svg")
 
+# ── Phase 3 redesign design system (injected once via solara.Style in Page) ─────
+_REDESIGN_CSS_PATH = os.path.join(_HERE, "styles_redesign.css")
+try:
+    with open(_REDESIGN_CSS_PATH, "r", encoding="utf-8") as _f:
+        _REDESIGN_CSS = _f.read()
+except OSError:
+    _REDESIGN_CSS = ""
+
 
 def _read_svg(path: str, height_px: int | None = None) -> str | None:
     """Return SVG content as a string, or None if file is missing.
@@ -1464,9 +1472,22 @@ def _panel_bar_html(amps, util_pct, panel_a, status, label):
     )
 
 
+_PEAK_BADGE = {
+    "green":  ("peak-ok",     "Within {p} A panel"),
+    "yellow": ("peak-warn",   "Approaching panel limit"),
+    "orange": ("peak-warn",   "Near panel capacity"),
+    "red":    ("peak-danger", "Exceeds {p} A — panel upgrade"),
+}
+_LOAD_ICON = ("<span class='ic'><svg viewBox='0 0 24 24' fill='currentColor'>"
+              "<path d='M13 2 4 14h6l-1 8 9-12h-6l1-8z'/></svg></span>")
+_CHECK_SVG = ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' "
+              "stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'>"
+              "<path d='M20 6 9 17l-5-5'/></svg>")
+
+
 @solara.component
 def PanelLoadCallout(model):
-    """Estimated Electrical Load — top-line callout (Phase 3 §5.6)."""
+    """Estimated Electrical Load — compact single-line strip (redesign §C)."""
     hc = model.home_config
     assessor = PanelAssessor(hc.square_footage, hc.panel_amps)
     timeline = assessor.journey_load_timeline(model.journey_home, model.n_years)
@@ -1474,61 +1495,39 @@ def PanelLoadCallout(model):
         return
     yr1  = timeline[0]
     peak = max(timeline, key=lambda t: t.service_amps)
-    upgrade_years = assessor.upgrade_needed_years(timeline)
+    panel = hc.panel_amps
 
-    rows = _panel_bar_html(yr1.service_amps, yr1.utilization_pct, hc.panel_amps,
-                           yr1.status, "Year 1")
-    peak_note = ""
-    if peak.year != yr1.year:
-        dev = f", {peak.new_device}" if peak.new_device else ""
-        peak_note = f"  (Year {peak.year}{dev})"
-    rows += _panel_bar_html(peak.service_amps, peak.utilization_pct, hc.panel_amps,
-                            peak.status, "Peak")
+    peak_cls, badge_tmpl = _PEAK_BADGE.get(peak.status, _PEAK_BADGE["green"])
+    badge_text = badge_tmpl.format(p=panel)
+    badge_icon = _CHECK_SVG if peak_cls == "peak-ok" else "⚠"
+    peak_dev = peak.new_device or "current load"
+    peak_cal = sim_start_year.value + peak.year - 1
 
-    with solara.Card(margin=0, elevation=1, style="overflow:hidden; margin-bottom:4px"):
-        with solara.Row(style=(
-            "background-color:#F0F0F0; padding:6px 12px;"
-            " border-radius:4px 4px 0 0; margin:-16px -16px 8px -16px;"
-            " align-items:center;"
-        )):
-            solara.Text("⚡ Estimated Electrical Load",
-                        style="font-weight:600; font-size:0.95em; flex:1")
+    metrics = (
+        "<div class='load-metrics'>"
+        "<div class='lm'>"
+        "<span class='lm-k'>Current Load</span>"
+        f"<span class='lm-v'>{yr1.service_amps:.0f} A</span>"
+        f"<span class='lm-s'>{yr1.utilization_pct:.0f}% of {panel}&nbsp;A panel</span>"
+        "</div>"
+        f"<div class='lm peak {peak_cls}'>"
+        "<span class='lm-k'>Journey Peak Load</span>"
+        f"<span class='lm-v'>{peak.service_amps:.0f} A</span>"
+        f"<span class='peak-badge'>{badge_icon} {badge_text}</span>"
+        f"<span class='lm-s'>peaks Yr&nbsp;{peak.year} ({peak_cal}) · {peak_dev}</span>"
+        "</div></div>"
+    )
+    title = (
+        "<div class='load-title'>"
+        f"{_LOAD_ICON}<h3>Estimated Electrical Load</h3></div>"
+    )
+
+    with solara.Card(classes=["card", "load-strip"], margin=0,
+                     style="margin-bottom:var(--gap)"):
+        with solara.Row(classes=["load-line"], style="align-items:center; gap:22px"):
+            solara.HTML(tag="div", unsafe_innerHTML=title, style="flex-shrink:0")
             HelpButton("panel_assessment")
-        solara.HTML(tag="div", unsafe_innerHTML=(
-            f"<div style='font-size:0.9em;'>{rows}"
-            + (f"<div style='font-size:0.86em; color:#90A4AE; margin-top:2px;'>"
-               f"Peak occurs in Year {peak.year}{peak_note[2:] if peak_note else ''}</div>"
-               if peak.year != yr1.year else "")
-            + "</div>"
-        ))
-        # Milestone strip — years where a device is added (Phase 3 §5.5)
-        milestones = [t for t in timeline if t.new_device is not None]
-        if milestones:
-            chips = ""
-            for t in milestones:
-                color = _PANEL_STATUS_COLOR[t.status]
-                cal_yr = sim_start_year.value + t.year - 1
-                chips += (
-                    f"<span style='display:inline-block; margin:2px 4px 0 0;"
-                    f" padding:2px 8px; border-radius:10px; font-size:0.78em;"
-                    f" background:#F5F5F5; border:1px solid #E0E0E0;'>"
-                    f"Yr {t.year} ({cal_yr}) <strong>+{t.new_device}</strong> → "
-                    f"<span style='color:{color}; font-weight:700;'>"
-                    f"{t.service_amps:.0f}A · {t.utilization_pct:.0f}%</span></span>"
-                )
-            solara.HTML(tag="div", unsafe_innerHTML=(
-                f"<div style='margin-top:6px;'>{chips}</div>"
-            ))
-
-        if upgrade_years:
-            first = upgrade_years[0]
-            solara.HTML(tag="div", unsafe_innerHTML=(
-                f"<div style='background:#FDECEA; border-left:4px solid #C62828;"
-                f" padding:6px 10px; margin-top:6px; border-radius:0 4px 4px 0;"
-                f" font-size:0.86em; color:#B71C1C;'>"
-                f"Panel upgrade likely needed by year {first} — consider adding a "
-                f"Panel Upgrade to your journey.</div>"
-            ))
+            solara.HTML(tag="div", unsafe_innerHTML=metrics, style="flex:1; min-width:0")
 
 
 @solara.component
@@ -3054,11 +3053,104 @@ def BottomZone(model):
         DetailView(dopen, model)
 
 
+# ── Phase 3 redesign — masthead + verdict band ──────────────────────────────────
+
+@solara.component
+def Masthead():
+    """Redesign masthead: preserved logo + one-line context pill + Reset/Help."""
+    ww_svg = _read_svg(_WHYWATT_LOGO, height_px=40)
+    bl_kwh = compute_baseload_kwh(
+        square_footage.value, num_bedrooms.value, baseload_constant_before.value
+    )
+    cz = climate_zone.value.replace("CZ", "").strip()
+    context_html = (
+        "<div class='context'>"
+        "<span class='loc'>"
+        "<svg viewBox='0 0 24 24' fill='currentColor'><path d='M12 2C8.1 2 5 5.1 5 9c0 "
+        "5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1112 6a2.5 2.5 0 010 "
+        "5.5z'/></svg>San Jose, CA</span>"
+        f"<span class='spec first'>ZIP <b class='mono'>{zip_code.value}</b></span>"
+        f"<span class='spec'>CZ <b>{cz}</b></span>"
+        f"<span class='spec'><b>{num_bedrooms.value}</b> bed</span>"
+        f"<span class='spec'><b class='mono'>{square_footage.value:,}</b> sq ft</span>"
+        f"<span class='spec'>Built <b class='mono'>{year_built.value}</b></span>"
+        f"<span class='spec'>Baseload <b class='mono'>{bl_kwh:,.0f}</b> kWh/yr</span>"
+        "</div>"
+    )
+    brand_inner = (
+        f"<div class='brand-mark'>{ww_svg}</div>"
+        "<div class='brand-name'>Why<b>Watt?</b></div>"
+    ) if ww_svg else "<div class='brand-name'>Why<b>Watt?</b></div>"
+    with solara.Row(classes=["masthead"], style="gap:16px"):
+        solara.HTML(tag="div", unsafe_innerHTML=brand_inner, classes=["brand"],
+                    style="display:flex; align-items:center; flex-shrink:0")
+        solara.HTML(tag="div", unsafe_innerHTML=context_html,
+                    style="flex:1; min-width:0")
+        with solara.Row(classes=["actions"], style="gap:8px; flex-shrink:0"):
+            solara.Button("↺ Reset to defaults", on_click=reset_to_defaults,
+                          classes=["btn"])
+            solara.Button("? Help", on_click=lambda: open_help("index.html"),
+                          classes=["btn", "primary"])
+
+
+def _verdict_numbers(df, model):
+    """Return (journey_cum, baseline_cum, payback_yr_or_None, net_delta)."""
+    delta_vals   = df["Opex Delta"].values
+    net_delta    = float(delta_vals[-1])
+    payback_yr   = next((i + 1 for i, d in enumerate(delta_vals) if d > 0), None)
+    journey_cum  = float(df["Journey Cum Cost"].iloc[-1])
+    baseline_cum = float(df["Baseline Cum Cost"].iloc[-1])
+    return journey_cum, baseline_cum, payback_yr, net_delta
+
+
+@solara.component
+def VerdictBand(df, n, model):
+    """Hero result band: two comparison bars + payback/net call-out."""
+    journey_cum, baseline_cum, payback_yr, net_delta = _verdict_numbers(df, model)
+    hi = max(journey_cum, baseline_cum, 1.0)
+    j_pct = max(8.0, journey_cum  / hi * 100)
+    b_pct = max(8.0, baseline_cum / hi * 100)
+
+    positive = net_delta >= 0
+    call_bg   = "var(--positive-soft)" if positive else "var(--baseline-soft)"
+    call_ink  = "var(--positive-ink)"  if positive else "var(--baseline-ink)"
+    if payback_yr is not None:
+        cal = sim_start_year.value + payback_yr - 1
+        headline = f"Payback in year {payback_yr} ({cal})"
+    else:
+        headline = f"No payback within {n} yrs"
+    big = f"{'+' if positive else '−'}${abs(net_delta):,.0f}"
+
+    html = (
+        "<section class='verdict'>"
+        "<div class='verdict-bars'>"
+        "<div class='cmp'>"
+        "<div class='cmp-label'><div class='t'>Your Electrification Journey</div>"
+        "<div class='s'>20-yr cumulative energy cost</div></div>"
+        f"<div class='bar-track'><div class='bar-fill journey' style='width:{j_pct:.0f}%'>"
+        f"<span class='v'>${journey_cum:,.0f}</span></div></div></div>"
+        "<div class='cmp'>"
+        "<div class='cmp-label'><div class='t'>Do-Nothing Baseline</div>"
+        "<div class='s'>Keep gas appliances</div></div>"
+        f"<div class='bar-track'><div class='bar-fill baseline' style='width:{b_pct:.0f}%'>"
+        f"<span class='v'>${baseline_cum:,.0f}</span></div></div></div>"
+        "</div>"
+        f"<div class='verdict-call' style='background:{call_bg}'>"
+        f"<div class='k' style='color:{call_ink}'>Payback</div>"
+        f"<div class='headline'>{headline}</div>"
+        f"<div class='big' style='color:{call_ink}'>{big}</div>"
+        "<div class='foot'>net position over 20 years</div>"
+        "</div></section>"
+    )
+    solara.HTML(tag="div", unsafe_innerHTML=html)
+
+
 # ── Main Page ──────────────────────────────────────────────────────────────────
 
 @solara.component
 def Page():
     solara.Title("WhyWatt?")
+    solara.Style(_REDESIGN_CSS)          # Phase 3 redesign design system
     HelpPopupOverlay()
 
     model, df = solara.use_memo(run_simulation, dependencies=[
@@ -3111,7 +3203,7 @@ def Page():
 
     n = years.value
 
-    with solara.Column(margin=3, gap="10px"):
+    with solara.Column(classes=["app"], gap="10px"):
 
         # Scoped CSS: larger dropdown arrow only in chart header selectors
         solara.HTML(
@@ -3145,53 +3237,13 @@ def Page():
             style="display:none",
         )
 
-        # ── Header ─────────────────────────────────────────────────────────────
-        ww_svg = _read_svg(_WHYWATT_LOGO, height_px=72)
-        with solara.Row(style=(
-            "align-items:center; gap:20px; padding:10px 0;"
-            " border-bottom:2px solid #E8EAF6; margin-bottom:4px"
-        )):
-            if ww_svg:
-                solara.HTML(
-                    tag="div",
-                    unsafe_innerHTML=ww_svg,
-                    style="height:72px; flex-shrink:0; display:flex; align-items:center",
-                )
-            else:
-                solara.Markdown("# ⚡ WhyWatt?")
-            with solara.Column(style="flex:1; justify-content:center"):
-                HomeInfoBar()
-            # Reset button — far right of header bar
-            solara.Button(
-                "↺ Reset to defaults",
-                on_click=reset_to_defaults,
-                style=(
-                    "background:transparent; color:#78909C;"
-                    " border:1.5px solid #C5CAE9;"
-                    " border-radius:6px; padding:5px 12px;"
-                    " font-size:0.80em; cursor:pointer;"
-                    " white-space:nowrap; flex-shrink:0;"
-                    " transition:all 0.15s;"
-                ),
-            )
-            # Help button — opens help index in browser
-            solara.Button(
-                "Help 📖",
-                on_click=lambda: open_help("index.html"),
-                style=(
-                    "background:transparent; color:#5C6BC0;"
-                    " border:1.5px solid #9FA8DA;"
-                    " border-radius:6px; padding:5px 12px;"
-                    " font-size:0.80em; cursor:pointer;"
-                    " white-space:nowrap; flex-shrink:0;"
-                    " transition:all 0.15s; margin-left:6px;"
-                ),
-            )
+        # ── Masthead (Phase 3 redesign §A) ──────────────────────────────────────
+        Masthead()
 
-        # ── Summary stats ───────────────────────────────────────────────────────
-        SummaryStats(df, n, model)
+        # ── Verdict band (hero result) ───────────────────────────────────────────
+        VerdictBand(df, n, model)
 
-        # ── Estimated Electrical Load (Phase 3 §5) ──────────────────────────────
+        # ── Estimated Electrical Load strip (single line) ────────────────────────
         PanelLoadCallout(model)
 
         # ── Dual chart panes (selector in grey title bar inside each card) ──────
