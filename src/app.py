@@ -1941,9 +1941,24 @@ _PANEL_IC = {
 }
 
 
+_DEVICE_HELP_KEY = {
+    "hvac":         "hvac",
+    "water_heater": "water_heater",
+    "ev":           "ev_charger",
+    "cooktop":      "cooktop",
+    "dryer":        "dryer",
+    "panel":        "panel_upgrade",
+    "baseload":     "baseload",
+    "home":         "home_profile",
+    "solar":        "solar",
+    "rates":        "rates",
+}
+
+
 def _card_header(key: str, title: str):
-    """Device-hd row: icon chip + name + ⋮ details button (design .device-hd style)."""
+    """Device-hd row: icon + name + ? help button + ⋮ details button."""
     icon_svg = _DEVICE_ICONS.get(key, "")
+    help_key = _DEVICE_HELP_KEY.get(key, "")
     with solara.Row(classes=["device-hd"], gap="0px",
                     style="align-items:center; gap:8px"):
         if icon_svg:
@@ -1953,6 +1968,8 @@ def _card_header(key: str, title: str):
         solara.HTML(tag="span", unsafe_innerHTML=(
             f"<span class='dn'>{title}</span>"
         ), style="flex:1")
+        if help_key:
+            HelpButton(help_key)
         solara.Button(
             "",
             on_click=lambda k=key: detail_open.set(
@@ -2189,58 +2206,56 @@ def BaseloadSummaryCard():
 
 @solara.component
 def HomeSummaryCard():
-    """§25.3.8 — zip + bedrooms | sq ft | climate zone. Panel sub-section."""
-    with solara.Column(classes=["panel"]):
-        _panel_hd("home_profile", "Home Profile")
-        with solara.Column(classes=["panel-bd"]):
-            # Row 1: ZIP + bedrooms
-            with solara.Row(gap="6px", style=_ROW_CTRL):
-                with solara.Column(style="min-width:75px; max-width:75px"):
-                    solara.InputText("ZIP", value=zip_code)
-                with solara.Column(style="min-width:75px; max-width:75px"):
-                    solara.Select("Beds", value=num_bedrooms, values=[1, 2, 3, 4, 5])
-            # Row 2: sq ft
-            with solara.Row(gap="6px", style=_ROW_CTRL):
-                with solara.Column(style="min-width:140px"):
-                    solara.InputInt("Sq ft", value=square_footage)
-            # Row 3: climate zone
-            with solara.Row(gap="6px", style=_ROW_CTRL):
-                with solara.Column(style="min-width:120px"):
-                    solara.Select("Climate zone", value=climate_zone, values=_CZ_OPTIONS)
+    """§25.3.8 — zip + bedrooms | sq ft | climate zone."""
+    with solara.Column(classes=["device"]):
+        _card_header("home", "Home Profile")
+        # Row 1: ZIP + bedrooms
+        with solara.Row(gap="6px", style=_ROW_CTRL):
+            with solara.Column(style="min-width:75px; max-width:75px"):
+                solara.InputText("ZIP", value=zip_code)
+            with solara.Column(style="min-width:75px; max-width:75px"):
+                solara.Select("Beds", value=num_bedrooms, values=[1, 2, 3, 4, 5])
+        # Row 2: sq ft
+        with solara.Row(gap="6px", style=_ROW_CTRL):
+            with solara.Column(style="min-width:140px"):
+                solara.InputInt("Sq ft", value=square_footage)
+        # Row 3: climate zone
+        with solara.Row(gap="6px", style=_ROW_CTRL):
+            with solara.Column(style="min-width:120px"):
+                solara.Select("Climate zone", value=climate_zone, values=_CZ_OPTIONS)
 
 
 @solara.component
 def SolarSummaryCard():
     """§25.3.9 — add solar + add battery checkboxes | plan yr | % coverage slider."""
     planned = solar_planned.value
-    with solara.Column(classes=["panel"]):
-        _panel_hd("solar", "Solar &amp; Battery")
-        with solara.Column(classes=["panel-bd"]):
-            # Row 1: add solar + add battery checkboxes
-            with solara.Row(gap="10px", style=_ROW_CTRL):
-                solara.Checkbox(label="Add solar", value=solar_planned)
-                if planned:
-                    solara.Checkbox(label="+ Battery", value=solar_include_battery)
-            # Row 2: plan year slider (if planned)
+    with solara.Column(classes=["device"]):
+        _card_header("solar", "Solar + Battery")
+        # Row 1: add solar + add battery checkboxes
+        with solara.Row(gap="10px", style=_ROW_CTRL):
+            solara.Checkbox(label="Add solar", value=solar_planned)
             if planned:
-                yr = solar_install_year.value
-                cal_yr = sim_start_year.value + yr - 1
-                with solara.Row(gap="4px", style=_ROW_CTRL):
-                    with solara.Column(style="min-width:160px"):
-                        solara.SliderInt(f"Install yr {yr} ({cal_yr})",
-                                         value=solar_install_year, min=1, max=25)
-            else:
-                solara.HTML(tag="div", unsafe_innerHTML=(
-                    "<div style='font-size:0.80em; color:#AAAAAA; margin-top:3px;'>"
-                    "Not planned</div>"
-                ))
-            # Row 3: % coverage slider (if planned)
-            if planned:
+                solara.Checkbox(label="+ Battery", value=solar_include_battery)
+        # Row 2: plan year slider (if planned)
+        if planned:
+            yr = solar_install_year.value
+            cal_yr = sim_start_year.value + yr - 1
+            with solara.Row(gap="4px", style=_ROW_CTRL):
                 with solara.Column(style="min-width:160px"):
-                    solara.SliderInt(
-                        f"{solar_coverage_pct.value}% electricity covered",
-                        value=solar_coverage_pct, min=0, max=100, step=5,
-                    )
+                    solara.SliderInt(f"Install yr {yr} ({cal_yr})",
+                                     value=solar_install_year, min=1, max=25)
+        else:
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                "<div style='font-size:0.80em; color:#AAAAAA; margin-top:3px;'>"
+                "Not planned</div>"
+            ))
+        # Row 3: % coverage slider (if planned)
+        if planned:
+            with solara.Column(style="min-width:160px"):
+                solara.SliderInt(
+                    f"{solar_coverage_pct.value}% electricity covered",
+                    value=solar_coverage_pct, min=0, max=100, step=5,
+                )
 
 
 def _model_toggle(label: str, rv, options: list, color: str):
@@ -2270,40 +2285,39 @@ def RatesSummaryCard():
     """Energy & Prices summary — elec model | gas model | timeline."""
     elec_model = elec_rate_model_a.value
     gas_model  = gas_rate_model_a.value
-    with solara.Column(classes=["panel"]):
-        _panel_hd("rates", "Rate Scenarios")
-        with solara.Column(classes=["panel-bd"]):
-            # Row 1: electricity rate model
-            solara.HTML(tag="div", unsafe_innerHTML=(
-                f"<div style='font-size:0.78em; font-weight:600; color:{C_RATE_ELEC};"
-                " margin-bottom:2px'>Electricity Rate Model</div>"
-            ))
-            with solara.Row(gap="6px", style="align-items:center; flex-wrap:wrap"):
-                _model_toggle("⚡", elec_rate_model_a,
-                              [("cagr_flat", "CAGR"), ("acc_shaped", "ACC")], C_RATE_ELEC)
-                if elec_model == "cagr_flat":
-                    solara.HTML(tag="span", unsafe_innerHTML=(
-                        f"<span style='font-size:0.80em; color:#546E7A;'>"
-                        f"+{elec_cagr_pct_a.value}%/yr</span>"
-                    ))
-            # Row 2: gas rate model
-            solara.HTML(tag="div", unsafe_innerHTML=(
-                f"<div style='font-size:0.78em; font-weight:600; color:{C_RATE_GAS};"
-                " margin-bottom:2px; margin-top:4px'>Gas Rate Model</div>"
-            ))
-            with solara.Row(gap="6px", style="align-items:center; flex-wrap:wrap"):
-                _model_toggle("🔥", gas_rate_model_a,
-                              [("cagr_flat", "CAGR"), ("acc_seasonal", "ACC")], C_RATE_GAS)
-                if gas_model == "cagr_flat":
-                    solara.HTML(tag="span", unsafe_innerHTML=(
-                        f"<span style='font-size:0.80em; color:#546E7A;'>"
-                        f"+{gas_cagr_pct_a.value}%/yr</span>"
-                    ))
-            # Row 3: timeline
-            solara.SliderInt(
-                f"Model: {years.value} yrs",
-                value=years, min=5, max=30,
-            )
+    with solara.Column(classes=["device"]):
+        _card_header("rates", "Rate Scenarios")
+        # Row 1: electricity rate model
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            f"<div style='font-size:0.78em; font-weight:600; color:{C_RATE_ELEC};"
+            " margin-bottom:2px'>Electricity Rate Model</div>"
+        ))
+        with solara.Row(gap="6px", style="align-items:center; flex-wrap:wrap"):
+            _model_toggle("⚡", elec_rate_model_a,
+                          [("cagr_flat", "CAGR"), ("acc_shaped", "ACC")], C_RATE_ELEC)
+            if elec_model == "cagr_flat":
+                solara.HTML(tag="span", unsafe_innerHTML=(
+                    f"<span style='font-size:0.80em; color:#546E7A;'>"
+                    f"+{elec_cagr_pct_a.value}%/yr</span>"
+                ))
+        # Row 2: gas rate model
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            f"<div style='font-size:0.78em; font-weight:600; color:{C_RATE_GAS};"
+            " margin-bottom:2px; margin-top:4px'>Gas Rate Model</div>"
+        ))
+        with solara.Row(gap="6px", style="align-items:center; flex-wrap:wrap"):
+            _model_toggle("🔥", gas_rate_model_a,
+                          [("cagr_flat", "CAGR"), ("acc_seasonal", "ACC")], C_RATE_GAS)
+            if gas_model == "cagr_flat":
+                solara.HTML(tag="span", unsafe_innerHTML=(
+                    f"<span style='font-size:0.80em; color:#546E7A;'>"
+                    f"+{gas_cagr_pct_a.value}%/yr</span>"
+                ))
+        # Row 3: timeline
+        solara.SliderInt(
+            f"Model: {years.value} yrs",
+            value=years, min=5, max=30,
+        )
 
 
 # ── §25.4 Detail windows ──────────────────────────────────────────────────────
@@ -3026,8 +3040,9 @@ def HomeProfilePanel():
     with solara.Column(classes=["card"]):
         with solara.Row(classes=["card-hd"]):
             _card_header_main("home", "Home &amp; Solar", "home_profile")
-        HomeSummaryCard()
-        SolarSummaryCard()
+        with solara.Column(classes=["card-bd"], gap="8px"):
+            HomeSummaryCard()
+            SolarSummaryCard()
 
 
 @solara.component
@@ -3035,56 +3050,100 @@ def EnergyPricesPanel():
     with solara.Column(classes=["card"]):
         with solara.Row(classes=["card-hd"]):
             _card_header_main("energy", "Energy &amp; Prices", "energy_prices")
-        RatesSummaryCard()
-        SocialCostPanel()
+        with solara.Column(classes=["card-bd"], gap="8px"):
+            RatesSummaryCard()
 
 
 @solara.component
 def SocialCostPanel():
-    """Social & Health Cost of Gas — rendered as a .panel sub-section inside EnergyPricesPanel."""
+    """Social & Health Cost of Gas — standalone .card with two .device sub-cards."""
     climate_on = social_climate_enabled.value
     health_on  = social_health_enabled.value
     total = (social_climate_rate.value if climate_on else 0.0) \
           + (social_health_rate.value  if health_on  else 0.0)
 
-    with solara.Column(classes=["panel"]):
-        _panel_hd("social", "Social &amp; Health Cost of Gas")
-        with solara.Column(classes=["panel-bd"], gap="4px"):
-            # ── Climate cost ─────────────────────────────────────────────────
-            solara.Checkbox(label="Climate cost (CO₂ + methane)", value=social_climate_enabled)
-            if climate_on:
-                SliderWithDefault("Climate", social_climate_rate,
-                                  _DEFAULTS["social_climate_rate"], 1.00, 2.00, 0.01,
-                                  unit=" $/therm", fmt="{v:.2f}")
-                solara.HTML(tag="div", unsafe_innerHTML=(
-                    "<div style='display:flex; justify-content:space-between;"
-                    " font-size:0.72em; color:#90A4AE; margin-top:-2px;'>"
-                    "<span>$1.00</span><span>$2.00</span></div>"
-                ))
+    _SOCIAL_IC = ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                  " stroke-linecap='round' stroke-linejoin='round'>"
+                  "<path d='M12 22C6.5 22 2 17.5 2 12S6.5 2 12 2s10 4.5 10 10-4.5 10-10 10z'/>"
+                  "<path d='M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01'/></svg>")
+    _CLIMATE_IC = ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                   " stroke-linecap='round' stroke-linejoin='round'>"
+                   "<path d='M12 2a7 7 0 017 7c0 5-7 13-7 13S5 14 5 9a7 7 0 017-7z'/>"
+                   "<circle cx='12' cy='9' r='2.5'/></svg>")
+    _HEALTH_IC  = ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                   " stroke-linecap='round' stroke-linejoin='round'>"
+                   "<path d='M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78"
+                   "l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z'/></svg>")
 
-            # ── Health cost ──────────────────────────────────────────────────
-            solara.Checkbox(label="Health cost (air quality)", value=social_health_enabled)
-            if health_on:
-                SliderWithDefault("Health", social_health_rate,
-                                  _DEFAULTS["social_health_rate"], 0.50, 2.00, 0.01,
-                                  unit=" $/therm", fmt="{v:.2f}")
-                solara.HTML(tag="div", unsafe_innerHTML=(
-                    "<div style='display:flex; justify-content:space-between;"
-                    " font-size:0.72em; color:#90A4AE; margin-top:-2px;'>"
-                    "<span>$0.50</span><span>$2.00</span></div>"
-                ))
-
-            # ── Total + disclosure ───────────────────────────────────────────
+    with solara.Column(classes=["card"]):
+        with solara.Row(classes=["card-hd"]):
             solara.HTML(tag="div", unsafe_innerHTML=(
-                f"<div style='margin-top:6px; padding-top:6px; border-top:1px solid #E0E0E0;"
-                f" font-size:0.86em; color:#37474F;'>"
-                f"Total social cost: <strong>${total:.2f}/therm</strong>"
-                f"<span style='color:#90A4AE;'> (market gas ≈ $2.08)</span></div>"
+                f"<div style='display:flex;align-items:center;gap:9px;flex:1;min-width:0'>"
+                f"<span class='ic'>{_SOCIAL_IC}</span>"
+                f"<h3 style='margin:0;font-size:14px;font-weight:700;color:var(--ink,#1C2333);"
+                f"white-space:nowrap;letter-spacing:-0.01em'>Social &amp; Health Cost of Gas</h3>"
+                f"</div>"
             ))
+            HelpButton("social_cost")
+
+        with solara.Column(classes=["card-bd"], gap="8px"):
+            # ── Climate Cost device card ──────────────────────────────────────
+            with solara.Column(classes=["device"]):
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    f"<div class='device-hd'>"
+                    f"<span class='di'>{_CLIMATE_IC}</span>"
+                    f"<span class='dn'>Climate Cost</span>"
+                    f"</div>"
+                ))
+                solara.Checkbox(label="Include CO₂ + methane cost", value=social_climate_enabled)
+                if climate_on:
+                    SliderWithDefault("Rate", social_climate_rate,
+                                      _DEFAULTS["social_climate_rate"], 1.00, 2.00, 0.01,
+                                      unit=" $/therm", fmt="{v:.2f}")
+                    solara.HTML(tag="div", unsafe_innerHTML=(
+                        "<div style='display:flex; justify-content:space-between;"
+                        " font-size:0.72em; color:#90A4AE; margin-top:-2px;'>"
+                        "<span>$1.00/therm</span><span>$2.00/therm</span></div>"
+                    ))
+                else:
+                    solara.HTML(tag="div", unsafe_innerHTML=(
+                        "<div style='font-size:0.80em; color:#AAAAAA;'>Not included</div>"
+                    ))
+
+            # ── Health Cost device card ───────────────────────────────────────
+            with solara.Column(classes=["device"]):
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    f"<div class='device-hd'>"
+                    f"<span class='di'>{_HEALTH_IC}</span>"
+                    f"<span class='dn'>Health Cost</span>"
+                    f"</div>"
+                ))
+                solara.Checkbox(label="Include air quality cost", value=social_health_enabled)
+                if health_on:
+                    SliderWithDefault("Rate", social_health_rate,
+                                      _DEFAULTS["social_health_rate"], 0.50, 2.00, 0.01,
+                                      unit=" $/therm", fmt="{v:.2f}")
+                    solara.HTML(tag="div", unsafe_innerHTML=(
+                        "<div style='display:flex; justify-content:space-between;"
+                        " font-size:0.72em; color:#90A4AE; margin-top:-2px;'>"
+                        "<span>$0.50/therm</span><span>$2.00/therm</span></div>"
+                    ))
+                else:
+                    solara.HTML(tag="div", unsafe_innerHTML=(
+                        "<div style='font-size:0.80em; color:#AAAAAA;'>Not included</div>"
+                    ))
+
+            # ── Total line ────────────────────────────────────────────────────
+            if climate_on or health_on:
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    f"<div style='font-size:0.84em; color:#37474F; padding:4px 0;'>"
+                    f"Total: <strong>${total:.2f}/therm</strong>"
+                    f"<span style='color:#90A4AE;'> added to gas cost</span></div>"
+                ))
             solara.HTML(tag="div", unsafe_innerHTML=(
-                "<div style='font-size:0.76em; color:#90A4AE; margin-top:4px; font-style:italic;'>"
-                "These costs do not appear on your utility bill. They represent damage to "
-                "public health and the climate caused by burning natural gas.</div>"
+                "<div style='font-size:0.74em; color:#90A4AE; font-style:italic;'>"
+                "These costs do not appear on your utility bill — they represent damage "
+                "to public health and the climate from burning gas.</div>"
             ))
             solara.Button(
                 "Learn more →",
@@ -3124,7 +3183,7 @@ def DetailView(item: str, model):
 
 @solara.component
 def SummaryView():
-    """3-col deck layout — Journey | Home & Solar | Energy & Prices."""
+    """3-col deck layout — Journey | Home & Solar | Energy & Prices + Social Cost."""
     with solara.Row(classes=["deck"]):
         with solara.Column(classes=["col"]):
             JourneyPlannerPanel()
@@ -3132,6 +3191,7 @@ def SummaryView():
             HomeProfilePanel()
         with solara.Column(classes=["col"]):
             EnergyPricesPanel()
+            SocialCostPanel()
 
 
 @solara.component
