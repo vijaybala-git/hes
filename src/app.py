@@ -103,6 +103,8 @@ CHART_OPTIONS = [
     "Journey Timeline",
     "Cost by Device",
     "Energy Use by Device",
+    "Annual kWh by Device",
+    "Annual Gas by Device",
 ]
 
 # Reference codes shown in chart titles and headers — used in help files
@@ -114,10 +116,22 @@ CHART_CODES = {
     "Journey Timeline":               "JC.5",
     "Cost by Device":                 "EU.1",
     "Energy Use by Device":           "EU.2",
+    "Annual kWh by Device":           "EU.3",
+    "Annual Gas by Device":           "EU.4",
     "Electric CAGR Projection":       "R.1",
     "Gas CAGR Projection":            "R.2",
     "ACC Rate Projection":            "R.3",
     "Electricity Rate Shape":         "R.4",
+}
+
+# Per-slot color palette (consistent across EU.3 / EU.4 / cost charts)
+_SLOT_COLORS = {
+    "HVAC":                  "#1565C0",
+    "Water Heater":          "#0288D1",
+    "Dryer":                 "#D32F2F",
+    "Cooktop":               "#F57C00",
+    "EV Charger":            "#388E3C",
+    "Lights and Appliances": "#78909C",
 }
 
 KWH_PER_THERM = 29.3
@@ -1419,6 +1433,82 @@ def render_device_chart(model, home: str = "journey",
     return fig
 
 
+# EU.3 — Annual kWh by Device (stacked bar, single pane, toggle)
+def make_annual_kwh(df, model, n, home="journey"):
+    """EU.3 · Actual electricity consumption per device per year — stacked bars."""
+    hobj      = model.journey_home if home == "journey" else model.baseline_home
+    title_sub = "Your Journey" if home == "journey" else "Do Nothing"
+
+    fig = _new_fig(wide=False)
+    ax  = fig.add_subplot(111)
+    x   = np.arange(1, n + 1)
+
+    slot_names = list(hobj.consumption_history_by_slot.keys())
+    bottom = np.zeros(n)
+    for sname in slot_names:
+        raw   = np.array(hobj.consumption_history_by_slot.get(sname, [0]*n)[:n], dtype=float)
+        fuels = hobj.fuel_history_by_slot.get(sname, ["electricity"]*n)[:n]
+        kwh   = np.where(np.array(fuels) == "electricity", raw, 0.0)
+        if kwh.sum() == 0:
+            continue
+        color = _SLOT_COLORS.get(sname, "#90A4AE")
+        ax.bar(x, kwh, bottom=bottom, label=sname, color=color, alpha=0.82, width=0.7)
+        bottom += kwh
+
+    ax.yaxis.set_major_formatter(
+        matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
+    ax.set_xlabel("Year")
+    ax.set_ylabel("kWh / year")
+    ax.set_title(f"EU.3 · Annual kWh — {title_sub}",
+                 fontsize=10, fontweight="bold", color=_CC_TICK)
+    ax.legend(fontsize=7, framealpha=0.8, loc="upper left")
+    _style(ax)
+    fig.tight_layout(pad=1.0)
+    return fig
+
+
+# EU.4 — Annual Gas Consumption by Device (stacked bar, single pane, toggle)
+def make_annual_gas(df, model, n, home="journey"):
+    """EU.4 · Actual gas consumption per device per year — stacked bars (therms)."""
+    hobj      = model.journey_home if home == "journey" else model.baseline_home
+    title_sub = "Your Journey" if home == "journey" else "Do Nothing"
+
+    fig = _new_fig(wide=False)
+    ax  = fig.add_subplot(111)
+    x   = np.arange(1, n + 1)
+
+    slot_names = list(hobj.consumption_history_by_slot.keys())
+    bottom = np.zeros(n)
+    has_any = False
+    for sname in slot_names:
+        raw   = np.array(hobj.consumption_history_by_slot.get(sname, [0]*n)[:n], dtype=float)
+        fuels = hobj.fuel_history_by_slot.get(sname, ["electricity"]*n)[:n]
+        therms = np.where(np.array(fuels) == "gas", raw, 0.0)
+        if therms.sum() == 0:
+            continue
+        has_any = True
+        color = _SLOT_COLORS.get(sname, "#90A4AE")
+        ax.bar(x, therms, bottom=bottom, label=sname, color=color, alpha=0.82, width=0.7)
+        bottom += therms
+
+    if not has_any:
+        ax.text(0.5, 0.5, "No gas consumption\nin this scenario",
+                ha="center", va="center", transform=ax.transAxes,
+                fontsize=11, color=_CC_TICK, style="italic")
+
+    ax.yaxis.set_major_formatter(
+        matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
+    ax.set_xlabel("Year")
+    ax.set_ylabel("Therms / year")
+    ax.set_title(f"EU.4 · Annual Gas — {title_sub}",
+                 fontsize=10, fontweight="bold", color=_CC_TICK)
+    if has_any:
+        ax.legend(fontsize=7, framealpha=0.8, loc="upper right")
+    _style(ax)
+    fig.tight_layout(pad=1.0)
+    return fig
+
+
 CHART_FNS = {
     "Cumulative Energy Costs":        make_cumulative_opex,
     "Annual Cost by Year":            make_annual_cost,
@@ -1429,13 +1519,19 @@ CHART_FNS = {
     "ACC Rate Projection":                make_rate_trajectory,
     "Electricity Rate Shape":         make_acc_rate_shape,
     "Journey Timeline":               make_journey_timeline,
+    "Annual kWh by Device":           make_annual_kwh,
+    "Annual Gas by Device":           make_annual_gas,
 }
 
 
 # ── Sub-components ─────────────────────────────────────────────────────────────
 
 _DEVICE_CHART_NAMES = {"Cost by Device", "Energy Use by Device"}
-_TOGGLE_CHART_NAMES = _DEVICE_CHART_NAMES | {"Cost Breakdown by Category"}
+_TOGGLE_CHART_NAMES = _DEVICE_CHART_NAMES | {
+    "Cost Breakdown by Category",
+    "Annual kWh by Device",
+    "Annual Gas by Device",
+}
 
 
 def _toggle_buttons(active_rv):
@@ -1473,6 +1569,18 @@ def ChartPane(chart_name, model, df, n):
         with solara.Column(gap="4px"):
             _toggle_buttons(device_chart_home)
             fig = make_cost_breakdown(df, model, n, home=home)
+            solara.FigureMatplotlib(fig)
+    elif chart_name == "Annual kWh by Device":
+        home = device_chart_home.value
+        with solara.Column(gap="4px"):
+            _toggle_buttons(device_chart_home)
+            fig = make_annual_kwh(df, model, n, home=home)
+            solara.FigureMatplotlib(fig)
+    elif chart_name == "Annual Gas by Device":
+        home = device_chart_home.value
+        with solara.Column(gap="4px"):
+            _toggle_buttons(device_chart_home)
+            fig = make_annual_gas(df, model, n, home=home)
             solara.FigureMatplotlib(fig)
     elif chart_name == "Electricity Rate Shape":
         fig = make_acc_rate_shape(df, model, n)
