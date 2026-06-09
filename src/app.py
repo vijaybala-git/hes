@@ -105,6 +105,21 @@ CHART_OPTIONS = [
     "Energy Use by Device",
 ]
 
+# Reference codes shown in chart titles and headers — used in help files
+CHART_CODES = {
+    "Cumulative Energy Costs":        "JC.1",
+    "Annual Cost by Year":            "JC.2",
+    "Cost Breakdown by Category":     "JC.3",
+    "Equipment Replacements (CapEx)": "JC.4",
+    "Journey Timeline":               "JC.5",
+    "Cost by Device":                 "EU.1",
+    "Energy Use by Device":           "EU.2",
+    "Electric CAGR Projection":       "R.1",
+    "Gas CAGR Projection":            "R.2",
+    "ACC Rate Projection":            "R.3",
+    "Electricity Rate Shape":         "R.4",
+}
+
 KWH_PER_THERM = 29.3
 
 UA_MAP = {"poor": 650, "average": 500, "good": 350}
@@ -912,7 +927,7 @@ def make_cumulative_opex(df, model, n):
     ax.set_xlabel("Year")
     ax.set_ylabel("Cumulative Energy Cost")
     ax.legend(fontsize=8, framealpha=0.6)
-    ax.set_title("Cumulative Energy Costs", fontsize=10, fontweight="bold", color=_CC_TICK)
+    ax.set_title("JC.1 · Cumulative Energy Costs", fontsize=10, fontweight="bold", color=_CC_TICK)
     _style(ax)
     fig.tight_layout(pad=1.0)
     return fig
@@ -933,65 +948,82 @@ def make_annual_cost(df, model, n):
                label="Your journey (B)", zorder=3, hatch="//")
     else:
         w = 0.35
-        ax.bar(x - w / 2, df["Baseline Annual Cost"].values, w, color=_CC_B, label="Do nothing",   zorder=3)
-        ax.bar(x + w / 2, df["Journey Annual Cost"].values,  w, color=_CC_J, label="Your journey", zorder=3)
+        b_ann = df["Baseline Annual Cost"].values
+        j_ann = df["Journey Annual Cost"].values
+        ax.bar(x - w / 2, b_ann, w, color=_CC_B, label="Do nothing",   zorder=3)
+        ax.bar(x + w / 2, j_ann, w, color=_CC_J, label="Your journey", zorder=3)
+        # Social cost — stacked on top when enabled
+        cfg = getattr(model, "social_cost_config", None)
+        if (cfg is not None and cfg.total_rate > 0
+                and "Baseline Social Climate" in df.columns):
+            b_soc = (df["Baseline Social Climate"].values
+                     + df["Baseline Social Health"].values)
+            j_soc = (df["Journey Social Climate"].values
+                     + df["Journey Social Health"].values)
+            ax.bar(x - w / 2, b_soc, w, bottom=b_ann,
+                   color="#FB8C00", alpha=0.85, label="Do nothing — social", zorder=3)
+            ax.bar(x + w / 2, j_soc, w, bottom=j_ann,
+                   color="#4CAF50", alpha=0.85, label="Your journey — social", zorder=3)
     ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(_money))
     ax.set_xlabel("Year")
     ax.set_ylabel("Annual Energy Cost")
     ax.legend(fontsize=8)
-    ax.set_title("Annual Cost by Year", fontsize=10, fontweight="bold", color=_CC_TICK)
+    ax.set_title("JC.2 · Annual Cost by Year", fontsize=10, fontweight="bold", color=_CC_TICK)
     _style(ax)
     fig.tight_layout(pad=1.0)
     return fig
 
 
-# Chart 3 — Cost Breakdown by Category (stacked cumulative, dual pane)
-def make_cost_breakdown(df, model, n):
-    fig = _new_fig(wide=True)
-    axes = fig.subplots(1, 2)
-    title = "Cumulative Cost by Category"
-    if model.comparison_mode:
-        title += " — Scenario A"
-    fig.suptitle(title, fontsize=10, fontweight="bold", y=1.01, color=_CC_TICK)
-    homes = [
-        (model.baseline_home, "Do Nothing",   0),
-        (model.journey_home,  "Your Journey", 1),
-    ]
-    x = np.arange(1, n + 1)
-    for ax, (home, title_sub, palette_idx) in zip(axes, homes):
-        bottom = np.zeros(n)
-        for cat in CATEGORY_ORDER:
-            annual = home.cost_history_by_category.get(cat, [])
-            if not annual:
-                continue
-            cum   = np.cumsum(annual[:n])
-            color = CATEGORY_COLORS[cat][palette_idx]
-            ax.fill_between(x, bottom, bottom + cum,
-                            color=color, alpha=0.85, label=CATEGORY_LABELS[cat])
-            ax.plot(x, bottom + cum, color=color, lw=0.5, alpha=0.5)
+# Chart 3 — Cost Breakdown by Category (stacked cumulative, single pane with toggle)
+def make_cost_breakdown(df, model, n, home="journey"):
+    """Single-pane cost breakdown; home = 'journey' | 'baseline'."""
+    fig = _new_fig(wide=False)
+    ax  = fig.add_subplot(111)
+
+    if home == "journey":
+        hobj        = model.journey_home
+        title_sub   = "Your Journey"
+        palette_idx = 1
+    else:
+        hobj        = model.baseline_home
+        title_sub   = "Do Nothing"
+        palette_idx = 0
+
+    x      = np.arange(1, n + 1)
+    bottom = np.zeros(n)
+    for cat in CATEGORY_ORDER:
+        annual = hobj.cost_history_by_category.get(cat, [])
+        if not annual:
+            continue
+        cum   = np.cumsum(annual[:n])
+        color = CATEGORY_COLORS[cat][palette_idx]
+        ax.fill_between(x, bottom, bottom + cum,
+                        color=color, alpha=0.85, label=CATEGORY_LABELS[cat])
+        ax.plot(x, bottom + cum, color=color, lw=0.5, alpha=0.5)
+        bottom = bottom + cum
+
+    # Social & health cost layers — stacked above market categories
+    cfg    = getattr(model, "social_cost_config", None)
+    therms = np.array(hobj.gas_therms_history[:n], dtype=float)
+    if cfg is not None and len(therms):
+        if cfg.climate_eff > 0:
+            cum = np.cumsum(therms * cfg.climate_eff)
+            ax.fill_between(x, bottom, bottom + cum, color="#FB8C00",
+                            alpha=0.80, label="Climate cost")
+            bottom = bottom + cum
+        if cfg.health_eff > 0:
+            cum = np.cumsum(therms * cfg.health_eff)
+            ax.fill_between(x, bottom, bottom + cum, color="#C62828",
+                            alpha=0.80, label="Health cost")
             bottom = bottom + cum
 
-        # Social & health cost layers (Phase 3 §6) — stacked above market categories
-        cfg = getattr(model, "social_cost_config", None)
-        therms = np.array(home.gas_therms_history[:n], dtype=float)
-        if cfg is not None and len(therms):
-            if cfg.climate_eff > 0:
-                cum = np.cumsum(therms * cfg.climate_eff)
-                ax.fill_between(x, bottom, bottom + cum, color="#FB8C00",
-                                alpha=0.80, label="Climate cost")
-                bottom = bottom + cum
-            if cfg.health_eff > 0:
-                cum = np.cumsum(therms * cfg.health_eff)
-                ax.fill_between(x, bottom, bottom + cum, color="#C62828",
-                                alpha=0.80, label="Health cost")
-                bottom = bottom + cum
-
-        ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(_money))
-        ax.set_xlabel("Year")
-        ax.set_ylabel("Cumulative Cost")
-        ax.set_title(title_sub, fontsize=9, fontweight="bold", color=_CC_TICK)
-        ax.legend(fontsize=7, framealpha=0.8, loc="upper left")
-        _style(ax)
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(_money))
+    ax.set_xlabel("Year")
+    ax.set_ylabel("Cumulative Cost")
+    ax.set_title(f"JC.3 · Cost by Category — {title_sub}",
+                 fontsize=10, fontweight="bold", color=_CC_TICK)
+    ax.legend(fontsize=7, framealpha=0.8, loc="upper left")
+    _style(ax)
     fig.tight_layout(pad=1.0)
     return fig
 
@@ -1403,6 +1435,28 @@ CHART_FNS = {
 # ── Sub-components ─────────────────────────────────────────────────────────────
 
 _DEVICE_CHART_NAMES = {"Cost by Device", "Energy Use by Device"}
+_TOGGLE_CHART_NAMES = _DEVICE_CHART_NAMES | {"Cost Breakdown by Category"}
+
+
+def _toggle_buttons(active_rv):
+    """Render 'Your journey' / 'Do nothing' toggle row using device_chart_home reactive."""
+    home = active_rv.value
+    with solara.Row(gap="6px", style="margin-bottom:4px"):
+        for val, label in [("journey", "Your journey"), ("baseline", "Do nothing")]:
+            is_active = home == val
+            solara.Button(
+                label,
+                on_click=lambda v=val: active_rv.set(v),
+                style=(
+                    f"background:{C_NAVY}; color:white; border:none;"
+                    " border-radius:4px; padding:4px 14px;"
+                    " font-size:0.82em; cursor:pointer;"
+                    if is_active else
+                    "background:#F5F5F5; color:#444; border:1px solid #CCCCCC;"
+                    " border-radius:4px; padding:4px 14px;"
+                    " font-size:0.82em; cursor:pointer;"
+                ),
+            )
 
 
 @solara.component
@@ -1411,23 +1465,14 @@ def ChartPane(chart_name, model, df, n):
         chart_type = "device_cost" if chart_name == "Cost by Device" else "device_consumption"
         home = device_chart_home.value
         with solara.Column(gap="4px"):
-            with solara.Row(gap="6px", style="margin-bottom:4px"):
-                for val, label in [("journey", "Your journey"), ("baseline", "Do nothing")]:
-                    is_active = home == val
-                    solara.Button(
-                        label,
-                        on_click=lambda v=val: device_chart_home.set(v),
-                        style=(
-                            f"background:{C_NAVY}; color:white; border:none;"
-                            " border-radius:4px; padding:4px 14px;"
-                            " font-size:0.82em; cursor:pointer;"
-                            if is_active else
-                            "background:#F5F5F5; color:#444; border:1px solid #CCCCCC;"
-                            " border-radius:4px; padding:4px 14px;"
-                            " font-size:0.82em; cursor:pointer;"
-                        ),
-                    )
+            _toggle_buttons(device_chart_home)
             fig = render_device_chart(model, home=home, chart_type=chart_type)
+            solara.FigureMatplotlib(fig)
+    elif chart_name == "Cost Breakdown by Category":
+        home = device_chart_home.value
+        with solara.Column(gap="4px"):
+            _toggle_buttons(device_chart_home)
+            fig = make_cost_breakdown(df, model, n, home=home)
             solara.FigureMatplotlib(fig)
     elif chart_name == "Electricity Rate Shape":
         fig = make_acc_rate_shape(df, model, n)
@@ -3447,13 +3492,24 @@ def Page():
 
     with solara.Column(classes=["app"], gap="10px"):
 
-        # Scoped CSS: larger dropdown arrow only in chart header selectors
+        # Scoped CSS: chart header selectors — no underline, larger arrow, code badge
         solara.HTML(
             tag="div",
             unsafe_innerHTML=(
                 "<style>"
                 ".chart-header-sel .v-input__icon--append .v-icon"
                 "{font-size:28px!important}"
+                ".chart-header-sel .v-input__slot::before,"
+                ".chart-header-sel .v-input__slot::after"
+                "{display:none!important}"
+                ".chart-header-sel .v-input__slot"
+                "{border:none!important;background:transparent!important;"
+                "padding:0 4px 0 0!important;min-height:32px!important}"
+                ".chart-code{font-family:var(--mono,'JetBrains Mono',monospace);"
+                "font-size:11px;font-weight:700;color:var(--accent-ink,#3B6FD4);"
+                "background:var(--accent-soft,#EBF0FB);border-radius:4px;"
+                "padding:2px 6px;margin-right:4px;flex-shrink:0;"
+                "align-self:center;letter-spacing:0.04em}"
                 "</style>"
             ),
             style="display:none",
@@ -3593,6 +3649,15 @@ def Page():
             with solara.Column(classes=["card"],
                                style="flex:1; min-width:300px; overflow:hidden"):
                 with solara.Row(classes=["card-hd", "chart-header-sel"]):
+                    solara.HTML(
+                        tag="span",
+                        unsafe_innerHTML=(
+                            f"<code class='chart-code'>"
+                            f"{CHART_CODES.get(chart_left.value, '')}"
+                            f"</code>"
+                        ),
+                        style="flex-shrink:0",
+                    )
                     solara.Select("", value=chart_left, values=CHART_OPTIONS)
                     ChartHelpButton(chart_left.value)
                 with solara.Column(style="padding:8px 4px"):
@@ -3600,6 +3665,15 @@ def Page():
             with solara.Column(classes=["card"],
                                style="flex:1; min-width:300px; overflow:hidden"):
                 with solara.Row(classes=["card-hd", "chart-header-sel"]):
+                    solara.HTML(
+                        tag="span",
+                        unsafe_innerHTML=(
+                            f"<code class='chart-code'>"
+                            f"{CHART_CODES.get(chart_right.value, '')}"
+                            f"</code>"
+                        ),
+                        style="flex-shrink:0",
+                    )
                     solara.Select("", value=chart_right, values=CHART_OPTIONS)
                     ChartHelpButton(chart_right.value)
                 with solara.Column(style="padding:8px 4px"):
