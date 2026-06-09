@@ -3351,11 +3351,13 @@ def VerdictBand(df, n, model):
 
     # Social cost line — only show if non-zero
     if net_social != 0.0:
-        sc_sign = "+" if net_social >= 0 else "−"
+        sc_sign     = "+" if net_social >= 0 else "−"
+        sc_ink      = "var(--positive-ink)" if net_social >= 0 else "var(--baseline-ink)"
+        sc_label_c  = "var(--positive-ink)" if net_social >= 0 else "var(--baseline-ink)"
         social_html = (
             f"<div class='verdict-social'>"
-            f"<span class='sc-label'>net social cost avoided&nbsp;</span>"
-            f"<span class='sc-val'>{sc_sign}${abs(net_social):,.0f}</span>"
+            f"<span class='sc-label' style='color:{sc_label_c}'>net social cost avoided&nbsp;</span>"
+            f"<span class='sc-val' style='color:{sc_ink}'>{sc_sign}${abs(net_social):,.0f}</span>"
             f"</div>"
         )
     else:
