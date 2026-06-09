@@ -3314,19 +3314,27 @@ def Masthead():
 
 
 def _verdict_numbers(df, model):
-    """Return (journey_cum, baseline_cum, payback_yr_or_None, net_delta)."""
+    """Return (journey_cum, baseline_cum, payback_yr_or_None, net_delta, net_social)."""
     delta_vals   = df["Opex Delta"].values
     net_delta    = float(delta_vals[-1])
     payback_yr   = next((i + 1 for i, d in enumerate(delta_vals) if d > 0), None)
     journey_cum  = float(df["Journey Cum Cost"].iloc[-1])
     baseline_cum = float(df["Baseline Cum Cost"].iloc[-1])
-    return journey_cum, baseline_cum, payback_yr, net_delta
+    # Net social cost avoided by electrifying (baseline social − journey social)
+    net_social = 0.0
+    try:
+        b_soc = (df.get("Baseline Social Climate", 0) + df.get("Baseline Social Health", 0))
+        j_soc = (df.get("Journey Social Climate",  0) + df.get("Journey Social Health",  0))
+        net_social = float((b_soc - j_soc).sum())
+    except Exception:
+        net_social = 0.0
+    return journey_cum, baseline_cum, payback_yr, net_delta, net_social
 
 
 @solara.component
 def VerdictBand(df, n, model):
     """Hero result band: two comparison bars + payback/net call-out."""
-    journey_cum, baseline_cum, payback_yr, net_delta = _verdict_numbers(df, model)
+    journey_cum, baseline_cum, payback_yr, net_delta, net_social = _verdict_numbers(df, model)
     hi = max(journey_cum, baseline_cum, 1.0)
     j_pct = max(8.0, journey_cum  / hi * 100)
     b_pct = max(8.0, baseline_cum / hi * 100)
@@ -3340,6 +3348,18 @@ def VerdictBand(df, n, model):
     else:
         headline = f"No payback within {n} yrs"
     big = f"{'+' if positive else '−'}${abs(net_delta):,.0f}"
+
+    # Social cost line — only show if non-zero
+    if net_social != 0.0:
+        sc_sign = "+" if net_social >= 0 else "−"
+        social_html = (
+            f"<div class='verdict-social'>"
+            f"<span class='sc-label'>net social cost avoided&nbsp;</span>"
+            f"<span class='sc-val'>{sc_sign}${abs(net_social):,.0f}</span>"
+            f"</div>"
+        )
+    else:
+        social_html = ""
 
     html = (
         "<section class='verdict'>"
@@ -3359,7 +3379,7 @@ def VerdictBand(df, n, model):
         f"<div class='k' style='color:{call_ink}'>Payback</div>"
         f"<div class='headline'>{headline}</div>"
         f"<div class='big' style='color:{call_ink}'>{big}</div>"
-        "<div class='foot'>net position over 20 years</div>"
+        f"{social_html}"
         "</div></section>"
     )
     solara.HTML(tag="div", unsafe_innerHTML=html)
