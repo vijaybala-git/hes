@@ -17,7 +17,8 @@ from home_config import HomeConfig, compute_baseload_kwh
 from journey import CATEGORY_ORDER, CATEGORY_LABELS, CapExOnlySlot
 from panel_assessor import PanelAssessor
 from social_cost import SocialCostConfig
-from help_utils import HelpButton, ChartHelpButton, HelpPopupOverlay, open_help
+from help_utils import (HelpButton, ChartHelpButton, HelpPopupOverlay,
+                        HelpDock, open_help)
 
 # ── Asset paths ───────────────────────────────────────────────────────────────
 _HERE         = os.path.dirname(os.path.abspath(__file__))
@@ -907,7 +908,7 @@ def _style(ax):
 
 def _new_fig(wide=False):
     w = 12 if wide else 6
-    fig = Figure(figsize=(w, 3.8), dpi=100)
+    fig = Figure(figsize=(w, 3.35), dpi=100)
     fig.patch.set_alpha(0)
     return fig
 
@@ -2187,6 +2188,25 @@ def _panel_hd(panel_key: str, title: str):
     ))
 
 
+@solara.component
+def _PlanCheck(planned_rv, label: str = "Plan", right: bool = True):
+    """Rounded (circle-icon), optionally right-justified 'Plan' checkbox."""
+    wrap = ("flex:1 1 auto; justify-content:flex-end" if right
+            else "justify-content:flex-start")
+    with solara.Row(classes=["plan-check"], style=wrap):
+        solara.v.Checkbox(
+            v_model=planned_rv.value,
+            on_v_model=planned_rv.set,
+            label=label,
+            dense=True,
+            hide_details=True,
+            ripple=False,
+            color="#3B6FD4",
+            off_icon="mdi-checkbox-blank-circle-outline",
+            on_icon="mdi-check-circle",
+        )
+
+
 def _cost_row(cost_rv, rebate_rv, net: int):
     """Install $ · Rebate $ · Net — compact single line, box-style, integers only."""
     net_color = "var(--positive-ink,#2E7D32)" if net >= 0 else "var(--baseline-ink,#B45B3E)"
@@ -2214,7 +2234,7 @@ def _appliance_rows(state_rv, planned_rv, year_rv, cost_rv, rebate_rv,
         with solara.Column(style="min-width:90px; max-width:90px"):
             solara.Select("", value=state_rv, values=list(state_values))
         if state != "electric":
-            solara.Checkbox(label="Plan", value=planned_rv)
+            _PlanCheck(planned_rv, "Plan")
         elif state == "electric":
             solara.HTML(tag="span", unsafe_innerHTML=(
                 "<span style='font-size:0.80em; color:#2E7D32; margin-left:4px;'>"
@@ -2286,7 +2306,7 @@ def EVSummaryCard():
             with solara.Column(style="min-width:80px; max-width:80px"):
                 solara.Select("", value=ev_starting_state, values=["none", "electric"])
             if state == "none":
-                solara.Checkbox(label="Plan", value=ev_swap_planned)
+                _PlanCheck(ev_swap_planned, "Plan")
             elif state == "electric":
                 solara.HTML(tag="span", unsafe_innerHTML=(
                     "<span style='font-size:0.80em; color:#2E7D32;'>✓ Installed</span>"
@@ -2337,7 +2357,7 @@ def _PanelControls():
     planned = panel_upgrade_planned.value
     # Row 1: plan checkbox
     with solara.Row(gap="8px", style=_ROW_CTRL):
-        solara.Checkbox(label="Plan 200A upgrade", value=panel_upgrade_planned)
+        _PlanCheck(panel_upgrade_planned, "Plan 200A upgrade")
     # Row 2: full-width year slider + subscript
     if planned:
         yr = panel_upgrade_year.value
@@ -2380,7 +2400,7 @@ def _BaseloadControls():
         solara.HTML(tag="span", unsafe_innerHTML=(
             "<span style='font-size:0.80em; color:#888;'>0 therms/mo gas</span>"
         ))
-        solara.Checkbox(label="Plan upgrade", value=baseload_swap_planned)
+        _PlanCheck(baseload_swap_planned, "Plan upgrade")
     # Row 3: saving or always-on constant info
     if baseload_swap_planned.value:
         bl_after = compute_baseload_kwh(square_footage.value, num_bedrooms.value,
@@ -3377,62 +3397,54 @@ def DetailView(item: str, model):
 
 @solara.component
 def BottomZone(model):
-    """v2 — Setup group + Journey grid, then the device-detail modal dialog."""
+    """v2 — Setup group + Journey grid (device detail now renders in DetailDock)."""
     SetupGroup()
     JourneyGrid()
 
+
+@solara.component
+def DetailDock(model):
+    """v2 — device-detail editor as an inline panel BELOW the charts (not a modal
+    overlay), so the graphs stay visible and update live while sliders move."""
     dopen = detail_open.value
-    is_open = dopen is not None
+    if dopen is None:
+        return
 
     _DETAIL_ICONS = {
-        "hvac":         _DEVICE_ICONS.get("hvac", ""),
-        "water_heater": _DEVICE_ICONS.get("water_heater", ""),
-        "ev":           _DEVICE_ICONS.get("ev", ""),
-        "cooktop":      _DEVICE_ICONS.get("cooktop", ""),
-        "dryer":        _DEVICE_ICONS.get("dryer", ""),
-        "panel":        _DEVICE_ICONS.get("panel", ""),
-        "baseload":     _DEVICE_ICONS.get("baseload", ""),
-        "home":         _DEVICE_ICONS.get("home", ""),
-        "solar":        _DEVICE_ICONS.get("solar", ""),
-        "rates":        _DEVICE_ICONS.get("rates", ""),
+        k: _DEVICE_ICONS.get(k, "")
+        for k in ("hvac", "water_heater", "ev", "cooktop", "dryer",
+                  "panel", "baseload", "home", "solar", "rates")
     }
-    icon_svg = _DETAIL_ICONS.get(dopen or "", "")
-    title    = _DETAIL_TITLES.get(dopen or "", "")
+    _DETAIL_HELP = {
+        "hvac": "hvac", "water_heater": "water_heater", "ev": "ev_charger",
+        "cooktop": "cooktop", "dryer": "dryer", "panel": "panel_upgrade",
+        "baseload": "baseload", "home": "home_profile", "solar": "solar",
+        "rates": "rates",
+    }
+    icon_svg = _DETAIL_ICONS.get(dopen, "")
+    title    = _DETAIL_TITLES.get(dopen, "")
+    help_key = _DETAIL_HELP.get(dopen, "")
 
-    with solara.v.Dialog(
-        v_model=is_open,
-        on_v_model=lambda v: (detail_open.set(None) if not v else None),
-        max_width="860px",
-        scrollable=True,
-    ):
-        with solara.v.Card():
-            # Modal header
-            with solara.Row(classes=["modal-hd"]):
-                if icon_svg:
-                    solara.HTML(tag="div", unsafe_innerHTML=(
-                        f"<div class='modal-di'>{icon_svg}</div>"
-                    ))
+    with solara.Column(classes=["card", "dock", "detail-dock"]):
+        # Dock header — icon + title (flex:1) push [?] + Done to the right
+        with solara.Row(classes=["modal-hd"]):
+            if icon_svg:
                 solara.HTML(tag="div", unsafe_innerHTML=(
-                    f"<div class='modal-title'>{title}</div>"
+                    f"<div class='modal-di'>{icon_svg}</div>"
                 ))
-                solara.Button(
-                    "✓ Done",
-                    on_click=lambda: detail_open.set(None),
-                    classes=["btn", "done"],
-                )
-                solara.Button(
-                    "✕",
-                    on_click=lambda: detail_open.set(None),
-                    style=(
-                        "background:none;border:none;cursor:pointer;"
-                        "color:#78909C;font-size:1.1em;padding:2px 8px;"
-                        "border-radius:4px;"
-                    ),
-                )
-            # Modal body
-            with solara.Column(classes=["modal-bd", "detail-body"]):
-                if dopen is not None:
-                    DetailView(dopen, model)
+            solara.HTML(tag="div", style="flex:1; min-width:0", unsafe_innerHTML=(
+                f"<div class='modal-title'>{title}</div>"
+            ))
+            if help_key:
+                HelpButton(help_key, style="width:26px;height:26px;font-size:0.82em")
+            solara.Button(
+                "✓ Done",
+                on_click=lambda: detail_open.set(None),
+                classes=["btn", "done"],
+            )
+        # Dock body
+        with solara.Column(classes=["modal-bd", "detail-body"]):
+            DetailView(dopen, model)
 
 
 # ── Phase 3 redesign — masthead + verdict band ──────────────────────────────────
@@ -3575,8 +3587,10 @@ def Cockpit(df, n, model):
     big = f"{'+' if positive else '−'}${abs(net_delta):,.0f}"
 
     if net_social != 0.0:
-        sc_sign = "+" if net_social >= 0 else "−"
-        foot = (f"net social cost avoided {sc_sign}${abs(net_social):,.0f}")
+        sc_sign  = "+" if net_social >= 0 else "−"
+        sc_cls   = "sc-val" if net_social >= 0 else "sc-val neg"
+        foot = (f"net social cost avoided "
+                f"<b class='{sc_cls}'>{sc_sign}${abs(net_social):,.0f}</b>")
     else:
         foot = f"over {n} yrs vs. do nothing"
 
@@ -3697,8 +3711,8 @@ def SetupGroup():
     with solara.Column(classes=group_cls):
         # Group header
         with solara.Row(classes=["sg-hd"], style="align-items:center; gap:10px"):
-            solara.HTML(tag="div", unsafe_innerHTML=(
-                f"<div style='display:flex;align-items:center;gap:10px;flex:1;min-width:0'>"
+            solara.HTML(tag="div", style="flex:1; min-width:0", unsafe_innerHTML=(
+                f"<div style='display:flex;align-items:center;gap:10px;min-width:0'>"
                 f"<span class='ic'>{_CARD_IC['home']}</span>"
                 f"<h3 style='margin:0'>Setup your home</h3>"
                 f"<span class='scope'>— Home &amp; Solar, Energy &amp; Prices, "
@@ -3796,7 +3810,6 @@ def JourneyGrid():
 def Page():
     solara.Title("WhyWatt?")
     solara.Style(_REDESIGN_CSS + "\n" + _LAYOUT_V2_CSS)   # design system + v2 layout
-    HelpPopupOverlay()
 
     model, df = solara.use_memo(run_simulation, dependencies=[
         zip_code.value, climate_zone.value, num_bedrooms.value,
@@ -3855,6 +3868,13 @@ def Page():
             tag="div",
             unsafe_innerHTML=(
                 "<style>"
+                # tighten the chart card header + remove dead space around figures
+                ".card-hd.chart-header-sel{padding:6px 10px 5px!important}"
+                ".chart-header-sel .v-input{margin:0!important;padding:0!important}"
+                ".chart-header-sel .v-input__control{min-height:32px!important}"
+                ".chart-header-sel .v-input__slot{margin-bottom:0!important}"
+                ".chart-header-sel .v-text-field__details{display:none!important}"
+                ".chart-header-sel .v-messages{display:none!important}"
                 ".chart-header-sel .v-input__icon--append .v-icon"
                 "{font-size:28px!important}"
                 ".chart-header-sel .v-input__slot::before,"
@@ -4006,6 +4026,9 @@ def Page():
                 ".v-row.split2>.v-col{padding:0!important}"
                 ".v-col.subpanel>.v-row{margin:0!important}"
                 ".setup-grid>.card,.jgrid>.device{margin:0!important}"
+                # collapse-all button: beat Vuetify .v-btn--default sizing
+                ".v-btn.collapse-all{height:26px!important;min-height:26px!important;"
+                "min-width:0!important;padding:0 9px!important}"
                 "</style>"
             ),
             style="display:none",
@@ -4033,7 +4056,7 @@ def Page():
                     )
                     solara.Select("", value=chart_left, values=CHART_OPTIONS)
                     ChartHelpButton(chart_left.value)
-                with solara.Column(style="padding:8px 4px"):
+                with solara.Column(style="padding:0 2px 2px"):
                     ChartPane(chart_left.value, model, df, n)
             with solara.Column(classes=["card"],
                                style="flex:1; min-width:300px; overflow:hidden"):
@@ -4049,7 +4072,7 @@ def Page():
                     )
                     solara.Select("", value=chart_right, values=CHART_OPTIONS)
                     ChartHelpButton(chart_right.value)
-                with solara.Column(style="padding:8px 4px"):
+                with solara.Column(style="padding:0 2px 2px"):
                     ChartPane(chart_right.value, model, df, n)
 
         # ── Series key strip (legend + scenario eyebrow) ─────────────────────────
@@ -4071,7 +4094,13 @@ def Page():
                 "<span class='scenario-eyebrow'>Adjust the scenario below</span>"
             ))
 
-        # ── Bottom zone — summary or detail view (§25) ─────────────────────────
+        # ── Inline docks — Help / Device detail render here, BELOW the charts ────
+        #    (sliders inside still drive run_simulation, so the graphs above
+        #     update live instead of being hidden behind a modal overlay).
+        HelpDock()
+        DetailDock(model)
+
+        # ── Bottom zone — Setup group + Journey grid ───────────────────────────
         BottomZone(model)
 
         # ── Footer — ECHo branding ──────────────────────────────────────────────

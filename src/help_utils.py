@@ -155,3 +155,47 @@ def HelpPopupOverlay():
                         " font-weight:600;"
                     ),
                 )
+
+
+# ── HelpDock ──────────────────────────────────────────────────────────────────
+
+@solara.component
+def HelpDock():
+    """Inline help panel rendered BELOW the charts (bottom half of the page)
+    instead of a centered overlay, so the graphs stay visible. Place once in
+    Page() next to DetailDock."""
+    key = help_open.value
+    if not (key and key in HELP_POPUPS and not key.startswith("_")):
+        return
+
+    def close():
+        help_open.set("")
+
+    text, learn_more = HELP_POPUPS[key]
+    title = key.replace("chart_", "").replace("_", " ").title()
+
+    with solara.Column(classes=["card", "dock", "help-dock"]):
+        # Header — title (flex:1) pushes ✕ to the right
+        with solara.Row(classes=["modal-hd"]):
+            solara.HTML(tag="div", style="flex:1; min-width:0", unsafe_innerHTML=(
+                f"<div class='modal-title'>❔ {title}</div>"
+            ))
+            solara.Button(
+                "✓ Done",
+                on_click=close,
+                classes=["btn", "done"],
+            )
+        # Body
+        with solara.Column(classes=["modal-bd"]):
+            solara.v.Html(tag="p", children=[text],
+                          style_="margin:0 0 14px 0; line-height:1.7; color:#37474F")
+            solara.Button(
+                "Learn more →",
+                on_click=lambda: (_open_topic(learn_more), close()),
+                style=(
+                    "background:transparent; color:#3F51B5;"
+                    " border:none; padding:0; font-size:0.9em;"
+                    " cursor:pointer; text-decoration:underline;"
+                    " font-weight:600;"
+                ),
+            )

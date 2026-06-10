@@ -22,7 +22,12 @@
 .ck-call.negative .k { color: var(--baseline-ink); }
 .ck-call .big { font-family: var(--mono); font-size: 30px; font-weight: 600; color: var(--positive-ink); letter-spacing: -0.02em; line-height: 1; }
 .ck-call.negative .big { color: var(--baseline-ink); }
-.ck-call .foot { font-size: 11.5px; color: var(--ink-3); }
+.ck-call .foot { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
+.ck-call .foot .sc-val {
+  font-family: var(--mono); font-weight: 700; font-size: 15px;
+  color: var(--positive-ink); letter-spacing: -0.01em;
+}
+.ck-call .foot .sc-val.neg { color: var(--baseline-ink); }
 
 .ck-bars { gap: 10px; }
 .ck-bars .cmp { grid-template-columns: 92px 1fr; gap: 12px; }
@@ -65,11 +70,12 @@
 .sg-hd .scope { font-size: 11.5px; color: var(--ink-3); }
 .sg-hd .sp { flex: 1; }
 .collapse-all {
-  display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 13px; border-radius: var(--r-sm);
+  display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border-radius: var(--r-sm);
   border: 1px solid var(--border-strong); background: var(--surface); color: var(--ink-2);
-  font-family: var(--font); font-size: 12.5px; font-weight: 600; cursor: pointer; box-shadow: var(--shadow-xs);
-  transition: all .14s ease;
+  font-family: var(--font); font-size: 11px; font-weight: 600; cursor: pointer; box-shadow: var(--shadow-xs);
+  transition: all .14s ease; flex-shrink: 0; min-width: 0;
 }
+.collapse-all .v-btn__content { font-size: 11px; }
 .collapse-all:hover { color: var(--ink); border-color: var(--ink-3); }
 .collapse-all svg { width: 14px; height: 14px; transition: transform .18s ease; }
 .collapse-all[data-collapsed="true"] svg { transform: rotate(-180deg); }
@@ -109,6 +115,14 @@
 .device.minor { gap: 10px; }
 .device .noplan { font-size: 11.5px; color: var(--ink-3); }
 
+/* rounded, right-justified "Plan" checkbox */
+.plan-check { align-items: center; }
+.plan-check .v-input { flex: 0 0 auto; }
+.plan-check .v-input--checkbox { margin: 0 !important; padding: 0 !important; }
+.plan-check .v-input__slot { margin: 0 !important; min-height: 0 !important; }
+.plan-check .v-label { font-size: 12.5px; color: var(--ink-2); }
+.plan-check .v-icon { font-size: 20px !important; }
+
 /* ---- Split Panel & Baseload card ---- */
 .split2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
 .subpanel { padding: 0 14px; display: flex; flex-direction: column; gap: 11px; }
@@ -124,3 +138,11 @@
   font-size: 10px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase;
   color: var(--ink-4);
 }
+
+/* ---- Inline docks (Detail / Help render below the charts, not as overlays) ---- */
+.dock { margin-bottom: var(--gap); box-shadow: var(--shadow-md); animation: dock-in .16s ease; }
+.dock .modal-bd { max-height: 56vh; overflow-y: auto; }
+.detail-dock { border-color: var(--journey) !important; }
+.detail-dock .modal-hd { border-bottom-color: var(--journey-soft); }
+.help-dock { border-color: var(--border-strong) !important; }
+@keyframes dock-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
