@@ -18,7 +18,7 @@ from journey import CATEGORY_ORDER, CATEGORY_LABELS, CapExOnlySlot
 from panel_assessor import PanelAssessor
 from social_cost import SocialCostConfig
 from help_utils import (HelpButton, ChartHelpButton, HelpPopupOverlay,
-                        HelpDock, open_help)
+                        HelpLink)
 
 # ── Asset paths ───────────────────────────────────────────────────────────────
 _HERE         = os.path.dirname(os.path.abspath(__file__))
@@ -3485,8 +3485,8 @@ def Masthead():
         with solara.Row(classes=["actions"], style="gap:8px; flex-shrink:0"):
             solara.Button("↺ Reset to defaults", on_click=reset_to_defaults,
                           classes=["btn"])
-            solara.Button("? Help", on_click=lambda: open_help("index.html"),
-                          classes=["btn", "primary"])
+            HelpLink("? Help", "index.html", classes=["btn", "primary"],
+                     style="text-decoration:none")
 
 
 def _verdict_numbers(df, model):
@@ -4094,10 +4094,10 @@ def Page():
                 "<span class='scenario-eyebrow'>Adjust the scenario below</span>"
             ))
 
-        # ── Inline docks — Help / Device detail render here, BELOW the charts ────
-        #    (sliders inside still drive run_simulation, so the graphs above
-        #     update live instead of being hidden behind a modal overlay).
-        HelpDock()
+        # ── Help — small popup window (dialog) with a "Learn more" link that
+        #    opens the full help page in a new browser tab. Device detail still
+        #    renders as an inline dock below the charts.
+        HelpPopupOverlay()
         DetailDock(model)
 
         # ── Bottom zone — Setup group + Journey grid ───────────────────────────

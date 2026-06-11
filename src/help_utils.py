@@ -2,43 +2,63 @@
 help_utils.py — Help system utilities for WhyWatt.
 
 Provides:
-  open_help(page, anchor)  — open a docs/help/*.html page in the browser
+  help_url(page, anchor)   — build the served URL for a docs/help/*.html page
+  HelpLink(label, topic)   — anchor that opens a help page in a new browser tab
   HelpButton(topic_key)    — small circular [?] button
   HelpPopupOverlay()       — single overlay instance; place once in Page()
   ChartHelpButton(chart_name_reactive)  — [?] for chart title bars (key from chart name)
+
+Help HTML pages are served by Solara as static files from the project-root
+``public/`` directory, mounted at ``/static/public/``. Links are plain
+``<a target="_blank">`` anchors so they open in the user's actual browser tab
+(server-side ``webbrowser.open`` does not work once the app is served over HTTP).
 """
-import os
-import webbrowser
 import solara
 from help_content import HELP_POPUPS, CHART_NAME_TO_HELP_KEY
 
-# Absolute path to docs/help/ directory
-_HELP_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "docs", "help")
-)
+# URL prefix where Solara serves project-root public/help/*.html
+_HELP_URL_BASE = "/static/public/help/"
 
 # ── Reactive state — key of currently open popup ("" = none open) ─────────────
 help_open = solara.reactive("")
 
+# Friendlier popup titles for chart keys (otherwise "chart_jc2" → "Jc2").
+# Reverse the chart-name→key map, then fill in keys with no chart name.
+_TOPIC_TITLES: dict[str, str] = {key: name for name, key in CHART_NAME_TO_HELP_KEY.items()}
+_TOPIC_TITLES.setdefault("chart_jc1", "Annual Cost by Year")
+_TOPIC_TITLES.setdefault("chart_r1",  "Rate Projection")
+_TOPIC_TITLES.setdefault("chart_eu1", "Annual Energy Use")
 
-# ── open_help() ───────────────────────────────────────────────────────────────
 
-def open_help(page: str, anchor: str = "") -> None:
-    """Open a help HTML page in the default browser (file:/// URL, offline-safe)."""
-    path = os.path.join(_HELP_DIR, page)
-    url  = "file:///" + path.replace(os.sep, "/")
+def _topic_title(key: str) -> str:
+    """Human-readable popup title for a help key."""
+    if key in _TOPIC_TITLES:
+        return _TOPIC_TITLES[key]
+    return key.replace("chart_", "").replace("_", " ").title()
+
+
+# ── help_url() ────────────────────────────────────────────────────────────────
+
+def help_url(page: str, anchor: str = "") -> str:
+    """Build the served URL for a help page. ``page`` may already include a
+    '#anchor'; an explicit ``anchor`` argument is appended if given."""
+    url = _HELP_URL_BASE + page
     if anchor:
         url += f"#{anchor}"
-    webbrowser.open(url)
+    return url
 
 
-def _open_topic(learn_more: str) -> None:
-    """Parse 'page.html' or 'page.html#anchor' and open it."""
-    if "#" in learn_more:
-        page, anchor = learn_more.split("#", 1)
-        open_help(page, anchor)
-    else:
-        open_help(learn_more)
+@solara.component
+def HelpLink(label: str, topic: str, classes: list[str] | None = None, style: str = ""):
+    """Anchor styled link that opens a help page (``page.html`` or
+    ``page.html#anchor``) in a new browser tab — pure client-side navigation."""
+    solara.HTML(
+        tag="a",
+        unsafe_innerHTML=label,
+        attributes={"href": help_url(topic), "target": "_blank", "rel": "noopener"},
+        classes=classes or [],
+        style=style,
+    )
 
 
 # ── HelpButton ────────────────────────────────────────────────────────────────
@@ -106,8 +126,7 @@ def HelpPopupOverlay():
             return
 
         text, learn_more = HELP_POPUPS[key]
-        # Human-readable title from the key
-        title = key.replace("chart_", "").replace("_", " ").title()
+        title = _topic_title(key)
 
         with solara.v.Card(elevation=8, style_="border-radius:10px; overflow:hidden"):
             # Title row
@@ -145,12 +164,14 @@ def HelpPopupOverlay():
                 )
             ):
                 solara.v.Html(tag="p", children=[text], style_="margin:0 0 16px 0")
-                solara.Button(
-                    "Learn more →",
-                    on_click=lambda: (_open_topic(learn_more), close()),
+                solara.HTML(
+                    tag="a",
+                    unsafe_innerHTML="Learn more →",
+                    attributes={"href": help_url(learn_more),
+                                "target": "_blank", "rel": "noopener"},
                     style=(
                         "background:transparent; color:#3F51B5;"
-                        " border:none; padding:0; font-size:0.9em;"
+                        " padding:0; font-size:0.9em;"
                         " cursor:pointer; text-decoration:underline;"
                         " font-weight:600;"
                     ),
@@ -172,7 +193,7 @@ def HelpDock():
         help_open.set("")
 
     text, learn_more = HELP_POPUPS[key]
-    title = key.replace("chart_", "").replace("_", " ").title()
+    title = _topic_title(key)
 
     with solara.Column(classes=["card", "dock", "help-dock"]):
         # Header — title (flex:1) pushes ✕ to the right
@@ -189,12 +210,14 @@ def HelpDock():
         with solara.Column(classes=["modal-bd"]):
             solara.v.Html(tag="p", children=[text],
                           style_="margin:0 0 14px 0; line-height:1.7; color:#37474F")
-            solara.Button(
-                "Learn more →",
-                on_click=lambda: (_open_topic(learn_more), close()),
+            solara.HTML(
+                tag="a",
+                unsafe_innerHTML="Learn more →",
+                attributes={"href": help_url(learn_more),
+                            "target": "_blank", "rel": "noopener"},
                 style=(
                     "background:transparent; color:#3F51B5;"
-                    " border:none; padding:0; font-size:0.9em;"
+                    " padding:0; font-size:0.9em;"
                     " cursor:pointer; text-decoration:underline;"
                     " font-weight:600;"
                 ),

@@ -10,7 +10,9 @@ USAGE:
 RUN FROM the project root (D:/vijay/MyDocuments/hes).
 
 OUTPUT:
-    docs/help/*.html        — one HTML file per section
+    docs/help/*.html        — one HTML file per section (source of truth)
+    public/help/*.html      — served copy (Solara serves public/ at /static/public/)
+    public/assets/          — logo copied so served pages render it
     src/help_content.py     — regenerated HELP_POPUPS dict
 
 This script is run by developers after an editor updates help_content.md.
@@ -29,6 +31,9 @@ ROOT        = Path(__file__).parent.parent
 CONTENT_MD  = ROOT / "docs" / "help" / "help_content.md"
 HELP_DIR    = ROOT / "docs" / "help"
 HELP_PY     = ROOT / "src" / "help_content.py"
+# Served copy — Solara serves project-root public/ at /static/public/
+PUBLIC_HELP   = ROOT / "public" / "help"
+PUBLIC_ASSETS = ROOT / "public" / "assets"
 
 # ── CSS shared across all pages ────────────────────────────────────────────────
 _CSS = """
@@ -441,6 +446,19 @@ def main():
     py_content = render_help_content_py(sections)
     HELP_PY.write_text(py_content, encoding="utf-8")
     print(f"  wrote {HELP_PY.relative_to(ROOT)}")
+
+    # Sync served copy: all docs/help/*.html (generated + hand-written index/about)
+    # → public/help/, plus the logo the pages reference at ../assets/.
+    import shutil
+    PUBLIC_HELP.mkdir(parents=True, exist_ok=True)
+    for html in HELP_DIR.glob("*.html"):
+        shutil.copy2(html, PUBLIC_HELP / html.name)
+    print(f"  synced {len(list(HELP_DIR.glob('*.html')))} html → {PUBLIC_HELP.relative_to(ROOT)}")
+    logo = ROOT / "docs" / "assets" / "whywatt_logo.svg"
+    if logo.exists():
+        PUBLIC_ASSETS.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(logo, PUBLIC_ASSETS / logo.name)
+        print(f"  synced logo → {(PUBLIC_ASSETS / logo.name).relative_to(ROOT)}")
 
     print(f"\nDone. {len(written_html)} HTML files + help_content.py regenerated.")
     print("\nNext steps:")

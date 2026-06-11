@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WhyWatt Help — Journey Planner</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+               max-width: 760px; margin: 2rem auto; padding: 0 1.5rem;
+               color: #222; line-height: 1.65; }
+        header { display: flex; align-items: center; gap: 1rem;
+                 border-bottom: 2px solid #E8EAF6; padding-bottom: 1rem; margin-bottom: 1rem; }
+        header img { height: 40px; }
+        header h1 { margin: 0; font-size: 1.4rem; color: #1A237E; }
+        nav { font-size: 0.88rem; margin-bottom: 1.5rem; }
+        nav a { color: #3F51B5; margin-right: 1.2rem; text-decoration: none; }
+        nav a:hover { text-decoration: underline; }
+        h2 { margin-top: 2rem; padding-bottom: 0.3rem;
+             border-bottom: 1px solid #E8EAF6; color: #283593; font-size: 1.1rem; }
+        p  { margin: 0.6rem 0; }
+        ul { margin: 0.4rem 0 0.8rem 0; padding-left: 1.5rem; }
+        li { margin: 0.3rem 0; }
+        .note { background: #FFF8E1; border-left: 4px solid #FFC107;
+                padding: 0.6rem 1rem; margin: 1rem 0; border-radius: 0 4px 4px 0; }
+        .formula { background: #F3F4F6; border-left: 4px solid #9FA8DA;
+                   padding: 0.6rem 1rem; margin: 1rem 0; font-family: monospace;
+                   font-size: 0.88em; border-radius: 0 4px 4px 0; white-space: pre-wrap; }
+        footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #E8EAF6;
+                 font-size: 0.78rem; color: #9E9E9E; display: flex;
+                 justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+        .section-tag { background: #E8EAF6; color: #5C6BC0; border-radius: 4px;
+                       padding: 2px 8px; font-size: 0.76rem; font-weight: 600;
+                       white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="../assets/whywatt_logo.svg" alt="WhyWatt"
+         onerror="this.style.display='none'">
+    <h1>Journey Planner</h1>
+  </header>
+  <nav>
+    <a href="index.html">← Help Index</a>
+  </nav>
+  <main>
+
+    <h2 id="what-this-means-for-you">What this means for you</h2>
+    <p>The Journey Planner shows what happens to your energy costs if you swap gas appliances for electric alternatives one by one, on a schedule you choose — compared to doing nothing for 20 years. You set which appliances to replace and in which year; WhyWatt does the math.</p>
+<p>The result is two cost curves on the same chart: Your Journey and Do Nothing. The gap between them — and the year they cross — is your payback.</p>
+
+    <h2 id="the-two-scenarios">The two scenarios</h2>
+    <p>Your Journey home starts with your current appliances. In each year you've scheduled a swap, the old appliance is replaced:</p>
+<ul>
+<li>A one-time install cost appears (minus any rebate you enter)</li>
+<li>From that year forward, the new appliance's operating cost replaces the old one</li>
+<li>All other appliances remain unchanged until their own swap year</li>
+</ul>
+<p>Do Nothing runs in parallel automatically. It uses exactly the same starting appliances — including any that are already electric — and keeps them for the full 20 years. No swaps, no upgrades, no rebates.</p>
+
+    <h2 id="what-swap-year-means">What "swap year" means</h2>
+    <p>Example: You schedule the HVAC swap in Year 3. In simulation year 3, the model applies the install cost ($14,000 minus $3,500 rebate = $10,500 net). From year 4 onward, the heat pump's electricity cost replaces the gas furnace's gas cost. Years 1-2 still use the gas furnace.</p>
+<p>The calendar year label next to the slider (e.g., "Yr 3 (2028)") is derived from the current calendar year when you run the simulation.</p>
+
+    <h2 id="key-assumptions">Key assumptions</h2>
+    <ul>
+<li>The simulation is deterministic — no randomness, no uncertainty bands.</li>
+</ul>
+<p>The same inputs always produce the same outputs.</p>
+<ul>
+<li>Appliance lifespans and end-of-life replacement costs are not modeled beyond</li>
+</ul>
+<p>your planned swaps.</p>
+<ul>
+<li>Energy consumption is based on your home profile and appliance efficiency</li>
+</ul>
+<p>ratings — not your actual meter readings.</p>
+<ul>
+<li>Rate escalation is applied uniformly each year at your chosen scenario rate.</li>
+</ul>
+<p>---</p>
+  </main>
+  <footer>
+    <span>WhyWatt v3.0 &middot; <a href="about.html" style="color:#9E9E9E">About</a></span>
+    <span class="section-tag">§1 · Journey Planner &middot; edit help_content.md §1</span>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WhyWatt Help — HVAC — Heating &amp; Cooling</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+               max-width: 760px; margin: 2rem auto; padding: 0 1.5rem;
+               color: #222; line-height: 1.65; }
+        header { display: flex; align-items: center; gap: 1rem;
+                 border-bottom: 2px solid #E8EAF6; padding-bottom: 1rem; margin-bottom: 1rem; }
+        header img { height: 40px; }
+        header h1 { margin: 0; font-size: 1.4rem; color: #1A237E; }
+        nav { font-size: 0.88rem; margin-bottom: 1.5rem; }
+        nav a { color: #3F51B5; margin-right: 1.2rem; text-decoration: none; }
+        nav a:hover { text-decoration: underline; }
+        h2 { margin-top: 2rem; padding-bottom: 0.3rem;
+             border-bottom: 1px solid #E8EAF6; color: #283593; font-size: 1.1rem; }
+        p  { margin: 0.6rem 0; }
+        ul { margin: 0.4rem 0 0.8rem 0; padding-left: 1.5rem; }
+        li { margin: 0.3rem 0; }
+        .note { background: #FFF8E1; border-left: 4px solid #FFC107;
+                padding: 0.6rem 1rem; margin: 1rem 0; border-radius: 0 4px 4px 0; }
+        .formula { background: #F3F4F6; border-left: 4px solid #9FA8DA;
+                   padding: 0.6rem 1rem; margin: 1rem 0; font-family: monospace;
+                   font-size: 0.88em; border-radius: 0 4px 4px 0; white-space: pre-wrap; }
+        footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #E8EAF6;
+                 font-size: 0.78rem; color: #9E9E9E; display: flex;
+                 justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+        .section-tag { background: #E8EAF6; color: #5C6BC0; border-radius: 4px;
+                       padding: 2px 8px; font-size: 0.76rem; font-weight: 600;
+                       white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="../assets/whywatt_logo.svg" alt="WhyWatt"
+         onerror="this.style.display='none'">
+    <h1>HVAC — Heating &amp; Cooling</h1>
+  </header>
+  <nav>
+    <a href="index.html">← Help Index</a>
+  </nav>
+  <main>
+
+    <h2 id="what-this-means-for-you">What this means for you</h2>
+    <p>Heating and cooling is usually the largest energy cost in a home. WhyWatt calculates HVAC energy month by month using your climate zone's actual heating and cooling degree-days, so the seasonal pattern is realistic — not just an annual average.</p>
+
+    <h2 id="how-we-calculate-it">How we calculate it</h2>
+    <p>Gas furnace heating:</p>
+<p>annual therms = HDD × UA × 24 / (AFUE × 100,000)</p>
+<p>Heat pump heating:</p>
+<p>annual kWh = HDD × UA × 24 / (COP × 3,412)</p>
+<p>Heat pump cooling:</p>
+<p>annual kWh = CDD × UA × 24 / (SEER × 1,000)  [approximate]</p>
+<p>Where:</p>
+<ul>
+<li>HDD = heating degree-days (base 65°F) for your climate zone</li>
+<li>CDD = cooling degree-days (base 65°F)</li>
+<li>UA = home heat loss rate (BTU/hr/°F) — set by insulation quality</li>
+<li>AFUE = furnace efficiency (e.g., 0.80 = 80%)</li>
+<li>COP = heat pump heating efficiency (e.g., 3.5 means 3.5x more heat than electricity used)</li>
+<li>SEER = heat pump cooling efficiency rating</li>
+</ul>
+
+    <h2 id="key-assumptions">Key assumptions</h2>
+    <ul>
+<li>Bay Area default: 1,910 HDD and 340 CDD (NOAA TMY3, San Jose Mineta)</li>
+<li>UA classes: Poor = 650, Average = 500, Good = 350 BTU/hr/°F</li>
+<li>Default heat pump: COP 3.5 heating, SEER 22 cooling</li>
+<li>Default gas furnace: AFUE 0.80</li>
+</ul>
+
+    <h2 id="data-sources">Data sources</h2>
+    <ul>
+<li>Climate data: NOAA TMY3 (NREL), 1991-2005 composite</li>
+<li>Efficiency specs: ENERGY STAR and AHRI reference data (2024)</li>
+</ul>
+<p>---</p>
+  </main>
+  <footer>
+    <span>WhyWatt v3.0 &middot; <a href="about.html" style="color:#9E9E9E">About</a></span>
+    <span class="section-tag">§4 · HVAC — Heating &amp; Cooling &middot; edit help_content.md §4</span>
+  </footer>
+</body>
+</html>
