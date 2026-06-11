@@ -47,22 +47,22 @@
     <p>Induction cooktops are significantly more efficient than gas — not just because electricity is cleaner, but because induction transfers heat directly to the pan using electromagnetism, wasting very little energy. Gas burners heat the air around the pan as much as the pan itself.</p>
 
     <h2 id="how-we-calculate-it">How we calculate it</h2>
-    <p>Cook time model (both fuel types use the same daily cook time input):</p>
-<p>Induction: annual kWh = cook_hours/day × 1.5 kW × 365 × 0.85</p>
-<p>Gas: annual therms = cook_hours/day × 7,500 BTU/hr × 365 / 100,000 / 0.40</p>
-<p>Where:</p>
+    <p>Both fuel types use the same meals-per-week input:</p>
+<p>annual energy = energy_per_meal × meals_per_week × 52</p>
 <ul>
-<li>1.5 kW = average power of two active induction burners</li>
-<li>0.85 = induction efficiency factor (accounts for warm-up overhead)</li>
-<li>7,500 BTU/hr = average output of two active gas burners</li>
-<li>0.40 = gas burner thermal efficiency (fraction reaching the cookware)</li>
+<li>Gas cooktop: 0.05 therms per meal</li>
+<li>Induction cooktop: 0.9 kWh per meal</li>
+<li>Default: 14 meals per week → about 36 therms/yr gas, or 655 kWh/yr induction</li>
 </ul>
-<p>Default: 1 hour 0 minutes per day → ~466 kWh/yr induction, ~68 therms/yr gas.</p>
+<p>The per-meal figures already bake in the efficiency difference between the two: gas burners lose most of their heat to the surrounding air, while induction transfers energy directly to the pan.</p>
 
     <h2 id="key-assumptions">Key assumptions</h2>
     <ul>
-<li>Two burners active on average during cooking sessions</li>
-<li>Oven is not separately modeled in the cooktop slot</li>
+<li>Energy is estimated per meal, not per minute of cooking — adjust meals per week in the</li>
+</ul>
+<p>cooktop detail panel to match your household.</p>
+<ul>
+<li>The oven is not separately modeled in the cooktop slot.</li>
 </ul>
 
     <h2 id="data-sources">Data sources</h2>

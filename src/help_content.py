@@ -14,15 +14,17 @@ HELP_POPUPS: dict[str, tuple[str, str]] = {
         "journey.html",
     ),
     "home_profile": (
-        "Home details — size, insulation quality, and location — affect how much"
-        " energy each appliance uses. Your ZIP code sets the climate zone, which"
-        " drives the heating and cooling calculations.",
+        "Home details — size and insulation quality — affect how much energy each"
+        " appliance uses. WhyWatt currently uses Bay Area (San Jose) climate data"
+        " for every home; ZIP-based climate zone selection is coming in a future"
+        " release.",
         "climate.html",
     ),
     "zip_code": (
-        "Home details — size, insulation quality, and location — affect how much"
-        " energy each appliance uses. Your ZIP code sets the climate zone, which"
-        " drives the heating and cooling calculations.",
+        "Home details — size and insulation quality — affect how much energy each"
+        " appliance uses. WhyWatt currently uses Bay Area (San Jose) climate data"
+        " for every home; ZIP-based climate zone selection is coming in a future"
+        " release.",
         "climate.html",
     ),
     "energy_prices": (
@@ -62,8 +64,9 @@ HELP_POPUPS: dict[str, tuple[str, str]] = {
         "cooktop.html",
     ),
     "ev_charger": (
-        "EV charging energy is estimated from your average daily miles driven and"
-        " your vehicle's efficiency. Level 2 home charging (240V) is assumed.",
+        "EV charging energy is estimated from your annual miles driven, your"
+        " vehicle's efficiency (kWh per mile), and a charging-efficiency factor"
+        " for home charging losses. Level 2 home charging (240V) is assumed.",
         "ev.html",
     ),
     "solar": (

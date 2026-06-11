@@ -47,16 +47,15 @@
     <p>Baseload is the electricity your home uses regardless of your heating, cooling, cooking, or EV decisions — refrigerator, lighting, TV, computer, small appliances, and similar loads. It's always present and always electric.</p>
 
     <h2 id="how-we-calculate-it">How we calculate it</h2>
-    <p>annual kWh = bedroom_scale × (1,200 kWh/yr + constant_always_on)</p>
-<p>Bedroom scaling (DOE/ENERGY STAR occupancy proxy):</p>
+    <p>annual kWh = (floor_area_sqft × 0.45) + (bedrooms × 200) + always_on_constant</p>
 <ul>
-<li>1 bedroom: 0.50× → 600 kWh/yr</li>
-<li>2 bedrooms: 0.83× → 996 kWh/yr</li>
-<li>3 bedrooms: 1.00× → 1,200 kWh/yr (reference)</li>
-<li>4 bedrooms: 1.17× → 1,404 kWh/yr</li>
-<li>5 bedrooms: 1.33× → 1,596 kWh/yr</li>
+<li>0.45 kWh per square foot per year (EIA RECS 2020, California)</li>
+<li>200 kWh per bedroom per year (occupancy proxy)</li>
+<li>always-on constant: 500 kWh/yr by default — covers a home office, networking gear,</li>
 </ul>
-<p>An additional always-on constant (default 500 kWh/yr) covers equipment that doesn't scale with bedrooms (e.g., home office, always-on networking). A baseload upgrade (LED lighting, efficient appliances) reduces this constant.</p>
+<p>and other loads that don't scale with home size</p>
+<p>Example: an 1,800 sq ft, 3-bedroom home → (1,800 × 0.45) + (3 × 200) + 500 = 1,910 kWh/yr.</p>
+<p>A baseload efficiency upgrade (LED lighting, efficient appliances) lowers the always-on constant — from 500 down to 300 kWh/yr by default.</p>
 
     <h2 id="key-assumptions">Key assumptions</h2>
     <ul>

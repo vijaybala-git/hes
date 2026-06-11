@@ -47,19 +47,25 @@
     <p>Adding an EV to an electrified home increases electricity use but eliminates gasoline costs entirely. WhyWatt models the electricity cost of home charging — it does not currently model gasoline savings (the financial case for an EV is in the vehicle purchase decision, not the home energy decision).</p>
 
     <h2 id="how-we-calculate-it">How we calculate it</h2>
-    <p>annual kWh = miles_per_day × 365 / vehicle_efficiency (mi/kWh)</p>
-<p>Vehicle efficiency presets:</p>
+    <p>annual kWh = miles_per_year × kWh_per_mile / charging_efficiency</p>
 <ul>
-<li>Efficient (e.g., Tesla Model 3 LR): 4.5 mi/kWh</li>
-<li>Average (e.g., F-150 Lightning): 3.5 mi/kWh</li>
-<li>Less efficient (large SUV/truck): 2.8 mi/kWh</li>
+<li>miles_per_year: how far you drive in a year (default 7,000)</li>
+<li>kWh_per_mile: your vehicle's energy use (default 0.30 kWh/mile, about 3.3 miles/kWh) —</li>
 </ul>
-<p>Default: 37 miles/day (US average vehicle miles traveled), average efficiency.</p>
+<p>efficient cars are lower, large trucks and SUVs are higher</p>
+<ul>
+<li>charging_efficiency: the share of energy drawn from the wall that actually reaches the</li>
+</ul>
+<p>battery (default 90%; the other ~10% is lost as heat while charging)</p>
+<p>Default: 7,000 × 0.30 / 0.90 ≈ 2,333 kWh/yr.</p>
 
     <h2 id="key-assumptions">Key assumptions</h2>
     <ul>
-<li>Level 2 charger (240V, 32A) assumed — most common home installation</li>
-<li>Charging efficiency loss (~15%) is absorbed into the vehicle efficiency figure</li>
+<li>Level 2 home charging (240V) is assumed — the most common home installation</li>
+<li>Charging efficiency is modeled explicitly with its own slider (default 90%), so the</li>
+</ul>
+<p>wall energy you are billed for is higher than the energy that reaches the battery</p>
+<ul>
 <li>The EV charger slot models home charging only, not workplace or public charging</li>
 </ul>
 

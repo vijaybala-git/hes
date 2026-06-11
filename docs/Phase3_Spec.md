@@ -76,7 +76,7 @@ high-visibility features that no comparable consumer simulator currently provide
 
 ---
 
-## §1 — Climate Lookup by ZIP Code
+## §1 — Climate Lookup by ZIP Code [ MOVED TO PHASE4 DOC  - NOT IMMPLEMENTED IN PHASE3]
 
 ### 1.1 Motivation
 
@@ -221,7 +221,7 @@ class ClimateLoader:
 
 `ClimateData` is injected into `HomeConfig`. Devices receive it at construction
 (injection pattern unchanged from Phase 2). The `hdd_cagr` / `cdd_cagr` fields default
-to 0.0 — the simulation loop reads them but multiplies by zero, so Phase 3 behavior is
+to 0.0 — the simulation loop reads them but multiplies by zero, so Phase 3 behavior   is
 identical to today. Phase 4 fills them from Cal-Adapt projections without any device
 or simulation code changes.
 
@@ -550,7 +550,7 @@ panel (currently hardcoded). Lets users model older or non-standard units.
 
 ---
 
-## §3 — EIA-Based Rate Modeling
+## §3 — EIA-Based Rate Modeling  [ MOVED TO PHASE4 DOC  - NOT IMMPLEMENTED IN PHASE3]
 
 ### 3.1 Motivation and Decision
 
@@ -1435,8 +1435,8 @@ constants exactly for any user who doesn't enter a ZIP.
 
 Deliverables:
 - `scripts/build_climate_db.py` — reads CEC ZIP table + 16 TMY3 EPW files
-- `data/climate/tmy3_zones.json` (16 CEC zone records) + `data/climate/zip_to_zone.json`
-- `src/climate_loader.py` — `ClimateLoader` + `ClimateData` dataclass (latent
+- `
+- `src/climate_loader.py` — `ClimateLoader` + `ClimateData`data/climate/tmy3_zones.json` (16 CEC zone records) + `data/climate/zip_to_zone.json` dataclass (latent
   `hdd_cagr`/`cdd_cagr` fields default 0.0 — no-ops in Phase 3)
 - `HomeConfig` extended: `climate: ClimateData` field
 - All physics devices updated to receive `ClimateData` at construction

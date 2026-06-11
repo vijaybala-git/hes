@@ -79,29 +79,27 @@ from the current calendar year when you run the simulation.
 ## §2 · Home & Climate
 @file: climate.html
 @keys: home_profile, zip_code
-@popup: Home details — size, insulation quality, and location — affect how much
-  energy each appliance uses. Your ZIP code sets the climate zone, which drives
-  the heating and cooling calculations.
+@popup: Home details — size and insulation quality — affect how much energy each
+  appliance uses. WhyWatt currently uses Bay Area (San Jose) climate data for every
+  home; ZIP-based climate zone selection is coming in a future release.
 
 ### What this means for you
 
 Your home profile tells WhyWatt how much energy your appliances use. A larger
 home needs more heating and cooling. Better insulation (lower UA value) means
-the HVAC works less hard. Your ZIP code determines which California climate zone
-your home is in, which sets the monthly heating and cooling degree-days.
+the HVAC works less hard. Heating and cooling are driven by your local climate,
+expressed as monthly heating and cooling degree-days (HDD/CDD).
 
-### Climate zones
+### Climate data
 
-California uses 16 official CEC Building Climate Zones for building energy codes.
-Every HVAC permit and utility rebate program uses these zones. WhyWatt maps your
-ZIP code to the correct zone automatically.
+WhyWatt currently uses a single Bay Area climate profile (San Jose) for every home —
+about 1,910 heating degree-days and 340 cooling degree-days per year, from NOAA TMY3
+data. This fits most of the Bay Area well, but understates heating in colder inland and
+mountain areas and cooling in the hot Central Valley.
 
-- CZ1 Arcata — cool foggy north coast
-- CZ3 Oakland — mild Bay Area coast
-- CZ4 San Jose — warm Bay Area interior
-- CZ12 Sacramento — hot central valley
-- CZ13 Fresno — hot/dry central valley
-- CZ16 Blue Canyon — mountain/snow
+ZIP-based climate selection — mapping your ZIP code to one of California's 16 official
+CEC Building Climate Zones — is coming in a future release. Until then, homes outside the
+Bay Area should treat the heating and cooling numbers as approximate.
 
 ### Insulation quality
 
@@ -186,11 +184,11 @@ Gas furnace heating:
 
 Heat pump heating:
 
-  annual kWh = HDD × UA × 24 / (COP × 1000)
+  annual kWh = HDD × UA × 24 / (COP × 3,412)
 
 Heat pump cooling:
 
-  annual kWh = CDD × UA × 24 / (SEER/1000 × 1000)  [approximate]
+  annual kWh = CDD × UA × 24 / (SEER × 1,000)  [approximate]
 
 Where:
 - HDD = heating degree-days (base 65°F) for your climate zone
@@ -229,7 +227,7 @@ of a gas water heater for the same amount of hot water.
 
 ### How we calculate it
 
-  heat load = daily_gallons × 8.34 × (120°F - inlet_temp°F)  [BTU/day]
+  heat load = daily_gallons × 8.33 × (120°F - inlet_temp°F)  [BTU/day]
 
 Gas water heater:
   annual therms = heat_load × 365 / (UEF × 100,000)
@@ -304,26 +302,23 @@ Gas burners heat the air around the pan as much as the pan itself.
 
 ### How we calculate it
 
-Cook time model (both fuel types use the same daily cook time input):
+Both fuel types use the same meals-per-week input:
 
-Induction:
-  annual kWh = cook_hours/day × 1.5 kW × 365 × 0.85
+  annual energy = energy_per_meal × meals_per_week × 52
 
-Gas:
-  annual therms = cook_hours/day × 7,500 BTU/hr × 365 / 100,000 / 0.40
+- Gas cooktop: 0.05 therms per meal
+- Induction cooktop: 0.9 kWh per meal
+- Default: 14 meals per week → about 36 therms/yr gas, or 655 kWh/yr induction
 
-Where:
-- 1.5 kW = average power of two active induction burners
-- 0.85 = induction efficiency factor (accounts for warm-up overhead)
-- 7,500 BTU/hr = average output of two active gas burners
-- 0.40 = gas burner thermal efficiency (fraction reaching the cookware)
-
-Default: 1 hour 0 minutes per day → ~466 kWh/yr induction, ~68 therms/yr gas.
+The per-meal figures already bake in the efficiency difference between the two: gas
+burners lose most of their heat to the surrounding air, while induction transfers energy
+directly to the pan.
 
 ### Key assumptions
 
-- Two burners active on average during cooking sessions
-- Oven is not separately modeled in the cooktop slot
+- Energy is estimated per meal, not per minute of cooking — adjust meals per week in the
+  cooktop detail panel to match your household.
+- The oven is not separately modeled in the cooktop slot.
 
 ### Data sources
 
@@ -335,9 +330,9 @@ Default: 1 hour 0 minutes per day → ~466 kWh/yr induction, ~68 therms/yr gas.
 ## §8 · EV Charger
 @file: ev.html
 @keys: ev_charger
-@popup: EV charging energy is estimated from your average daily miles
-  driven and your vehicle's efficiency. Level 2 home charging
-  (240V) is assumed.
+@popup: EV charging energy is estimated from your annual miles driven, your
+  vehicle's efficiency (kWh per mile), and a charging-efficiency factor for home
+  charging losses. Level 2 home charging (240V) is assumed.
 
 ### What this means for you
 
@@ -349,19 +344,21 @@ not the home energy decision).
 
 ### How we calculate it
 
-  annual kWh = miles_per_day × 365 / vehicle_efficiency (mi/kWh)
+  annual kWh = miles_per_year × kWh_per_mile / charging_efficiency
 
-Vehicle efficiency presets:
-- Efficient (e.g., Tesla Model 3 LR): 4.5 mi/kWh
-- Average (e.g., F-150 Lightning): 3.5 mi/kWh
-- Less efficient (large SUV/truck): 2.8 mi/kWh
+- miles_per_year: how far you drive in a year (default 7,000)
+- kWh_per_mile: your vehicle's energy use (default 0.30 kWh/mile, about 3.3 miles/kWh) —
+  efficient cars are lower, large trucks and SUVs are higher
+- charging_efficiency: the share of energy drawn from the wall that actually reaches the
+  battery (default 90%; the other ~10% is lost as heat while charging)
 
-Default: 37 miles/day (US average vehicle miles traveled), average efficiency.
+Default: 7,000 × 0.30 / 0.90 ≈ 2,333 kWh/yr.
 
 ### Key assumptions
 
-- Level 2 charger (240V, 32A) assumed — most common home installation
-- Charging efficiency loss (~15%) is absorbed into the vehicle efficiency figure
+- Level 2 home charging (240V) is assumed — the most common home installation
+- Charging efficiency is modeled explicitly with its own slider (default 90%), so the
+  wall energy you are billed for is higher than the energy that reaches the battery
 - The EV charger slot models home charging only, not workplace or public charging
 
 ### Data sources
@@ -427,18 +424,18 @@ small appliances, and similar loads. It's always present and always electric.
 
 ### How we calculate it
 
-  annual kWh = bedroom_scale × (1,200 kWh/yr + constant_always_on)
+  annual kWh = (floor_area_sqft × 0.45) + (bedrooms × 200) + always_on_constant
 
-Bedroom scaling (DOE/ENERGY STAR occupancy proxy):
-- 1 bedroom: 0.50× → 600 kWh/yr
-- 2 bedrooms: 0.83× → 996 kWh/yr
-- 3 bedrooms: 1.00× → 1,200 kWh/yr (reference)
-- 4 bedrooms: 1.17× → 1,404 kWh/yr
-- 5 bedrooms: 1.33× → 1,596 kWh/yr
+- 0.45 kWh per square foot per year (EIA RECS 2020, California)
+- 200 kWh per bedroom per year (occupancy proxy)
+- always-on constant: 500 kWh/yr by default — covers a home office, networking gear,
+  and other loads that don't scale with home size
 
-An additional always-on constant (default 500 kWh/yr) covers equipment
-that doesn't scale with bedrooms (e.g., home office, always-on networking).
-A baseload upgrade (LED lighting, efficient appliances) reduces this constant.
+Example: an 1,800 sq ft, 3-bedroom home →
+(1,800 × 0.45) + (3 × 200) + 500 = 1,910 kWh/yr.
+
+A baseload efficiency upgrade (LED lighting, efficient appliances) lowers the always-on
+constant — from 500 down to 300 kWh/yr by default.
 
 ### Key assumptions
 
