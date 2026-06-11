@@ -19,6 +19,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY --chown=user src/  ./src/
 COPY --chown=user data/ ./data/
 COPY --chown=user docs/assets/ ./docs/assets/
+# public/ is served by Solara at /static/public/ (Help pages + logo) — required
+COPY --chown=user public/ ./public/
 
 EXPOSE $PORT
 

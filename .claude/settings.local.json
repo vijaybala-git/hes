@@ -27,7 +27,12 @@
       "Bash(python -c \"import app; print\\('import OK'\\)\")",
       "Bash(python -c \"import src.app\")",
       "Bash(python *)",
-      "Bash(.venv/Scripts/python -c ' *)"
+      "Bash(.venv/Scripts/python -c ' *)",
+      "Bash(cd /d/vijay/MyDocuments/hes)",
+      "Bash(ls .claude/launch.json)",
+      "Bash(ls .venv/Scripts/solara*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(./.venv/Scripts/python.exe -c \"import py_compile; py_compile.compile\\('src/help_utils.py', doraise=True\\); print\\('OK'\\)\")"
     ]
   }
 }
