@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WhyWatt? — v2 Layout</title>
+<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="layout-v2.css" />
+</head>
+<body>
+<div class="app" id="app" data-screen-label="Main v2">
+
+  <!-- ============ HEADER ============ -->
+  <header class="masthead">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 3.1 20.6 10v9.5a1.3 1.3 0 0 1-1.3 1.3H4.7a1.3 1.3 0 0 1-1.3-1.3V10z" fill="#fff"/>
+          <path d="M13.1 7.7 9.1 13.4h2.6l-0.8 4 4.2-5.9h-2.7z" fill="var(--journey-ink)"/>
+        </svg>
+      </div>
+      <div class="brand-name">Why<b>Watt?</b></div>
+    </div>
+    <div class="context">
+      <span class="loc">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1112 6a2.5 2.5 0 010 5.5z"/></svg>
+        San Jose, CA
+      </span>
+      <span class="spec first">ZIP <b class="mono">95112</b></span>
+      <span class="spec">CZ <b>12</b></span>
+      <span class="spec"><b>3</b> bed</span>
+      <span class="spec"><b class="mono">1,800</b> sq ft</span>
+      <span class="spec">Built <b class="mono">1985</b></span>
+      <span class="spec">Baseload <b class="mono">1,910</b> kWh/yr</span>
+    </div>
+    <div class="actions">
+      <button class="btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 109-9 9 9 0 00-6.4 2.6L3 8"/><path d="M3 4v4h4"/></svg>
+        Reset to defaults
+      </button>
+      <button class="btn primary" data-help="about">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 015 .3c0 1.7-2.5 2.2-2.5 2.2"/><path d="M12 17h.01"/></svg>
+        Help
+      </button>
+    </div>
+  </header>
+
+  <!-- ============ COCKPIT (compact top results bar) ============ -->
+  <section class="card cockpit" aria-label="Outcome summary">
+    <div class="ck-call">
+      <span class="k">Payback · Yr 1 (2025)</span>
+      <span class="big">+$41,644</span>
+      <span class="foot">net social cost avoided +$18,627</span>
+    </div>
+    <div class="ck-bars">
+      <div class="cmp">
+        <div class="cmp-label"><div class="t">Your journey</div></div>
+        <div class="bar-track"><div class="bar-fill journey" style="width:50%"><span class="v">$42,259</span></div></div>
+      </div>
+      <div class="cmp">
+        <div class="cmp-label"><div class="t">Do nothing</div></div>
+        <div class="bar-track"><div class="bar-fill baseline" style="width:100%"><span class="v">$83,904</span></div></div>
+      </div>
+    </div>
+    <div class="ck-guide">
+      <span class="guide-box-title">Electrical Panel Guidance</span>
+      <div class="guide-metrics">
+        <div class="gm"><span class="k">Current</span><div class="row"><span class="num">41</span><span class="unit">A</span></div></div>
+        <div class="gm"><span class="k">Peak</span><div class="row"><span class="num">86</span><span class="unit">A</span></div></div>
+        <span class="peak-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          Within 200&nbsp;A
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CHARTS ============ -->
+  <section class="charts">
+    <div class="card">
+      <div class="card-hd">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M19 9l-5 5-3-3-4 4"/></svg></span>
+        <h3>Cumulative Energy Costs</h3>
+        <span class="sp"></span>
+        <button class="select">Cumulative <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+        <button class="iconbtn help" data-help="chart-cumulative" title="Help">?</button>
+      </div>
+      <div class="chart-bd" id="chart1"></div>
+    </div>
+    <div class="card">
+      <div class="card-hd">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="7"/><rect x="13" y="7" width="3" height="11"/></svg></span>
+        <h3>Cost Breakdown by Category</h3>
+        <span class="sp"></span>
+        <button class="select">Stacked area <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+        <button class="iconbtn help" data-help="chart-breakdown" title="Help">?</button>
+      </div>
+      <div class="chart-bd" id="chart2"></div>
+    </div>
+  </section>
+
+  <div class="series-key">
+    <span class="li baseline-c"><span class="box" style="background:var(--baseline)"></span>Do nothing</span>
+    <span class="li journey-c"><span class="box" style="background:var(--journey)"></span>Your journey</span>
+    <span style="flex:1"></span>
+    <span class="eyebrow">Adjust the scenario below</span>
+  </div>
+
+  <!-- ============ SETUP YOUR HOME (3 collapsible panels) ============ -->
+  <section class="setup-group">
+    <div class="sg-hd">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5M5 10.5V20h14v-9.5"/></svg></span>
+      <h3>Setup your home</h3>
+      <span class="scope">— Home &amp; Solar, Energy &amp; Prices, Social &amp; Health collapse together</span>
+      <span class="sp"></span>
+      <button class="collapse-all" data-collapsed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>
+        <span class="lbl">Collapse all</span>
+      </button>
+    </div>
+
+    <div class="setup-grid">
+
+      <!-- Home & Solar -->
+      <div class="card">
+        <div class="card-hd">
+          <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5M5 10.5V20h14v-9.5"/></svg></span>
+          <h3>Home &amp; Solar</h3>
+          <span class="sp"></span>
+          <button class="iconbtn chev-btn" title="Collapse"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+          <button class="iconbtn help" data-help="home" title="Help">?</button>
+        </div>
+        <div class="panel">
+          <div class="panel-hd">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5M5 10.5V20h14v-9.5"/></svg></span>
+            <h4>Home Profile</h4>
+          </div>
+          <div class="panel-bd">
+            <div class="field-row">
+              <div class="field"><label>ZIP code</label><input class="input" value="95112" /></div>
+              <div class="field"><label>Bedrooms</label><select class="selectbox"><option>3</option><option>2</option><option>4</option></select></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Square feet</label><input class="input" value="1,800" /></div>
+              <div class="field"><label>Climate zone</label><select class="selectbox"><option>CZ12</option><option>CZ13</option></select></div>
+            </div>
+            <div class="field"><label>Insulation</label>
+              <div class="seg" role="group"><button>Poor</button><button class="on">Average</button><button>Good</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-hd">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg></span>
+            <h4>Solar &amp; Battery</h4>
+          </div>
+          <div class="panel-bd">
+            <label class="check"><input type="checkbox" /><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="lab">Add rooftop solar</span></label>
+            <div class="empty-note">Not planned — enable to size a system and model net metering.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Energy & Prices -->
+      <div class="card">
+        <div class="card-hd">
+          <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-4 3 2 4-6"/></svg></span>
+          <h3>Energy &amp; Prices</h3>
+          <span class="sp"></span>
+          <button class="iconbtn chev-btn" title="Collapse"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+          <button class="iconbtn help" data-help="energy" title="Help">?</button>
+        </div>
+        <div class="panel">
+          <div class="panel-hd">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 3 7-8"/><path d="M21 7v5h-5"/></svg></span>
+            <h4>Rate Scenarios</h4>
+          </div>
+          <div class="panel-bd">
+            <div class="rate-block">
+              <span class="eyebrow">Electricity rate model</span>
+              <div class="rate-row">
+                <div class="seg" role="group"><button class="on">CAGR</button><button>ACC</button></div>
+                <span class="seg-cap"><span class="mono">+7%</span>/yr</span>
+              </div>
+            </div>
+            <div class="rate-block">
+              <span class="eyebrow">Gas rate model</span>
+              <div class="rate-row">
+                <div class="seg" role="group"><button class="on">CAGR</button><button>ACC</button></div>
+                <span class="seg-cap"><span class="mono">+8%</span>/yr</span>
+              </div>
+            </div>
+            <div class="field"><label>Model horizon</label>
+              <div class="slider-wrap"><input type="range" class="slider" min="5" max="30" value="20" /><span class="slider-val">20 yrs</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Social & Health -->
+      <div class="card">
+        <div class="card-hd">
+          <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17a4 4 0 01-4-4c0-2 1.5-3.5 3.5-3.9A5 5 0 0116 8a4 4 0 011 7.9"/><path d="M9 21l2-3M13 21l2-3"/></svg></span>
+          <h3>Social &amp; Health</h3>
+          <span class="sp"></span>
+          <button class="iconbtn chev-btn" title="Collapse"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+          <button class="iconbtn help" data-help="energy" title="Help">?</button>
+        </div>
+        <div class="panel">
+          <div class="panel-hd">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M5 12H2M22 12h-3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="3.2"/></svg></span>
+            <h4>Cost of Gas</h4>
+          </div>
+          <div class="panel-bd">
+            <label class="check"><input type="checkbox" checked /><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="lab">Climate cost (CO₂ + methane)</span></label>
+            <div class="sliderblock">
+              <div class="top"><span class="lab">Climate</span><span class="val">1.74 $/therm</span></div>
+              <input type="range" class="slider" min="1" max="2" step="0.01" value="1.74" />
+              <div class="delta">+0.67 $/therm above default (1.07)</div>
+              <div class="scale"><span>$1.00</span><span>$2.00</span></div>
+            </div>
+            <label class="check"><input type="checkbox" checked /><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="lab">Health cost (air quality)</span></label>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============ YOUR ELECTRIFICATION JOURNEY (2-row appliance grid) ============ -->
+  <section class="card jcard">
+    <div class="card-hd">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5a2 2 0 012-2h9l5 5v11a2 2 0 01-2 2H6a2 2 0 01-2-2z"/><path d="M8 8h5M8 12h8M8 16h8"/></svg></span>
+      <h3>Your Electrification Journey</h3>
+      <span class="sp"></span>
+      <span class="count-pill">6 devices</span>
+      <button class="iconbtn help" data-help="journey" title="Help">?</button>
+    </div>
+    <div class="jbody">
+
+      <span class="jrow-label">Major loads</span>
+      <div class="jgrid">
+
+        <!-- HVAC -->
+        <div class="device" data-detail="HVAC">
+          <div class="device-hd">
+            <span class="di"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg></span>
+            <span class="dn">HVAC</span>
+            <button class="iconbtn" title="Details" onclick="openDetail('HVAC')"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Fuel</label><select class="selectbox"><option>Gas → Heat pump</option><option>Gas (keep)</option></select></div>
+            <div class="field"><label>Plan year</label>
+              <div class="slider-wrap"><input type="range" class="slider" min="2025" max="2044" value="2027" /><span class="slider-cap mono">2027</span></div>
+            </div>
+          </div>
+          <label class="check"><input type="checkbox" checked /><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="lab">Include in plan</span></label>
+          <div class="field-row three">
+            <div class="field"><label>Install $</label><input class="input" value="14,000" /></div>
+            <div class="field"><label>Rebate $</label><input class="input" value="3,500" /></div>
+            <div class="field"><label>Net cost</label><div class="net" style="height:34px;justify-content:center;align-items:center">Net <span class="mono">$10,500</span></div></div>
+          </div>
+        </div>
+
+        <!-- HPWH -->
+        <div class="device" data-detail="Water Heater">
+          <div class="device-hd">
+            <span class="di"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="3"/><path d="M9 8h6M12 13v4"/></svg></span>
+            <span class="dn">HPWH</span>
+            <button class="iconbtn" title="Details" onclick="openDetail('Water Heater')"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Fuel</label><select class="selectbox"><option>Gas → Heat pump</option><option>Gas (keep)</option></select></div>
+            <div class="field"><label>Plan year</label>
+              <div class="slider-wrap"><input type="range" class="slider" min="2025" max="2044" value="2029" /><span class="slider-cap mono">2029</span></div>
+            </div>
+          </div>
+          <label class="check"><input type="checkbox" checked /><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="lab">Include in plan</span></label>
+          <div class="field-row three">
+            <div class="field"><label>Install $</label><input class="input" value="2,500" /></div>
+            <div class="field"><label>Rebate $</label><input class="input" value="500" /></div>
+            <div class="field"><label>Net cost</label><div class="net" style="height:34px;justify-content:center;align-items:center">Net <span class="mono">$2,000</span></div></div>
+          </div>
+        </div>
+
+        <!-- EV Charger (custom — extra button row) -->
+        <div class="device" data-detail="EV Charger">
+          <div class="device-hd">
+            <span class="di"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17V8a2 2 0 012-2h7a2 2 0 012 2v9"/><path d="M2 17h13"/><circle cx="5.5" cy="17.5" r="1.6"/><circle cx="11.5" cy="17.5" r="1.6"/><path d="M14 9h2.5L19 12v5h-5"/></svg></span>
+            <span class="dn">EV Charger</span>
+            <button class="iconbtn" title="Details" onclick="openDetail('EV Charger')"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+          </div>
+          <div class="field">
+            <label>Vehicle profile</label>
+            <div class="seg" role="group">
+              <button>Efficient</button><button class="on">Average</button><button>SUV / Truck</button>
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Charger</label><select class="selectbox"><option>None planned</option><option>L2 (240 V)</option></select></div>
+            <div class="field"><label>Miles / yr</label><input class="input" value="7,000" /></div>
+          </div>
+          <label class="check"><input type="checkbox" /><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="lab">Include in plan</span></label>
+        </div>
+
+      </div>
+
+      <span class="jrow-label">Other appliances</span>
+      <div class="jgrid">
+
+        <!-- Cooktop -->
+        <div class="device minor" data-detail="Cooktop">
+          <div class="device-hd">
+            <span class="di"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8" cy="9" r="1.6"/><circle cx="16" cy="9" r="1.6"/></svg></span>
+            <span class="dn">Cooktop</span>
+            <button class="iconbtn" title="Details" onclick="openDetail('Cooktop')"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Fuel</label><select class="selectbox"><option>Gas (keep)</option><option>Gas → Induction</option></select></div>
+            <div class="field"><label>&nbsp;</label><label class="check" style="height:34px"><input type="checkbox" /><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="lab">Plan swap</span></label></div>
+          </div>
+          <div class="noplan">No swap planned</div>
+        </div>
+
+        <!-- Dryer -->
+        <div class="device minor" data-detail="Dryer">
+          <div class="device-hd">
+            <span class="di"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="13" r="4.5"/></svg></span>
+            <span class="dn">Dryer</span>
+            <button class="iconbtn" title="Details" onclick="openDetail('Dryer')"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Fuel</label><select class="selectbox"><option>Gas (keep)</option><option>Gas → Heat pump</option></select></div>
+            <div class="field"><label>&nbsp;</label><label class="check" style="height:34px"><input type="checkbox" /><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="lab">Plan swap</span></label></div>
+          </div>
+          <div class="noplan">No swap planned</div>
+        </div>
+
+        <!-- Panel & Baseload (split) -->
+        <div class="device">
+          <div class="split2">
+            <div class="subpanel">
+              <div class="snm"><span class="di"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 7h6M9 11h6M9 15h3"/></svg></span>Electrical Panel</div>
+              <div class="inrow"><input class="input" value="200 A panel" /><button class="opt-btn" title="Details" onclick="openDetail('Panel Upgrade')"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button></div>
+              <div class="plan-help">
+                <label class="check"><input type="checkbox" /><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="lab">Plan</span></label>
+                <span class="sp"></span>
+                <button class="iconbtn help help-q" data-help="load" title="Help">?</button>
+              </div>
+            </div>
+            <div class="subpanel">
+              <div class="snm"><span class="di"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg></span>Baseload</div>
+              <div class="inrow"><input class="input" value="1,910 kWh/yr" /><button class="opt-btn" title="Details" onclick="openDetail('Baseload')"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button></div>
+              <div class="plan-help">
+                <label class="check"><input type="checkbox" /><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="lab">Plan</span></label>
+                <span class="sp"></span>
+                <button class="iconbtn help help-q" data-help="load" title="Help">?</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FOOTER ============ -->
+  <footer class="foot">
+    <span>Estimates are illustrative — adjust assumptions to match your home.</span>
+    <span class="powered">This website runs on <a href="#">Solara</a></span>
+  </footer>
+
+</div>
+
+<div id="modal-root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="charts.js"></script>
+<script src="detail.js"></script>
+<script src="help.js"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+
+<!-- collapse behavior for "Setup your home" -->
+<script>
+(function () {
+  const group = document.querySelector('.setup-group');
+  if (!group) return;
+  const cards = [...group.querySelectorAll('.setup-grid > .card')];
+  const allBtn = group.querySelector('.collapse-all');
+  const allLbl = allBtn.querySelector('.lbl');
+
+  function refresh() {
+    const allCollapsed = cards.length && cards.every((c) => c.classList.contains('is-collapsed'));
+    group.classList.toggle('collapsed-all', allCollapsed);
+    allBtn.dataset.collapsed = allCollapsed ? 'true' : 'false';
+    allLbl.textContent = allCollapsed ? 'Expand all' : 'Collapse all';
+  }
+
+  allBtn.addEventListener('click', () => {
+    const allCollapsed = cards.every((c) => c.classList.contains('is-collapsed'));
+    cards.forEach((c) => c.classList.toggle('is-collapsed', !allCollapsed));
+    refresh();
+  });
+
+  cards.forEach((c) => {
+    const chev = c.querySelector('.chev-btn');
+    if (!chev) return;
+    chev.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      c.classList.toggle('is-collapsed');
+      refresh();
+    });
+  });
+})();
+</script>
+</body>
+</html>

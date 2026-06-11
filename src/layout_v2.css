@@ -1,0 +1,148 @@
+/* ============================================================
+   layout-v2.css — v2 layout shell for the WhyWatt redesign
+   Builds on styles_redesign.css (real components). Adds:
+   · compact cockpit results bar (payback + bars + panel guidance)
+   · "Setup your home" group with collapse-all → single line of titles
+   · 2-row appliance grid + split Panel/Baseload card
+   ============================================================ */
+
+/* ---- COCKPIT (compact top results bar) ---- */
+.cockpit {
+  display: grid; grid-template-columns: auto minmax(210px, 1fr) auto;
+  align-items: stretch; padding: 0; overflow: hidden; margin-bottom: var(--gap);
+}
+.cockpit > div { padding: 14px 20px; display: flex; flex-direction: column; justify-content: center; position: relative; }
+.cockpit > div + div::before {
+  content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 1px; background: var(--border-soft);
+}
+
+.ck-call { background: var(--positive-soft); gap: 2px; }
+.ck-call.negative { background: var(--baseline-soft); }
+.ck-call .k { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--positive-ink); }
+.ck-call.negative .k { color: var(--baseline-ink); }
+.ck-call .big { font-family: var(--mono); font-size: 30px; font-weight: 600; color: var(--positive-ink); letter-spacing: -0.02em; line-height: 1; }
+.ck-call.negative .big { color: var(--baseline-ink); }
+.ck-call .foot { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
+.ck-call .foot .sc-val {
+  font-family: var(--mono); font-weight: 700; font-size: 15px;
+  color: var(--positive-ink); letter-spacing: -0.01em;
+}
+.ck-call .foot .sc-val.neg { color: var(--baseline-ink); }
+
+.ck-bars { gap: 10px; }
+.ck-bars .cmp { grid-template-columns: 92px 1fr; gap: 12px; }
+.ck-bars .cmp-label .t { font-size: 12px; }
+.ck-bars .cmp-label .s { display: none; }
+.ck-bars .bar-track { height: 24px; }
+.ck-bars .bar-fill .v { font-size: 12px; }
+
+/* guidance badge may wrap to 2 lines so the bars can compress */
+.ck-guide .peak-badge { white-space: normal; text-align: left; line-height: 1.2; max-width: 92px; }
+/* threshold colour for the peak number (existing rules target .lm-v) */
+.guide-metrics.peak-warn .gm.peak .num { color: oklch(0.55 0.13 75); }
+.guide-metrics.peak-danger .gm.peak .num { color: var(--baseline-ink); }
+
+.ck-guide { gap: 7px; }
+.guide-box-title { font-size: 9.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.guide-metrics { display: flex; align-items: center; gap: 16px; }
+.gm { display: flex; flex-direction: column; gap: 1px; }
+.gm .k { font-size: 9px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+.gm .row { display: flex; align-items: baseline; gap: 4px; }
+.gm .num { font-family: var(--mono); font-size: 19px; font-weight: 600; color: var(--ink); line-height: 1; }
+.gm .unit { font-size: 11px; color: var(--ink-3); }
+
+@media (max-width: 820px) {
+  .cockpit { grid-template-columns: 1fr; }
+  .cockpit > div + div::before { display: none; }
+  .cockpit > div + div { border-top: 1px solid var(--border-soft); }
+}
+
+
+/* ---- "Setup your home" group ---- */
+.setup-group {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-xl);
+  padding: 16px; display: flex; flex-direction: column; gap: 14px; margin-bottom: var(--gap);
+}
+.sg-hd { display: flex; align-items: center; gap: 10px; }
+.sg-hd .ic { width: 28px; height: 28px; border-radius: 8px; background: var(--journey-soft); color: var(--journey-ink); display: grid; place-items: center; flex-shrink: 0; }
+.sg-hd .ic svg { width: 16px; height: 16px; }
+.sg-hd h3 { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+.sg-hd .scope { font-size: 11.5px; color: var(--ink-3); }
+.sg-hd .sp { flex: 1; }
+.collapse-all {
+  display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border-radius: var(--r-sm);
+  border: 1px solid var(--border-strong); background: var(--surface); color: var(--ink-2);
+  font-family: var(--font); font-size: 11px; font-weight: 600; cursor: pointer; box-shadow: var(--shadow-xs);
+  transition: all .14s ease; flex-shrink: 0; min-width: 0;
+}
+.collapse-all .v-btn__content { font-size: 11px; }
+.collapse-all:hover { color: var(--ink); border-color: var(--ink-3); }
+.collapse-all svg { width: 14px; height: 14px; transition: transform .18s ease; }
+.collapse-all[data-collapsed="true"] svg { transform: rotate(-180deg); }
+
+.setup-grid { display: flex; flex-wrap: wrap; gap: 16px; align-items: start; }
+.setup-grid > .card { flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; }
+
+/* collapse chevron on each domain card header */
+.chev-btn {
+  background: none; border: none; cursor: pointer; color: var(--ink-3);
+  display: grid; place-items: center; width: 24px; height: 24px; padding: 0;
+  transition: transform .18s ease;
+}
+.chev-btn:hover { color: var(--ink); }
+.chev-btn svg { width: 16px; height: 16px; }
+.card.is-collapsed .chev-btn { transform: rotate(-90deg); }
+
+/* collapsed card → header only (override Vuetify .d-flex !important) */
+.card.is-collapsed > *:not(.card-hd) { display: none !important; }
+.card.is-collapsed .card-hd { border-bottom: none; }
+
+/* collapse-all → single line of title chips */
+.setup-group.collapsed-all .setup-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+.setup-group.collapsed-all .setup-grid > .card { flex: 1 1 0; min-width: 0; }
+
+/* ---- Appliance journey: 2-row grid ---- */
+.jbody { padding: var(--pad); display: flex; flex-direction: column; gap: 14px; }
+.jrow-label {
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--ink-4); margin-bottom: 1px;
+}
+.jgrid { display: flex; flex-wrap: wrap; gap: 14px; align-items: stretch; }
+.jgrid > * { flex: 1 1 280px; min-width: 0; }
+.count-pill { font-size: 11px; font-weight: 600; color: var(--ink-3); }
+
+/* compact device (cooktop / dryer) */
+.device.minor { gap: 10px; }
+.device .noplan { font-size: 11.5px; color: var(--ink-3); }
+
+/* rounded, right-justified "Plan" checkbox */
+.plan-check { align-items: center; }
+.plan-check .v-input { flex: 0 0 auto; }
+.plan-check .v-input--checkbox { margin: 0 !important; padding: 0 !important; }
+.plan-check .v-input__slot { margin: 0 !important; min-height: 0 !important; }
+.plan-check .v-label { font-size: 12.5px; color: var(--ink-2); }
+.plan-check .v-icon { font-size: 20px !important; }
+
+/* ---- Split Panel & Baseload card ---- */
+.split2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.subpanel { padding: 0 14px; display: flex; flex-direction: column; gap: 11px; }
+.subpanel:first-child { padding-left: 0; }
+.subpanel:last-child { padding-right: 0; }
+.subpanel + .subpanel { border-left: 1px solid var(--border); }
+.subpanel .snm { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; color: var(--ink); }
+.subpanel .snm .di { color: var(--journey-ink); display: inline-flex; }
+.subpanel .snm .di svg { width: 15px; height: 15px; }
+
+/* series-key strip eyebrow */
+.scenario-eyebrow {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--ink-4);
+}
+
+/* ---- Inline docks (Detail / Help render below the charts, not as overlays) ---- */
+.dock { margin-bottom: var(--gap); box-shadow: var(--shadow-md); animation: dock-in .16s ease; }
+.dock .modal-bd { max-height: 56vh; overflow-y: auto; }
+.detail-dock { border-color: var(--journey) !important; }
+.detail-dock .modal-hd { border-bottom-color: var(--journey-soft); }
+.help-dock { border-color: var(--border-strong) !important; }
+@keyframes dock-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
