@@ -521,6 +521,303 @@ time-of-use rating; the ICE side is pure cost/externality arithmetic with no dev
 
 ---
 
+# Phase 4 — Unified device legend, Journey Timeline v2, and CapEx recolor
+
+> Append this block to `docs/Phase4_spec.md`. Renumber the `§4.x` headings to
+> continue your existing Phase 4 numbering if needed. Three deliverables:
+> (1) a single source-of-truth device style map, (2) a redesigned Journey
+> Timeline, (3) the Equipment Replacement (CapEx) chart recolored to match.
+
+---
+
+## §4.1 Canonical device style map (single source of truth)
+
+Every chart that references a device must pull color, code, and label from one
+dict. No more ad-hoc `C_BASE` / `C_ELEC` two-color scheme for device-aware charts.
+
+Create `src/ui/device_style.py`:
+
+```python
+# One source of truth for device color / code / label across ALL charts.
+# Colors chosen to be distinct and to read on both light and dark canvases.
+# Matplotlib renders on a light bg by default -> use `color`.
+# `color_dark` is reserved for a future dark-themed export path.
+
+DEVICE_STYLE = {
+    "hvac":    {"label": "HVAC",                "code": "HV", "color": "#D85A30", "color_dark": "#F0997B"},
+    "wh":      {"label": "Water heater",        "code": "WH", "color": "#E24B4A", "color_dark": "#F09595"},
+    "dryer":   {"label": "Dryer",               "code": "DR", "color": "#7F77DD", "color_dark": "#AFA9EC"},
+    "cooktop": {"label": "Cooktop",             "code": "CK", "color": "#C9821C", "color_dark": "#FAC775"},
+    "ev":      {"label": "EV charger",          "code": "EV", "color": "#639922", "color_dark": "#97C459"},
+    "lights":  {"label": "Lights & appliances", "code": "LA", "color": "#378ADD", "color_dark": "#85B7EB"},
+    "solar":   {"label": "Solar + battery",     "code": "SB", "color": "#1D9E75", "color_dark": "#5DCAA5"},
+    "panel":   {"label": "Electrical panel",    "code": "EP", "color": "#888780", "color_dark": "#B4B2A9"},
+}
+
+# Stable stacking / legend order (big-ticket end uses first, infra last).
+DEVICE_ORDER = ["hvac", "wh", "dryer", "cooktop", "ev", "lights", "solar", "panel"]
+
+def dstyle(key: str) -> dict:
+    """Lookup with a safe fallback so an unmapped slot never crashes a chart."""
+    return DEVICE_STYLE.get(key, {"label": key.title(), "code": key[:2].upper(),
+                                  "color": "#888780", "color_dark": "#B4B2A9"})
+```
+
+Map each existing slot to a `device_style` key. Add a `style_key` attribute to
+`DeviceSlot` and `CapExOnlySlot` (panel -> `"panel"`, baseload -> `"lights"`,
+solar -> `"solar"`, etc.) so charts never string-match on display names.
+
+| Slot                 | style_key | Color (light) | Code |
+|----------------------|-----------|---------------|------|
+| HVAC                 | `hvac`    | `#D85A30`     | HV   |
+| Water heater         | `wh`      | `#E24B4A`     | WH   |
+| Dryer                | `dryer`   | `#7F77DD`     | DR   |
+| Cooktop              | `cooktop` | `#C9821C`     | CK   |
+| EV charger           | `ev`      | `#639922`     | EV   |
+| Lights & appliances  | `lights`  | `#378ADD`     | LA   |
+| Solar + battery      | `solar`   | `#1D9E75`     | SB   |
+| Electrical panel     | `panel`   | `#888780`     | EP   |
+
+A shared legend helper used by both charts (and, later, the cost-by-category and
+device charts):
+
+```python
+from matplotlib.lines import Line2D
+
+def device_legend_handles(keys):
+    return [Line2D([0], [0], marker="o", linestyle="",
+                   markerfacecolor=dstyle(k)["color"],
+                   markeredgecolor=dstyle(k)["color"], markersize=8,
+                   label=dstyle(k)["label"]) for k in keys]
+```
+
+---
+
+## §4.2 Journey Timeline v2
+
+### 4.2.1 Intent
+The current timeline reads as cramped and doesn't answer the user's real
+question: **when should I do each replacement?** The redesign puts the year axis
+down the middle, the chosen swaps above the line ("Your journey"), and the
+forced wear-out replacements below the line ("Do nothing"). A connector ties each
+appliance's two events together so the user can see how many years *early* they'd
+be acting — and align a swap to a natural wear-out year or (future) a rebate
+window.
+
+Two prototypes were built; **implement Prototype A** as the default chart.
+Prototype B is captured in §4.2.5 as an optional second view.
+
+### 4.2.2 Data model
+Each appliance contributes up to two timeline events:
+
+- **Journey event** — at `slot.install_year` (the swap the user planned). Always
+  present for any planned slot. Marker: filled circle in the device color, 2-letter
+  code inside, placed ABOVE the axis.
+- **Do-nothing event** — the year the *existing* unit forcibly wears out and is
+  replaced in-kind. Marker: open/dashed circle in the device color, code inside,
+  placed BELOW the axis.
+
+Compute the do-nothing year from the existing unit's remaining life:
+
+```python
+do_nothing_year = max(1, slot.lifespan - slot.existing_age)
+```
+
+This needs a per-slot `existing_age` (years). If not already modeled, add it as an
+optional Home Profile / appliance-detail input (default = `lifespan // 2`, i.e.
+"mid-life", so the timeline is sensible before the user customizes). **Open
+question flagged in §4.5.**
+
+Add-on slots that have no incumbent (EV charger, electrical panel, solar+battery)
+produce a **journey event only** — no do-nothing marker, no connector. Tag them
+visually as add-ons.
+
+`gap = do_nothing_year - install_year`:
+- `gap > 0` -> acting early (capital retired before end of life). Annotate `"{gap}y early"`.
+- `gap == 0` -> swapping at wear-out (most capital-efficient). Annotate `"on time"`.
+- `gap < 0` -> swapping after the unit would already have died (annotate `"overdue"`; rare, but handle it).
+
+### 4.2.3 Layout (matplotlib)
+- **Bigger figure + fonts.** This is the headline complaint. Target ~`figsize=(9.5, 4.2)`,
+  `dpi>=110`. Minimum font sizes: axis tick labels **12**, marker codes **11**,
+  side labels ("Your journey"/"Do nothing") **12**, gap annotations **11**,
+  legend **10**, title **13** bold. No text below 10pt anywhere on this chart.
+- Central spine: draw the year axis as a horizontal rail at `y=0`. Hide the
+  y-axis entirely (`ax.get_yaxis().set_visible(False)`, despine top/left/right).
+  `ax.set_ylim(-1.25, 1.25)`.
+- X axis: integer year ticks `0..N`, `ax.tick_params(labelsize=12)`, label `"year"`.
+- Journey markers at `y = +0.62`; stagger to `+0.92` only when two journey events
+  share a year (e.g. panel + EV both at year 1) to avoid overlap.
+- Do-nothing markers at `y = -0.62` (stagger to `-0.92` on collision).
+- Drift connector per paired appliance: dashed line in the device color from the
+  journey marker to the do-nothing marker, `lw=1.3, alpha=0.7, zorder=1`. Draw the
+  rail and markers at higher `zorder` so the connector reads as passing behind the rail.
+- Marker glyph: `ax.scatter` with `s≈260`; journey = filled (`color`), do-nothing =
+  open (`facecolors="none"`, `edgecolors=color`, dashed via a thin ring). Put the
+  2-letter code centered on the marker with `ax.annotate`, white text on filled,
+  device color on open.
+- Side labels: `ax.text` "Your journey" just above the rail at the far left
+  (year-0 dead zone) and "Do nothing" just below it.
+- Gap annotation: small text directly under each do-nothing marker (`"on time"` /
+  `"3y early"`), device color.
+
+### 4.2.4 Rebate window (forward-looking, OFF by default)
+We have no rebate-timing data yet, so ship this dark. When/if a rebate window is
+provided per device or globally, shade it with:
+
+```python
+ax.axvspan(rebate_start, rebate_end, color="#EF9F27", alpha=0.12, zorder=0)
+ax.text((rebate_start + rebate_end) / 2, 1.15, "rebate window",
+        ha="center", fontsize=11, color="#8a6d1a")
+```
+
+Gate behind `show_rebate_window: bool = False`. Document in the UI that it is
+illustrative until real incentive data is wired in.
+
+### 4.2.5 Prototype B (optional second view — "aligned lanes")
+One horizontal lane per appliance against a shared top year axis. In each lane a
+bar spans `[install_year, do_nothing_year]` (the runway), with the filled journey
+marker and the dashed do-nothing marker at the ends; an aligned swap shows a
+single filled marker wrapped in a dashed ring. Add-ons render in a separate
+"New add-ons" group with just the filled marker. Trades the literal above/below
+mirror for per-appliance scanability. Implement only if we add a chart sub-toggle;
+not required for v2.
+
+---
+
+## §4.3 Equipment Replacement (CapEx) chart — recolor to match
+
+Replace the two-color grouped bars (`C_BASE` / `C_ELEC`) with **grouped + stacked
+bars colored by device**, so this chart and the timeline share one visual language
+when viewed side by side.
+
+- Per year, two bars: **left = do nothing**, **right = your journey** (`width≈0.38`,
+  offset `±width/2`).
+- Each bar is **stacked by device** using `DEVICE_ORDER`, each segment in the device
+  color from `DEVICE_STYLE`.
+- Secondary cue (don't rely on color alone to separate the two columns): render
+  do-nothing segments **hatched** (`hatch="//"`) with the device color as edge, and
+  journey segments **solid**. This mirrors the prototype.
+- Shared device legend via `device_legend_handles(...)`, plus a tiny note: "left
+  bar (hatched) = do nothing · right bar (solid) = your journey".
+- Money formatter on y (`$k`), `tick labelsize >= 11`, title 13 bold.
+
+```python
+def make_capex_v2(model, n):
+    fig, ax = _new_fig(figsize=(9.5, 4.0))
+    yrs = np.arange(1, n + 1)
+    w = 0.38
+    for grp, sign, hatch in (("baseline", -1, "//"), ("journey", +1, None)):
+        home = model.baseline_home if grp == "baseline" else model.journey_home
+        bottoms = np.zeros(len(yrs))
+        for key in DEVICE_ORDER:
+            seg = np.array([home.capex_by_device.get(key, {}).get(int(y), 0) for y in yrs])
+            if not seg.any():
+                continue
+            c = dstyle(key)["color"]
+            ax.bar(yrs + sign * w / 2, seg, w, bottom=bottoms,
+                   color=("none" if hatch else c),
+                   edgecolor=c, hatch=hatch, linewidth=0.6, zorder=3)
+            bottoms += seg
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(_money))
+    ax.set_xlabel("year"); ax.set_ylabel("replacement cost")
+    ax.tick_params(labelsize=11)
+    ax.set_title("Equipment replacements (CapEx)", fontsize=13, fontweight="bold")
+    keys_present = [k for k in DEVICE_ORDER
+                    if any(model.journey_home.capex_by_device.get(k)) or
+                       any(model.baseline_home.capex_by_device.get(k))]
+    ax.legend(handles=device_legend_handles(keys_present), fontsize=10,
+              ncol=2, framealpha=0.85, loc="upper left")
+    _style(ax); fig.tight_layout(pad=1.0)
+    return fig
+```
+
+**Model change required:** the homes currently expose `capex_by_year` (a flat
+`{year: total}`). To color CapEx by device, also collect **`capex_by_device`** as
+`{style_key: {year: amount}}` on each home during the run. `capex_by_year` stays
+for any chart that still wants the total.
+
+---
+
+## §4.4 Shared usage
+The cost-by-category and device-breakdown charts should migrate to the same
+`DEVICE_STYLE` colors in a follow-up so the entire dashboard is one palette.
+Not in scope for this change, but keep the helper generic enough to reuse.
+
+---
+
+## §4.5 Open questions / data we don't have yet
+1. **Do-nothing wear-out year.** Needs `existing_age` per slot. Add as an input
+   (appliance-detail expander), default `lifespan // 2`. Confirm desired default.
+2. **Rebate window.** No incentive-timing data in the model. Shipping the band
+   OFF; revisit when we have per-device or program-level windows.
+3. **Prototype A vs B.** A ships as default (matches the literal brief). Decide
+   later whether B is worth a sub-toggle.
+4. **Aligned swaps** (gap == 0) — confirm the "on time" wording vs. something like
+   "at end of life".
+
+---
+
+## §4.6 Claude Code prompt
+
+```
+Implement §4.1–§4.3 of docs/Phase4_spec.md.
+
+Step 1 — src/ui/device_style.py:
+  Add DEVICE_STYLE, DEVICE_ORDER, dstyle(), device_legend_handles() exactly as specced.
+  Add a `style_key` attribute to DeviceSlot and CapExOnlySlot; set it for every
+  configured slot in _build_slot_configs().
+
+Step 2 — model:
+  Add `existing_age` (int years, optional) to device slots; default lifespan // 2.
+  Collect capex_by_device = {style_key: {year: amount}} on baseline_home and
+  journey_home alongside the existing capex_by_year.
+  Add tests: capex_by_device sums per year equal capex_by_year; add-on slots
+  (panel/ev/solar) never appear in baseline_home.capex_by_device.
+
+Step 3 — charts (app.py):
+  Replace the Journey Timeline renderer with make_journey_timeline_v2 per §4.2:
+    central year rail, journey markers above (filled, code), do-nothing markers
+    below (open dashed, code), per-device dashed drift connectors, gap annotations,
+    side labels, larger fonts (no text < 10pt). Rebate window gated OFF by default.
+    Add-on slots: journey marker only, tagged as add-on, no connector.
+  Replace make_capex with make_capex_v2 per §4.3: grouped (do nothing / your
+    journey) + stacked-by-device, do-nothing hatched, shared device legend.
+
+Step 4 — verify:
+  solara run src/app.py
+  - Journey Timeline: axis centered, "Your journey" above / "Do nothing" below,
+    readable fonts, drift lines link each appliance's swap to its wear-out year,
+    EV/panel/solar show no do-nothing marker.
+  - CapEx: two bars per year, left hatched (do nothing) / right solid (your
+    journey), segments colored per device, legend matches the timeline colors.
+  All existing tests still pass.
+```
+
+---
+
+## §4.7 Tests (add to tests/test_charts.py)
+
+```python
+def test_device_style_covers_all_slots():
+    for key in DEVICE_ORDER:
+        s = dstyle(key)
+        assert s["color"].startswith("#") and len(s["code"]) == 2
+
+def test_do_nothing_year_from_existing_age():
+    # lifespan 15, existing_age 9 -> wears out in 6 years
+    assert max(1, 15 - 9) == 6
+
+def test_addons_have_no_do_nothing_event(model_with_addons):
+    for key in ("ev", "panel", "solar"):
+        assert key not in model_with_addons.baseline_home.capex_by_device
+
+def test_capex_by_device_sums_to_capex_by_year(model_run):
+    for y, total in model_run.journey_home.capex_by_year.items():
+        s = sum(d.get(y, 0) for d in model_run.journey_home.capex_by_device.values())
+        assert abs(s - total) < 1e-6
+```
+
 ## §4 — Temperature-Dependent Heat Pump COP
 
 > Relocated from Phase 3 §2.1. Moved here because it requires the ZIP-level monthly
