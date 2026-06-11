@@ -2,7 +2,7 @@
 
 **Status:** 🔵 DRAFTING — requirements phase as of 2026-06-10.
 **Follows:** Phase 3 (panel load assessment, social/health cost of natural gas, help system, improved appliance physics).
-**Last updated:** 2026-06-10 — initial draft. Relocates climate-by-ZIP (was Phase 3 §1), EIA rate modeling (was Phase 3 §3), and temperature-dependent HVAC COP (was Phase 3 §2.1) from Phase 3; adds the Transportation (ICE & EV) model; carries the long-deferred items (rebates, Monte Carlo, save/load) forward.
+**Last updated:** 2026-06-11 — §8 battery/NEM default resolved: Battery On + NEM 3.0 (NBT) is the factual default for any new CA solar installation (NEM 2.0 closed Apr 2026, battery attach rate ~70%+).
 
 ---
 
@@ -927,7 +927,7 @@ entered raw. `specific_yield` is the single number anchored to PVWatts.
 
 | Parameter | Default | Range | Editable? | Basis |
 |---|---|---|---|---|
-| `battery_enabled` | On | on/off | **Primary toggle (main)** | NEM 3.0 battery attach rate ~70% |
+| `battery_enabled` | **On** ✓ | on/off | **Primary toggle (main)** | NEM 3.0 battery attach rate ~70%+; NEM 2.0 closed Apr 2026 — any new install is NEM 3.0 + battery |
 | `battery_kWh` | 13.5 | 0–40 | Detail | One Powerwall-class unit; range allows 0 to ~3 units |
 | `self_consumption` (solar-only) | 35% | 25–45% | Derived (shown) | Midday production vs. evening-skewed electrified load |
 | `self_consumption` (with battery) | 80% | 60–90% | Derived (shown) | Battery shifts midday surplus to evening; not 100% (finite capacity) |
@@ -942,10 +942,11 @@ entered raw. `specific_yield` is the single number anchored to PVWatts.
 | `nbc` (non-bypassable charge) | $0.025/kWh | $0.02–0.03 | Advanced (detail) | CPUC NBC component; NEM 2.0 only |
 | `retail_rate` | — | — | From rate model | Not solar-specific; reuses existing PG&E/EIA rate |
 
-> **Default posture decision (flagged):** battery defaults **On**, which matches the market
-> and makes export modeling negligible — but also makes solar look better. For a
-> skeptical-audience posture, consider defaulting battery **Off** so the harsher solar-only
-> NEM 3.0 economics show first. Author's call.
+> **Default posture — decided:** battery defaults **On**, NEM 3.0 (NBT). This reflects
+> the actual market: NEM 2.0 closed to new PTO in April 2026, and battery attach rates on
+> new CA solar installs are ~70%+. Any homeowner buying solar today gets NEM 3.0 + battery.
+> Users describing a solar-only or legacy NEM 2.0 system can toggle battery off or switch
+> the NEM mode in the detail panel.
 
 ### 8.4 Net metering — one export-rate switch, not two models
 
@@ -1016,9 +1017,9 @@ class SolarBatteryConfig:
     panels:         int   = 15
     kw_per_panel:   float = 0.42
     specific_yield: float = 1500.0   # kWh/kW/yr; anchor to PVWatts
-    battery_enabled: bool  = True
+    battery_enabled: bool  = True    # On by default — NEM 3.0 + battery is the new-install standard
     battery_kwh:     float = 13.5
-    nem_mode:        str   = "nbt"   # "nbt" (3.0) | "nem2"
+    nem_mode:        str   = "nbt"   # "nbt" (NEM 3.0, default) | "nem2" (existing pre-2023 solar)
     nbc:             float = 0.025   # $/kWh, NEM 2.0 only
 
     @property
@@ -1043,7 +1044,7 @@ Model-level object on `HESModel` (like `SocialCostConfig` / `TransportationConfi
 - [x] **One export-rate switch** (ACC for NEM 3.0, retail−NBC for NEM 2.0); no hour-by-hour NEM engine.
 - [x] **Battery raises self-consumption**, making the export term second-order under NEM 3.0.
 - [x] **Main panel = `# panels` + kW + battery toggle + coverage line; rest in detail.**
-- [ ] **Battery default On vs. Off** — market-realistic vs. skeptical-audience posture (§8.3).
+- [x] **Battery default On, NEM 3.0 (NBT) default** — NEM 2.0 closed Apr 2026; any new install is NEM 3.0 + battery. Battery On is the factual market default, not an optimistic assumption. (§8.3)
 - [ ] **Per-zone `specific_yield`** — if §1 CEC climate zone is wired, auto-set yield by zone and drop the manual default.
 
 ---
@@ -1085,4 +1086,3 @@ tests/
 Note: the shared social-cost-of-carbon parameter (§3.3) touches the Phase 3 `social_cost.py`
 — `SocialCostConfig` and `TransportationConfig` should read a common `scc_per_ton` rather
 than each carrying an independent carbon price.
-
