@@ -3474,7 +3474,7 @@ def Masthead():
         f"<div class='brand-mark'>{_WHYWATT_ICON_SVG}</div>"
         "<div style='display:flex;flex-direction:column;line-height:1.1'>"
         "<div class='brand-name'>Why<b>Watt?</b></div>"
-        "<div class='brand-tag'>Home Electrification Simulator</div>"
+        "<div class='brand-tag'>Home Electrification Explorer</div>"
         "</div>"
     )
     with solara.Row(classes=["masthead"], style="gap:16px"):
@@ -4115,7 +4115,7 @@ def Page():
                             style="display:flex; align-items:center; flex-shrink:0")
             solara.HTML(tag="span", unsafe_innerHTML=(
                 "<span style='font-size:.8em;color:#546E7A;flex:1'>"
-                "Estimates are illustrative — adjust assumptions to match your home. "
+                "Connect on Discord : <a href='https://community.whywatt.org' target='_blank'>https://community.whywatt.org</a> "
                 "Supported by the <strong>Electrification Collaboration</strong>."
                 "</span>"
             ))
