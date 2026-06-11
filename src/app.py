@@ -17,7 +17,8 @@ from home_config import HomeConfig, compute_baseload_kwh
 from journey import CATEGORY_ORDER, CATEGORY_LABELS, CapExOnlySlot
 from panel_assessor import PanelAssessor
 from social_cost import SocialCostConfig
-from help_utils import HelpButton, ChartHelpButton, HelpPopupOverlay, open_help
+from help_utils import (HelpButton, ChartHelpButton, HelpPopupOverlay,
+                        HelpDock, open_help)
 
 # ── Asset paths ───────────────────────────────────────────────────────────────
 _HERE         = os.path.dirname(os.path.abspath(__file__))
@@ -48,6 +49,14 @@ try:
         _REDESIGN_CSS = _f.read()
 except OSError:
     _REDESIGN_CSS = ""
+
+# ── v2 layout layer (cockpit, setup group + collapse, 2-row journey, split card) ─
+_LAYOUT_V2_CSS_PATH = os.path.join(_HERE, "layout_v2.css")
+try:
+    with open(_LAYOUT_V2_CSS_PATH, "r", encoding="utf-8") as _f:
+        _LAYOUT_V2_CSS = _f.read()
+except OSError:
+    _LAYOUT_V2_CSS = ""
 
 
 def _read_svg(path: str, height_px: int | None = None) -> str | None:
@@ -501,6 +510,19 @@ chart_right = solara.reactive("Cost Breakdown by Category")
 # Detail view state (§25)
 detail_open = solara.reactive(None)   # None | "hvac" | "water_heater" | "ev" | "cooktop" | "dryer" | "home" | "solar" | "rates"
 
+# v2 §D — "Setup your home" collapse state (one bool per domain card)
+setup_collapsed = solara.reactive({"home": False, "energy": False, "social": False})
+
+def _toggle_setup(key: str):
+    """Flip the collapsed flag for one setup card (immutable dict update)."""
+    cur = dict(setup_collapsed.value)
+    cur[key] = not cur.get(key, False)
+    setup_collapsed.set(cur)
+
+def _set_all_setup(collapsed: bool):
+    """Collapse or expand all three setup cards at once."""
+    setup_collapsed.set({"home": collapsed, "energy": collapsed, "social": collapsed})
+
 # ── Reset function ───────────────────────────────────────────────────────────
 def reset_to_defaults():
     """Reset every reactive to its _DEFAULTS value in one shot."""
@@ -620,6 +642,7 @@ def reset_to_defaults():
     device_chart_home.set(_DEFAULTS["device_chart_home"])
     acc_shape_year.set(_DEFAULTS["acc_shape_year"])
     detail_open.set(_DEFAULTS["detail_open"])
+    _set_all_setup(False)
 
 
 # ── Labels / option lists ─────────────────────────────────────────────────────
@@ -885,7 +908,7 @@ def _style(ax):
 
 def _new_fig(wide=False):
     w = 12 if wide else 6
-    fig = Figure(figsize=(w, 3.8), dpi=100)
+    fig = Figure(figsize=(w, 3.35), dpi=100)
     fig.patch.set_alpha(0)
     return fig
 
@@ -2165,6 +2188,25 @@ def _panel_hd(panel_key: str, title: str):
     ))
 
 
+@solara.component
+def _PlanCheck(planned_rv, label: str = "Plan", right: bool = True):
+    """Rounded (circle-icon), optionally right-justified 'Plan' checkbox."""
+    wrap = ("flex:1 1 auto; justify-content:flex-end" if right
+            else "justify-content:flex-start")
+    with solara.Row(classes=["plan-check"], style=wrap):
+        solara.v.Checkbox(
+            v_model=planned_rv.value,
+            on_v_model=planned_rv.set,
+            label=label,
+            dense=True,
+            hide_details=True,
+            ripple=False,
+            color="#3B6FD4",
+            off_icon="mdi-checkbox-blank-circle-outline",
+            on_icon="mdi-check-circle",
+        )
+
+
 def _cost_row(cost_rv, rebate_rv, net: int):
     """Install $ · Rebate $ · Net — compact single line, box-style, integers only."""
     net_color = "var(--positive-ink,#2E7D32)" if net >= 0 else "var(--baseline-ink,#B45B3E)"
@@ -2192,7 +2234,7 @@ def _appliance_rows(state_rv, planned_rv, year_rv, cost_rv, rebate_rv,
         with solara.Column(style="min-width:90px; max-width:90px"):
             solara.Select("", value=state_rv, values=list(state_values))
         if state != "electric":
-            solara.Checkbox(label="Plan", value=planned_rv)
+            _PlanCheck(planned_rv, "Plan")
         elif state == "electric":
             solara.HTML(tag="span", unsafe_innerHTML=(
                 "<span style='font-size:0.80em; color:#2E7D32; margin-left:4px;'>"
@@ -2264,7 +2306,7 @@ def EVSummaryCard():
             with solara.Column(style="min-width:80px; max-width:80px"):
                 solara.Select("", value=ev_starting_state, values=["none", "electric"])
             if state == "none":
-                solara.Checkbox(label="Plan", value=ev_swap_planned)
+                _PlanCheck(ev_swap_planned, "Plan")
             elif state == "electric":
                 solara.HTML(tag="span", unsafe_innerHTML=(
                     "<span style='font-size:0.80em; color:#2E7D32;'>✓ Installed</span>"
@@ -2294,7 +2336,7 @@ def EVSummaryCard():
 @solara.component
 def CooktopSummaryCard():
     """§25.3.4 — state dropdown + plan year | install cost | rebate."""
-    with solara.Column(classes=["device"]):
+    with solara.Column(classes=["device", "minor"]):
         _card_header("cooktop", "Cooktop")
         _appliance_rows(cooktop_starting_state, cooktop_swap_planned, cooktop_swap_year,
                         cooktop_install_cost, cooktop_rebate)
@@ -2303,77 +2345,86 @@ def CooktopSummaryCard():
 @solara.component
 def DryerSummaryCard():
     """§25.3.5 — state dropdown + plan year | install cost | rebate."""
-    with solara.Column(classes=["device"]):
+    with solara.Column(classes=["device", "minor"]):
         _card_header("dryer", "Dryer")
         _appliance_rows(dryer_starting_state, dryer_swap_planned, dryer_swap_year,
                         dryer_install_cost, dryer_rebate)
 
 
 @solara.component
+def _PanelControls():
+    """Panel Upgrade inline controls (no .device wrapper / header)."""
+    planned = panel_upgrade_planned.value
+    # Row 1: plan checkbox
+    with solara.Row(gap="8px", style=_ROW_CTRL):
+        _PlanCheck(panel_upgrade_planned, "Plan 200A upgrade")
+    # Row 2: full-width year slider + subscript
+    if planned:
+        yr = panel_upgrade_year.value
+        cal_yr = sim_start_year.value + yr - 1
+        with solara.Column(style="width:100%"):
+            solara.SliderInt("", value=panel_upgrade_year, min=1, max=25)
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                f"<div style='font-size:0.72em;color:var(--ink-3,#888);"
+                f"margin-top:-4px;text-align:center'>"
+                f"Yr {yr} &nbsp;·&nbsp; {cal_yr}</div>"
+            ))
+        net = panel_upgrade_cost.value - panel_upgrade_rebate.value
+        _cost_row(panel_upgrade_cost, panel_upgrade_rebate, net)
+    else:
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            "<div class='noplan' style='margin-top:3px'>Not planned</div>"
+        ))
+
+
+@solara.component
 def PanelSummaryCard():
     """§25.3.6 — amperage + plan year | install cost | rebate."""
-    planned = panel_upgrade_planned.value
     with solara.Column(classes=["device"]):
         _card_header("panel", "Panel Upgrade")
-        # Row 1: plan checkbox
-        with solara.Row(gap="8px", style=_ROW_CTRL):
-            solara.Checkbox(label="Plan 200A upgrade", value=panel_upgrade_planned)
-        # Row 2: full-width year slider + subscript
-        if planned:
-            yr = panel_upgrade_year.value
-            cal_yr = sim_start_year.value + yr - 1
-            with solara.Column(style="width:100%"):
-                solara.SliderInt("", value=panel_upgrade_year, min=1, max=25)
-                solara.HTML(tag="div", unsafe_innerHTML=(
-                    f"<div style='font-size:0.72em;color:var(--ink-3,#888);"
-                    f"margin-top:-4px;text-align:center'>"
-                    f"Yr {yr} &nbsp;·&nbsp; {cal_yr}</div>"
-                ))
-        # Row 2: install cost + rebate + net (combined) or status
-        if planned:
-            net = panel_upgrade_cost.value - panel_upgrade_rebate.value
-            _cost_row(panel_upgrade_cost, panel_upgrade_rebate, net)
-        else:
-            solara.HTML(tag="div", unsafe_innerHTML=(
-                "<div style='font-size:0.80em; color:#AAAAAA; margin-top:3px;'>"
-                "Not planned</div>"
-            ))
+        _PanelControls()
+
+
+@solara.component
+def _BaseloadControls():
+    """Baseload inline controls (no .device wrapper / header)."""
+    bl_kwh = compute_baseload_kwh(square_footage.value, num_bedrooms.value,
+                                   baseload_constant_before.value)
+    # Row 1: elec kWh/mo
+    solara.HTML(tag="div", unsafe_innerHTML=(
+        f"<div style='font-size:0.80em; color:#444; margin-top:3px;'>"
+        f"~<strong>{bl_kwh/12:,.0f} kWh/mo</strong> electricity</div>"
+    ))
+    # Row 2: gas therms/mo + plan upgrade checkbox
+    with solara.Row(gap="8px", style=_ROW_CTRL):
+        solara.HTML(tag="span", unsafe_innerHTML=(
+            "<span style='font-size:0.80em; color:#888;'>0 therms/mo gas</span>"
+        ))
+        _PlanCheck(baseload_swap_planned, "Plan upgrade")
+    # Row 3: saving or always-on constant info
+    if baseload_swap_planned.value:
+        bl_after = compute_baseload_kwh(square_footage.value, num_bedrooms.value,
+                                        baseload_constant_after.value)
+        saving  = bl_kwh - bl_after
+        yr      = baseload_swap_year.value
+        cal_yr  = sim_start_year.value + yr - 1
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            f"<div style='font-size:0.80em; color:#2E7D32; margin-top:3px;'>"
+            f"Save ~{saving:,.0f} kWh/yr · yr {yr} ({cal_yr})</div>"
+        ))
+    else:
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            f"<div style='font-size:0.80em; color:#888; margin-top:3px;'>"
+            f"Always-on: {baseload_constant_before.value} kWh/yr constant</div>"
+        ))
 
 
 @solara.component
 def BaseloadSummaryCard():
     """§25.3.7 — elec kWh/mo | gas therms/mo | growth %/yr."""
-    bl_kwh = compute_baseload_kwh(square_footage.value, num_bedrooms.value,
-                                   baseload_constant_before.value)
     with solara.Column(classes=["device"]):
         _card_header("baseload", "Baseload")
-        # Row 1: elec kWh/mo
-        solara.HTML(tag="div", unsafe_innerHTML=(
-            f"<div style='font-size:0.80em; color:#444; margin-top:3px;'>"
-            f"~<strong>{bl_kwh/12:,.0f} kWh/mo</strong> electricity</div>"
-        ))
-        # Row 2: gas therms/mo + plan upgrade checkbox
-        with solara.Row(gap="8px", style=_ROW_CTRL):
-            solara.HTML(tag="span", unsafe_innerHTML=(
-                "<span style='font-size:0.80em; color:#888;'>0 therms/mo gas</span>"
-            ))
-            solara.Checkbox(label="Plan upgrade", value=baseload_swap_planned)
-        # Row 3: saving or always-on constant info
-        if baseload_swap_planned.value:
-            bl_after = compute_baseload_kwh(square_footage.value, num_bedrooms.value,
-                                            baseload_constant_after.value)
-            saving  = bl_kwh - bl_after
-            yr      = baseload_swap_year.value
-            cal_yr  = sim_start_year.value + yr - 1
-            solara.HTML(tag="div", unsafe_innerHTML=(
-                f"<div style='font-size:0.80em; color:#2E7D32; margin-top:3px;'>"
-                f"Save ~{saving:,.0f} kWh/yr · yr {yr} ({cal_yr})</div>"
-            ))
-        else:
-            solara.HTML(tag="div", unsafe_innerHTML=(
-                f"<div style='font-size:0.80em; color:#888; margin-top:3px;'>"
-                f"Always-on: {baseload_constant_before.value} kWh/yr constant</div>"
-            ))
+        _BaseloadControls()
 
 
 @solara.component
@@ -3231,18 +3282,21 @@ def EnergyPricesPanel():
             RatesSummaryCard()
 
 
+# Social & Health icon — module-level so SetupGroup header can reuse it
+_SOCIAL_IC = ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+              " stroke-linecap='round' stroke-linejoin='round'>"
+              "<path d='M12 22C6.5 22 2 17.5 2 12S6.5 2 12 2s10 4.5 10 10-4.5 10-10 10z'/>"
+              "<path d='M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01'/></svg>")
+
+
 @solara.component
-def SocialCostPanel():
-    """Social & Health Cost of Gas — standalone .card with two .device sub-cards."""
+def _SocialBody():
+    """Social & Health Cost of Gas — card-bd content (two .device sub-cards)."""
     climate_on = social_climate_enabled.value
     health_on  = social_health_enabled.value
     total = (social_climate_rate.value if climate_on else 0.0) \
           + (social_health_rate.value  if health_on  else 0.0)
 
-    _SOCIAL_IC = ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
-                  " stroke-linecap='round' stroke-linejoin='round'>"
-                  "<path d='M12 22C6.5 22 2 17.5 2 12S6.5 2 12 2s10 4.5 10 10-4.5 10-10 10z'/>"
-                  "<path d='M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01'/></svg>")
     _CLIMATE_IC = ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
                    " stroke-linecap='round' stroke-linejoin='round'>"
                    "<path d='M12 2a7 7 0 017 7c0 5-7 13-7 13S5 14 5 9a7 7 0 017-7z'/>"
@@ -3252,18 +3306,7 @@ def SocialCostPanel():
                    "<path d='M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78"
                    "l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z'/></svg>")
 
-    with solara.Column(classes=["card"]):
-        with solara.Row(classes=["card-hd"]):
-            solara.HTML(tag="div", unsafe_innerHTML=(
-                f"<div style='display:flex;align-items:center;gap:9px;flex:1;min-width:0'>"
-                f"<span class='ic'>{_SOCIAL_IC}</span>"
-                f"<h3 style='margin:0;font-size:14px;font-weight:700;color:var(--ink,#1C2333);"
-                f"white-space:nowrap;letter-spacing:-0.01em'>Social &amp; Health Cost of Gas</h3>"
-                f"</div>"
-            ))
-            HelpButton("social_cost")
-
-        with solara.Column(classes=["card-bd"], gap="8px"):
+    with solara.Column(classes=["card-bd"], gap="8px"):
             # ── Climate Cost device card ──────────────────────────────────────
             with solara.Column(classes=["device"]):
                 solara.HTML(tag="div", unsafe_innerHTML=(
@@ -3353,75 +3396,55 @@ def DetailView(item: str, model):
 
 
 @solara.component
-def SummaryView():
-    """3-col deck layout — Journey | Home & Solar | Energy & Prices + Social Cost."""
-    with solara.Row(classes=["deck"]):
-        with solara.Column(classes=["col"]):
-            JourneyPlannerPanel()
-        with solara.Column(classes=["col"]):
-            HomeProfilePanel()
-        with solara.Column(classes=["col"]):
-            EnergyPricesPanel()
-            SocialCostPanel()
+def BottomZone(model):
+    """v2 — Setup group + Journey grid (device detail now renders in DetailDock)."""
+    SetupGroup()
+    JourneyGrid()
 
 
 @solara.component
-def BottomZone(model):
-    """Always shows SummaryView; opens DetailView in a modal dialog."""
-    SummaryView()
-
+def DetailDock(model):
+    """v2 — device-detail editor as an inline panel BELOW the charts (not a modal
+    overlay), so the graphs stay visible and update live while sliders move."""
     dopen = detail_open.value
-    is_open = dopen is not None
+    if dopen is None:
+        return
 
     _DETAIL_ICONS = {
-        "hvac":         _DEVICE_ICONS.get("hvac", ""),
-        "water_heater": _DEVICE_ICONS.get("water_heater", ""),
-        "ev":           _DEVICE_ICONS.get("ev", ""),
-        "cooktop":      _DEVICE_ICONS.get("cooktop", ""),
-        "dryer":        _DEVICE_ICONS.get("dryer", ""),
-        "panel":        _DEVICE_ICONS.get("panel", ""),
-        "baseload":     _DEVICE_ICONS.get("baseload", ""),
-        "home":         _DEVICE_ICONS.get("home", ""),
-        "solar":        _DEVICE_ICONS.get("solar", ""),
-        "rates":        _DEVICE_ICONS.get("rates", ""),
+        k: _DEVICE_ICONS.get(k, "")
+        for k in ("hvac", "water_heater", "ev", "cooktop", "dryer",
+                  "panel", "baseload", "home", "solar", "rates")
     }
-    icon_svg = _DETAIL_ICONS.get(dopen or "", "")
-    title    = _DETAIL_TITLES.get(dopen or "", "")
+    _DETAIL_HELP = {
+        "hvac": "hvac", "water_heater": "water_heater", "ev": "ev_charger",
+        "cooktop": "cooktop", "dryer": "dryer", "panel": "panel_upgrade",
+        "baseload": "baseload", "home": "home_profile", "solar": "solar",
+        "rates": "rates",
+    }
+    icon_svg = _DETAIL_ICONS.get(dopen, "")
+    title    = _DETAIL_TITLES.get(dopen, "")
+    help_key = _DETAIL_HELP.get(dopen, "")
 
-    with solara.v.Dialog(
-        v_model=is_open,
-        on_v_model=lambda v: (detail_open.set(None) if not v else None),
-        max_width="860px",
-        scrollable=True,
-    ):
-        with solara.v.Card():
-            # Modal header
-            with solara.Row(classes=["modal-hd"]):
-                if icon_svg:
-                    solara.HTML(tag="div", unsafe_innerHTML=(
-                        f"<div class='modal-di'>{icon_svg}</div>"
-                    ))
+    with solara.Column(classes=["card", "dock", "detail-dock"]):
+        # Dock header — icon + title (flex:1) push [?] + Done to the right
+        with solara.Row(classes=["modal-hd"]):
+            if icon_svg:
                 solara.HTML(tag="div", unsafe_innerHTML=(
-                    f"<div class='modal-title'>{title}</div>"
+                    f"<div class='modal-di'>{icon_svg}</div>"
                 ))
-                solara.Button(
-                    "✓ Done",
-                    on_click=lambda: detail_open.set(None),
-                    classes=["btn", "done"],
-                )
-                solara.Button(
-                    "✕",
-                    on_click=lambda: detail_open.set(None),
-                    style=(
-                        "background:none;border:none;cursor:pointer;"
-                        "color:#78909C;font-size:1.1em;padding:2px 8px;"
-                        "border-radius:4px;"
-                    ),
-                )
-            # Modal body
-            with solara.Column(classes=["modal-bd", "detail-body"]):
-                if dopen is not None:
-                    DetailView(dopen, model)
+            solara.HTML(tag="div", style="flex:1; min-width:0", unsafe_innerHTML=(
+                f"<div class='modal-title'>{title}</div>"
+            ))
+            if help_key:
+                HelpButton(help_key, style="width:26px;height:26px;font-size:0.82em")
+            solara.Button(
+                "✓ Done",
+                on_click=lambda: detail_open.set(None),
+                classes=["btn", "done"],
+            )
+        # Dock body
+        with solara.Column(classes=["modal-bd", "detail-body"]):
+            DetailView(dopen, model)
 
 
 # ── Phase 3 redesign — masthead + verdict band ──────────────────────────────────
@@ -3451,7 +3474,7 @@ def Masthead():
         f"<div class='brand-mark'>{_WHYWATT_ICON_SVG}</div>"
         "<div style='display:flex;flex-direction:column;line-height:1.1'>"
         "<div class='brand-name'>Why<b>Watt?</b></div>"
-        "<div class='brand-tag'>Home Electrification Simulator</div>"
+        "<div class='brand-tag'>Home Electrification Explorer</div>"
         "</div>"
     )
     with solara.Row(classes=["masthead"], style="gap:16px"):
@@ -3540,13 +3563,253 @@ def VerdictBand(df, n, model):
     solara.HTML(tag="div", unsafe_innerHTML=html)
 
 
+# ── v2 cockpit — merged results bar (payback · bars · panel guidance) ───────────
+
+@solara.component
+def Cockpit(df, n, model):
+    """v2 §B — one .card.cockpit with three zones: payback call-out,
+    comparison bars, electrical-panel guidance. Replaces the former
+    VerdictBand + PanelLoadCallout panels."""
+    # ── Zone 1 + 2 data — payback / net / bars ────────────────────────────────
+    journey_cum, baseline_cum, payback_yr, net_delta, net_social = \
+        _verdict_numbers(df, model)
+    hi = max(journey_cum, baseline_cum, 1.0)
+    j_pct = max(8.0, journey_cum  / hi * 100)
+    b_pct = max(8.0, baseline_cum / hi * 100)
+
+    positive = net_delta >= 0
+    call_cls = "ck-call" if positive else "ck-call negative"
+    if payback_yr is not None:
+        cal = sim_start_year.value + payback_yr - 1
+        eyebrow = f"PAYBACK · YR {payback_yr} ({cal})"
+    else:
+        eyebrow = f"NO PAYBACK · {n} YRS"
+    big = f"{'+' if positive else '−'}${abs(net_delta):,.0f}"
+
+    if net_social != 0.0:
+        sc_sign  = "+" if net_social >= 0 else "−"
+        sc_cls   = "sc-val" if net_social >= 0 else "sc-val neg"
+        foot = (f"net social cost avoided "
+                f"<b class='{sc_cls}'>{sc_sign}${abs(net_social):,.0f}</b>")
+    else:
+        foot = f"over {n} yrs vs. do nothing"
+
+    call_html = (
+        f"<div class='{call_cls}'>"
+        f"<div class='k'>{eyebrow}</div>"
+        f"<div class='big'>{big}</div>"
+        f"<div class='foot'>{foot}</div>"
+        f"</div>"
+    )
+
+    bars_html = (
+        "<div class='ck-bars'>"
+        "<div class='cmp'>"
+        "<div class='cmp-label'><div class='t'>Your journey</div></div>"
+        f"<div class='bar-track'><div class='bar-fill journey' style='width:{j_pct:.0f}%'>"
+        f"<span class='v'>${journey_cum:,.0f}</span></div></div></div>"
+        "<div class='cmp'>"
+        "<div class='cmp-label'><div class='t'>Do nothing</div></div>"
+        f"<div class='bar-track'><div class='bar-fill baseline' style='width:{b_pct:.0f}%'>"
+        f"<span class='v'>${baseline_cum:,.0f}</span></div></div></div>"
+        "</div>"
+    )
+
+    # ── Zone 3 data — electrical panel guidance ───────────────────────────────
+    hc = model.home_config
+    assessor = PanelAssessor(hc.square_footage, hc.panel_amps)
+    timeline = assessor.journey_load_timeline(model.journey_home, model.n_years)
+    if timeline:
+        yr1   = timeline[0]
+        peak  = max(timeline, key=lambda t: t.service_amps)
+        panel = hc.panel_amps
+        peak_cls, badge_tmpl = _PEAK_BADGE.get(peak.status, _PEAK_BADGE["green"])
+        badge_text = badge_tmpl.format(p=panel)
+        badge_icon = _CHECK_SVG if peak_cls == "peak-ok" else "⚠"
+        guide_html = (
+            "<div class='ck-guide'>"
+            "<div class='guide-box-title'>ELECTRICAL PANEL GUIDANCE</div>"
+            f"<div class='guide-metrics {peak_cls}'>"
+            "<div class='gm'><span class='k'>Current</span>"
+            f"<div class='row'><span class='num'>{yr1.service_amps:.0f}</span>"
+            "<span class='unit'>A</span></div></div>"
+            "<div class='gm peak'><span class='k'>Peak</span>"
+            f"<div class='row'><span class='num'>{peak.service_amps:.0f}</span>"
+            "<span class='unit'>A</span></div></div>"
+            f"<span class='peak-badge'>{badge_icon} {badge_text}</span>"
+            "</div></div>"
+        )
+    else:
+        guide_html = "<div class='ck-guide'></div>"
+
+    solara.HTML(tag="div", classes=["card", "cockpit"],
+                unsafe_innerHTML=(call_html + bars_html + guide_html))
+
+
+# ── v2 §D — "Setup your home" collapsible group ─────────────────────────────────
+
+_CHEVRON_SVG = ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                " stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>")
+
+
+def _chev_button(collapse_key: str):
+    """Per-card collapse chevron (reuses .iconbtn reset + .chev-btn rotation)."""
+    solara.Button(
+        "",
+        on_click=lambda k=collapse_key: _toggle_setup(k),
+        classes=["iconbtn", "chev-btn"],
+        children=[solara.HTML(tag="span", unsafe_innerHTML=_CHEVRON_SVG)],
+    )
+
+
+@solara.component
+def _SetupCard(collapse_key: str, icon_svg: str, title: str, help_key: str, body):
+    """One collapsible domain card inside the setup group."""
+    collapsed = setup_collapsed.value.get(collapse_key, False)
+    classes = ["card"] + (["is-collapsed"] if collapsed else [])
+    with solara.Column(classes=classes):
+        with solara.Row(classes=["card-hd"]):
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                f"<div style='display:flex;align-items:center;gap:9px;flex:1;min-width:0'>"
+                f"<span class='ic'>{icon_svg}</span>"
+                f"<h3 style='margin:0;font-size:14px;font-weight:700;color:var(--ink,#1C2333);"
+                f"white-space:nowrap;letter-spacing:-0.01em'>{title}</h3></div>"
+            ))
+            _chev_button(collapse_key)
+            HelpButton(help_key)
+        body()
+
+
+@solara.component
+def _HomeBody():
+    with solara.Column(classes=["card-bd"], gap="8px"):
+        HomeSummaryCard()
+        SolarSummaryCard()
+
+
+@solara.component
+def _EnergyBody():
+    with solara.Column(classes=["card-bd"], gap="8px"):
+        RatesSummaryCard()
+
+
+@solara.component
+def SetupGroup():
+    """v2 §D — tinted group wrapping the three assumption cards with collapse."""
+    sc = setup_collapsed.value
+    all_collapsed = all(sc.get(k, False) for k in ("home", "energy", "social"))
+    group_cls = ["setup-group"] + (["collapsed-all"] if all_collapsed else [])
+
+    label = "Expand all" if all_collapsed else "Collapse all"
+    rot   = "transform:rotate(180deg);" if all_collapsed else ""
+    btn_inner = (
+        f"<span style='display:inline-flex;align-items:center;gap:7px'>{label}"
+        f"<span style='display:inline-flex;{rot}transition:transform .18s ease'>"
+        f"{_CHEVRON_SVG}</span></span>"
+    )
+
+    with solara.Column(classes=group_cls):
+        # Group header
+        with solara.Row(classes=["sg-hd"], style="align-items:center; gap:10px"):
+            solara.HTML(tag="div", style="flex:1; min-width:0", unsafe_innerHTML=(
+                f"<div style='display:flex;align-items:center;gap:10px;min-width:0'>"
+                f"<span class='ic'>{_CARD_IC['home']}</span>"
+                f"<h3 style='margin:0'>Setup your home</h3>"
+                f"<span class='scope'>— Home &amp; Solar, Energy &amp; Prices, "
+                f"Social &amp; Health collapse together</span></div>"
+            ))
+            solara.Button(
+                "",
+                on_click=lambda: _set_all_setup(not all_collapsed),
+                classes=["collapse-all"],
+                children=[solara.HTML(tag="span", unsafe_innerHTML=btn_inner)],
+            )
+        # 3-card grid (flex; collapsed-all CSS turns this into a chip row)
+        with solara.Row(classes=["setup-grid"]):
+            _SetupCard("home",   _CARD_IC["home"],   "Home &amp; Solar",
+                       "home_profile",  _HomeBody)
+            _SetupCard("energy", _CARD_IC["energy"], "Energy &amp; Prices",
+                       "energy_prices", _EnergyBody)
+            _SetupCard("social", _SOCIAL_IC,         "Social &amp; Health",
+                       "social_cost",   _SocialBody)
+
+
+# ── v2 §E — Electrification Journey 2-row appliance grid ─────────────────────────
+
+def _subpanel_head(icon_svg: str, name: str, detail_key: str, help_key: str = ""):
+    """Split-card subpanel header: icon+name (flex) + ? help + ⋮ details."""
+    with solara.Row(style="align-items:center; gap:8px"):
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            f"<div class='snm'><span class='di'>{icon_svg}</span>{name}</div>"
+        ), style="flex:1; min-width:0")
+        if help_key:
+            HelpButton(help_key)
+        solara.Button(
+            "",
+            on_click=lambda k=detail_key: detail_open.set(
+                None if detail_open.value == k else k),
+            classes=["iconbtn"],
+            children=[solara.HTML(tag="span", unsafe_innerHTML=(
+                "<svg viewBox='0 0 24 24' fill='currentColor'>"
+                "<circle cx='5' cy='12' r='1.8'/>"
+                "<circle cx='12' cy='12' r='1.8'/>"
+                "<circle cx='19' cy='12' r='1.8'/></svg>"
+            ))],
+        )
+
+
+@solara.component
+def PanelBaseloadSplit():
+    """v2 §E Change 5 — one .device card split into Electrical Panel | Baseload.
+    Per project decision, inline controls are retained (not pushed to modal)."""
+    panel_ic    = _DEVICE_ICONS.get("panel", "")
+    baseload_ic = _DEVICE_ICONS.get("baseload", "")
+    with solara.Column(classes=["device"], style="flex:1.3 1 360px"):
+        with solara.Row(classes=["split2"]):
+            with solara.Column(classes=["subpanel"]):
+                _subpanel_head(panel_ic, "Electrical Panel", "panel", "panel_assessment")
+                _PanelControls()
+            with solara.Column(classes=["subpanel"]):
+                _subpanel_head(baseload_ic, "Baseload", "baseload", "baseload")
+                _BaseloadControls()
+
+
+@solara.component
+def JourneyGrid():
+    """v2 §E — full-width journey card with two labeled appliance rows."""
+    with solara.Column(classes=["card"]):
+        with solara.Row(classes=["card-hd"]):
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                f"<div style='display:flex;align-items:center;gap:9px;flex:1;min-width:0'>"
+                f"<span class='ic'>{_CARD_IC['journey']}</span>"
+                f"<h3 style='margin:0;font-size:14px;font-weight:700;color:var(--ink,#1C2333);"
+                f"white-space:nowrap;letter-spacing:-0.01em'>Your Electrification Journey</h3>"
+                f"<span class='count-pill'>6 devices</span></div>"
+            ))
+            HelpButton("journey_planner")
+        with solara.Column(classes=["jbody"]):
+            # Row 1 — MAJOR LOADS
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                "<div class='jrow-label'>Major Loads</div>"))
+            with solara.Row(classes=["jgrid"]):
+                HVACSummaryCard()
+                WHSummaryCard()
+                EVSummaryCard()
+            # Row 2 — OTHER APPLIANCES
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                "<div class='jrow-label'>Other Appliances</div>"))
+            with solara.Row(classes=["jgrid"]):
+                CooktopSummaryCard()
+                DryerSummaryCard()
+                PanelBaseloadSplit()
+
+
 # ── Main Page ──────────────────────────────────────────────────────────────────
 
 @solara.component
 def Page():
     solara.Title("WhyWatt?")
-    solara.Style(_REDESIGN_CSS)          # Phase 3 redesign design system
-    HelpPopupOverlay()
+    solara.Style(_REDESIGN_CSS + "\n" + _LAYOUT_V2_CSS)   # design system + v2 layout
 
     model, df = solara.use_memo(run_simulation, dependencies=[
         zip_code.value, climate_zone.value, num_bedrooms.value,
@@ -3605,6 +3868,13 @@ def Page():
             tag="div",
             unsafe_innerHTML=(
                 "<style>"
+                # tighten the chart card header + remove dead space around figures
+                ".card-hd.chart-header-sel{padding:6px 10px 5px!important}"
+                ".chart-header-sel .v-input{margin:0!important;padding:0!important}"
+                ".chart-header-sel .v-input__control{min-height:32px!important}"
+                ".chart-header-sel .v-input__slot{margin-bottom:0!important}"
+                ".chart-header-sel .v-text-field__details{display:none!important}"
+                ".chart-header-sel .v-messages{display:none!important}"
                 ".chart-header-sel .v-input__icon--append .v-icon"
                 "{font-size:28px!important}"
                 ".chart-header-sel .v-input__slot::before,"
@@ -3738,6 +4008,27 @@ def Page():
                 ".foot{margin-top:16px;padding:10px 14px;"
                 "border-top:1px solid var(--border,#e2e5ed);"
                 "background:var(--surface-2,#F4F6FB);border-radius:0 0 8px 8px}"
+                # ── v2 layout: neutralize Vuetify v-col/v-row wrappers ──────────
+                ".v-col.cockpit{padding:0!important;margin:0!important}"
+                ".v-col.setup-group{padding:16px!important;margin:0!important;"
+                "display:flex!important;flex-direction:column!important}"
+                ".v-row.sg-hd{margin:0!important;flex-wrap:nowrap!important}"
+                ".v-row.setup-grid{margin:0!important;display:flex!important;"
+                "flex-wrap:wrap!important;gap:16px!important}"
+                ".v-row.setup-grid>.v-col{padding:0!important}"
+                ".v-col.jbody{padding:var(--pad,16px)!important;margin:0!important;"
+                "display:flex!important;flex-direction:column!important;gap:14px!important}"
+                ".v-row.jgrid{margin:0!important;display:flex!important;"
+                "flex-wrap:wrap!important;gap:14px!important}"
+                ".v-row.jgrid>.v-col{padding:0!important}"
+                ".v-row.split2{margin:0!important;display:grid!important;"
+                "grid-template-columns:1fr 1fr!important}"
+                ".v-row.split2>.v-col{padding:0!important}"
+                ".v-col.subpanel>.v-row{margin:0!important}"
+                ".setup-grid>.card,.jgrid>.device{margin:0!important}"
+                # collapse-all button: beat Vuetify .v-btn--default sizing
+                ".v-btn.collapse-all{height:26px!important;min-height:26px!important;"
+                "min-width:0!important;padding:0 9px!important}"
                 "</style>"
             ),
             style="display:none",
@@ -3746,11 +4037,8 @@ def Page():
         # ── Masthead (Phase 3 redesign §A) ──────────────────────────────────────
         Masthead()
 
-        # ── Verdict band (hero result) ───────────────────────────────────────────
-        VerdictBand(df, n, model)
-
-        # ── Estimated Electrical Load strip (single line) ────────────────────────
-        PanelLoadCallout(model)
+        # ── Cockpit — merged payback · bars · panel guidance (v2 §B) ────────────
+        Cockpit(df, n, model)
 
         # ── Dual chart panes ─────────────────────────────────────────────────────
         with solara.Row(gap="8px", style="align-items:stretch"):
@@ -3768,7 +4056,7 @@ def Page():
                     )
                     solara.Select("", value=chart_left, values=CHART_OPTIONS)
                     ChartHelpButton(chart_left.value)
-                with solara.Column(style="padding:8px 4px"):
+                with solara.Column(style="padding:0 2px 2px"):
                     ChartPane(chart_left.value, model, df, n)
             with solara.Column(classes=["card"],
                                style="flex:1; min-width:300px; overflow:hidden"):
@@ -3784,15 +4072,15 @@ def Page():
                     )
                     solara.Select("", value=chart_right, values=CHART_OPTIONS)
                     ChartHelpButton(chart_right.value)
-                with solara.Column(style="padding:8px 4px"):
+                with solara.Column(style="padding:0 2px 2px"):
                     ChartPane(chart_right.value, model, df, n)
 
-        # ── Legend ──────────────────────────────────────────────────────────────
-        with solara.Row(gap="24px"):
+        # ── Series key strip (legend + scenario eyebrow) ─────────────────────────
+        with solara.Row(style="align-items:center; gap:24px"):
             leg = (
-                f"<span style='color:{_CC_B};font-weight:bold'>■ Do nothing (A)</span>"
+                f"<span style='color:{_CC_B};font-weight:bold'>● Do nothing (A)</span>"
                 f"&nbsp;&nbsp;"
-                f"<span style='color:{_CC_J};font-weight:bold'>■ Your journey (A)</span>"
+                f"<span style='color:{_CC_J};font-weight:bold'>● Your journey (A)</span>"
             )
             if comparison_mode.value:
                 leg += (
@@ -3801,9 +4089,18 @@ def Page():
                     f"&nbsp;&nbsp;"
                     f"<span style='color:{_CC_J};opacity:0.6;font-weight:bold'>┅ Your journey (B)</span>"
                 )
-            solara.Markdown(leg)
+            solara.HTML(tag="div", unsafe_innerHTML=leg, style="flex:1; min-width:0")
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                "<span class='scenario-eyebrow'>Adjust the scenario below</span>"
+            ))
 
-        # ── Bottom zone — summary or detail view (§25) ─────────────────────────
+        # ── Inline docks — Help / Device detail render here, BELOW the charts ────
+        #    (sliders inside still drive run_simulation, so the graphs above
+        #     update live instead of being hidden behind a modal overlay).
+        HelpDock()
+        DetailDock(model)
+
+        # ── Bottom zone — Setup group + Journey grid ───────────────────────────
         BottomZone(model)
 
         # ── Footer — ECHo branding ──────────────────────────────────────────────
@@ -3818,7 +4115,7 @@ def Page():
                             style="display:flex; align-items:center; flex-shrink:0")
             solara.HTML(tag="span", unsafe_innerHTML=(
                 "<span style='font-size:.8em;color:#546E7A;flex:1'>"
-                "Estimates are illustrative — adjust assumptions to match your home. "
+                "Connect on Discord : <a href='https://community.whywatt.org' target='_blank'>https://community.whywatt.org</a> "
                 "Supported by the <strong>Electrification Collaboration</strong>."
                 "</span>"
             ))
