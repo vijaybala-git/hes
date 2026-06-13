@@ -22,6 +22,7 @@ class SolarBatteryConfig:
     battery_kwh:     float = 13.5     # usable battery capacity (one Powerwall-class unit)
     nem_mode:        str   = "nbt"    # "nbt" (NEM 3.0, default) | "nem2" (existing pre-2023)
     nbc:             float = 0.025    # $/kWh non-bypassable charge (NEM 2.0 only)
+    scf:             float = 0.80     # self-consumption fraction (0–1); user-controlled slider
 
     @property
     def system_kw(self) -> float:
@@ -29,8 +30,7 @@ class SolarBatteryConfig:
 
     @property
     def self_consumption_fraction(self) -> float:
-        """Two-point model: battery shifts midday surplus to evening demand."""
-        return 0.80 if self.battery_enabled else 0.35
+        return self.scf
 
 # Category constants shared across journey and model layers
 CATEGORY_ORDER  = ["Baseload", "WaterHeating", "HVAC_Cooling", "HVAC_Heating", "Transportation"]

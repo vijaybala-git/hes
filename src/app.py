@@ -328,6 +328,7 @@ _DEFAULTS = {
     "solar_specific_yield":  1500,
     "solar_battery_enabled": True,
     "solar_battery_kwh":     13.5,
+    "solar_scf":             80,
     "solar_nem_mode":        "nbt",
     "solar_nbc":             0.025,
     "solar_system_cost":     30000,
@@ -515,6 +516,7 @@ solar_kw_per_panel     = solara.reactive(0.42)     # detail: standard=0.42, prem
 solar_specific_yield   = solara.reactive(1500)     # detail: kWh/kW/yr (PVWatts typical CA)
 solar_battery_enabled  = solara.reactive(True)     # On = NEM 3.0 default
 solar_battery_kwh      = solara.reactive(13.5)     # detail: one Powerwall-class unit
+solar_scf              = solara.reactive(80)       # self-consumption %; 80 w/battery, 35 solar-only
 solar_nem_mode         = solara.reactive("nbt")    # "nbt" (NEM 3.0) | "nem2" (existing)
 solar_nbc              = solara.reactive(0.025)    # $/kWh NBC for NEM 2.0 only
 solar_system_cost      = solara.reactive(30000)    # total installed cost from contractor quote
@@ -681,6 +683,7 @@ def reset_to_defaults():
     solar_specific_yield.set(_DEFAULTS["solar_specific_yield"])
     solar_battery_enabled.set(_DEFAULTS["solar_battery_enabled"])
     solar_battery_kwh.set(_DEFAULTS["solar_battery_kwh"])
+    solar_scf.set(_DEFAULTS["solar_scf"])
     solar_nem_mode.set(_DEFAULTS["solar_nem_mode"])
     solar_nbc.set(_DEFAULTS["solar_nbc"])
     solar_system_cost.set(_DEFAULTS["solar_system_cost"])
@@ -953,6 +956,7 @@ def run_simulation():
         specific_yield=float(solar_specific_yield.value),
         battery_enabled=solar_battery_enabled.value,
         battery_kwh=solar_battery_kwh.value,
+        scf=solar_scf.value / 100.0,
         nem_mode=solar_nem_mode.value,
         nbc=solar_nbc.value,
     ) if solar_planned.value else None
@@ -3560,16 +3564,25 @@ def HomeDetail():
 
 @solara.component
 def SolarDetail(model):
-    """Solar + battery detail panel (§8)."""
+    """Solar + battery detail panel (§8).
+
+    Layout:
+      Row 1  — checkbox + full-width install-year slider
+      Row 2  — [System Size col] | [Battery & Net Metering col]  (equal width)
+      Row 3  — Self-Consumption slider (full width)
+      Row 4  — Advanced (PVWatts): 2-col compact [inputs | derived kWh]
+      Footer — Cost & Rebate
+    """
     planned = solar_planned.value
     net = solar_system_cost.value - solar_rebate.value
 
-    with solara.Row(gap="8px", style=_TOP_ROW):
+    # ── Row 1: checkbox + install-year slider ─────────────────────────────────
+    with solara.Row(gap="12px", style=_TOP_ROW + " align-items:center"):
         solara.Checkbox(label="Adding solar to my journey", value=solar_planned)
         if planned:
-            yr = solar_install_year.value
+            yr     = solar_install_year.value
             cal_yr = sim_start_year.value + yr - 1
-            with solara.Column(style="min-width:170px"):
+            with solara.Column(style="flex:1; min-width:220px"):
                 solara.SliderInt(f"Install yr {yr} ({cal_yr})",
                                  value=solar_install_year, min=1, max=25)
 
@@ -3578,96 +3591,128 @@ def SolarDetail(model):
                     style="font-size:0.85em; color:#888")
         return
 
-    # Derived quantities for display
+    # Derived quantities (recomputed on every render)
     panels     = solar_panels.value
     kw_panel   = solar_kw_per_panel.value
     yield_kwh  = solar_specific_yield.value
     system_kw  = panels * kw_panel
     annual_kwh = system_kw * yield_kwh
-    battery_on = solar_battery_enabled.value
-    scf        = 0.80 if battery_on else 0.35
+    scf_pct    = solar_scf.value           # integer 0-100
+    scf        = scf_pct / 100.0
     self_kwh   = annual_kwh * scf
     export_kwh = annual_kwh * (1.0 - scf)
+    nem        = solar_nem_mode.value
+    battery_on = solar_battery_enabled.value
 
-    with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
-        with solara.Column(style=_LEFT_COL):
+    # ── Row 2: System Size | Battery & Net Metering ───────────────────────────
+    _COL_HALF = "flex:1; min-width:200px"
+    _COL_HALF_R = _COL_HALF + "; padding-left:16px; border-left:2px solid #E8EAF6"
+
+    with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap; margin-top:6px"):
+
+        # ── Left: System Size ─────────────────────────────────────────────────
+        with solara.Column(style=_COL_HALF):
             _DS("System Size")
-            with solara.Column(style="min-width:180px"):
-                solara.SliderInt(f"Panels: {panels}", value=solar_panels, min=1, max=30)
+            with solara.Column(style="width:100%"):
+                solara.SliderInt(f"Panels: {panels}  ({system_kw:.1f} kW)",
+                                 value=solar_panels, min=1, max=30)
+
+        # ── Right: Battery & Net Metering ─────────────────────────────────────
+        with solara.Column(style=_COL_HALF_R):
+            _DS("Battery &amp; Net Metering")
+
+            # Battery checkbox + kWh inline
+            def _on_battery(enabled):
+                solar_battery_enabled.set(enabled)
+                solar_scf.set(80 if enabled else 35)
+
+            with solara.Row(gap="8px", style="align-items:center; margin-bottom:4px"):
+                solara.Checkbox(label="Battery", value=solar_battery_enabled,
+                                on_value=_on_battery)
+                if battery_on:
+                    solara.InputFloat("kWh", value=solar_battery_kwh)
+
+            # NEM mode — small pill radio buttons
+            _NEM_PILL_ON  = ("background:#1D9E75; color:white; border:none;"
+                             " border-radius:12px; padding:2px 10px;"
+                             " font-size:0.76em; cursor:pointer; font-weight:600;")
+            _NEM_PILL_OFF = ("background:#F5F5F5; color:#555;"
+                             " border:1px solid #CCC; border-radius:12px;"
+                             " padding:2px 10px; font-size:0.76em; cursor:pointer;")
+            with solara.Row(gap="4px", style="align-items:center; flex-wrap:wrap"):
+                for key, lbl in [("nbt", "NEM 3.0 / NBT"), ("nem2", "NEM 2.0")]:
+                    solara.Button(lbl, on_click=lambda k=key: solar_nem_mode.set(k),
+                                  style=_NEM_PILL_ON if nem == key else _NEM_PILL_OFF)
+
             solara.HTML(tag="div", unsafe_innerHTML=(
-                f"<div style='font-size:0.84em; color:#333; margin:4px 0;'>"
-                f"System: <b>{system_kw:.2f} kW</b> &nbsp;·&nbsp; "
-                f"Est. production: <b>{annual_kwh:,.0f} kWh/yr</b></div>"
+                "<div style='font-size:0.74em; color:#888; margin-top:2px;'>"
+                + ("Export: ACC avoided cost (~$0.06/kWh avg)" if nem == "nbt"
+                   else f"Export: retail − ${solar_nbc.value:.3f}/kWh NBC")
+                + "</div>"
             ))
-            _DS("Advanced (PVWatts)")
-            with solara.Row(gap="8px", style="flex-wrap:wrap; align-items:center"):
+
+    # ── Row 3: Self-Consumption slider (full width) ───────────────────────────
+    with solara.Column(style="width:100%; margin-top:8px"):
+        solara.SliderInt(
+            f"Self-Consumption: {scf_pct}%",
+            value=solar_scf, min=10, max=98, step=1,
+        )
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            "<div style='font-size:0.74em; color:#888; margin-top:-2px;'>"
+            "Battery shifts midday surplus to evening demand. "
+            "Default: 80% with battery · 35% solar-only.</div>"
+        ))
+
+    # ── Row 4: Advanced (PVWatts) — compact 2-col ────────────────────────────
+    _DS("Advanced (PVWatts)")
+    credit_label = "ACC credit" if nem == "nbt" else "NEM 2.0 credit"
+    with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
+        with solara.Column(style=_COL_HALF):
+            with solara.Row(gap="8px", style="align-items:center; margin-bottom:2px"):
                 solara.HTML(tag="span", unsafe_innerHTML=(
-                    "<span style='font-size:0.80em; color:#555;'>kW/panel</span>"
+                    "<span style='font-size:0.80em; color:#555; min-width:120px'>"
+                    "kW / panel</span>"
                 ))
                 solara.InputFloat("", value=solar_kw_per_panel)
-            with solara.Row(gap="8px", style="flex-wrap:wrap; align-items:center"):
+            with solara.Row(gap="8px", style="align-items:center; margin-bottom:2px"):
                 solara.HTML(tag="span", unsafe_innerHTML=(
-                    "<span style='font-size:0.80em; color:#555;'>Yield (kWh/kW/yr)</span>"
+                    "<span style='font-size:0.80em; color:#555; min-width:120px'>"
+                    "Yield (kWh/kW/yr)</span>"
                 ))
                 solara.InputInt("", value=solar_specific_yield)
             solara.HTML(tag="div", unsafe_innerHTML=(
-                "<div style='font-size:0.75em; color:#888; margin-top:2px;'>"
-                "Default 1,500 = CA typical. ~1,400 fog coast · ~1,650 inland.</div>"
+                "<div style='font-size:0.74em; color:#888;'>"
+                "~1,400 fog coast · ~1,650 inland</div>"
             ))
 
-        with solara.Column(style=_RIGHT_COL):
-            _DS("Battery & Net Metering")
-            with solara.Row(gap="8px", style="align-items:center"):
-                solara.Checkbox(label="Battery storage", value=solar_battery_enabled)
-                if battery_on:
-                    solara.InputFloat("kWh", value=solar_battery_kwh)
-            nem = solar_nem_mode.value
-            with solara.Row(gap="6px", style="flex-wrap:wrap; margin-top:6px"):
-                for key, label in [("nbt", "NEM 3.0 / NBT"), ("nem2", "NEM 2.0")]:
-                    active = nem == key
-                    solara.Button(
-                        label,
-                        on_click=lambda k=key: solar_nem_mode.set(k),
-                        style=(
-                            "background:#1D9E75; color:white; border:none;"
-                            " border-radius:4px; padding:3px 10px;"
-                            " font-size:0.78em; cursor:pointer;"
-                            if active else
-                            "background:#F5F5F5; color:#555; border:1px solid #CCC;"
-                            " border-radius:4px; padding:3px 10px;"
-                            " font-size:0.78em; cursor:pointer;"
-                        ),
-                    )
+        with solara.Column(style=_COL_HALF_R):
             solara.HTML(tag="div", unsafe_innerHTML=(
-                "<div style='font-size:0.75em; color:#888; margin-top:3px;'>"
-                + ("Export credit: ACC avoided cost (~$0.06/kWh avg)"
-                   if nem == "nbt" else
-                   f"Export credit: retail − ${solar_nbc.value:.3f}/kWh NBC")
-                + "</div>"
+                f"<div style='font-size:0.82em; line-height:1.8; color:#333;'>"
+                f"Gross production &nbsp; <b>{annual_kwh:,.0f} kWh</b><br>"
+                f"Self-consumed &nbsp;&nbsp;&nbsp; <b>{self_kwh:,.0f} kWh</b>"
+                f" <span style='color:#888;'>→ offsets at retail</span><br>"
+                f"Exported &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>{export_kwh:,.0f} kWh</b>"
+                f" <span style='color:#888;'>→ {credit_label}</span>"
+                f"</div>"
             ))
-            solara.Markdown("---")
-            solara.Markdown(
-                f"| | kWh/yr |\n|--|--|\n"
-                f"| Gross production | **{annual_kwh:,.0f}** |\n"
-                f"| Self-consumed | **{self_kwh:,.0f}** → offsets at retail |\n"
-                f"| Exported | **{export_kwh:,.0f}** → {"ACC credit" if nem == "nbt" else "NEM 2.0 credit"} |"
-            )
             if model is not None and model.journey_home.solar_savings_history:
                 annual_saving = model.journey_home.solar_savings_history[0]
                 if annual_saving > 0 and net > 0:
-                    solara.Markdown(
-                        f"Est. annual saving: **${annual_saving:,.0f}/yr**  \n"
-                        f"Est. payback: **~{net / annual_saving:.1f} yrs**"
-                    )
+                    solara.HTML(tag="div", unsafe_innerHTML=(
+                        f"<div style='font-size:0.82em; color:#1976D2; margin-top:4px;'>"
+                        f"~${annual_saving:,.0f}/yr saving"
+                        f" · payback ~{net / annual_saving:.1f} yrs</div>"
+                    ))
 
+    # ── Footer: Cost & Rebate ─────────────────────────────────────────────────
     with solara.Column(style=_COSTS_BOX):
         solara.HTML(tag="div", unsafe_innerHTML=(
             "<div style='font-weight:700; font-size:0.9em; color:#0D47A1;"
             " border-bottom:1px solid #C5CAE9; padding-bottom:4px;"
-            " margin-bottom:8px;'>Cost &amp; Rebate</div>"
+            " margin-bottom:6px;'>Cost &amp; Rebate</div>"
         ))
         solara.HTML(tag="div", unsafe_innerHTML=(
-            "<div style='font-size:0.80em; color:#555; margin-bottom:6px;'>"
+            "<div style='font-size:0.79em; color:#555; margin-bottom:6px;'>"
             "Enter the total installed cost from your contractor quote.</div>"
         ))
         with solara.Row(gap="12px", style="flex-wrap:wrap; align-items:center"):
@@ -4404,7 +4449,7 @@ def Page():
         baseload_install_cost.value, baseload_rebate.value,
         solar_planned.value, solar_install_year.value,
         solar_panels.value, solar_kw_per_panel.value, solar_specific_yield.value,
-        solar_battery_enabled.value, solar_battery_kwh.value,
+        solar_battery_enabled.value, solar_battery_kwh.value, solar_scf.value,
         solar_nem_mode.value, solar_nbc.value,
         solar_system_cost.value, solar_rebate.value,
         elec_rate_model_a.value, elec_cagr_pct_a.value, acc_elec_cagr_a.value,
