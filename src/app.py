@@ -2688,30 +2688,38 @@ def TransportationSummaryCard():
 
 @solara.component
 def TransportationDetail():
-    """Detail panel — Current vehicle (ICE) | EV plan + L2 charger + gasoline price."""
-    annual_gal = transport_gasoline_miles.value / max(transport_mpg.value, 0.1)
-    annual_wall_kwh = (transport_plan_electric_miles.value
-                       / max(transport_ev_eff.value, 0.1)
-                       / max(transport_charging_eff.value, 0.01))
+    """Detail panel (§3.9) — two-column Current Driving | After Charger Year.
 
-    # Top row: Plan EV Charger — same reactive as summary card
+    Pricing (gasoline + external EV) lives in Energy & Prices, not here.
+    """
+    planned = ev_swap_planned.value
+    gal_now      = transport_gasoline_miles.value / max(transport_mpg.value, 0.1)
+    gal_after    = transport_ice_miles_after.value / max(transport_mpg.value, 0.1)
+    wall_kwh     = (transport_plan_electric_miles.value
+                    / max(transport_ev_eff.value, 0.1)
+                    / max(transport_charging_eff.value, 0.01))
+    home_kwh     = wall_kwh * transport_pct_home_after.value
+    ext_kwh      = wall_kwh * (1.0 - transport_pct_home_after.value)
+
+    # Top row: Plan EV + Charger + install-year slider
     with solara.Row(gap="8px", style=_TOP_ROW):
-        with solara.Column(style="min-width:140px"):
-            solara.Checkbox(label="Plan EV Charger", value=ev_swap_planned)
-        if ev_swap_planned.value:
+        with solara.Column(style="min-width:150px"):
+            solara.Checkbox(label="Plan EV + Charger", value=ev_swap_planned)
+        if planned:
             yr = ev_swap_year.value
             cal_yr = sim_start_year.value + yr - 1
             with solara.Column(style="min-width:170px"):
                 solara.SliderInt(f"Yr {yr} ({cal_yr})", value=ev_swap_year, min=1, max=25)
 
     with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
-        # ── Left column: current ICE vehicle ──────────────────────────────────
+        # ── Left column: Current Driving (both scenarios) ─────────────────────
         with solara.Column(style=_LEFT_COL):
-            _DS("Current Vehicle (ICE)")
-            solara.Markdown(
-                f"~**{annual_gal:,.0f} gal/yr**  ·  "
-                f"{transport_gasoline_miles.value:,} mi ÷ {transport_mpg.value:.1f} MPG"
-            )
+            _DS("Current Driving")
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                "<div style='font-size:0.74em; color:#888; margin:-2px 0 4px'>"
+                "Both scenarios start here.</div>"
+            ))
+            solara.Markdown(f"🚗 **ICE** · ~{gal_now:,.0f} gal/yr")
             _DSl("Gasoline miles/yr", transport_gasoline_miles,
                  _DEFAULTS["transport_gasoline_miles"],
                  1_000, 30_000, step=500, unit=" mi/yr")
@@ -2733,33 +2741,38 @@ def TransportationDetail():
                                " background:#F5F5F5; border:1px solid #DDD; color:#555;")
                         ),
                     )
-
-            # Gasoline Price (ICE-specific, always visible)
-            solara.HTML(tag="hr", unsafe_innerHTML="", style="margin:8px 0; border-color:#EEE")
-            _DS("Gasoline Price")
-            _DSl("Current price", gasoline_price,
-                 _DEFAULTS["gasoline_price"],
-                 2.00, 8.00, step=0.10, unit=" $/gal", fmt="{v:.2f}")
-            _DSl("Annual change", gasoline_escalation_pct,
-                 _DEFAULTS["gasoline_escalation_pct"],
-                 -5, 10, step=1, unit=" %/yr")
             solara.HTML(tag="div", unsafe_innerHTML=(
-                f"<div style='font-size:0.78em; color:#777; margin-top:4px;'>"
-                f"Yr 1: <strong>${gasoline_price.value:.2f}/gal</strong>"
-                f" &nbsp;·&nbsp; "
-                f"Yr 10: <strong>${gasoline_price.value * (1 + gasoline_escalation_pct.value/100)**9:.2f}/gal</strong>"
-                f"</div>"
+                "<div style='font-size:0.78em; color:#999; margin-top:8px'>"
+                "🔌 <strong>EV</strong> · none today "
+                "<em style='color:#bbb'>(added in your journey →)</em></div>"
             ))
 
-        # ── Right column: EV plan + L2 charger ────────────────────────────────
+        # ── Right column: After Charger Year (journey only) ───────────────────
         with solara.Column(style=_RIGHT_COL):
-            _DS("EV Plan")
-            if ev_swap_planned.value:
+            _DS("After Charger Year")
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                "<div style='font-size:0.74em; color:#888; margin:-2px 0 4px'>"
+                "Your Journey only.</div>"
+            ))
+            if not planned:
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    "<div style='font-size:0.85em; color:#999; margin-top:4px;'>"
+                    "Check 'Plan EV + Charger' above to configure the switch.</div>"
+                ))
+            else:
+                # ICE after switch (may be 0 for a full switch)
                 solara.Markdown(
-                    f"~**{annual_wall_kwh:,.0f} kWh/yr** after switch  \n"
-                    f"({transport_plan_electric_miles.value:,} mi ÷ "
-                    f"{transport_ev_eff.value:.1f} mi/kWh ÷ "
-                    f"{transport_charging_eff.value:.2f} charging eff.)"
+                    f"🚗 **ICE** · ~{gal_after:,.0f} gal/yr"
+                    + ("  _(fully replaced)_" if transport_ice_miles_after.value == 0 else "")
+                )
+                _DSl("ICE miles/yr after", transport_ice_miles_after,
+                     _DEFAULTS["transport_ice_miles_after"],
+                     0, 30_000, step=500, unit=" mi/yr")
+
+                solara.HTML(tag="hr", unsafe_innerHTML="", style="margin:8px 0; border-color:#EEE")
+                solara.Markdown(
+                    f"🔌 **EV** · ~{wall_kwh:,.0f} kWh/yr "
+                    f"({home_kwh:,.0f} home · {ext_kwh:,.0f} external)"
                 )
                 _DSl("Electric miles/yr", transport_plan_electric_miles,
                      _DEFAULTS["transport_plan_electric_miles"],
@@ -2782,44 +2795,38 @@ def TransportationDetail():
                                    " background:#F5F5F5; border:1px solid #DDD; color:#555;")
                             ),
                         )
+                _DSl("% charged at home", transport_pct_home_after,
+                     _DEFAULTS["transport_pct_home_after"],
+                     0.50, 1.0, step=0.05, fmt="{v:.0%}")
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    "<div style='font-size:0.74em; color:#888; margin-top:2px'>"
+                    "Rest billed at the External EV rate "
+                    "<em style='color:#aaa'>(set in Energy &amp; Prices)</em>.</div>"
+                ))
                 _DSl("Charging efficiency", transport_charging_eff,
                      _DEFAULTS["transport_charging_eff"],
                      0.80, 0.98, step=0.01, fmt="{v:.2f}")
-            else:
-                solara.HTML(tag="div", unsafe_innerHTML=(
-                    "<div style='font-size:0.85em; color:#999; margin-top:4px;'>"
-                    "Check 'Plan EV Charger' above to configure the electric vehicle.</div>"
-                ))
 
-            # L2 Charger Hardware
-            _DS("L2 Charger Hardware")
-            if ev_swap_planned.value:
-                yr = ev_swap_year.value
-                cal_yr = sim_start_year.value + yr - 1
-                with solara.Column(style="width:100%"):
-                    solara.SliderInt(f"Install year: Yr {yr} ({cal_yr})",
-                                     value=ev_swap_year, min=1, max=25)
-                with solara.Row(gap="4px", style="margin-bottom:4px; align-items:center"):
-                    for lbl, amps in [("32 A (7.7 kW)", 32), ("48 A (11.5 kW)", 48)]:
-                        is_sel = ev_charger_amps.value == amps
-                        solara.Button(
-                            lbl,
-                            on_click=lambda a=amps: ev_charger_amps.set(a),
-                            style=(
-                                "font-size:0.74em; padding:2px 8px; border-radius:10px;"
-                                " cursor:pointer;"
-                                + (" background:#C5CAE9; border:1px solid #7986CB; color:#3949AB;"
-                                   if is_sel else
-                                   " background:#F5F5F5; border:1px solid #DDD; color:#555;")
-                            ),
-                        )
-                _elec_display(240, ev_charger_amps.value)
-                _DetailCosts(ev_install_cost, ev_rebate)
-            else:
-                solara.HTML(tag="div", unsafe_innerHTML=(
-                    "<div class='noplan' style='margin-top:3px'>"
-                    "Enable 'Plan EV Charger' above to configure.</div>"
-                ))
+    # ── Full-width: L2 Charger Hardware ───────────────────────────────────────
+    if planned:
+        solara.HTML(tag="hr", unsafe_innerHTML="", style="margin:10px 0 6px; border-color:#EEE")
+        _DS("L2 Charger Hardware")
+        with solara.Row(gap="4px", style="margin-bottom:4px; align-items:center"):
+            for lbl, amps in [("32 A (7.7 kW)", 32), ("48 A (11.5 kW)", 48)]:
+                is_sel = ev_charger_amps.value == amps
+                solara.Button(
+                    lbl,
+                    on_click=lambda a=amps: ev_charger_amps.set(a),
+                    style=(
+                        "font-size:0.74em; padding:2px 8px; border-radius:10px;"
+                        " cursor:pointer;"
+                        + (" background:#C5CAE9; border:1px solid #7986CB; color:#3949AB;"
+                           if is_sel else
+                           " background:#F5F5F5; border:1px solid #DDD; color:#555;")
+                    ),
+                )
+        _elec_display(240, ev_charger_amps.value)
+        _DetailCosts(ev_install_cost, ev_rebate)
 
 
 @solara.component
@@ -3005,15 +3012,17 @@ def _model_toggle(label: str, rv, options: list, color: str):
 
 @solara.component
 def RatesSummaryCard():
-    """Energy & Prices summary — elec model | gas model | timeline."""
+    """Energy & Prices summary (§3.8) — timeline on top, then 4 rate rows."""
     elec_model = elec_rate_model_a.value
     gas_model  = gas_rate_model_a.value
     with solara.Column(classes=["device"]):
-        _card_header("rates", "Rate Scenarios")
+        _card_header("rates", "Energy & Prices")
+        # Row 0 (top): model timeline
+        solara.SliderInt(f"⏱ Model: {years.value} yrs", value=years, min=5, max=30)
         # Row 1: electricity rate model
         solara.HTML(tag="div", unsafe_innerHTML=(
             f"<div style='font-size:0.78em; font-weight:600; color:{C_RATE_ELEC};"
-            " margin-bottom:2px'>Electricity Rate Model</div>"
+            " margin-bottom:2px; margin-top:4px'>⚡ Electricity Rate Model</div>"
         ))
         with solara.Row(gap="6px", style="align-items:center; flex-wrap:wrap"):
             _model_toggle("⚡", elec_rate_model_a,
@@ -3026,7 +3035,7 @@ def RatesSummaryCard():
         # Row 2: gas rate model
         solara.HTML(tag="div", unsafe_innerHTML=(
             f"<div style='font-size:0.78em; font-weight:600; color:{C_RATE_GAS};"
-            " margin-bottom:2px; margin-top:4px'>Gas Rate Model</div>"
+            " margin-bottom:2px; margin-top:4px'>🔥 Gas Rate Model</div>"
         ))
         with solara.Row(gap="6px", style="align-items:center; flex-wrap:wrap"):
             _model_toggle("🔥", gas_rate_model_a,
@@ -3036,11 +3045,17 @@ def RatesSummaryCard():
                     f"<span style='font-size:0.80em; color:#546E7A;'>"
                     f"+{gas_cagr_pct_a.value}%/yr</span>"
                 ))
-        # Row 3: timeline
-        solara.SliderInt(
-            f"Model: {years.value} yrs",
-            value=years, min=5, max=30,
-        )
+        # Row 3 + 4: shared transport fuels (not scenario-split)
+        gpr = gasoline_price.value
+        gesc = gasoline_escalation_pct.value
+        epr = external_ev_price_per_kwh.value
+        eesc = external_ev_escalation_pct.value
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            "<div style='font-size:0.80em; color:#546E7A; margin-top:6px; line-height:1.6'>"
+            f"<strong>⛽ Gasoline</strong> &nbsp; ${gpr:.2f}/gal &nbsp;·&nbsp; +{gesc}%/yr<br>"
+            f"<strong>🔌 External EV</strong> &nbsp; ${epr:.2f}/kWh &nbsp;·&nbsp; +{eesc}%/yr"
+            "</div>"
+        ))
 
 
 # ── §25.4 Detail windows ──────────────────────────────────────────────────────
@@ -3883,7 +3898,17 @@ def _fuel_model_block(heading: str, color: str,
 
 @solara.component
 def RatesDetail():
-    """Rate scenarios detail panel."""
+    """Energy & Prices detail panel (§3.8) — timeline on top; gasoline + external EV
+    are single shared values below Scenario A; A/B governs electricity + gas only."""
+    # ── Model timeline (top) ──────────────────────────────────────────────────
+    _DS("⏱ Model Timeline")
+    solara.SliderInt(f"Years to model: {years.value}", value=years, min=5, max=30)
+
+    solara.HTML(tag="div", unsafe_innerHTML=(
+        "<div style='border-top:1px solid #E0E0E0; margin:10px 0 6px'></div>"
+    ))
+
+    # ── Scenario A — electricity + gas (scenario-split) ───────────────────────
     _DS("Scenario A")
     _fuel_model_block("⚡ Electricity Rate Model", C_RATE_ELEC,
                        elec_rate_model_a, elec_cagr_pct_a, acc_elec_cagr_a,
@@ -3892,12 +3917,31 @@ def RatesDetail():
                        gas_rate_model_a, gas_cagr_pct_a, acc_gas_cagr_a,
                        [("cagr_flat", "CAGR Flat"), ("acc_seasonal", "ACC Seasonal")], 20)
 
+    # ── Shared transport fuels (NOT scenario-split) ───────────────────────────
     solara.HTML(tag="div", unsafe_innerHTML=(
         "<div style='border-top:1px solid #E0E0E0; margin:10px 0 6px'></div>"
     ))
-    _DS("Timeline")
-    solara.SliderInt(f"Years to model: {years.value}", value=years, min=5, max=30)
+    _DS("Transport Fuels  (shared across scenarios)")
+    _DSl("⛽ Gasoline price", gasoline_price, _DEFAULTS["gasoline_price"],
+         2.00, 8.00, step=0.10, unit=" $/gal", fmt="{v:.2f}")
+    _DSl("⛽ Annual change", gasoline_escalation_pct, _DEFAULTS["gasoline_escalation_pct"],
+         -5, 10, step=1, unit=" %/yr")
+    _DSl("🔌 External EV price", external_ev_price_per_kwh,
+         _DEFAULTS["external_ev_price_per_kwh"],
+         0.10, 0.60, step=0.01, unit=" $/kWh", fmt="{v:.2f}")
+    _DSl("🔌 Annual change", external_ev_escalation_pct,
+         _DEFAULTS["external_ev_escalation_pct"],
+         -5, 10, step=1, unit=" %/yr")
+    solara.HTML(tag="div", unsafe_innerHTML=(
+        f"<div style='font-size:0.76em; color:#888; margin-top:4px'>"
+        f"Gasoline yr 10: <strong>"
+        f"${gasoline_price.value * (1 + gasoline_escalation_pct.value/100)**9:.2f}/gal</strong>"
+        f" &nbsp;·&nbsp; External EV yr 10: <strong>"
+        f"${external_ev_price_per_kwh.value * (1 + external_ev_escalation_pct.value/100)**9:.2f}/kWh"
+        f"</strong></div>"
+    ))
 
+    # ── Compare A/B (electricity + gas only) ──────────────────────────────────
     solara.HTML(tag="div", unsafe_innerHTML=(
         "<div style='border-top:1px solid #E0E0E0; margin:10px 0 6px'></div>"
     ))
@@ -3905,7 +3949,8 @@ def RatesDetail():
     if comparison_mode.value:
         solara.HTML(tag="div", unsafe_innerHTML=(
             "<div style='font-size:0.80em; color:#888; margin:4px 0 2px'>"
-            "Scenario A above — solid lines on charts</div>"
+            "Scenario A above — solid lines on charts. "
+            "Transport fuels are shared (not split).</div>"
         ))
         _DS("Scenario B  (dashed lines)")
         _fuel_model_block("⚡ Electricity Rate Model", C_RATE_ELEC,
@@ -3926,7 +3971,7 @@ def JourneyPlannerPanel():
         with solara.Column(classes=["card-bd"], gap="8px"):
             HVACSummaryCard()
             WHSummaryCard()
-            EVSummaryCard()
+            TransportationSummaryCard()
             CooktopSummaryCard()
             DryerSummaryCard()
             PanelSummaryCard()
