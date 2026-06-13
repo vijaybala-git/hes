@@ -200,6 +200,7 @@ def _make_device(spec: dict, mesa_model: mesa.Model, *,
                                miles_per_year=spec.get("miles_per_year", 12_000),
                                ev_eff_mi_per_kwh=spec.get("ev_eff_mi_per_kwh", 3.5),
                                charging_efficiency=spec.get("charging_efficiency", 0.88),
+                               pct_home_charge=spec.get("pct_home_charge", 1.0),
                                age=age, lifespan=ls, installation_cost=cost)
 
     raise ValueError(f"Unknown device class: {cls!r}")
@@ -296,6 +297,9 @@ class HESModel(mesa.Model):
                  gasoline_climate_cost_per_gallon:  float = 1.69,  # $/gal at $190/ton SCC
                  gasoline_health_enabled:           bool  = True,
                  gasoline_health_cost_per_gallon:   float = 0.75,
+                 # §3.13 Wave 3 — external (public/workplace) EV charging price model
+                 external_ev_price_per_kwh:         float = 0.25,
+                 external_ev_escalation_pct:        float = 0.03,  # annual fractional change
                  # §23 rate model selections — stored, wired when ACCRateLoader is added
                  elec_rate_model_a: str = "cagr_flat",
                  gas_rate_model_a:  str = "cagr_flat",
@@ -341,6 +345,15 @@ class HESModel(mesa.Model):
             for yr in range(n_years)
         ], dtype=float)
         self.gasoline_rates = _gasoline_rates
+
+        # ── External EV charging rate array — flat monthly price + annual escalation ──
+        # Shape (n_years, 12): $/kWh for public/workplace charging (§3.13). Parallel to
+        # gasoline; used only for the non-home fraction of an EV (pct_home_charge < 1.0).
+        _external_ev_rates = np.array([
+            [external_ev_price_per_kwh * (1.0 + external_ev_escalation_pct) ** yr] * 12
+            for yr in range(n_years)
+        ], dtype=float)
+        self.external_ev_rates = _external_ev_rates
 
         # ── Climate constants ─────────────────────────────────────────────────
         with open(_DATA / "climate/bayarea_tmy3.json") as f:
@@ -442,11 +455,13 @@ class HESModel(mesa.Model):
                                          solar_config=solar_config,
                                          solar_export_rates=solar_export_rates,
                                          elec_rates_by_category=elec_by_cls_a,
-                                         gasoline_rates=_gasoline_rates)
+                                         gasoline_rates=_gasoline_rates,
+                                         external_ev_rates=_external_ev_rates)
         self.baseline_home = JourneyHome(self, baseline_slots, self.elec_rates, self.gas_rates,
                                          is_baseline_home=True,
                                          elec_rates_by_category=elec_by_cls_a,
-                                         gasoline_rates=_gasoline_rates)
+                                         gasoline_rates=_gasoline_rates,
+                                         external_ev_rates=_external_ev_rates)
 
         # ── Scenario B (lazy — only when comparison_mode=True) ────────────────
         if comparison_mode:
@@ -480,11 +495,13 @@ class HESModel(mesa.Model):
                                                solar_config=solar_config,
                                                solar_export_rates=solar_export_rates,
                                                elec_rates_by_category=elec_by_cls_b,
-                                               gasoline_rates=_gasoline_rates)
+                                               gasoline_rates=_gasoline_rates,
+                                               external_ev_rates=_external_ev_rates)
             self.baseline_home_b = JourneyHome(self, baseline_slots_b, self.elec_rates_b, self.gas_rates_b,
                                                is_baseline_home=True,
                                                elec_rates_by_category=elec_by_cls_b,
-                                               gasoline_rates=_gasoline_rates)
+                                               gasoline_rates=_gasoline_rates,
+                                               external_ev_rates=_external_ev_rates)
 
         # ── DataCollector ─────────────────────────────────────────────────────
         reporters = {

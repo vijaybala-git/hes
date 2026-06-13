@@ -897,3 +897,141 @@ def test_solar_saving_zero_before_install_year():
     assert savings[1] == 0.0, f"Year 2 saving should be 0, got {savings[1]}"
     assert savings[2] > 0.0, f"Year 3 saving should be >0, got {savings[2]}"
     assert savings[3] > 0.0, f"Year 4 saving should be >0, got {savings[3]}"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Wave 3 — EV home/external charging split (§3.13, three-stream cost model)
+# ═════════════════════════════════════════════════════════════════════════════
+
+_FLAT_EXT = np.full(12, 0.25)   # $/kWh external (public/workplace) charging
+
+
+def _ev_dev(model, **kw):
+    from devices.vehicle import ElectricVehicle
+    return ElectricVehicle(model, **kw)
+
+
+def _ev_slot(ev):
+    from journey import DeviceSlot
+    return DeviceSlot(
+        name="Transportation", category="Transportation",
+        starting_state="electric", baseline_devices=[], electric_device=ev,
+    )
+
+
+def test_ev_split_three_streams():
+    """EV with pct_home_charge<1: home cost on the meter, external tracked separately."""
+    import pytest
+    model = mesa.Model()
+    ev = _ev_dev(model, miles_per_year=12_000, ev_eff_mi_per_kwh=3.5,
+                 charging_efficiency=0.88, pct_home_charge=0.85)
+    slot = _ev_slot(ev)
+    wall_kwh = ev.annual_wall_kwh
+
+    total = slot.step(1, _FLAT_ELEC, _FLAT_GAS, external_ev_rates=_FLAT_EXT)
+
+    home_kwh, ext_kwh = wall_kwh * 0.85, wall_kwh * 0.15
+    home_cost, ext_cost = home_kwh * 0.386, ext_kwh * 0.25
+
+    # External stream tracked on the slot (excluded from the home meter)
+    assert slot._last_external_ev_kwh  == pytest.approx(ext_kwh,  rel=1e-6)
+    assert slot._last_external_ev_cost == pytest.approx(ext_cost, rel=1e-6)
+    # Device history reflects home meter only → drives EU.3 + year_elec_opex
+    assert ev.history["consumption"][-1] == pytest.approx(home_kwh,  rel=1e-6)
+    assert ev.history["cost"][-1]        == pytest.approx(home_cost, rel=1e-6)
+    # Total slot cost = home + external
+    assert total == pytest.approx(home_cost + ext_cost, rel=1e-6)
+
+
+def test_ev_full_home_no_external():
+    """pct_home_charge=1.0 → no external stream; device sees full wall kWh."""
+    import pytest
+    model = mesa.Model()
+    ev = _ev_dev(model, miles_per_year=12_000, pct_home_charge=1.0)
+    slot = _ev_slot(ev)
+
+    total = slot.step(1, _FLAT_ELEC, _FLAT_GAS, external_ev_rates=_FLAT_EXT)
+
+    assert slot._last_external_ev_kwh  == 0.0
+    assert slot._last_external_ev_cost == 0.0
+    assert ev.history["consumption"][-1] == pytest.approx(ev.annual_wall_kwh, rel=1e-6)
+    assert total == pytest.approx(ev.annual_wall_kwh * 0.386, rel=1e-6)
+
+
+def test_ev_no_external_rates_charges_all_home():
+    """external_ev_rates=None → full home charging even if pct_home_charge<1 (safe fallback)."""
+    import pytest
+    model = mesa.Model()
+    ev = _ev_dev(model, miles_per_year=12_000, pct_home_charge=0.85)
+    slot = _ev_slot(ev)
+
+    total = slot.step(1, _FLAT_ELEC, _FLAT_GAS, external_ev_rates=None)
+
+    assert slot._last_external_ev_kwh == 0.0
+    assert total == pytest.approx(ev.annual_wall_kwh * 0.386, rel=1e-6)
+
+
+def test_journey_home_external_ev_history():
+    """JourneyHome records external EV kWh/cost; EU.3 consumption is home-only."""
+    import pytest
+    from journey import JourneyHome
+    model = mesa.Model()
+    ev = _ev_dev(model, miles_per_year=12_000, pct_home_charge=0.85)
+    slot = _ev_slot(ev)
+
+    n = 3
+    e = np.full((n, 12), 0.386)
+    g = np.full((n, 12), 2.08)
+    ext = np.full((n, 12), 0.25)
+    jh = JourneyHome(model, [slot], e, g, external_ev_rates=ext)
+    _advance(jh, n)
+
+    wall_kwh = ev.annual_wall_kwh
+    assert jh.external_ev_kwh_history[0]  == pytest.approx(wall_kwh * 0.15, rel=1e-6)
+    assert jh.external_ev_cost_history[0] == pytest.approx(wall_kwh * 0.15 * 0.25, rel=1e-6)
+    # EU.3: the EV slot reports home-charged kWh only
+    assert jh.consumption_history_by_slot["Transportation"][0] == pytest.approx(
+        wall_kwh * 0.85, rel=1e-6)
+    assert len(jh.external_ev_kwh_history) == n
+
+
+def _transport_ev_slots(pct_home=0.85, swap_year=1):
+    """Minimal slot configs: one Transportation slot (ICE→EV) for Wave 3 model tests."""
+    return [{
+        "name": "Transportation", "category": "Transportation", "style_key": "ice",
+        "starting_state": "gas", "has_cooling_baseline": False,
+        "baseline_devices": [{
+            "class": "GasolineVehicle", "miles_per_year": 12_000, "mpg": 28.0,
+            "lifespan": 25, "installation_cost": 0,
+        }],
+        "existing_age": 0,
+        "electric_device": {
+            "class": "ElectricVehicle", "miles_per_year": 12_000,
+            "ev_eff_mi_per_kwh": 3.5, "charging_efficiency": 0.88,
+            "pct_home_charge": pct_home, "lifespan": 25, "installation_cost": 0,
+        },
+        "swap_year": swap_year, "install_cost": 0, "rebate": 0,
+    }]
+
+
+def test_external_ev_through_model():
+    """Full HESModel: journey EV charges partly external; baseline (ICE) has none."""
+    from model import HESModel
+    m = HESModel(n_years=3,
+                 slot_configs=_transport_ev_slots(pct_home=0.85, swap_year=1),
+                 external_ev_price_per_kwh=0.25, external_ev_escalation_pct=0.0)
+    m.run_all()
+    # Journey EV active from year 1 → positive external charging
+    assert m.journey_home.external_ev_kwh_history[0] > 0.0
+    # Baseline keeps the ICE (swap forced None) → no EV, no external charging
+    assert all(v == 0.0 for v in m.baseline_home.external_ev_kwh_history)
+
+
+def test_external_ev_history_zero_default_config():
+    """Default config (no EV with pct_home<1) → external EV history all zeros (no regression)."""
+    from model import HESModel
+    m = HESModel(n_years=5)
+    m.run_all()
+    assert all(v == 0.0 for v in m.journey_home.external_ev_kwh_history)
+    assert all(v == 0.0 for v in m.baseline_home.external_ev_kwh_history)
+    assert len(m.journey_home.external_ev_kwh_history) == 5

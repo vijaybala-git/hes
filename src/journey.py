@@ -102,7 +102,8 @@ class DeviceSlot:
              gas_rates:  np.ndarray,
              is_baseline_home: bool = False,
              elec_rates_by_category: dict | None = None,
-             gasoline_rates: np.ndarray | None = None) -> float:
+             gasoline_rates: np.ndarray | None = None,
+             external_ev_rates: np.ndarray | None = None) -> float:
         """
         Step the slot for one simulation year.
         Returns the total OpEx cost for this slot in this year.
@@ -112,10 +113,15 @@ class DeviceSlot:
           effective rate rather than the shared flat rate.  Gas devices always use
           gas_rates regardless of this dict.
         gasoline_rates: shape (12,) in $/gallon; routed to devices with fuel_type="gasoline".
+        external_ev_rates: shape (12,) in $/kWh; the external (public/workplace) charging
+          rate used for the non-home fraction of an EV with pct_home_charge < 1.0 (§3.13).
+          The home fraction uses elec_rates and is what lands on the home meter.
         """
         self._last_active_device = None   # reset; set below after active_list is known
         self._last_gas_therms = 0.0       # gas therms consumed this slot this year
         self._last_gasoline_gallons = 0.0  # gallons consumed (transportation slot only)
+        self._last_external_ev_kwh = 0.0   # external (non-home) EV charging kWh (§3.13)
+        self._last_external_ev_cost = 0.0  # external EV charging cost — excluded from elec opex
 
         # ── Determine which devices are active this year ──────────────────────
         if self.starting_state == "electric":
@@ -133,11 +139,32 @@ class DeviceSlot:
         # ── Run active devices, accumulate step cost ──────────────────────────
         step_cost = 0.0
         for active in active_list:
-            if active.fuel_type == "electricity" and elec_rates_by_category is not None:
-                cls_name = type(active).__name__
-                rates = elec_rates_by_category.get(cls_name, elec_rates)
-            elif active.fuel_type == "electricity":
-                rates = elec_rates
+            if active.fuel_type == "electricity":
+                if elec_rates_by_category is not None:
+                    cls_name = type(active).__name__
+                    rates = elec_rates_by_category.get(cls_name, elec_rates)
+                else:
+                    rates = elec_rates
+
+                # §3.13 — EV home/external charging split (two-pass, never blended).
+                # Home fraction → home rate (lands on the home meter / elec opex);
+                # external fraction → external_ev_rates (separate cost stream).
+                pct_home = getattr(active, "pct_home_charge", 1.0)
+                if pct_home < 1.0 and external_ev_rates is not None:
+                    monthly_cons = active.monthly_consumption()   # (12,) full wall kWh
+                    wall_kwh  = float(monthly_cons.sum())
+                    ext_frac  = 1.0 - pct_home
+                    home_cost = float((monthly_cons * pct_home * rates).sum())
+                    ext_cost  = float((monthly_cons * ext_frac * external_ev_rates).sum())
+                    # Device history reflects the HOME meter only — so EU.3 (Annual kWh)
+                    # and year_elec_opex see home-charged kWh/cost, not the external part.
+                    active.history["consumption"].append(wall_kwh * pct_home)
+                    active.history["cost"].append(home_cost)
+                    active.age += 1
+                    step_cost += home_cost + ext_cost
+                    self._last_external_ev_kwh  += wall_kwh * ext_frac
+                    self._last_external_ev_cost += ext_cost
+                    continue
             elif active.fuel_type == "gasoline":
                 rates = gasoline_rates if gasoline_rates is not None else np.zeros(12)
             else:
@@ -193,7 +220,8 @@ class JourneyHome(mesa.Agent):
                  solar_config: SolarBatteryConfig | None = None,
                  solar_export_rates: np.ndarray | None = None,
                  elec_rates_by_category: dict | None = None,
-                 gasoline_rates: np.ndarray | None = None):
+                 gasoline_rates: np.ndarray | None = None,
+                 external_ev_rates: np.ndarray | None = None):
         """
         solar_config: SolarBatteryConfig for the journey home; None for baseline.
         solar_export_rates: (n_years, 12) $/kWh export credit rates. For NEM 3.0 these
@@ -208,6 +236,7 @@ class JourneyHome(mesa.Agent):
         self._elec_rates = elec_rates   # shape (n_years, 12)
         self._gas_rates  = gas_rates    # shape (n_years, 12)
         self._gasoline_rates = gasoline_rates  # shape (n_years, 12) | None
+        self._external_ev_rates = external_ev_rates  # shape (n_years, 12) | None
         self._elec_rates_by_category = elec_rates_by_category  # dict | None
         self._solar_config       = solar_config        # SolarBatteryConfig | None
         self._solar_export_rates = solar_export_rates  # (n_years, 12) | None
@@ -223,6 +252,8 @@ class JourneyHome(mesa.Agent):
         self.solar_self_consumed_history:  list = []  # kWh/yr self-consumed
         self.solar_exported_kwh_history:   list = []  # kWh/yr exported
         self.gasoline_gallons_history: list = []  # annual gallons (transportation slot)
+        self.external_ev_kwh_history:  list = []  # annual external (public) EV charging kWh
+        self.external_ev_cost_history: list = []  # annual external EV charging cost ($)
         self.cost_history_by_category:    dict = {cat: []  for cat in CATEGORY_ORDER}
         self.gas_therms_history:          list = []   # annual gas therms (all gas slots)
         self.cost_history_by_slot:        dict = {s.name: [] for s in slots}
@@ -236,6 +267,7 @@ class JourneyHome(mesa.Agent):
         elec_r     = self._elec_rates[year_idx]
         gas_r      = self._gas_rates[year_idx]
         gasoline_r = self._gasoline_rates[year_idx] if self._gasoline_rates is not None else None
+        external_ev_r = self._external_ev_rates[year_idx] if self._external_ev_rates is not None else None
 
         # ACC mode: slice per-device rate arrays for this year
         elec_by_cat_yr = None
@@ -252,17 +284,23 @@ class JourneyHome(mesa.Agent):
         year_capex             = 0.0
         year_gas_therms        = 0.0
         year_gasoline_gallons  = 0.0
+        year_external_ev_kwh   = 0.0
+        year_external_ev_cost  = 0.0
 
         for slot in self.slots:
             cost = slot.step(current_year, elec_r, gas_r, self.is_baseline_home,
                              elec_rates_by_category=elec_by_cat_yr,
-                             gasoline_rates=gasoline_r)
+                             gasoline_rates=gasoline_r,
+                             external_ev_rates=external_ev_r)
             year_opex += cost
             cat = slot.category if slot.category in year_category_costs else "Baseload"
             year_category_costs[cat] += cost
 
             year_gas_therms       += getattr(slot, "_last_gas_therms", 0.0)
             year_gasoline_gallons += getattr(slot, "_last_gasoline_gallons", 0.0)
+            slot_ext_cost          = getattr(slot, "_last_external_ev_cost", 0.0)
+            year_external_ev_kwh  += getattr(slot, "_last_external_ev_kwh", 0.0)
+            year_external_ev_cost += slot_ext_cost
 
             self.cost_history_by_slot[slot.name].append(cost)
             active_dev = slot._last_active_device
@@ -271,7 +309,9 @@ class JourneyHome(mesa.Agent):
                     active_dev.history["consumption"][-1])
                 self.fuel_history_by_slot[slot.name].append(active_dev.fuel_type)
                 if active_dev.fuel_type == "electricity":
-                    year_elec_opex += cost
+                    # §3.13 — external EV charging is NOT on the home meter; exclude it
+                    # from elec opex so the §8 solar cap can't offset public charging.
+                    year_elec_opex += cost - slot_ext_cost
             else:
                 self.consumption_history_by_slot[slot.name].append(0.0)
                 self.fuel_history_by_slot[slot.name].append("electricity")
@@ -300,6 +340,8 @@ class JourneyHome(mesa.Agent):
         # Annual gas therms — pure physics, independent of social-cost rates
         self.gas_therms_history.append(year_gas_therms)
         self.gasoline_gallons_history.append(year_gasoline_gallons)
+        self.external_ev_kwh_history.append(year_external_ev_kwh)
+        self.external_ev_cost_history.append(year_external_ev_cost)
 
         if year_capex > 0:
             self.capex_by_year[current_year] = (

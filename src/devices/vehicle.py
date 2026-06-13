@@ -46,6 +46,11 @@ class ElectricVehicle(EnergyConsumer):
 
     Input basis: battery-out / dashboard efficiency (mi/kWh); charging_efficiency
     converts to wall kWh.  Default 0.88 matches Phase 3 §2.4 value.
+
+    pct_home_charge (Wave 3, §3.13): fraction of wall kWh charged at home (home
+    electricity rate); the remainder is billed at the external EV rate. The split
+    is performed by DeviceSlot.step(), NOT here — monthly_consumption() always
+    returns the full wall kWh regardless of pct_home_charge. Default 1.0 = all home.
     """
     fuel_type = "electricity"
 
@@ -53,6 +58,7 @@ class ElectricVehicle(EnergyConsumer):
                  miles_per_year: float = 12_000,
                  ev_eff_mi_per_kwh: float = 3.5,
                  charging_efficiency: float = 0.88,
+                 pct_home_charge: float = 1.0,
                  **kwargs):
         kwargs.setdefault("lifespan", 25)
         kwargs.setdefault("installation_cost", 0.0)
@@ -60,6 +66,7 @@ class ElectricVehicle(EnergyConsumer):
         self.miles_per_year = float(miles_per_year)
         self.ev_eff_mi_per_kwh = float(ev_eff_mi_per_kwh)
         self.charging_efficiency = float(charging_efficiency)
+        self.pct_home_charge = float(pct_home_charge)
 
     @property
     def annual_wall_kwh(self) -> float:
