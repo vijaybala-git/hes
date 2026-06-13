@@ -585,58 +585,118 @@ gasoline price. Default $0.25/kWh (median US public L2 rate), escalation 3%/yr.
 
 ---
 
-### 3.8 Wave 3 — Energy & Prices Panel
+### 3.8 Wave 3 — Energy & Prices Panel (locked)
 
 All energy commodity prices live in one panel. Transportation-specific prices move here:
 
-| Price stream | Panel in Wave 2 | Panel in Wave 3 |
-|---|---|---|
-| Electricity (home rate) | Energy & Prices | no change |
-| Natural gas | Energy & Prices | no change |
-| Gasoline | Transportation Detail | **→ Energy & Prices** |
-| External EV charging | does not exist | **→ Energy & Prices (new)** |
+| Price stream | Panel in Wave 2 | Panel in Wave 3 | Scenario A/B split? |
+|---|---|---|---|
+| Electricity (home rate) | Energy & Prices | no change | **yes** (existing) |
+| Natural gas | Energy & Prices | no change | **yes** (existing) |
+| Gasoline | Transportation Detail | **→ Energy & Prices** | **no — shared** |
+| External EV charging | does not exist | **→ Energy & Prices (new)** | **no — shared** |
 
-The Rates Detail window gains two new rows:
-- **Gasoline:** price $/gal + annual change % (moved from Transportation Detail)
-- **External EV charging:** $/kWh + annual change % (new; default $0.25/kWh, +3%/yr)
+**Layout decision (locked):**
+- **Model Timeline moves to the top** of both the summary card and the detail window
+  (it was at the bottom in Wave 2). Everything reads top-down: *how long, then at what prices.*
+- **Gasoline and External EV are single shared values, not scenario-split.** The A/B
+  comparison exists to contrast *utility rate* escalation scenarios; transport fuel prices
+  are not part of that narrative. They render once, below the Scenario A block and outside
+  the A/B toggle, applying to both scenarios.
+
+**Detail window (`RatesDetail`) — top-down order:**
+```
+┌─ Energy & Prices ───────────────────────────────────┐
+│  ⏱ Model Timeline                                   │
+│     Years to model: 25  ──────●──                   │
+│  ───────────────────────────────────────────────    │
+│  Scenario A                                         │
+│   ⚡ Electricity   [CAGR | ACC]   +7%/yr            │
+│   🔥 Natural Gas   [CAGR | ACC]   +8%/yr            │
+│   ⛽ Gasoline       $4.50/gal      +0%/yr   (shared)│
+│   🔌 External EV    $0.25/kWh      +3%/yr   (shared)│
+│  ───────────────────────────────────────────────    │
+│  ☐ Compare two scenarios (A vs B)                   │
+│     └ Scenario B …  (electricity + gas only)        │
+└──────────────────────────────────────────────────────┘
+```
+Gasoline + External EV sit between the Scenario A block and the Compare toggle, so the
+A/B toggle visibly governs only electricity + gas.
+
+**Summary card (`RatesSummaryCard`) — same order, compact:**
+```
+⏱ Model: 25 yrs  ──●──
+⚡ Electricity  [CAGR] +7%/yr
+🔥 Gas          [ACC]
+⛽ Gasoline      $4.50/gal +0%
+🔌 External EV   $0.25/kWh +3%
+```
+
+**New reactives:** `external_ev_price_per_kwh` (default 0.25), `external_ev_escalation_pct`
+(default 3). Gasoline reactives (`gasoline_price`, `gasoline_escalation_pct`) are unchanged —
+only their *panel location* moves from Transportation Detail to Energy & Prices.
 
 Transportation Detail in Wave 3 contains only vehicle specs and L2 charger hardware — no
 pricing inputs.
 
 ---
 
-### 3.9 Wave 3 — Transportation Detail Panel Layout
+### 3.9 Wave 3 — Transportation Detail Panel Layout (locked)
+
+Two-column "Current Driving" vs "After Charger Year" — the two-slot story. **No pricing
+inputs** (gasoline + external EV live in Energy & Prices, §3.8).
 
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│  ☑ Plan EV + Charger   [Year slider — ev_acquisition_year]        │
-├─────────────────────────┬──────────────────────────────────────────┤
-│  Current Driving        │  After Charger Year                     │
-│  (both scenarios start  │  (Journey home only)                    │
-│   from these values)    │                                         │
-│                         │                                         │
-│  ICE miles/yr           │  ICE miles/yr  (may be 0)              │
-│  MPG  [presets]         │  MPG                                    │
-│                         │                                         │
-│  EV miles/yr (0 if      │  EV miles/yr                           │
-│    no EV today)         │  mi/kWh  [presets]                     │
-│  mi/kWh                 │  % charged at home                     │
-│                         │  (rest → external rate in E&P panel)   │
-├─────────────────────────┴──────────────────────────────────────────┤
-│  L2 Charger Hardware                                               │
-│  [Amperage: 32A / 48A]   [Install cost]   [Rebate]               │
-└────────────────────────────────────────────────────────────────────┘
+┌─ Transportation ────────────────────────────────────────────┐
+│  ☑ Plan EV + Charger     Yr 3 (2028) ──●──                  │
+├──────────────────────────┬───────────────────────────────────┤
+│  Current Driving         │  After Charger Year                │
+│  (both scenarios)        │  (Your Journey only)               │
+│                          │                                    │
+│  🚗 ICE                  │  🚗 ICE                            │
+│   miles/yr   12,000      │   miles/yr   0   ← may be 0        │
+│   MPG        28          │   MPG        28                    │
+│   [Compact·Sedan·SUV·Tk] │                                    │
+│                          │                                    │
+│  🔌 EV                   │  🔌 EV                             │
+│   miles/yr   0           │   miles/yr   12,000                │
+│   (0 = no EV today)      │   mi/kWh     3.5  [Eff·Avg·SUV]    │
+│   mi/kWh     3.5         │   % charged at home  85%           │
+│                          │   └ rest billed at External EV     │
+│                          │      rate (Energy & Prices)        │
+├──────────────────────────┴───────────────────────────────────┤
+│  L2 Charger Hardware                                         │
+│  [32 A (7.7 kW) | 48 A (11.5 kW)]   240 V · …               │
+│  Install cost  $2,000      Rebate  $500     → Net $1,500    │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-Summary card (always visible):
+Summary card (EV fields always visible, not gated by the checkbox — both ICE and EV specs
+are meaningful whether or not a charger is planned, since the household may already have an EV):
 ```
-Row 1:  [Gas mi/yr]  [MPG]  |  [EV mi/yr]  [mi/kWh]  ☑ Plan EV Charger
-Row 2 (when planned):  [Year slider]   Net EV Charger Cost (hardware only)
+Row 1:  🚗 12,000 mi · 28 MPG   |   🔌 12,000 mi · 3.5 mi/kWh   ☑ Plan EV Charger
+Row 2 (when planned):  Yr 3 (2028) ──●──    Net charger $1,500
 ```
 
-The EV fields are always visible in the summary card (not gated by the checkbox) —
-both ICE and EV specs are meaningful inputs whether or not a charger is planned,
-since the household may already have an EV.
+**New reactives** (replace today's single ICE/EV pair):
+
+| Reactive | Meaning | Default |
+|---|---|---|
+| `transport_ice_miles_now` | ICE miles/yr — both scenarios start here | 12,000 |
+| `transport_ice_miles_after` | ICE miles/yr after switch (journey; may be 0) | 0 |
+| `transport_mpg` | shared MPG (both columns) | 28 |
+| `transport_ev_miles_now` | EV miles/yr today (usually 0 — no EV) | 0 |
+| `transport_ev_miles_after` | EV miles/yr after switch (journey) | 12,000 |
+| `transport_ev_eff` | EV efficiency mi/kWh | 3.5 |
+| `transport_charging_eff` | wall-loss factor | 0.88 |
+| `transport_pct_home_after` | % charged at home post-L2 (→ `ElectricVehicle.pct_home_charge`) | 0.85 |
+
+Retired: `transport_gasoline_miles` (becomes `transport_ice_miles_now`) and the in-panel
+gasoline-price block (price/escalation move to Energy & Prices, §3.8).
+
+**Slot wiring** (per §3.6): Slot A `TransportationICE` uses `ice_miles_now` →
+`ice_miles_after`; Slot B `TransportationEV` uses `ev_miles_now` (baseline_devices, often
+empty/zero) → `ev_miles_after` with `pct_home_charge = transport_pct_home_after`.
 
 ---
 
@@ -676,6 +736,10 @@ since the household may already have an EV.
 - [x] **EU.3 reports home-charged kWh only;** external charging surfaced in new EU.6 (§3.14).
 - [x] **New EU.6 Energy-Mix Timeline** — stacked area: Gas, Utility-Elec, Solar-Elec, External-Elec
   in kWh-equivalent (§3.14).
+- [x] **Energy & Prices layout (§3.8):** Model Timeline moves to top; Gasoline + External EV are
+  single shared values (not A/B scenario-split). A/B governs electricity + gas only.
+- [x] **Transportation Detail (§3.9):** two-column Current Driving / After Charger Year; no pricing
+  inputs; new reactives table locked.
 - [ ] Default `pct_home_after` (% home charged after L2 install): 0.85 proposed; confirm with advocate feedback.
 - [ ] Default external EV rate: $0.25/kWh proposed (median US public L2); confirm for CA context.
 
