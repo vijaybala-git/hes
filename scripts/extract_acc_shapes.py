@@ -310,7 +310,16 @@ def extract_electric():
             else:
                 shape[mo - 1, hr] = vals.mean()
 
-    # Normalise each month's row to mean = 1.0
+    # Capture monthly average $/kWh BEFORE normalisation — these are the actual
+    # ACC credit rates used for NEM 3.0 solar export (not scaled by retail rate).
+    # Raw shape values are in $/MWh at the meter; divide by 1,000 → $/kWh.
+    monthly_avg_acc_kwh = [float(shape[mo].mean()) / 1000.0 for mo in range(12)]
+    print(f"\n  Monthly avg ACC credit rates ($/kWh, pre-normalisation):")
+    for i, v in enumerate(monthly_avg_acc_kwh):
+        print(f"    Month {i+1:2d}: ${v:.4f}/kWh")
+    print(f"  Annual average: ${sum(monthly_avg_acc_kwh)/12:.4f}/kWh")
+
+    # Normalise each month's row to mean = 1.0 (for consumption-billing shape)
     for mo in range(12):
         row_mean = shape[mo].mean()
         if row_mean > 0:
@@ -323,6 +332,11 @@ def extract_electric():
         "note":   f"Extracted by scripts/extract_acc_shapes.py from {path.name}",
         "data_year": first_date.year,
         "shape_24h_by_month": [list(np.round(row, 4)) for row in shape],
+        # Pre-normalisation monthly average ACC values in $/kWh at the meter.
+        # Used as NEM 3.0 solar export credit rates — NOT scaled by retail rate.
+        # Source: raw $/MWh means from CPUC ACC Electric Model ÷ 1,000.
+        "monthly_avg_acc_kwh": [round(v, 5) for v in monthly_avg_acc_kwh],
+        "monthly_avg_acc_kwh_annual_avg": round(sum(monthly_avg_acc_kwh) / 12, 5),
     }
     OUT_ELEC.write_text(json.dumps(result, indent=2))
     print(f"\n  Written: {OUT_ELEC}")

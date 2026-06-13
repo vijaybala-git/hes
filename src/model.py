@@ -17,7 +17,7 @@ import numpy as np
 
 from home_config import HomeConfig, compute_baseload_kwh, HOT_WATER_GAL_PER_DAY
 from social_cost import SocialCostConfig
-from journey import JourneyHome, DeviceSlot, CapExOnlySlot, CATEGORY_ORDER, CATEGORY_LABELS
+from journey import JourneyHome, DeviceSlot, CapExOnlySlot, CATEGORY_ORDER, CATEGORY_LABELS, SolarBatteryConfig
 from rate_loader import RateLoader, ACCRateLoader
 from devices.physics  import GasFurnace, HeatPumpHVAC, GasWaterHeater, HeatPumpWaterHeater, CentralAC
 from devices.seasonal import GasDryer, HeatPumpDryer, GasCooktop, InductionCooktop, LightsAndPlugs
@@ -287,7 +287,7 @@ class HESModel(mesa.Model):
                  sim_start_year:   int  = 2025,
                  slot_configs:     list | None = None,
                  capex_only_slots: list | None = None,
-                 solar_coverage_pct: float = 0.0,
+                 solar_config: SolarBatteryConfig | None = None,
                  social_cost_config: SocialCostConfig | None = None,
                  # §3 Transportation — gasoline price model
                  gasoline_price_per_gallon:        float = 4.50,
@@ -417,13 +417,30 @@ class HESModel(mesa.Model):
                 elec_loader_a, sim_start_year, n_years, scenario_a,
                 custom_cagr=elec_cagr_a_eff)
 
+        # ── Solar export rates (§8) — built once, used by journey_home only ──
+        # NEM 3.0 (nbt): ACC avoided-cost $/kWh from ACCRateLoader.
+        #   We always build an ACCRateLoader for this regardless of the consumption
+        #   rate mode, because the export credit is a grid property, not a billing choice.
+        # NEM 2.0 (nem2): retail rate minus non-bypassable charge (NBC).
+        solar_export_rates: np.ndarray | None = None
+        if solar_config is not None:
+            if solar_config.nem_mode == "nbt":
+                _acc_for_export = elec_loader_a if isinstance(elec_loader_a, ACCRateLoader) \
+                    else ACCRateLoader(rl)
+                solar_export_rates = _acc_for_export.get_nem3_export_rates(
+                    sim_start_year, n_years,
+                    scenario=scenario_a, custom_cagr=elec_cagr_a_eff)
+            else:  # nem2: retail minus NBC, floored at zero
+                solar_export_rates = np.maximum(0.0, self.elec_rates - solar_config.nbc)
+
         # ── Two JourneyHome instances — Scenario A ────────────────────────────
         journey_slots  = _build_slots(slot_configs, False, self, **device_kw)
         baseline_slots = _build_slots(slot_configs, True,  self, **device_kw)
 
         self.journey_home  = JourneyHome(self, journey_slots,  self.elec_rates, self.gas_rates,
                                          is_baseline_home=False, capex_only_slots=capex_only_slots,
-                                         solar_coverage_pct=solar_coverage_pct,
+                                         solar_config=solar_config,
+                                         solar_export_rates=solar_export_rates,
                                          elec_rates_by_category=elec_by_cls_a,
                                          gasoline_rates=_gasoline_rates)
         self.baseline_home = JourneyHome(self, baseline_slots, self.elec_rates, self.gas_rates,
@@ -460,6 +477,8 @@ class HESModel(mesa.Model):
 
             self.journey_home_b  = JourneyHome(self, journey_slots_b,  self.elec_rates_b, self.gas_rates_b,
                                                is_baseline_home=False,
+                                               solar_config=solar_config,
+                                               solar_export_rates=solar_export_rates,
                                                elec_rates_by_category=elec_by_cls_b,
                                                gasoline_rates=_gasoline_rates)
             self.baseline_home_b = JourneyHome(self, baseline_slots_b, self.elec_rates_b, self.gas_rates_b,

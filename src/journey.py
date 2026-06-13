@@ -7,6 +7,31 @@ from typing import Optional
 import mesa
 import numpy as np
 
+
+@dataclass
+class SolarBatteryConfig:
+    """Physics model for a solar + optional battery system (§8).
+
+    System size drives production; battery determines self-consumption split;
+    NEM mode determines the export credit rate used in model.py.
+    """
+    panels:          int   = 15       # number of panels (primary sizing input)
+    kw_per_panel:    float = 0.42     # kW per panel (standard = 0.42, premium = 0.50)
+    specific_yield:  float = 1500.0   # kWh/kW/yr — CA PVWatts typical; ~1,400 coast, ~1,650 inland
+    battery_enabled: bool  = True     # On by default — NEM 3.0 + battery is the new-install norm
+    battery_kwh:     float = 13.5     # usable battery capacity (one Powerwall-class unit)
+    nem_mode:        str   = "nbt"    # "nbt" (NEM 3.0, default) | "nem2" (existing pre-2023)
+    nbc:             float = 0.025    # $/kWh non-bypassable charge (NEM 2.0 only)
+
+    @property
+    def system_kw(self) -> float:
+        return self.panels * self.kw_per_panel
+
+    @property
+    def self_consumption_fraction(self) -> float:
+        """Two-point model: battery shifts midday surplus to evening demand."""
+        return 0.80 if self.battery_enabled else 0.35
+
 # Category constants shared across journey and model layers
 CATEGORY_ORDER  = ["Baseload", "WaterHeating", "HVAC_Cooling", "HVAC_Heating", "Transportation"]
 CATEGORY_LABELS = {
@@ -165,10 +190,15 @@ class JourneyHome(mesa.Agent):
                  gas_rates:  np.ndarray,
                  is_baseline_home: bool = False,
                  capex_only_slots: list | None = None,
-                 solar_coverage_pct: float = 0.0,
+                 solar_config: SolarBatteryConfig | None = None,
+                 solar_export_rates: np.ndarray | None = None,
                  elec_rates_by_category: dict | None = None,
                  gasoline_rates: np.ndarray | None = None):
         """
+        solar_config: SolarBatteryConfig for the journey home; None for baseline.
+        solar_export_rates: (n_years, 12) $/kWh export credit rates. For NEM 3.0 these
+          are the ACC avoided-cost values; for NEM 2.0, retail minus NBC. Built in
+          HESModel and passed in so JourneyHome.step() needs no rate-loader access.
         elec_rates_by_category: optional dict {device_class_name: (n_years, 12) array}.
           Provided in ACC mode; each electric device uses its category-specific effective
           rate.  None in CAGR mode — all devices share the flat elec_rates array.
@@ -178,17 +208,20 @@ class JourneyHome(mesa.Agent):
         self._elec_rates = elec_rates   # shape (n_years, 12)
         self._gas_rates  = gas_rates    # shape (n_years, 12)
         self._gasoline_rates = gasoline_rates  # shape (n_years, 12) | None
-        # ACC mode: per-device-class rate arrays indexed as [n_years, 12]
         self._elec_rates_by_category = elec_rates_by_category  # dict | None
+        self._solar_config       = solar_config        # SolarBatteryConfig | None
+        self._solar_export_rates = solar_export_rates  # (n_years, 12) | None
         self.is_baseline_home = is_baseline_home
         self.capex_only_slots: list = capex_only_slots or []
-        self.solar_coverage_pct = solar_coverage_pct
 
         self.annual_opex     = 0.0
         self.cumulative_opex = 0.0
         self.capex_by_year:   dict = {}
         self.capex_by_device: dict = {}  # {style_key: {year: amount}}
-        self.solar_savings_history:    list = []
+        self.solar_savings_history:       list = []  # $/yr bill savings
+        self.solar_production_kwh_history: list = []  # kWh/yr gross production
+        self.solar_self_consumed_history:  list = []  # kWh/yr self-consumed
+        self.solar_exported_kwh_history:   list = []  # kWh/yr exported
         self.gasoline_gallons_history: list = []  # annual gallons (transportation slot)
         self.cost_history_by_category:    dict = {cat: []  for cat in CATEGORY_ORDER}
         self.gas_therms_history:          list = []   # annual gas therms (all gas slots)
@@ -273,21 +306,49 @@ class JourneyHome(mesa.Agent):
                 self.capex_by_year.get(current_year, 0.0) + year_capex
             )
 
-        # Solar savings gated by install_year (see §19.1 fix above)
-        # Appliance opex gated by swap_year in DeviceSlot.step() — correct
+        # Solar savings — physics model (§8)
+        # Install year is read from the Solar CapExOnlySlot so it stays in sync
+        # with the capex event on the journey timeline.
         solar_install_yr = None
         for cslot in self.capex_only_slots:
             if "Solar" in cslot.name and cslot.install_year is not None:
                 solar_install_yr = cslot.install_year
                 break
-        if (self.solar_coverage_pct > 0
+
+        if (self._solar_config is not None
                 and solar_install_yr is not None
                 and current_year >= solar_install_yr):
-            solar_saving = year_elec_opex * (self.solar_coverage_pct / 100.0)
+            cfg = self._solar_config
+            annual_production_kwh = cfg.system_kw * cfg.specific_yield
+            scf = cfg.self_consumption_fraction   # 0.80 battery, 0.35 solar-only
+
+            self_consumed_kwh = annual_production_kwh * scf
+            exported_kwh      = annual_production_kwh * (1.0 - scf)
+
+            # Retail rate: mean of this year's 12 monthly rates.
+            # In ACC mode, self._elec_rates uses the flat profile → equals retail.
+            avg_retail = float(self._elec_rates[year_idx].mean())
+
+            # Export credit rate from the pre-built (n_years,12) array.
+            # NEM 3.0: ACC avoided-cost $/kWh.  NEM 2.0: retail minus NBC.
+            avg_export = float(self._solar_export_rates[year_idx].mean()) \
+                if self._solar_export_rates is not None else 0.0
+
+            retail_savings = self_consumed_kwh * avg_retail
+            export_credit  = exported_kwh      * avg_export
+            # Cap at actual electricity spend — solar can't reduce below zero
+            solar_saving = min(retail_savings + export_credit, year_elec_opex)
         else:
-            solar_saving = 0.0
+            annual_production_kwh = 0.0
+            self_consumed_kwh     = 0.0
+            exported_kwh          = 0.0
+            solar_saving          = 0.0
+
         year_opex -= solar_saving
         self.solar_savings_history.append(solar_saving)
+        self.solar_production_kwh_history.append(annual_production_kwh)
+        self.solar_self_consumed_history.append(self_consumed_kwh)
+        self.solar_exported_kwh_history.append(exported_kwh)
 
         self.annual_opex      = year_opex
         self.cumulative_opex += year_opex

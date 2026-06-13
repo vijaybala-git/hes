@@ -120,6 +120,15 @@ class ACCRateLoader:
         assert self._gas_shape.shape == (12,), \
             f"Expected (12,) ACC gas shape, got {self._gas_shape.shape}"
 
+        # Pre-normalisation monthly average ACC values in $/kWh — used as NEM 3.0
+        # solar export credit rates. These are absolute avoided-cost values, NOT
+        # scaled by retail rate. Shape: (12,).
+        self.monthly_avg_acc_kwh: np.ndarray = np.array(
+            elec_data["monthly_avg_acc_kwh"], dtype=float
+        )
+        assert self.monthly_avg_acc_kwh.shape == (12,), \
+            f"Expected (12,) monthly_avg_acc_kwh, got {self.monthly_avg_acc_kwh.shape}"
+
         prof_path = _RATES_DIR / "device_load_shapes.json"
         with open(prof_path) as f:
             prof_data = json.load(f)
@@ -127,6 +136,32 @@ class ACCRateLoader:
             k: np.array(v, dtype=float)
             for k, v in prof_data["profiles"].items()
         }
+
+    def get_nem3_export_rates(self, sim_start_year: int, n_years: int,
+                              scenario: str = "moderate",
+                              custom_cagr: float | None = None) -> np.ndarray:
+        """Return shape (n_years, 12) NEM 3.0 export credit rates in $/kWh.
+
+        Based on the pre-normalisation ACC monthly averages, escalated by the same
+        CAGR as consumption rates (scenario-driven). These are absolute $/kWh values
+        — do NOT multiply by retail rate.
+        """
+        base_year = sim_start_year
+        # Derive the CAGR to apply: use the same projection block as the base loader.
+        # get_rate returns the projected retail rate; we compute the year-0 ACC baseline
+        # and then apply the same growth factor rather than calling get_rate (which would
+        # mix retail levels with ACC levels).
+        proj = self._base._fuel_data("electricity")["projection"]
+        cagr = custom_cagr if custom_cagr is not None else proj.get(
+            f"cagr_{scenario}", proj["cagr_moderate"]
+        )
+
+        rates = np.empty((n_years, 12), dtype=float)
+        for yr_idx in range(n_years):
+            growth = (1.0 + cagr) ** yr_idx
+            for mo in range(12):
+                rates[yr_idx, mo] = float(self.monthly_avg_acc_kwh[mo]) * growth
+        return rates
 
     def get_annual_monthly_rates(self, fuel: str, sim_start_year: int,
                                   n_years: int,
