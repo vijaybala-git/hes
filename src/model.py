@@ -22,6 +22,7 @@ from rate_loader import RateLoader, ACCRateLoader
 from devices.physics  import GasFurnace, HeatPumpHVAC, GasWaterHeater, HeatPumpWaterHeater, CentralAC
 from devices.seasonal import GasDryer, HeatPumpDryer, GasCooktop, InductionCooktop, LightsAndPlugs
 from devices.schedule import EVCharger, PhysicsEVCharger
+from devices.vehicle  import GasolineVehicle, ElectricVehicle
 
 _DATA = Path(__file__).parent.parent / "data"
 
@@ -188,6 +189,19 @@ def _make_device(spec: dict, mesa_model: mesa.Model, *,
                          monthly_cdd=cdd,
                          age=age, lifespan=ls, installation_cost=cost, **elec)
 
+    if cls == "GasolineVehicle":
+        return GasolineVehicle(mesa_model,
+                               miles_per_year=spec.get("miles_per_year", 12_000),
+                               mpg=spec.get("mpg", 28.0),
+                               age=age, lifespan=ls, installation_cost=cost)
+
+    if cls == "ElectricVehicle":
+        return ElectricVehicle(mesa_model,
+                               miles_per_year=spec.get("miles_per_year", 12_000),
+                               ev_eff_mi_per_kwh=spec.get("ev_eff_mi_per_kwh", 3.5),
+                               charging_efficiency=spec.get("charging_efficiency", 0.88),
+                               age=age, lifespan=ls, installation_cost=cost)
+
     raise ValueError(f"Unknown device class: {cls!r}")
 
 
@@ -211,6 +225,11 @@ def _build_slots(slot_configs: list, is_baseline: bool,
         # Baseline home: all swap_years set to None; starting_state preserved
         swap_yr = None if is_baseline else cfg.get("swap_year")
 
+        # Derive slot-level lifespan from the first baseline device config
+        baseline_cfgs = cfg.get("baseline_devices", [])
+        slot_lifespan = baseline_cfgs[0]["lifespan"] if baseline_cfgs else 15
+        slot_age      = cfg.get("existing_age", slot_lifespan // 2)
+
         slots.append(DeviceSlot(
             name               = cfg["name"],
             category           = cfg["category"],
@@ -221,6 +240,9 @@ def _build_slots(slot_configs: list, is_baseline: bool,
             swap_year          = swap_yr,
             install_cost       = cfg.get("install_cost", 0.0),
             rebate             = cfg.get("rebate", 0.0),
+            style_key          = cfg.get("style_key", "lights"),
+            lifespan           = slot_lifespan,
+            existing_age       = slot_age,
         ))
     return slots
 
@@ -267,6 +289,13 @@ class HESModel(mesa.Model):
                  capex_only_slots: list | None = None,
                  solar_coverage_pct: float = 0.0,
                  social_cost_config: SocialCostConfig | None = None,
+                 # §3 Transportation — gasoline price model
+                 gasoline_price_per_gallon:        float = 4.50,
+                 gasoline_escalation_pct:           float = 0.0,   # annual fractional change
+                 gasoline_climate_enabled:          bool  = True,
+                 gasoline_climate_cost_per_gallon:  float = 1.69,  # $/gal at $190/ton SCC
+                 gasoline_health_enabled:           bool  = True,
+                 gasoline_health_cost_per_gallon:   float = 0.75,
                  # §23 rate model selections — stored, wired when ACCRateLoader is added
                  elec_rate_model_a: str = "cagr_flat",
                  gas_rate_model_a:  str = "cagr_flat",
@@ -298,6 +327,20 @@ class HESModel(mesa.Model):
         self.home_config = home_config
 
         self.social_cost_config = social_cost_config or SocialCostConfig()
+
+        # ── Gasoline externalities (stored for DataCollector) ─────────────────
+        self.gasoline_climate_cost_per_gallon = (
+            gasoline_climate_cost_per_gallon if gasoline_climate_enabled else 0.0)
+        self.gasoline_health_cost_per_gallon = (
+            gasoline_health_cost_per_gallon if gasoline_health_enabled else 0.0)
+
+        # ── Gasoline rate array — flat monthly price with annual escalation ────
+        # Shape (n_years, 12): each row is the $/gallon rate for that year's 12 months.
+        _gasoline_rates = np.array([
+            [gasoline_price_per_gallon * (1.0 + gasoline_escalation_pct) ** yr] * 12
+            for yr in range(n_years)
+        ], dtype=float)
+        self.gasoline_rates = _gasoline_rates
 
         # ── Climate constants ─────────────────────────────────────────────────
         with open(_DATA / "climate/bayarea_tmy3.json") as f:
@@ -381,10 +424,12 @@ class HESModel(mesa.Model):
         self.journey_home  = JourneyHome(self, journey_slots,  self.elec_rates, self.gas_rates,
                                          is_baseline_home=False, capex_only_slots=capex_only_slots,
                                          solar_coverage_pct=solar_coverage_pct,
-                                         elec_rates_by_category=elec_by_cls_a)
+                                         elec_rates_by_category=elec_by_cls_a,
+                                         gasoline_rates=_gasoline_rates)
         self.baseline_home = JourneyHome(self, baseline_slots, self.elec_rates, self.gas_rates,
                                          is_baseline_home=True,
-                                         elec_rates_by_category=elec_by_cls_a)
+                                         elec_rates_by_category=elec_by_cls_a,
+                                         gasoline_rates=_gasoline_rates)
 
         # ── Scenario B (lazy — only when comparison_mode=True) ────────────────
         if comparison_mode:
@@ -415,10 +460,12 @@ class HESModel(mesa.Model):
 
             self.journey_home_b  = JourneyHome(self, journey_slots_b,  self.elec_rates_b, self.gas_rates_b,
                                                is_baseline_home=False,
-                                               elec_rates_by_category=elec_by_cls_b)
+                                               elec_rates_by_category=elec_by_cls_b,
+                                               gasoline_rates=_gasoline_rates)
             self.baseline_home_b = JourneyHome(self, baseline_slots_b, self.elec_rates_b, self.gas_rates_b,
                                                is_baseline_home=True,
-                                               elec_rates_by_category=elec_by_cls_b)
+                                               elec_rates_by_category=elec_by_cls_b,
+                                               gasoline_rates=_gasoline_rates)
 
         # ── DataCollector ─────────────────────────────────────────────────────
         reporters = {
@@ -441,6 +488,23 @@ class HESModel(mesa.Model):
                                                   * m.social_cost_config.climate_eff),
             "Baseline Social Health":  lambda m: (m.baseline_home.gas_therms_history[-1]
                                                   * m.social_cost_config.health_eff),
+            # §3 Transportation — gasoline gallons + externalities
+            "Journey Gasoline Gallons":   lambda m: (m.journey_home.gasoline_gallons_history[-1]
+                                                     if m.journey_home.gasoline_gallons_history else 0.0),
+            "Baseline Gasoline Gallons":  lambda m: (m.baseline_home.gasoline_gallons_history[-1]
+                                                     if m.baseline_home.gasoline_gallons_history else 0.0),
+            "Journey Gasoline Climate":   lambda m: (m.journey_home.gasoline_gallons_history[-1]
+                                                     * m.gasoline_climate_cost_per_gallon
+                                                     if m.journey_home.gasoline_gallons_history else 0.0),
+            "Journey Gasoline Health":    lambda m: (m.journey_home.gasoline_gallons_history[-1]
+                                                     * m.gasoline_health_cost_per_gallon
+                                                     if m.journey_home.gasoline_gallons_history else 0.0),
+            "Baseline Gasoline Climate":  lambda m: (m.baseline_home.gasoline_gallons_history[-1]
+                                                     * m.gasoline_climate_cost_per_gallon
+                                                     if m.baseline_home.gasoline_gallons_history else 0.0),
+            "Baseline Gasoline Health":   lambda m: (m.baseline_home.gasoline_gallons_history[-1]
+                                                     * m.gasoline_health_cost_per_gallon
+                                                     if m.baseline_home.gasoline_gallons_history else 0.0),
         }
         if comparison_mode:
             reporters.update({

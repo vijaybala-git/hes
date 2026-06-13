@@ -8,12 +8,13 @@ import mesa
 import numpy as np
 
 # Category constants shared across journey and model layers
-CATEGORY_ORDER  = ["Baseload", "WaterHeating", "HVAC_Cooling", "HVAC_Heating"]
+CATEGORY_ORDER  = ["Baseload", "WaterHeating", "HVAC_Cooling", "HVAC_Heating", "Transportation"]
 CATEGORY_LABELS = {
-    "Baseload":     "Baseload",
-    "WaterHeating": "Water Heating",
-    "HVAC_Cooling": "Cooling",
-    "HVAC_Heating": "Heating",
+    "Baseload":       "Baseload",
+    "WaterHeating":   "Water Heating",
+    "HVAC_Cooling":   "Cooling",
+    "HVAC_Heating":   "Heating",
+    "Transportation": "Transportation",
 }
 
 
@@ -31,6 +32,7 @@ class CapExOnlySlot:
     lifespan:     int          = 25
     install_year: Optional[int] = None   # None = not planning
     capex_events: list         = field(default_factory=list)
+    style_key:    str          = "panel"  # maps to DEVICE_STYLE in src/ui/device_style.py
 
     @property
     def net_install_cost(self) -> float:
@@ -62,6 +64,9 @@ class DeviceSlot:
     install_cost:         float = 0.0
     rebate:               float = 0.0
     capex_events:         list = field(default_factory=list)  # [(year, cost)]
+    style_key:            str = "lights"   # maps to DEVICE_STYLE in src/ui/device_style.py
+    lifespan:             int = 15         # baseline device lifespan (years); drives do_nothing_year
+    existing_age:         int = 0          # current age of baseline device at sim start
 
     @property
     def net_install_cost(self) -> float:
@@ -71,7 +76,8 @@ class DeviceSlot:
              elec_rates: np.ndarray,
              gas_rates:  np.ndarray,
              is_baseline_home: bool = False,
-             elec_rates_by_category: dict | None = None) -> float:
+             elec_rates_by_category: dict | None = None,
+             gasoline_rates: np.ndarray | None = None) -> float:
         """
         Step the slot for one simulation year.
         Returns the total OpEx cost for this slot in this year.
@@ -80,9 +86,11 @@ class DeviceSlot:
           When provided (ACC mode), each electric device uses its category-specific
           effective rate rather than the shared flat rate.  Gas devices always use
           gas_rates regardless of this dict.
+        gasoline_rates: shape (12,) in $/gallon; routed to devices with fuel_type="gasoline".
         """
         self._last_active_device = None   # reset; set below after active_list is known
         self._last_gas_therms = 0.0       # gas therms consumed this slot this year
+        self._last_gasoline_gallons = 0.0  # gallons consumed (transportation slot only)
 
         # ── Determine which devices are active this year ──────────────────────
         if self.starting_state == "electric":
@@ -105,6 +113,8 @@ class DeviceSlot:
                 rates = elec_rates_by_category.get(cls_name, elec_rates)
             elif active.fuel_type == "electricity":
                 rates = elec_rates
+            elif active.fuel_type == "gasoline":
+                rates = gasoline_rates if gasoline_rates is not None else np.zeros(12)
             else:
                 rates = gas_rates
             active.step(rates)
@@ -112,17 +122,27 @@ class DeviceSlot:
 
         self._last_active_device = active_list[0] if active_list else None
 
-        # Gas therms across ALL active gas devices (e.g. furnace, not the AC beside it)
+        # Gas therms across ALL active natural-gas devices
         self._last_gas_therms = sum(
             a.history["consumption"][-1]
             for a in active_list
             if a.fuel_type == "gas"
         )
 
+        # Gasoline gallons (transportation slot only)
+        self._last_gasoline_gallons = sum(
+            a.history["consumption"][-1]
+            for a in active_list
+            if a.fuel_type == "gasoline"
+        )
+
         # ── CapEx: swap install OR per-device end-of-life replacement ─────────
+        # Only log if net cost > 0 — $0 transitions (e.g. transportation) produce
+        # no timeline marker and no CapEx bar segment.
         if (self.swap_year is not None
                 and current_year == self.swap_year
-                and self.starting_state in ("gas", "none")):
+                and self.starting_state in ("gas", "none")
+                and self.net_install_cost > 0):
             self.capex_events.append((current_year, self.net_install_cost))
         else:
             for active in active_list:
@@ -146,7 +166,8 @@ class JourneyHome(mesa.Agent):
                  is_baseline_home: bool = False,
                  capex_only_slots: list | None = None,
                  solar_coverage_pct: float = 0.0,
-                 elec_rates_by_category: dict | None = None):
+                 elec_rates_by_category: dict | None = None,
+                 gasoline_rates: np.ndarray | None = None):
         """
         elec_rates_by_category: optional dict {device_class_name: (n_years, 12) array}.
           Provided in ACC mode; each electric device uses its category-specific effective
@@ -156,6 +177,7 @@ class JourneyHome(mesa.Agent):
         self.slots = slots
         self._elec_rates = elec_rates   # shape (n_years, 12)
         self._gas_rates  = gas_rates    # shape (n_years, 12)
+        self._gasoline_rates = gasoline_rates  # shape (n_years, 12) | None
         # ACC mode: per-device-class rate arrays indexed as [n_years, 12]
         self._elec_rates_by_category = elec_rates_by_category  # dict | None
         self.is_baseline_home = is_baseline_home
@@ -164,8 +186,10 @@ class JourneyHome(mesa.Agent):
 
         self.annual_opex     = 0.0
         self.cumulative_opex = 0.0
-        self.capex_by_year: dict = {}
-        self.solar_savings_history: list = []
+        self.capex_by_year:   dict = {}
+        self.capex_by_device: dict = {}  # {style_key: {year: amount}}
+        self.solar_savings_history:    list = []
+        self.gasoline_gallons_history: list = []  # annual gallons (transportation slot)
         self.cost_history_by_category:    dict = {cat: []  for cat in CATEGORY_ORDER}
         self.gas_therms_history:          list = []   # annual gas therms (all gas slots)
         self.cost_history_by_slot:        dict = {s.name: [] for s in slots}
@@ -176,8 +200,9 @@ class JourneyHome(mesa.Agent):
         year_idx     = self.model.steps - 1   # 0-based array index
         current_year = self.model.steps        # 1-indexed simulation year
 
-        elec_r = self._elec_rates[year_idx]
-        gas_r  = self._gas_rates[year_idx]
+        elec_r     = self._elec_rates[year_idx]
+        gas_r      = self._gas_rates[year_idx]
+        gasoline_r = self._gasoline_rates[year_idx] if self._gasoline_rates is not None else None
 
         # ACC mode: slice per-device rate arrays for this year
         elec_by_cat_yr = None
@@ -188,20 +213,23 @@ class JourneyHome(mesa.Agent):
             }
 
         # Sum costs per category first, then append once — fixes Phase 1 bug
-        year_category_costs = {cat: 0.0 for cat in CATEGORY_ORDER}
-        year_opex       = 0.0
-        year_elec_opex  = 0.0
-        year_capex      = 0.0
-        year_gas_therms = 0.0
+        year_category_costs    = {cat: 0.0 for cat in CATEGORY_ORDER}
+        year_opex              = 0.0
+        year_elec_opex         = 0.0
+        year_capex             = 0.0
+        year_gas_therms        = 0.0
+        year_gasoline_gallons  = 0.0
 
         for slot in self.slots:
             cost = slot.step(current_year, elec_r, gas_r, self.is_baseline_home,
-                             elec_rates_by_category=elec_by_cat_yr)
+                             elec_rates_by_category=elec_by_cat_yr,
+                             gasoline_rates=gasoline_r)
             year_opex += cost
             cat = slot.category if slot.category in year_category_costs else "Baseload"
             year_category_costs[cat] += cost
 
-            year_gas_therms += getattr(slot, "_last_gas_therms", 0.0)
+            year_gas_therms       += getattr(slot, "_last_gas_therms", 0.0)
+            year_gasoline_gallons += getattr(slot, "_last_gasoline_gallons", 0.0)
 
             self.cost_history_by_slot[slot.name].append(cost)
             active_dev = slot._last_active_device
@@ -218,6 +246,9 @@ class JourneyHome(mesa.Agent):
             for event_year, event_cost in slot.capex_events:
                 if event_year == current_year:
                     year_capex += event_cost
+                    key = slot.style_key
+                    yr_map = self.capex_by_device.setdefault(key, {})
+                    yr_map[current_year] = yr_map.get(current_year, 0.0) + event_cost
 
         # CapEx-only slots (e.g. electrical panel upgrade) — journey home only
         for cslot in self.capex_only_slots:
@@ -225,6 +256,9 @@ class JourneyHome(mesa.Agent):
             for event_year, event_cost in cslot.capex_events:
                 if event_year == current_year:
                     year_capex += event_cost
+                    key = cslot.style_key
+                    yr_map = self.capex_by_device.setdefault(key, {})
+                    yr_map[current_year] = yr_map.get(current_year, 0.0) + event_cost
 
         # Append exactly once per category per step (sum-then-append fix)
         for cat in CATEGORY_ORDER:
@@ -232,6 +266,7 @@ class JourneyHome(mesa.Agent):
 
         # Annual gas therms — pure physics, independent of social-cost rates
         self.gas_therms_history.append(year_gas_therms)
+        self.gasoline_gallons_history.append(year_gasoline_gallons)
 
         if year_capex > 0:
             self.capex_by_year[current_year] = (

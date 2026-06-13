@@ -361,163 +361,333 @@ source was used.
 
 ### 3.1 Motivation
 
-Phase 3 modeled the EV charger only as a household electricity load (`miles_per_day` ×
-efficiency tier → kWh). It had no notion of the **gasoline (ICE) vehicle being replaced**,
-so it could not show the central transportation story: the fuel-cost and externality
-delta of moving miles from gasoline to electric. Phase 4 models the household's driving
-as a **Current vs. Plan** comparison — the same idiom used for home appliances — and adds
-the climate and health externalities of gasoline combustion, the transportation analogue
-of the natural-gas social-cost panel (Phase 3 §6).
+Phase 3 modeled the EV charger only as a household electricity load. It had no notion of
+the gasoline vehicle being replaced, so it could not show the central transportation story:
+the fuel-cost and externality delta of moving miles from gasoline to electric.
 
 This section supersedes Phase 3 §2.4 (EV Charger — Miles-per-Day Model).
 
-### 3.2 Model Structure — Current vs. Plan
+Phase 4 transportation modeling was delivered in two waves:
 
-The household's driving is described by four numbers in each of two states:
+- **Wave 2 (delivered 2026-06):** Full-switch model — single ICE vehicle transitions to a
+  single EV at a chosen year. Device-model architecture (see §3.3). EV charger as
+  CapExOnlySlot. Gasoline externalities wired to Social & Health panel.
+- **Wave 3 (designed, not yet implemented):** Mixed ICE+EV household model — two concurrent
+  vehicle slots, per-scenario driving mix, pct_home_charge, external charging rate.
+  Full design in §3.5–§3.9.
 
-| Input | Unit | Meaning |
-|-------|------|---------|
-| Gasoline miles / year | mi/yr | Annual miles driven on gasoline (ICE) |
-| Fuel economy | MPG | ICE vehicle efficiency |
-| Electric miles / year | mi/yr | Annual miles driven electric |
-| Vehicle efficiency | mi/kWh | EV efficiency (battery-out — see §3.4) |
+---
 
-- **Current State** describes how the household drives today (e.g., 12,000 gasoline mi at
-  28 MPG, 0 electric mi).
-- **Plan State** (gated by a **"Plan"** checkbox, matching the journey idiom) describes the
-  future. The change between states is either a **mode shift** (miles moving from gasoline
-  to electric) or an **efficiency change** (a more efficient EV / different ICE), or both —
-  all captured by editing the four numbers.
-- **Savings** = (Current fuel cost + externality) − (Plan fuel cost + externality), per year,
-  feeding the same JC cost charts as the rest of the journey.
+### 3.2 Wave 2 — Full-Switch Model (DELIVERED)
+
+The Wave 2 model captures the most common advocate scenario: a household with one ICE car
+that is considering switching to an EV and installing a home L2 charger.
+
+**Core decision — device model architecture:**  
+Rather than a separate `TransportationConfig` dataclass, transportation was integrated into
+the existing `DeviceSlot` / `JourneyHome` machinery — the same pattern used for
+GasFurnace → HeatPumpHVAC. This reused all slot stepping, cost routing, chart integration,
+and capex timeline logic with minimal new code.
+
+**New device classes (`src/devices/vehicle.py`):**
+
+```python
+class GasolineVehicle(EnergyConsumer):
+    fuel_type = "gasoline"              # new third fuel type
+    # monthly_consumption() → (12,) gallons, seasonal weights from FHWA VMT data
+
+class ElectricVehicle(EnergyConsumer):
+    fuel_type = "electricity"
+    # monthly_consumption() → (12,) wall-kWh, same seasonal weights
+    # params: miles_per_year, ev_eff_mi_per_kwh (battery-out/dashboard), charging_efficiency
+```
+
+**Slot structure (Wave 2):**
+```
+DeviceSlot "Transportation":
+  starting_state   = "gas"
+  baseline_devices = [GasolineVehicle(miles, mpg)]
+  electric_device  = ElectricVehicle(miles, eff, charging_eff)
+  swap_year        = ev_swap_year   (shared with L2 charger install year)
+  install_cost     = 0              (car purchase not modeled)
+  rebate           = 0
+
+CapExOnlySlot "EV Charger":
+  install_year     = ev_swap_year
+  install_cost     = ev_install_cost   (L2 hardware + labor)
+  rebate           = ev_rebate
+  style_key        = "ev"
+```
+
+**Key implementation details:**
+
+- `fuel_type = "gasoline"` routes to a new `gasoline_rates` array in `DeviceSlot.step()`,
+  built in `HESModel` as `price × (1 + escalation)^year`. Gas-appliance routing is unchanged.
+- `JourneyHome` tracks `gasoline_gallons_history` (parallel to `gas_therms_history`).
+- **$0 capex guard:** `DeviceSlot.step()` only logs a capex event when `net_install_cost > 0`.
+  This prevents the Transportation slot (install_cost=0) from placing an IC marker on the
+  Journey Timeline. The EV charger CapExOnlySlot still fires normally.
+- **JC.5 timeline guard:** `make_journey_timeline_v2` skips journey and do-nothing markers
+  for DeviceSlots with `net_install_cost == 0`, for the same reason.
+- `ev_swap_planned` / `ev_swap_year` are the single reactives controlling both the
+  Transportation DeviceSlot swap and the EV Charger CapExOnlySlot install year.
+  No separate "transport_plan_enabled" reactive exists.
+
+**Gasoline price inputs:**
+- Current price ($/gal) and annual escalation (%) live in the **Transportation Detail panel**.
+- Externalities (climate $/gal, health $/gal) live in the **Social & Health panel** —
+  consistent with the natural-gas social-cost panel placement.
+
+**Wave 2 limitations (addressed in Wave 3):**
+- Assumes full ICE → EV switch: no concurrent ICE+EV driving.
+- Cannot model a household that already has an EV and is adding a charger.
+- The "Do Nothing" baseline keeps the same miles/MPG as the journey — no ability to specify
+  a different driving mix per scenario.
+- No external charging rate (all EV charging is at home).
+
+---
 
 ### 3.3 ICE (Gasoline) Vehicle — Energy, Cost, Externalities
 
 ```
-gallons_per_year   = gasoline_miles_per_year / mpg
-fuel_cost          = gallons_per_year × gasoline_price_per_gallon
-climate_externality= gallons_per_year × co2_kg_per_gallon × scc_per_kg
-health_externality = gallons_per_year × health_cost_per_gallon
+gallons_per_year    = gasoline_miles_per_year / mpg
+fuel_cost           = gallons_per_year × gasoline_price_per_gallon
+climate_externality = gallons_per_year × 0.008887 t/gal × scc_per_ton
+health_externality  = gallons_per_year × health_cost_per_gallon
 ```
 
-All three transportation externalities key off **gallons/year**, exactly as the natural-gas
-social cost keys off therms/year — so the same enable-toggle + slider pattern from Phase 3
-§6 applies. Defaults and ranges (documented in `docs/help/transportation.html`):
+Externality defaults and ranges (documented in `docs/help/transportation.html`):
 
 | Quantity | Default | Basis |
 |----------|---------|-------|
-| `co2_kg_per_gallon` | 8.887 kg/gal | EPA standard tailpipe CO₂ per gallon of gasoline (fixed constant) |
-| `scc_per_ton` | $190/t CO₂ | EPA 2023 SC-CO₂ central (2% discount). Slider $51–$340. **Shared** with the natural-gas climate slider — same SCC drives both. |
-| Climate cost (derived) | ~$1.69/gal | 0.008887 t × $190/t. Recomputes live from the SCC slider. |
-| `health_cost_per_gallon` | $0.75/gal | Central of tailpipe + upstream PM/ozone mortality (Tessum/Hill/Marshall ~$0.50 floor). Slider $0.40–$3.00. |
+| CO₂ per gallon | 8.887 kg/gal | EPA standard tailpipe CO₂ (fixed constant) |
+| `scc_per_ton` | $190/t CO₂ | EPA 2023 SC-CO₂ central (2% discount) |
+| Climate cost (derived) | ~$1.69/gal | 0.008887 t × $190/t |
+| `health_cost_per_gallon` | $0.75/gal | Tailpipe + upstream PM/ozone mortality |
 
-> **Do not stack with the "$3.80/gallon true cost" figure.** Widely-cited combined
-> estimates (e.g., Shindell/Duke 2015) bundle climate **and** health into one number;
-> our two components are deliberately non-overlapping so each is independently defensible
-> and independently toggleable. The help page documents this explicitly.
+> **Do not stack with "$3.80/gallon true cost" figures.** Combined estimates bundle climate
+> and health; our components are non-overlapping and independently toggleable.
 
-**SCC consistency note:** the social cost of carbon should be a single tool-wide
-parameter. The natural-gas climate slider (Phase 3 §6) and this gasoline climate cost
-both derive from it — a homeowner shouldn't see two different carbon prices. Implementation
-folds the Phase 3 `SocialCostConfig.climate_rate` ($/therm) and this $/gallon figure into a
-common `scc_per_ton`, with each fuel applying its own emission factor.
+**SCC consistency:** the natural-gas climate slider (Phase 3 §6) and gasoline climate cost
+share a common `scc_per_ton`. A homeowner should never see two different carbon prices.
 
 ### 3.4 Electric Vehicle — Energy and Charging Efficiency
 
 ```
-battery_kwh_per_year = electric_miles_per_year / vehicle_eff_mi_per_kwh   # battery-out
-wall_kwh_per_year    = battery_kwh_per_year / charging_efficiency         # billed at the wall
-ev_electricity_cost  = wall_kwh_per_year × electricity_rate
+battery_kwh/yr = electric_miles/yr ÷ ev_eff_mi_per_kwh    # battery-out
+wall_kwh/yr    = battery_kwh/yr ÷ charging_efficiency      # billed at the wall
 ```
 
-**Charging efficiency** captures wall-to-battery losses (AC→DC conversion, thermal):
-- Default `charging_efficiency = 0.88` (Level 2 home charging; Level 1 slightly lower).
-- Held **constant across Current and Plan** (it's a property of home charging, not the trip).
+- `ev_eff_mi_per_kwh` is **battery-out / dashboard basis** (what the car's display reports).
+  Charging efficiency is applied separately. Users entering the EPA window-sticker figure
+  (which is wall-to-wheels) should set `charging_efficiency = 1.0` to avoid double-counting.
+- Default `charging_efficiency = 0.88` (L2 home charging).
 
-**Critical input-basis decision — which mi/kWh the user enters:**
-- The input is defined as **battery-out / dashboard efficiency** (what a Tesla/onboard
-  display reports as consumption). Charging efficiency is then applied **separately** to
-  reach billed wall energy. A tooltip states this.
-- This avoids double-counting: the EPA window-sticker / fueleconomy.gov mi/kWh is already
-  **wall-to-wheels** (charging loss baked in). If a user enters that number instead,
-  applying `charging_efficiency` again would under-count range per kWh. The help page warns
-  to use the **dashboard** number, or to set charging efficiency to 1.0 if entering the
-  EPA figure.
+---
 
-The `wall_kwh_per_year` total distributes across the existing time-of-use charging
-schedule (retained from the Phase 3 `ScheduleDevice` backend) for rate purposes.
+### 3.5 Wave 3 — Mixed ICE+EV Model (DESIGNED, NOT YET IMPLEMENTED)
 
-### 3.5 The Multi-Vehicle UI Problem
+Wave 3 addresses the common scenario where a household already has **both** an ICE car and
+an EV (or is getting an EV). The journey event is installing a home L2 charger, which shifts
+EV charging from expensive external rates (public/workplace) to home electricity rates.
 
-Modeling *n* vehicles with four fields each, across Current and Plan, becomes crowded fast
-(3 vehicles × 4 fields × 2 states = 24 inputs). A naive "just enter one blended MPG" has a
-correctness trap: **miles add, but MPG does not** — fuel economy combines harmonically, so a
-12k-mi 40-MPG car plus a 6k-mi 16-MPG truck is **not** "28 MPG." Aggregation must happen at
-the **gallons** (and kWh) level, never by averaging efficiencies.
+**The core story Wave 3 tells:**
 
-**Decision — two input modes** (consistent with the conservative/central/detailed philosophy
-and the Phase 3 §13 appliance expand/collapse idiom):
+> "Do Nothing: your ICE keeps burning gasoline, your EV keeps charging at public stations.
+> Your Journey: install an L2 charger at home — shift charging from $0.25/kWh (public) to
+> $0.39/kWh (home rate), but use it far more conveniently and at night off-peak."
 
-- **Simple (default):** total annual miles split gasoline / electric, plus *one*
-  representative MPG and one mi/kWh. A tooltip directs users with very different vehicles to
-  detailed mode and warns against hand-blending MPG. Good enough for the headline advocacy
-  number.
-- **Detailed:** 1–3 vehicle slots, each collapsing to a one-line summary, **summed at the
-  consumption level** behind the scenes (Σ gallons, Σ kWh). Cap at 3 to bound UI complexity.
+The Do Nothing and Your Journey scenarios can also differ in the ICE/EV miles split —
+capturing the case where the household plans to reduce ICE miles (or eliminate them) as
+they adopt the EV more fully.
 
-A common middle ground covers most households without unbounded UI: a single primary
-vehicle plus an optional **"second vehicle"** toggle — the two-car case (efficient EV
-commuter + gasoline hauler) is exactly where per-vehicle detail matters most; beyond two,
-aggregate.
+---
 
-### 3.6 Chart Integration
+### 3.6 Wave 3 — Two-Slot Architecture
 
-Transportation fuel cost and externalities feed the existing **JC** charts on the same
-footing as home energy:
-- **JC-1 / JC-2:** transportation fuel cost is added to annual and cumulative totals;
-  gasoline externalities (when enabled) appear as the same dashed "+ social/health" overlay
-  used for natural gas, so the home and transport externalities sum into one true-cost line.
-- **JC-4:** new stacked segments — "Gasoline (fuel)", "Gasoline — climate cost",
-  "Gasoline — health cost", and "EV charging" — sit alongside the appliance segments.
-- **EU charts:** transportation energy may optionally appear as gallons-equivalent and kWh;
-  externalities are **not** shown in EU (energy quantities, not costs) — same rule as §6.
+Replace the single Transportation DeviceSlot with **two concurrent DeviceSlots** that run
+simultaneously in both scenarios. Neither slot waits for the other; the L2 charger
+CapExOnlySlot remains independent.
 
-### 3.7 New `TransportationConfig` Dataclass (sketch)
-
-```python
-@dataclass
-class VehicleState:
-    gasoline_miles_yr: float = 12_000
-    mpg:               float = 28.0
-    electric_miles_yr: float = 0.0
-    ev_eff_mi_per_kwh: float = 3.5    # battery-out / dashboard basis
-
-@dataclass
-class TransportationConfig:
-    current: VehicleState = field(default_factory=VehicleState)
-    plan:    VehicleState = field(default_factory=VehicleState)
-    plan_enabled:        bool  = False   # "Plan" checkbox
-    charging_efficiency: float = 0.88    # constant across states
-    # Gasoline externalities (mirror SocialCostConfig pattern):
-    climate_enabled: bool  = True        # uses tool-wide scc_per_ton
-    health_enabled:  bool  = True
-    health_cost_per_gallon: float = 0.75
-    # detailed mode (optional): list of VehicleState pairs, summed at gallons/kWh level
+**Slot A — TransportationICE**
+```
+starting_state   = "gas"
+baseline_devices = [GasolineVehicle(miles=ice_miles_now, mpg=mpg)]
+electric_device  = GasolineVehicle(miles=ice_miles_after, mpg=mpg)
+                   # "electric_device" here means the post-journey ICE state;
+                   # ice_miles_after may be 0 (pure EV household) or reduced
+swap_year        = ev_acquisition_year    # year the driving mix shifts
+install_cost     = 0                      # car purchase not modeled
 ```
 
-Like `SocialCostConfig`, this is a **model-level** object on `HESModel`, not injected into
-devices. The EV's wall-kWh still flows through the existing charging-schedule device for
-time-of-use rating; the ICE side is pure cost/externality arithmetic with no device.
+**Slot B — TransportationEV**
+```
+starting_state   = "none"         # no EV today (typical Do Nothing baseline)
+baseline_devices = []             # absent from Do Nothing — correct for ICE-only household
+electric_device  = ElectricVehicle(miles=ev_miles_after,
+                                   pct_home_charge=pct_home_after)
+swap_year        = ev_acquisition_year
+install_cost     = 0
+```
 
-### 3.8 Decisions Made / Open Questions
+**CapExOnlySlot "EV Charger"** (unchanged from Wave 2):
+```
+install_year = ev_charger_year    # same as ev_acquisition_year in Phase 4;
+                                  # two-event split (get EV first, charger later) is Phase 5
+install_cost = ev_install_cost
+style_key    = "ev"
+```
 
-- [x] **Current vs. Plan structure**, gated by a "Plan" checkbox — mirrors the journey idiom.
-- [x] **mi/kWh is battery-out/dashboard basis**; charging efficiency applied separately, constant across states.
-- [x] **Gasoline externalities split into non-overlapping climate + health**, each toggleable; do not stack with combined "$X/gal true cost" figures.
-- [x] **SCC is one tool-wide parameter** shared by natural-gas and gasoline climate costs.
-- [x] **Multi-vehicle: simple (default) + detailed (≤3 slots)**; aggregate at gallons/kWh, never average MPG.
-- [ ] **Default health cost per gallon:** $0.75 central proposed; confirm vs. $0.50 conservative floor for the default advocacy posture.
-- [ ] **CA-specific refinement:** CA gasoline blend (ethanol) and LCFS context — worth a help-page note; not a v1 formula change.
+**Do Nothing baseline behavior:**
+- Slot A: ICE vehicle runs with `ice_miles_now` and `mpg` every year — never changes.
+- Slot B: `starting_state="none"` + `baseline_devices=[]` → zero EV miles, zero EV cost,
+  no charger. Correct for a household that never acquires an EV.
+
+**Journey home behavior:**
+- Slot A: drives `ice_miles_now` until `ev_acquisition_year`, then `ice_miles_after`
+  (possibly 0). Same DeviceSlot swap machinery as today.
+- Slot B: absent until `ev_acquisition_year`, then EV miles at `pct_home_after` (high,
+  because the L2 charger is assumed co-installed). External charging still applies for
+  the fraction `(1 - pct_home_after)`.
+
+**Phase 5 deferral — two-event case:**
+Getting the EV one year and installing the charger a later year is rare and adds a second
+independent year slider. Deferred: in Wave 3, `ev_acquisition_year` and
+`ev_charger_install_year` are the same control.
+
+---
+
+### 3.7 Wave 3 — External Charging Rate
+
+EV miles not charged at home are billed at an external rate (public DCFC or workplace L2),
+distinct from the home electricity rate.
+
+```
+home_kwh/yr     = wall_kwh/yr × pct_home_charge
+external_kwh/yr = wall_kwh/yr × (1 − pct_home_charge)
+
+home_cost     = home_kwh/yr    × home_electricity_rate
+external_cost = external_kwh/yr × external_ev_rate
+```
+
+**`pct_home_charge` defaults:**
+| Scenario | Default | Meaning |
+|---|---|---|
+| Before charger (Slot B, journey pre-year X) | N/A — slot absent | |
+| After charger installed | 0.85 | ~15% still charged externally (long trips, convenience) |
+| Do Nothing (never charger) | N/A — slot absent | |
+
+For the typical ICE-only household starting point, Slot B doesn't exist in Do Nothing,
+so `pct_home_charge` only applies in the Journey scenario.
+
+**`external_ev_rate`** lives in the **Energy & Prices panel** (see §3.8), alongside
+gasoline price. Default $0.25/kWh (median US public L2 rate), escalation 3%/yr.
+
+---
+
+### 3.8 Wave 3 — Energy & Prices Panel
+
+All energy commodity prices live in one panel. Transportation-specific prices move here:
+
+| Price stream | Panel in Wave 2 | Panel in Wave 3 |
+|---|---|---|
+| Electricity (home rate) | Energy & Prices | no change |
+| Natural gas | Energy & Prices | no change |
+| Gasoline | Transportation Detail | **→ Energy & Prices** |
+| External EV charging | does not exist | **→ Energy & Prices (new)** |
+
+The Rates Detail window gains two new rows:
+- **Gasoline:** price $/gal + annual change % (moved from Transportation Detail)
+- **External EV charging:** $/kWh + annual change % (new; default $0.25/kWh, +3%/yr)
+
+Transportation Detail in Wave 3 contains only vehicle specs and L2 charger hardware — no
+pricing inputs.
+
+---
+
+### 3.9 Wave 3 — Transportation Detail Panel Layout
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│  ☑ Plan EV + Charger   [Year slider — ev_acquisition_year]        │
+├─────────────────────────┬──────────────────────────────────────────┤
+│  Current Driving        │  After Charger Year                     │
+│  (both scenarios start  │  (Journey home only)                    │
+│   from these values)    │                                         │
+│                         │                                         │
+│  ICE miles/yr           │  ICE miles/yr  (may be 0)              │
+│  MPG  [presets]         │  MPG                                    │
+│                         │                                         │
+│  EV miles/yr (0 if      │  EV miles/yr                           │
+│    no EV today)         │  mi/kWh  [presets]                     │
+│  mi/kWh                 │  % charged at home                     │
+│                         │  (rest → external rate in E&P panel)   │
+├─────────────────────────┴──────────────────────────────────────────┤
+│  L2 Charger Hardware                                               │
+│  [Amperage: 32A / 48A]   [Install cost]   [Rebate]               │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+Summary card (always visible):
+```
+Row 1:  [Gas mi/yr]  [MPG]  |  [EV mi/yr]  [mi/kWh]  ☑ Plan EV Charger
+Row 2 (when planned):  [Year slider]   Net EV Charger Cost (hardware only)
+```
+
+The EV fields are always visible in the summary card (not gated by the checkbox) —
+both ICE and EV specs are meaningful inputs whether or not a charger is planned,
+since the household may already have an EV.
+
+---
+
+### 3.10 Wave 3 — Model Changes Required
+
+| Component | Change |
+|---|---|
+| `ElectricVehicle` | Add `pct_home_charge` (default 1.0). `monthly_consumption()` unchanged — returns total wall kWh. |
+| `DeviceSlot.step()` | For EV `fuel_type="electricity"` with `pct_home_charge < 1.0`: split cost into home portion (home rate) + external portion (external_ev_rates). |
+| `HESModel` | Add `external_ev_price_per_kwh` + `external_ev_escalation_pct`. Build `external_ev_rates` array (shape n_years × 12), parallel to `gasoline_rates`. |
+| `JourneyHome` | Add `external_ev_kwh_history` and `external_ev_cost_history` (parallel to `gasoline_gallons_history`). |
+| `app.py` | `_build_slot_configs()` emits two slots (ICE + EV) instead of one. Energy & Prices panel gains gasoline + external EV price rows. Transportation Detail gains "After Charger Year" column. |
+| Charts | External charging cost appears as a distinct segment in JC cost charts. EU.5 (Annual Gasoline) unchanged. |
+
+---
+
+### 3.11 Decisions Made / Open Questions
+
+**Wave 2 (locked):**
+- [x] Device-model architecture (GasolineVehicle + ElectricVehicle as DeviceSlots).
+- [x] EV charger as CapExOnlySlot, not a DeviceSlot.
+- [x] `fuel_type = "gasoline"` third routing branch in DeviceSlot.step().
+- [x] `ev_swap_planned` / `ev_swap_year` are the single unified plan controls.
+- [x] $0 capex guard prevents IC marker on Journey Timeline.
+- [x] Gasoline externalities live in Social & Health panel.
+- [x] Gasoline price + escalation live in Transportation Detail (to move to E&P in Wave 3).
+
+**Wave 3 (designed):**
+- [x] Two-slot architecture (TransportationICE + TransportationEV).
+- [x] `starting_state="none"` on TransportationEV correctly produces zero EV cost in Do Nothing baseline.
+- [x] External charging rate lives in Energy & Prices panel.
+- [x] `pct_home_charge` on ElectricVehicle; cost split in DeviceSlot.step().
+- [x] Two-event case (get EV first, install charger later) deferred to Phase 5 — rare scenario, adds a second independent year slider.
+- [ ] Default `pct_home_after` (% home charged after L2 install): 0.85 proposed; confirm with advocate feedback.
+- [ ] Default external EV rate: $0.25/kWh proposed (median US public L2); confirm for CA context.
+
+---
+
+### 3.12 Chart Integration
+
+Transportation fuel cost and externalities feed the JC charts on the same footing as home energy:
+
+- **JC-1 / JC-2:** gasoline fuel cost + EV charging cost added to annual and cumulative totals.
+  Externalities appear as the dashed "+ social/health" overlay (same pattern as natural gas).
+- **JC-4 (CapEx):** EV charger hardware cost appears as an "ev"-colored segment.
+  ICE vehicle purchase cost is **not modeled** — no bar, no IC segment.
+- **JC-5 (Journey Timeline):** EV charger CapExOnlySlot places an EV marker.
+  Transportation DeviceSlot places no marker (install_cost=0 guard).
+- **EU.5 (Annual Gasoline):** bar chart of gallons/year, journey vs. do-nothing.
+  External EV kWh appears in EU.3 (Annual kWh) in Wave 3.
+- Externalities are **not** shown in EU charts (energy quantities, not costs) — same rule as §6.
 
 ---
 

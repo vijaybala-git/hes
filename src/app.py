@@ -15,6 +15,7 @@ from matplotlib.figure import Figure
 from model import HESModel
 from home_config import HomeConfig, compute_baseload_kwh
 from journey import CATEGORY_ORDER, CATEGORY_LABELS, CapExOnlySlot
+from ui.device_style import DEVICE_STYLE, DEVICE_ORDER, dstyle, device_legend_handles
 from panel_assessor import PanelAssessor
 from social_cost import SocialCostConfig
 from help_utils import (HelpButton, ChartHelpButton, HelpPopupOverlay,
@@ -140,6 +141,7 @@ _SLOT_COLORS = {
     "Dryer":                 "#D32F2F",
     "Cooktop":               "#F57C00",
     "EV Charger":            "#388E3C",
+    "Transportation":        "#C0392B",
     "Lights and Appliances": "#78909C",
 }
 
@@ -191,7 +193,7 @@ def _kwh_eq(therms: float) -> float:
     return therms * KWH_PER_THERM
 
 
-DEVICE_ORDER  = ["HVAC", "Water Heater", "Dryer", "Cooktop", "Lights and Appliances"]
+_SLOT_DISPLAY_ORDER = ["HVAC", "Water Heater", "Dryer", "Cooktop", "Lights and Appliances"]
 DEVICE_LABELS = ["HVAC", "Water Heater", "Dryer", "Cooktop", "Baseload"]
 DEVICE_COLORS = ["#0D47A1", "#1565C0", "#D0302D", "#EC9B1E", "#78909C"]
 DEVICE_ALPHAS = [0.70,      0.60,       0.55,      0.55,      0.45]
@@ -244,12 +246,25 @@ _DEFAULTS = {
     "cooktop_swap_year":      10,
     "cooktop_install_cost":   1500,
     "cooktop_rebate":         0,
-    # Journey — EV Charger
+    # Journey — EV Charger (hardware only — CapExOnlySlot)
     "ev_starting_state":      "none",
     "ev_swap_planned":        False,
     "ev_swap_year":           2,
     "ev_install_cost":        800,
     "ev_rebate":              0,
+    # Journey — Transportation (§3)
+    "transport_gasoline_miles":      12_000,
+    "transport_mpg":                 28.0,
+    "transport_plan_electric_miles": 12_000,
+    "transport_ev_eff":              3.5,
+    "transport_charging_eff":        0.88,
+    # Gasoline price model (§3)
+    "gasoline_price":                    4.50,
+    "gasoline_escalation_pct":           0,
+    "gasoline_climate_enabled":          True,
+    "gasoline_climate_cost_per_gallon":  1.69,
+    "gasoline_health_enabled":           True,
+    "gasoline_health_cost_per_gallon":   0.75,
     # Journey — Baseload efficiency
     "baseload_constant_before": 500,
     "baseload_constant_after":  300,
@@ -267,25 +282,35 @@ _DEFAULTS = {
     "ev_expanded":        False,
     "baseload_expanded":  False,
     # HVAC detail specs
-    "hvac_furnace_age": 10,
-    "hvac_ac_seer":     14,
-    "hvac_ac_age":      7,
+    "hvac_furnace_age":              10,
+    "hvac_baseline_lifespan":        20,
+    "hvac_baseline_replace_cost":    6000,
+    "hvac_ac_seer":                  14,
+    "hvac_ac_age":                   7,
     # WH detail specs
-    "wh_gas_age":              5,
-    "hw_daily_gallons":        65,
-    "gas_wh_tank_gallons":     50,
-    "hpwh_tank_gallons":       65,
-    "hpwh_ambient_location":   "conditioned",
-    "wh_inlet_temp_f":         60,
-    "wh_setpoint_f":           120,
+    "wh_gas_age":                    10,
+    "wh_baseline_lifespan":          12,
+    "wh_baseline_replace_cost":      1200,
+    "hw_daily_gallons":              65,
+    "gas_wh_tank_gallons":           50,
+    "hpwh_tank_gallons":             65,
+    "hpwh_ambient_location":         "conditioned",
+    "wh_inlet_temp_f":               60,
+    "wh_setpoint_f":                 120,
     # Dryer detail specs
-    "dryer_gas_therms_per_cycle": 0.22,
-    "dryer_loads_per_week":       5,
-    "dryer_hp_kwh_per_cycle":     1.8,
+    "dryer_gas_therms_per_cycle":    0.22,
+    "dryer_loads_per_week":          5,
+    "dryer_hp_kwh_per_cycle":        1.8,
+    "dryer_age":                     10,
+    "dryer_baseline_lifespan":       15,
+    "dryer_baseline_replace_cost":   800,
     # Cooktop detail specs
     "cooktop_gas_therms_per_meal":    0.05,
     "cooktop_meals_per_week":         14,
     "cooktop_induction_kwh_per_meal": 0.9,
+    "cooktop_age":                    10,
+    "cooktop_baseline_lifespan":      20,
+    "cooktop_baseline_replace_cost":  1000,
     # Panel upgrade
     "panel_upgrade_planned": False,
     "panel_upgrade_year":    1,
@@ -422,29 +447,39 @@ _baseload_state = solara.reactive("electric")
 _panel_state    = solara.reactive("none")     # upgrade slot: always "none" label
 
 # HVAC detail specs
-hvac_furnace_age = solara.reactive(10)   # yrs
-hvac_ac_seer     = solara.reactive(14)   # existing CentralAC SEER
-hvac_ac_age      = solara.reactive(7)    # yrs
+hvac_furnace_age             = solara.reactive(10)    # yrs — existing furnace age
+hvac_baseline_lifespan       = solara.reactive(20)    # yrs — gas furnace expected lifespan
+hvac_baseline_replace_cost   = solara.reactive(6000)  # $ — in-kind gas furnace replacement
+hvac_ac_seer                 = solara.reactive(14)    # existing CentralAC SEER
+hvac_ac_age                  = solara.reactive(7)     # yrs
 
 # Water Heater detail specs
-wh_gas_age              = solara.reactive(5)     # yrs
-hw_daily_gallons        = solara.reactive(65)    # gal/day
-hw_gallons_user_override = solara.reactive(False) # True once user moves slider
-gas_wh_tank_gallons     = solara.reactive(50)    # gal
-hpwh_tank_gallons       = solara.reactive(65)    # gal
-hpwh_ambient_location   = solara.reactive("conditioned")  # "conditioned" | "unconditioned"
-wh_inlet_temp_f         = solara.reactive(60)    # °F — annual avg cold-water inlet
-wh_setpoint_f           = solara.reactive(120)   # °F — tank setpoint
+wh_gas_age                   = solara.reactive(10)    # yrs — existing WH age
+wh_baseline_lifespan         = solara.reactive(12)    # yrs — gas WH expected lifespan
+wh_baseline_replace_cost     = solara.reactive(1200)  # $ — in-kind gas WH replacement
+hw_daily_gallons             = solara.reactive(65)    # gal/day
+hw_gallons_user_override     = solara.reactive(False)
+gas_wh_tank_gallons          = solara.reactive(50)    # gal
+hpwh_tank_gallons            = solara.reactive(65)    # gal
+hpwh_ambient_location        = solara.reactive("conditioned")
+wh_inlet_temp_f              = solara.reactive(60)    # °F
+wh_setpoint_f                = solara.reactive(120)   # °F
 
 # Dryer detail specs
-dryer_gas_therms_per_cycle = solara.reactive(0.22)
-dryer_loads_per_week       = solara.reactive(5)
-dryer_hp_kwh_per_cycle     = solara.reactive(1.8)
+dryer_gas_therms_per_cycle   = solara.reactive(0.22)
+dryer_loads_per_week         = solara.reactive(5)
+dryer_hp_kwh_per_cycle       = solara.reactive(1.8)
+dryer_age                    = solara.reactive(10)    # yrs — existing dryer age
+dryer_baseline_lifespan      = solara.reactive(15)    # yrs — gas dryer expected lifespan
+dryer_baseline_replace_cost  = solara.reactive(800)   # $ — in-kind gas dryer replacement
 
 # Cooktop detail specs
 cooktop_gas_therms_per_meal    = solara.reactive(0.05)
 cooktop_meals_per_week         = solara.reactive(14)
 cooktop_induction_kwh_per_meal = solara.reactive(0.9)
+cooktop_age                      = solara.reactive(10)    # yrs — existing cooktop age
+cooktop_baseline_lifespan        = solara.reactive(20)    # yrs — gas cooktop expected lifespan
+cooktop_baseline_replace_cost    = solara.reactive(1000)  # $ — in-kind gas cooktop replacement
 
 # Panel upgrade
 panel_upgrade_planned = solara.reactive(False)
@@ -452,10 +487,25 @@ panel_upgrade_year    = solara.reactive(1)      # install in year 1 if planned
 panel_upgrade_cost    = solara.reactive(3000)   # slider 2000–10000
 panel_upgrade_rebate  = solara.reactive(0)
 
-# EV detail specs
+# EV detail specs (retained for backward compat; not used in Transportation slot)
 ev_miles_per_year      = solara.reactive(7000)   # mi/yr
 ev_kwh_per_mile        = solara.reactive(0.30)   # kWh/mi
 ev_charging_efficiency = solara.reactive(0.90)   # 0–1
+
+# Transportation (§3)
+transport_gasoline_miles      = solara.reactive(12_000)
+transport_mpg                 = solara.reactive(28.0)
+transport_plan_electric_miles = solara.reactive(12_000)
+transport_ev_eff              = solara.reactive(3.5)     # mi/kWh battery-out
+transport_charging_eff        = solara.reactive(0.88)
+
+# Gasoline price model (§3)
+gasoline_price                   = solara.reactive(4.50)
+gasoline_escalation_pct          = solara.reactive(0)       # % per year real change
+gasoline_climate_enabled         = solara.reactive(True)
+gasoline_climate_cost_per_gallon = solara.reactive(1.69)    # $/gal @ $190/ton SCC
+gasoline_health_enabled          = solara.reactive(True)
+gasoline_health_cost_per_gallon  = solara.reactive(0.75)
 
 # Solar + Battery
 solar_planned           = solara.reactive(False)
@@ -505,10 +555,10 @@ social_health_rate     = solara.reactive(1.23)   # $/therm — CPUC D.24-07-015 
 
 # Chart selection
 chart_left  = solara.reactive("Cumulative Energy Costs")
-chart_right = solara.reactive("Cost Breakdown by Category")
+chart_right = solara.reactive("Journey Timeline")
 
 # Detail view state (§25)
-detail_open = solara.reactive(None)   # None | "hvac" | "water_heater" | "ev" | "cooktop" | "dryer" | "home" | "solar" | "rates"
+detail_open = solara.reactive(None)   # None | "hvac" | "water_heater" | "ice" | "ev" | "cooktop" | "dryer" | "home" | "solar" | "rates"
 
 # v2 §D — "Setup your home" collapse state (one bool per domain card)
 setup_collapsed = solara.reactive({"home": False, "energy": False, "social": False})
@@ -584,9 +634,13 @@ def reset_to_defaults():
     ev_expanded.set(_DEFAULTS["ev_expanded"])
     baseload_expanded.set(_DEFAULTS["baseload_expanded"])
     hvac_furnace_age.set(_DEFAULTS["hvac_furnace_age"])
+    hvac_baseline_lifespan.set(_DEFAULTS["hvac_baseline_lifespan"])
+    hvac_baseline_replace_cost.set(_DEFAULTS["hvac_baseline_replace_cost"])
     hvac_ac_seer.set(_DEFAULTS["hvac_ac_seer"])
     hvac_ac_age.set(_DEFAULTS["hvac_ac_age"])
     wh_gas_age.set(_DEFAULTS["wh_gas_age"])
+    wh_baseline_lifespan.set(_DEFAULTS["wh_baseline_lifespan"])
+    wh_baseline_replace_cost.set(_DEFAULTS["wh_baseline_replace_cost"])
     hw_daily_gallons.set(_DEFAULTS["hw_daily_gallons"])
     hw_gallons_user_override.set(False)
     gas_wh_tank_gallons.set(_DEFAULTS["gas_wh_tank_gallons"])
@@ -597,9 +651,15 @@ def reset_to_defaults():
     dryer_gas_therms_per_cycle.set(_DEFAULTS["dryer_gas_therms_per_cycle"])
     dryer_loads_per_week.set(_DEFAULTS["dryer_loads_per_week"])
     dryer_hp_kwh_per_cycle.set(_DEFAULTS["dryer_hp_kwh_per_cycle"])
+    dryer_age.set(_DEFAULTS["dryer_age"])
+    dryer_baseline_lifespan.set(_DEFAULTS["dryer_baseline_lifespan"])
+    dryer_baseline_replace_cost.set(_DEFAULTS["dryer_baseline_replace_cost"])
     cooktop_gas_therms_per_meal.set(_DEFAULTS["cooktop_gas_therms_per_meal"])
     cooktop_meals_per_week.set(_DEFAULTS["cooktop_meals_per_week"])
     cooktop_induction_kwh_per_meal.set(_DEFAULTS["cooktop_induction_kwh_per_meal"])
+    cooktop_age.set(_DEFAULTS["cooktop_age"])
+    cooktop_baseline_lifespan.set(_DEFAULTS["cooktop_baseline_lifespan"])
+    cooktop_baseline_replace_cost.set(_DEFAULTS["cooktop_baseline_replace_cost"])
     panel_upgrade_planned.set(_DEFAULTS["panel_upgrade_planned"])
     panel_upgrade_year.set(_DEFAULTS["panel_upgrade_year"])
     panel_upgrade_cost.set(_DEFAULTS["panel_upgrade_cost"])
@@ -607,6 +667,17 @@ def reset_to_defaults():
     ev_miles_per_year.set(_DEFAULTS["ev_miles_per_year"])
     ev_kwh_per_mile.set(_DEFAULTS["ev_kwh_per_mile"])
     ev_charging_efficiency.set(_DEFAULTS["ev_charging_efficiency"])
+    transport_gasoline_miles.set(_DEFAULTS["transport_gasoline_miles"])
+    transport_mpg.set(_DEFAULTS["transport_mpg"])
+    transport_plan_electric_miles.set(_DEFAULTS["transport_plan_electric_miles"])
+    transport_ev_eff.set(_DEFAULTS["transport_ev_eff"])
+    transport_charging_eff.set(_DEFAULTS["transport_charging_eff"])
+    gasoline_price.set(_DEFAULTS["gasoline_price"])
+    gasoline_escalation_pct.set(_DEFAULTS["gasoline_escalation_pct"])
+    gasoline_climate_enabled.set(_DEFAULTS["gasoline_climate_enabled"])
+    gasoline_climate_cost_per_gallon.set(_DEFAULTS["gasoline_climate_cost_per_gallon"])
+    gasoline_health_enabled.set(_DEFAULTS["gasoline_health_enabled"])
+    gasoline_health_cost_per_gallon.set(_DEFAULTS["gasoline_health_cost_per_gallon"])
     solar_planned.set(_DEFAULTS["solar_planned"])
     solar_install_year.set(_DEFAULTS["solar_install_year"])
     solar_coverage_pct.set(_DEFAULTS["solar_coverage_pct"])
@@ -667,7 +738,8 @@ def _build_slot_configs() -> list:
         "class": "GasFurnace",
         "afue": furnace_afue.value,
         "age": hvac_furnace_age.value,
-        "lifespan": 20, "installation_cost": 6000,
+        "lifespan": hvac_baseline_lifespan.value,
+        "installation_cost": hvac_baseline_replace_cost.value,
     }]
     if has_ac:
         hvac_baseline.append({
@@ -682,9 +754,11 @@ def _build_slot_configs() -> list:
         {
             "name": "HVAC",
             "category": "HVAC_Heating",
+            "style_key": "hvac",
             "starting_state": hvac_starting_state.value,
             "has_cooling_baseline": has_ac,
             "baseline_devices": hvac_baseline,
+            "existing_age": hvac_furnace_age.value,
             "electric_device": {
                 "class": "HeatPumpHVAC",
                 "cop_heating": hp_cop_heating.value,
@@ -702,18 +776,21 @@ def _build_slot_configs() -> list:
         {
             "name": "Water Heater",
             "category": "WaterHeating",
+            "style_key": "wh",
             "starting_state": wh_starting_state.value,
             "has_cooling_baseline": False,
             "baseline_devices": [{
                 "class": "GasWaterHeater",
                 "uef": gas_wh_uef.value,
                 "age": wh_gas_age.value,
-                "lifespan": 12, "installation_cost": 1200,
+                "lifespan": wh_baseline_lifespan.value,
+                "installation_cost": wh_baseline_replace_cost.value,
                 "daily_gallons_override": hw_override,
                 "tank_gallons": gas_wh_tank_gallons.value,
                 "setpoint_f": wh_setpoint_f.value,
                 "inlet_temp_f": wh_inlet_temp_f.value,
             }],
+            "existing_age": wh_gas_age.value,
             "electric_device": {
                 "class": "HeatPumpWaterHeater",
                 "uef": hpwh_uef.value,
@@ -733,14 +810,17 @@ def _build_slot_configs() -> list:
         {
             "name": "Dryer",
             "category": "Baseload",
+            "style_key": "dryer",
             "starting_state": dryer_starting_state.value,
             "has_cooling_baseline": False,
             "baseline_devices": [{
                 "class": "GasDryer",
                 "therms_per_cycle": dryer_gas_therms_per_cycle.value,
                 "cycles_per_week":  dryer_loads_per_week.value,
-                "lifespan": 15, "installation_cost": 800,
+                "lifespan": dryer_baseline_lifespan.value,
+                "installation_cost": dryer_baseline_replace_cost.value,
             }],
+            "existing_age": dryer_age.value,
             "electric_device": {
                 "class": "HeatPumpDryer",
                 "kwh_per_cycle":   dryer_hp_kwh_per_cycle.value,
@@ -756,14 +836,17 @@ def _build_slot_configs() -> list:
         {
             "name": "Cooktop",
             "category": "Baseload",
+            "style_key": "cooktop",
             "starting_state": cooktop_starting_state.value,
             "has_cooling_baseline": False,
             "baseline_devices": [{
                 "class": "GasCooktop",
                 "therms_per_meal": cooktop_gas_therms_per_meal.value,
                 "meals_per_week":  cooktop_meals_per_week.value,
-                "lifespan": 20, "installation_cost": 1000,
+                "lifespan": cooktop_baseline_lifespan.value,
+                "installation_cost": cooktop_baseline_replace_cost.value,
             }],
+            "existing_age": cooktop_age.value,
             "electric_device": {
                 "class": "InductionCooktop",
                 "kwh_per_meal":  cooktop_induction_kwh_per_meal.value,
@@ -777,27 +860,33 @@ def _build_slot_configs() -> list:
             "rebate": cooktop_rebate.value,
         },
         {
-            "name": "EV Charger",
-            "category": "Baseload",
-            "starting_state": ev_starting_state.value,
+            "name": "Transportation",
+            "category": "Transportation",
+            "style_key": "ice",
+            "starting_state": "gas",
             "has_cooling_baseline": False,
-            "baseline_devices": [],
+            "baseline_devices": [{
+                "class": "GasolineVehicle",
+                "miles_per_year": transport_gasoline_miles.value,
+                "mpg":            transport_mpg.value,
+                "lifespan": 25, "installation_cost": 0,
+            }],
+            "existing_age": 0,
             "electric_device": {
-                "class": "PhysicsEVCharger",
-                "miles_per_year":      ev_miles_per_year.value,
-                "kwh_per_mile":        ev_kwh_per_mile.value,
-                "charging_efficiency": ev_charging_efficiency.value,
-                "lifespan": 20, "installation_cost": 800,
-                "circuit_volts": 240, "circuit_amps": ev_charger_amps.value, "continuous": True,
+                "class": "ElectricVehicle",
+                "miles_per_year":     transport_plan_electric_miles.value,
+                "ev_eff_mi_per_kwh":  transport_ev_eff.value,
+                "charging_efficiency": transport_charging_eff.value,
+                "lifespan": 25, "installation_cost": 0,
             },
-            "swap_year": _eff_swap_year(ev_starting_state.value,
-                                        ev_swap_planned.value, ev_swap_year.value),
-            "install_cost": ev_install_cost.value,
-            "rebate": ev_rebate.value,
+            "swap_year": ev_swap_year.value if ev_swap_planned.value else None,
+            "install_cost": 0,
+            "rebate": 0,
         },
         {
             "name": "Lights and Appliances",
             "category": "Baseload",
+            "style_key": "lights",
             "starting_state": "gas",
             "has_cooling_baseline": False,
             "baseline_devices": [{"class": "LightsAndPlugs", "annual_kwh": 0, "lifespan": 15}],
@@ -838,6 +927,17 @@ def run_simulation():
             rebate=panel_upgrade_rebate.value,
             lifespan=25,
             install_year=panel_upgrade_year.value,
+            style_key="panel",
+        ))
+    # EV charger hardware (L2 install cost) — now a CapExOnlySlot
+    if ev_swap_planned.value:
+        capex_slots.append(CapExOnlySlot(
+            name="EV Charger",
+            install_cost=ev_install_cost.value,
+            rebate=ev_rebate.value,
+            lifespan=20,
+            install_year=ev_swap_year.value,
+            style_key="ev",
         ))
 
     # Solar derived values
@@ -854,6 +954,7 @@ def run_simulation():
             rebate=solar_rebate.value,
             lifespan=25,
             install_year=solar_install_year.value,
+            style_key="solar",
         ))
     solar_coverage = solar_coverage_pct.value if solar_planned.value else 0
 
@@ -884,6 +985,12 @@ def run_simulation():
             health_enabled=social_health_enabled.value,
             health_rate=social_health_rate.value,
         ),
+        gasoline_price_per_gallon=gasoline_price.value,
+        gasoline_escalation_pct=gasoline_escalation_pct.value / 100.0,
+        gasoline_climate_enabled=gasoline_climate_enabled.value,
+        gasoline_climate_cost_per_gallon=gasoline_climate_cost_per_gallon.value,
+        gasoline_health_enabled=gasoline_health_enabled.value,
+        gasoline_health_cost_per_gallon=gasoline_health_cost_per_gallon.value,
     )
     m.run_all()
     df = m.datacollector.get_model_vars_dataframe()
@@ -964,7 +1071,6 @@ def make_cumulative_opex(df, model, n):
     ax.set_xlabel("Year")
     ax.set_ylabel("Cumulative Energy Cost")
     ax.legend(fontsize=8, framealpha=0.6)
-    ax.set_title("JC.1 · Cumulative Energy Costs", fontsize=10, fontweight="bold", color=_CC_TICK)
     _style(ax)
     fig.tight_layout(pad=1.0)
     return fig
@@ -1005,7 +1111,6 @@ def make_annual_cost(df, model, n):
     ax.set_xlabel("Year")
     ax.set_ylabel("Annual Energy Cost")
     ax.legend(fontsize=8)
-    ax.set_title("JC.2 · Annual Cost by Year", fontsize=10, fontweight="bold", color=_CC_TICK)
     _style(ax)
     fig.tight_layout(pad=1.0)
     return fig
@@ -1039,26 +1144,40 @@ def make_cost_breakdown(df, model, n, home="journey"):
         ax.plot(x, bottom + cum, color=color, lw=0.5, alpha=0.5)
         bottom = bottom + cum
 
-    # Social & health cost layers — stacked above market categories
+    # Social & health cost layers — natural gas (stacked above market categories)
     cfg    = getattr(model, "social_cost_config", None)
     therms = np.array(hobj.gas_therms_history[:n], dtype=float)
     if cfg is not None and len(therms):
         if cfg.climate_eff > 0:
             cum = np.cumsum(therms * cfg.climate_eff)
             ax.fill_between(x, bottom, bottom + cum, color="#FB8C00",
-                            alpha=0.80, label="Climate cost")
+                            alpha=0.80, label="Gas — climate cost")
             bottom = bottom + cum
         if cfg.health_eff > 0:
             cum = np.cumsum(therms * cfg.health_eff)
             ax.fill_between(x, bottom, bottom + cum, color="#C62828",
-                            alpha=0.80, label="Health cost")
+                            alpha=0.80, label="Gas — health cost")
+            bottom = bottom + cum
+
+    # Gasoline externalities (§3)
+    gallons = np.array(hobj.gasoline_gallons_history[:n], dtype=float) if hobj.gasoline_gallons_history else np.zeros(n)
+    if gallons.sum() > 0:
+        gc = getattr(model, "gasoline_climate_cost_per_gallon", 0.0)
+        gh = getattr(model, "gasoline_health_cost_per_gallon", 0.0)
+        if gc > 0:
+            cum = np.cumsum(gallons * gc)
+            ax.fill_between(x, bottom, bottom + cum, color="#E67E22",
+                            alpha=0.80, label="Gasoline — climate")
+            bottom = bottom + cum
+        if gh > 0:
+            cum = np.cumsum(gallons * gh)
+            ax.fill_between(x, bottom, bottom + cum, color="#922B21",
+                            alpha=0.80, label="Gasoline — health")
             bottom = bottom + cum
 
     ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(_money))
     ax.set_xlabel("Year")
     ax.set_ylabel("Cumulative Cost")
-    ax.set_title(f"JC.3 · Cost by Category — {title_sub}",
-                 fontsize=10, fontweight="bold", color=_CC_TICK)
     ax.legend(fontsize=7, framealpha=0.8, loc="upper left")
     _style(ax)
     fig.tight_layout(pad=1.0)
@@ -1079,10 +1198,6 @@ def make_capex(df, model, n):
     ax.set_xlabel("Year")
     ax.set_ylabel("Replacement Cost")
     ax.legend(fontsize=8)
-    title = "Equipment Replacements (CapEx)"
-    if model.comparison_mode:
-        title += " — Scenario A"
-    ax.set_title(title, fontsize=10, fontweight="bold", color=_CC_TICK)
     _style(ax)
     fig.tight_layout(pad=1.0)
     return fig
@@ -1112,7 +1227,6 @@ def make_elec_price(df, model, n):
         ax.legend(fontsize=8)
     ax.set_xlabel("Year")
     ax.set_ylabel("Avg Electricity Price  ($/kWh)")
-    ax.set_title("Electric CAGR Projection", fontsize=10, fontweight="bold", color=_CC_TICK)
     _style(ax)
     fig.tight_layout(pad=1.0)
     return fig
@@ -1131,7 +1245,6 @@ def make_gas_price(df, model, n):
         ax.legend(fontsize=8)
     ax.set_xlabel("Year")
     ax.set_ylabel("Avg Gas Price  ($/therm)")
-    ax.set_title("Gas CAGR Projection", fontsize=10, fontweight="bold", color=_CC_TICK)
     _style(ax)
     fig.tight_layout(pad=1.0)
     return fig
@@ -1194,7 +1307,6 @@ def make_rate_trajectory(df, model, n):
     ax_elec.yaxis.set_major_formatter(
         matplotlib.ticker.FuncFormatter(lambda v, _: f"${v:.3f}"))
     ax_elec.set_ylabel("$/kWh")
-    ax_elec.set_title("ACC Rate Projection", fontsize=10, fontweight="bold")
     _style(ax_elec)
 
     # ── Gas subplot ───────────────────────────────────────────────────────────
@@ -1285,10 +1397,6 @@ def make_acc_rate_shape(df, model, n):
     )
     ax.set_xlabel("Hour of day")
     ax.set_ylabel("Month")
-    ax.set_title(
-        f"ACC Electric Rate Shape — PG&E Residential  ({model.sim_start_year} reference)",
-        fontsize=10, fontweight="bold",
-    )
     ax.text(0.01, -0.18,
             "Source: 2024 CPUC ACC Model (E3), CZ12. Shows avoided cost per hour — "
             "not retail TOU pricing. Winter overnight elevated by heating-season grid capacity.",
@@ -1367,7 +1475,6 @@ def make_journey_timeline(df, model, n):
     ax.set_xlabel("Simulation Year")
     ax.set_xlim(0.5, n + 3.5)
     ax.set_ylim(-0.7, n_rows - 0.3)
-    ax.set_title("Journey Timeline — Swap Schedule", fontsize=10, fontweight="bold", color=_CC_TICK)
     handles = [
         Line2D([0], [0], color=_CC_B, lw=2, linestyle="--", label="Gas device running"),
         Line2D([0], [0], color=_CC_J, lw=2, label="Electric device running"),
@@ -1378,6 +1485,188 @@ def make_journey_timeline(df, model, n):
                    label="CapEx event (panel / solar)")
         )
     ax.legend(handles=handles, fontsize=8, loc="lower right")
+    _style(ax)
+    fig.tight_layout(pad=1.0)
+    return fig
+
+
+# Chart 7v2 — Journey Timeline v2 (Phase 4 §4.2)
+def make_journey_timeline_v2(df, model, n):
+    """
+    Central year-rail timeline.
+    Journey events (filled markers, device color) above the rail.
+    Do-nothing wear-out events (open markers) below the rail.
+    Dashed drift connectors link each pair. Add-on slots show journey only.
+    """
+    display_slots = [s for s in model.journey_home.slots
+                     if s.name != "Lights and Appliances"]
+    capex_slots   = model.journey_home.capex_only_slots
+
+    fig = Figure(figsize=(9.5, 4.2), dpi=110)
+    fig.patch.set_facecolor("#F9F9F9")
+    ax = fig.add_subplot(111)
+    ax.set_facecolor("#F9F9F9")
+
+    # --- rail ---
+    ax.axhline(0, color=_CC_TICK, lw=1.2, zorder=2)
+    ax.set_ylim(-1.25, 1.25)
+    ax.set_xlim(-0.5, n + 0.5)
+    ax.set_xlabel("Year", fontsize=12)
+    ax.set_xticks(range(0, n + 1))
+    ax.tick_params(labelsize=12)
+    ax.get_yaxis().set_visible(False)
+    for spine in ("top", "left", "right"):
+        ax.spines[spine].set_visible(False)
+
+    # side labels
+    ax.text(-0.45, 0.18, "Your journey", fontsize=12, color=_CC_TICK,
+            va="bottom", ha="left", style="italic")
+    ax.text(-0.45, -0.18, "Do nothing",  fontsize=12, color=_CC_TICK,
+            va="top",    ha="left", style="italic")
+
+    # collision tracking for stagger — also stores placed y so connectors can read it back
+    journey_y_placed:   dict[int, list[float]] = {}   # yr → [y0, y1, ...]
+    donothing_y_placed: dict[int, list[float]] = {}
+
+    def _y_journey(yr):
+        lst = journey_y_placed.setdefault(yr, [])
+        y = 0.62 + 0.30 * len(lst)
+        lst.append(y)
+        return y
+
+    def _y_donothing(yr):
+        lst = donothing_y_placed.setdefault(yr, [])
+        y = -(0.62 + 0.30 * len(lst))
+        lst.append(y)
+        return y
+
+    def _draw_marker(x, y, color, filled, code):
+        """Draw a circle badge with 2-letter code using bbox annotation (no scatter spill)."""
+        ax.annotate(
+            code, xy=(x, y), ha="center", va="center",
+            fontsize=10, fontweight="bold",
+            color="white" if filled else color,
+            bbox=dict(
+                boxstyle="circle,pad=0.35",
+                facecolor=color if filled else "#F9F9F9",
+                edgecolor=color,
+                linewidth=1.8,
+            ),
+            zorder=5,
+        )
+
+    # Stagger cost labels above journey markers — cycle through 3 heights
+    _COST_OFFSETS = [0.22, 0.40, 0.58]
+    _ann_idx = 0
+
+    # --- DeviceSlots ---
+    for slot in display_slots:
+        color = dstyle(slot.style_key)["color"]
+        code  = dstyle(slot.style_key)["code"]
+        is_addon = slot.starting_state == "none"
+        net_cost = slot.install_cost - slot.rebate
+
+        # Journey event — skip $0 slots (e.g. Transportation vehicle switch:
+        # no car CapEx is modeled; the EV charger CapExOnlySlot carries that marker)
+        sw = slot.swap_year
+        if sw is not None and sw <= n and net_cost > 0:
+            yj = _y_journey(sw)
+            _draw_marker(sw, yj, color, filled=True, code=code)
+            v_off = _COST_OFFSETS[_ann_idx % len(_COST_OFFSETS)]
+            _ann_idx += 1
+            ax.annotate(f"${net_cost:,.0f}", xy=(sw, yj),
+                        xytext=(sw + 0.12, yj + v_off),
+                        fontsize=9, color=color, zorder=5)
+
+        # Do-nothing event — only for non-add-on slots with a baseline and modeled cost
+        if not is_addon and slot.baseline_devices and net_cost > 0:
+            dn_yr = max(1, slot.lifespan - slot.existing_age)
+            if dn_yr <= n:
+                ydn = _y_donothing(dn_yr)
+                _draw_marker(dn_yr, ydn, color, filled=False, code=code)
+
+                # Drift connector from journey marker to do-nothing marker
+                if sw is not None and sw <= n:
+                    yj_val  = journey_y_placed[sw][-1]
+                    ydn_val = donothing_y_placed[dn_yr][-1]
+                    ax.plot([sw, dn_yr], [yj_val, ydn_val],
+                            color=color, lw=1.3, linestyle="--", alpha=0.7, zorder=1)
+
+    # --- CapExOnlySlots (add-on: journey marker only) ---
+    for cslot in capex_slots:
+        if cslot.install_year is not None and cslot.install_year <= n:
+            color = dstyle(cslot.style_key)["color"]
+            code  = dstyle(cslot.style_key)["code"]
+            yj = _y_journey(cslot.install_year)
+            _draw_marker(cslot.install_year, yj, color, filled=True, code=code)
+            net = cslot.install_cost - cslot.rebate
+            v_off = _COST_OFFSETS[_ann_idx % len(_COST_OFFSETS)]
+            _ann_idx += 1
+            ax.annotate(f"${net:,.0f}", xy=(cslot.install_year, yj),
+                        xytext=(cslot.install_year + 0.12, yj + v_off),
+                        fontsize=9, color=color, zorder=5)
+
+    # --- legend (below axes, reserves space via rect) ---
+    present_keys = [s.style_key for s in display_slots
+                    if s.swap_year is not None and s.swap_year <= n]
+    present_keys += [cs.style_key for cs in capex_slots
+                     if cs.install_year is not None and cs.install_year <= n]
+    if present_keys:
+        ax.legend(
+            handles=device_legend_handles(present_keys),
+            fontsize=10, framealpha=0.85,
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.14),
+            ncol=min(4, len(present_keys)),
+        )
+
+    fig.tight_layout(rect=[0, 0.14, 1, 1])
+    return fig
+
+
+# Chart 4v2 — Equipment Replacements (CapEx) v2 (Phase 4 §4.3)
+def make_capex_v2(df, model, n):
+    """Grouped + stacked CapEx bars colored by device. Left=do nothing (hatched), right=journey (solid)."""
+    fig = Figure(figsize=(9.5, 4.0), dpi=110)
+    fig.patch.set_facecolor("#F9F9F9")
+    ax = fig.add_subplot(111)
+    ax.set_facecolor("#F9F9F9")
+
+    yrs = np.arange(1, n + 1)
+    w   = 0.38
+
+    for grp, sign, hatch in (("baseline", -1, "//"), ("journey", +1, None)):
+        home    = model.baseline_home if grp == "baseline" else model.journey_home
+        bottoms = np.zeros(len(yrs))
+        for key in DEVICE_ORDER:
+            seg = np.array([
+                home.capex_by_device.get(key, {}).get(int(y), 0) for y in yrs
+            ])
+            if not seg.any():
+                continue
+            c = dstyle(key)["color"]
+            ax.bar(yrs + sign * w / 2, seg, w, bottom=bottoms,
+                   color=("none" if hatch else c),
+                   edgecolor=c, hatch=hatch, linewidth=0.6, zorder=3)
+            bottoms += seg
+
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(_money))
+    ax.set_xlabel("Year", fontsize=11)
+    ax.set_ylabel("Replacement cost", fontsize=11)
+    ax.tick_params(labelsize=11)
+
+    keys_present = [k for k in DEVICE_ORDER
+                    if any(model.journey_home.capex_by_device.get(k, {}).values())
+                    or any(model.baseline_home.capex_by_device.get(k, {}).values())]
+    if keys_present:
+        handles = device_legend_handles(keys_present)
+        from matplotlib.patches import Patch
+        handles += [
+            Patch(facecolor="none", edgecolor="#666", hatch="//", label="Do nothing (hatched)"),
+            Patch(facecolor="#aaa", edgecolor="#666", label="Your journey (solid)"),
+        ]
+        ax.legend(handles=handles, fontsize=10, ncol=2, framealpha=0.85, loc="upper left")
+
     _style(ax)
     fig.tight_layout(pad=1.0)
     return fig
@@ -1406,7 +1695,7 @@ def render_device_chart(model, home: str = "journey",
         y_fmt   = lambda v, _: f"{v/1000:.1f}k"
         y_label = "kWh-eq / yr"
 
-    for i, name in enumerate(DEVICE_ORDER):
+    for i, name in enumerate(_SLOT_DISPLAY_ORDER):
         if is_cost:
             data = np.array(
                 jh.cost_history_by_slot.get(name, [0] * n), dtype=float)
@@ -1446,12 +1735,6 @@ def render_device_chart(model, home: str = "journey",
     ax.spines["right"].set_visible(False)
     ax.legend(handles=patches, loc="upper left", fontsize=8, framealpha=0.9, ncol=5)
 
-    home_label  = "Your journey" if home == "journey" else "Do nothing"
-    chart_label = "Annual cost by device" if is_cost \
-                  else "Annual energy use by device (kWh-eq)"
-    ax.set_title(f"{home_label} — {chart_label}",
-                 fontsize=10, fontweight="bold", loc="left", pad=8)
-
     fig.tight_layout(pad=1.0)
     return fig
 
@@ -1482,8 +1765,6 @@ def make_annual_kwh(df, model, n, home="journey"):
         matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
     ax.set_xlabel("Year")
     ax.set_ylabel("kWh / year")
-    ax.set_title(f"EU.3 · Annual kWh — {title_sub}",
-                 fontsize=10, fontweight="bold", color=_CC_TICK)
     ax.legend(fontsize=7, framealpha=0.8, loc="upper left")
     _style(ax)
     fig.tight_layout(pad=1.0)
@@ -1523,9 +1804,34 @@ def make_annual_gas(df, model, n, home="journey"):
         matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
     ax.set_xlabel("Year")
     ax.set_ylabel("Therms / year")
-    ax.set_title(f"EU.4 · Annual Gas — {title_sub}",
-                 fontsize=10, fontweight="bold", color=_CC_TICK)
     if has_any:
+        ax.legend(fontsize=7, framealpha=0.8, loc="upper right")
+    _style(ax)
+    fig.tight_layout(pad=1.0)
+    return fig
+
+
+# EU.5 — Annual Gasoline Consumption (gallons/year)
+def make_annual_gasoline(df, model, n, home="journey"):
+    """EU.5 · Gasoline consumption (gallons/year) from the Transportation slot."""
+    hobj = model.journey_home if home == "journey" else model.baseline_home
+    gallons = np.array(hobj.gasoline_gallons_history[:n], dtype=float) if hobj.gasoline_gallons_history else np.zeros(n)
+
+    fig = _new_fig(wide=False)
+    ax  = fig.add_subplot(111)
+    x   = np.arange(1, n + 1)
+
+    if gallons.sum() > 0:
+        ax.bar(x, gallons, color="#C0392B", alpha=0.82, width=0.7, label="Gasoline")
+    else:
+        ax.text(0.5, 0.5, "No gasoline consumption\nin this scenario",
+                ha="center", va="center", transform=ax.transAxes,
+                fontsize=11, color=_CC_TICK, style="italic")
+
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
+    ax.set_xlabel("Year")
+    ax.set_ylabel("Gallons / year")
+    if gallons.sum() > 0:
         ax.legend(fontsize=7, framealpha=0.8, loc="upper right")
     _style(ax)
     fig.tight_layout(pad=1.0)
@@ -1536,14 +1842,15 @@ CHART_FNS = {
     "Cumulative Energy Costs":        make_cumulative_opex,
     "Annual Cost by Year":            make_annual_cost,
     "Cost Breakdown by Category":     make_cost_breakdown,
-    "Equipment Replacements (CapEx)": make_capex,
+    "Equipment Replacements (CapEx)": make_capex_v2,
     "Electric CAGR Projection":        make_elec_price,
     "Gas CAGR Projection":                make_gas_price,
     "ACC Rate Projection":                make_rate_trajectory,
     "Electricity Rate Shape":         make_acc_rate_shape,
-    "Journey Timeline":               make_journey_timeline,
+    "Journey Timeline":               make_journey_timeline_v2,
     "Annual kWh by Device":           make_annual_kwh,
     "Annual Gas by Device":           make_annual_gas,
+    "Annual Gasoline by Vehicle":     make_annual_gasoline,
 }
 
 
@@ -1554,6 +1861,7 @@ _TOGGLE_CHART_NAMES = _DEVICE_CHART_NAMES | {
     "Cost Breakdown by Category",
     "Annual kWh by Device",
     "Annual Gas by Device",
+    "Annual Gasoline by Vehicle",
 }
 
 
@@ -1604,6 +1912,12 @@ def ChartPane(chart_name, model, df, n):
         with solara.Column(gap="4px"):
             _toggle_buttons(device_chart_home)
             fig = make_annual_gas(df, model, n, home=home)
+            solara.FigureMatplotlib(fig)
+    elif chart_name == "Annual Gasoline by Vehicle":
+        home = device_chart_home.value
+        with solara.Column(gap="4px"):
+            _toggle_buttons(device_chart_home)
+            fig = make_annual_gasoline(df, model, n, home=home)
             solara.FigureMatplotlib(fig)
     elif chart_name == "Electricity Rate Shape":
         fig = make_acc_rate_shape(df, model, n)
@@ -1910,7 +2224,8 @@ def SliderWithDefault(label, value, default, min, max, step=1, unit="", fmt="{v}
 _DETAIL_TITLES = {
     "hvac":         "🌡️ HVAC — Heating & Cooling",
     "water_heater": "🚿 Water Heater",
-    "ev":           "🚗 EV Charger",
+    "ice":          "🚗 Transportation",
+    "ev":           "🔌 EV Charger",
     "cooktop":      "🍳 Cooktop",
     "dryer":        "👕 Dryer",
     "panel":        "⚡ Electrical Panel Upgrade",
@@ -2049,6 +2364,12 @@ _DEVICE_ICONS = {
                      " stroke-linecap='round' stroke-linejoin='round'>"
                      "<rect x='6' y='3' width='12' height='18' rx='3'/>"
                      "<path d='M9 8h6M12 13v4'/></svg>"),
+    "ice":          ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                     " stroke-linecap='round' stroke-linejoin='round'>"
+                     "<path d='M2 17V9a2 2 0 012-2h9l4 4v6'/>"
+                     "<path d='M1 17h18'/><circle cx='5' cy='17.5' r='1.5'/>"
+                     "<circle cx='14' cy='17.5' r='1.5'/>"
+                     "<path d='M9 7V3M9 3h4'/></svg>"),
     "ev":           ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
                      " stroke-linecap='round' stroke-linejoin='round'>"
                      "<path d='M3 17V8a2 2 0 012-2h7a2 2 0 012 2v9'/>"
@@ -2120,6 +2441,7 @@ _PANEL_IC = {
 _DEVICE_HELP_KEY = {
     "hvac":         "hvac",
     "water_heater": "water_heater",
+    "ice":          "transportation",
     "ev":           "ev_charger",
     "cooktop":      "cooktop",
     "dryer":        "dryer",
@@ -2283,36 +2605,25 @@ def WHSummaryCard():
 
 
 @solara.component
-def EVSummaryCard():
-    """§25.3.3 — vehicle preset + plan year | charger L1/L2 | miles/yr."""
-    state = ev_starting_state.value
+def TransportationSummaryCard():
+    """Transportation — ICE miles/MPG + plan EV Charger (single plan controls)."""
     with solara.Column(classes=["device"]):
-        _card_header("ev", "EV Charger")
-        # Row 1: vehicle presets + state dropdown + plan checkbox
-        with solara.Row(gap="4px", style=_ROW_CTRL):
-            for lbl, val in [("Eff", 0.23), ("Avg", 0.30), ("SUV", 0.45)]:
-                is_sel = abs(ev_kwh_per_mile.value - val) < 0.01
-                solara.Button(
-                    lbl,
-                    on_click=lambda v=val: ev_kwh_per_mile.set(v),
-                    style=(
-                        "font-size:0.72em; padding:2px 7px; border-radius:10px;"
-                        " cursor:pointer;"
-                        + (" background:#C5CAE9; border:1px solid #7986CB; color:#3949AB;"
-                           if is_sel else
-                           " background:#F5F5F5; border:1px solid #DDD; color:#666;")
-                    ),
-                )
-            with solara.Column(style="min-width:80px; max-width:80px"):
-                solara.Select("", value=ev_starting_state, values=["none", "electric"])
-            if state == "none":
-                _PlanCheck(ev_swap_planned, "Plan")
-            elif state == "electric":
-                solara.HTML(tag="span", unsafe_innerHTML=(
-                    "<span style='font-size:0.80em; color:#2E7D32;'>✓ Installed</span>"
-                ))
-        # Row 2: full-width year slider + subscript (only when planned)
-        if state == "none" and ev_swap_planned.value:
+        _card_header("ice", "Transportation")
+        # Row 1: Gas mi/yr | MPG | Plan EV Charger
+        with solara.Row(gap="6px", style=_ROW_CTRL + " align-items:center"):
+            with solara.Column(style="min-width:90px; max-width:100px"):
+                solara.InputInt("Gas mi/yr", value=transport_gasoline_miles)
+            with solara.Column(style="min-width:64px; max-width:72px"):
+                solara.InputFloat("MPG", value=transport_mpg)
+            _PlanCheck(ev_swap_planned, "Plan EV Charger")
+        # When EV charger is planned: Row 2 electric specs + year slider + net cost
+        if ev_swap_planned.value:
+            # Row 2: Electric mi/yr | mi/kWh
+            with solara.Row(gap="6px", style=_ROW_CTRL + " align-items:center; margin-top:2px"):
+                with solara.Column(style="min-width:90px; max-width:100px"):
+                    solara.InputInt("Elec mi/yr", value=transport_plan_electric_miles)
+                with solara.Column(style="min-width:64px; max-width:72px"):
+                    solara.InputFloat("mi/kWh", value=transport_ev_eff)
             yr = ev_swap_year.value
             cal_yr = sim_start_year.value + yr - 1
             with solara.Column(style="width:100%"):
@@ -2322,15 +2633,148 @@ def EVSummaryCard():
                     f"margin-top:-4px;text-align:center'>"
                     f"Yr {yr} &nbsp;·&nbsp; {cal_yr}</div>"
                 ))
-        # Row 2: charger type
-        solara.HTML(tag="div", unsafe_innerHTML=(
-            "<div style='font-size:0.80em; color:#555; margin-top:3px;'>"
-            "Charger: <strong>L2</strong> (240 V)</div>"
-        ))
-        # Row 3: miles/yr input
-        with solara.Row(gap="6px", style=_ROW_CTRL):
-            with solara.Column(style="min-width:140px"):
-                solara.InputInt("Miles/yr", value=ev_miles_per_year)
+            net = ev_install_cost.value - ev_rebate.value
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                "<div style='font-size:0.74em; color:#888; margin-bottom:2px;'>"
+                "Net EV Charger Cost &nbsp;<em style='color:#aaa'>(hardware only — car not modeled)</em></div>"
+            ))
+            _cost_row(ev_install_cost, ev_rebate, net)
+
+
+@solara.component
+def TransportationDetail():
+    """Detail panel — Current vehicle (ICE) | EV plan + L2 charger + gasoline price."""
+    annual_gal = transport_gasoline_miles.value / max(transport_mpg.value, 0.1)
+    annual_wall_kwh = (transport_plan_electric_miles.value
+                       / max(transport_ev_eff.value, 0.1)
+                       / max(transport_charging_eff.value, 0.01))
+
+    # Top row: Plan EV Charger — same reactive as summary card
+    with solara.Row(gap="8px", style=_TOP_ROW):
+        with solara.Column(style="min-width:140px"):
+            solara.Checkbox(label="Plan EV Charger", value=ev_swap_planned)
+        if ev_swap_planned.value:
+            yr = ev_swap_year.value
+            cal_yr = sim_start_year.value + yr - 1
+            with solara.Column(style="min-width:170px"):
+                solara.SliderInt(f"Yr {yr} ({cal_yr})", value=ev_swap_year, min=1, max=25)
+
+    with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
+        # ── Left column: current ICE vehicle ──────────────────────────────────
+        with solara.Column(style=_LEFT_COL):
+            _DS("Current Vehicle (ICE)")
+            solara.Markdown(
+                f"~**{annual_gal:,.0f} gal/yr**  ·  "
+                f"{transport_gasoline_miles.value:,} mi ÷ {transport_mpg.value:.1f} MPG"
+            )
+            _DSl("Gasoline miles/yr", transport_gasoline_miles,
+                 _DEFAULTS["transport_gasoline_miles"],
+                 1_000, 30_000, step=500, unit=" mi/yr")
+            _DSl("Fuel economy", transport_mpg,
+                 _DEFAULTS["transport_mpg"],
+                 10.0, 60.0, step=0.5, unit=" MPG", fmt="{v:.1f}")
+            with solara.Row(gap="3px", style="flex-wrap:wrap; margin-top:4px"):
+                for lbl, val in [("Compact (35)", 35.0), ("Sedan (28)", 28.0),
+                                  ("SUV (20)", 20.0), ("Truck (16)", 16.0)]:
+                    is_sel = abs(transport_mpg.value - val) < 0.5
+                    solara.Button(
+                        lbl,
+                        on_click=lambda v=val: transport_mpg.set(v),
+                        style=(
+                            "font-size:0.74em; padding:2px 7px; border-radius:10px;"
+                            " cursor:pointer; margin:2px;"
+                            + (" background:#FFCCBC; border:1px solid #FF7043; color:#BF360C;"
+                               if is_sel else
+                               " background:#F5F5F5; border:1px solid #DDD; color:#555;")
+                        ),
+                    )
+
+            # Gasoline Price (ICE-specific, always visible)
+            solara.HTML(tag="hr", unsafe_innerHTML="", style="margin:8px 0; border-color:#EEE")
+            _DS("Gasoline Price")
+            _DSl("Current price", gasoline_price,
+                 _DEFAULTS["gasoline_price"],
+                 2.00, 8.00, step=0.10, unit=" $/gal", fmt="{v:.2f}")
+            _DSl("Annual change", gasoline_escalation_pct,
+                 _DEFAULTS["gasoline_escalation_pct"],
+                 -5, 10, step=1, unit=" %/yr")
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                f"<div style='font-size:0.78em; color:#777; margin-top:4px;'>"
+                f"Yr 1: <strong>${gasoline_price.value:.2f}/gal</strong>"
+                f" &nbsp;·&nbsp; "
+                f"Yr 10: <strong>${gasoline_price.value * (1 + gasoline_escalation_pct.value/100)**9:.2f}/gal</strong>"
+                f"</div>"
+            ))
+
+        # ── Right column: EV plan + L2 charger ────────────────────────────────
+        with solara.Column(style=_RIGHT_COL):
+            _DS("EV Plan")
+            if ev_swap_planned.value:
+                solara.Markdown(
+                    f"~**{annual_wall_kwh:,.0f} kWh/yr** after switch  \n"
+                    f"({transport_plan_electric_miles.value:,} mi ÷ "
+                    f"{transport_ev_eff.value:.1f} mi/kWh ÷ "
+                    f"{transport_charging_eff.value:.2f} charging eff.)"
+                )
+                _DSl("Electric miles/yr", transport_plan_electric_miles,
+                     _DEFAULTS["transport_plan_electric_miles"],
+                     1_000, 30_000, step=500, unit=" mi/yr")
+                _DSl("Vehicle efficiency", transport_ev_eff,
+                     _DEFAULTS["transport_ev_eff"],
+                     2.0, 5.5, step=0.1, unit=" mi/kWh", fmt="{v:.1f}")
+                with solara.Row(gap="3px", style="flex-wrap:wrap; margin-top:4px"):
+                    for lbl, val in [("Efficient (4.5)", 4.5), ("Average (3.5)", 3.5),
+                                      ("SUV (2.5)", 2.5)]:
+                        is_sel = abs(transport_ev_eff.value - val) < 0.1
+                        solara.Button(
+                            lbl,
+                            on_click=lambda v=val: transport_ev_eff.set(v),
+                            style=(
+                                "font-size:0.74em; padding:2px 7px; border-radius:10px;"
+                                " cursor:pointer; margin:2px;"
+                                + (" background:#C5CAE9; border:1px solid #7986CB; color:#3949AB;"
+                                   if is_sel else
+                                   " background:#F5F5F5; border:1px solid #DDD; color:#555;")
+                            ),
+                        )
+                _DSl("Charging efficiency", transport_charging_eff,
+                     _DEFAULTS["transport_charging_eff"],
+                     0.80, 0.98, step=0.01, fmt="{v:.2f}")
+            else:
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    "<div style='font-size:0.85em; color:#999; margin-top:4px;'>"
+                    "Check 'Plan EV Charger' above to configure the electric vehicle.</div>"
+                ))
+
+            # L2 Charger Hardware
+            _DS("L2 Charger Hardware")
+            if ev_swap_planned.value:
+                yr = ev_swap_year.value
+                cal_yr = sim_start_year.value + yr - 1
+                with solara.Column(style="width:100%"):
+                    solara.SliderInt(f"Install year: Yr {yr} ({cal_yr})",
+                                     value=ev_swap_year, min=1, max=25)
+                with solara.Row(gap="4px", style="margin-bottom:4px; align-items:center"):
+                    for lbl, amps in [("32 A (7.7 kW)", 32), ("48 A (11.5 kW)", 48)]:
+                        is_sel = ev_charger_amps.value == amps
+                        solara.Button(
+                            lbl,
+                            on_click=lambda a=amps: ev_charger_amps.set(a),
+                            style=(
+                                "font-size:0.74em; padding:2px 8px; border-radius:10px;"
+                                " cursor:pointer;"
+                                + (" background:#C5CAE9; border:1px solid #7986CB; color:#3949AB;"
+                                   if is_sel else
+                                   " background:#F5F5F5; border:1px solid #DDD; color:#555;")
+                            ),
+                        )
+                _elec_display(240, ev_charger_amps.value)
+                _DetailCosts(ev_install_cost, ev_rebate)
+            else:
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    "<div class='noplan' style='margin-top:3px'>"
+                    "Enable 'Plan EV Charger' above to configure.</div>"
+                ))
 
 
 @solara.component
@@ -2591,6 +3035,11 @@ def HVACDetail():
                      0.70, 0.95, 0.01, fmt="{v:.2f}")
                 _DSl("Furnace age", hvac_furnace_age, _DEFAULTS["hvac_furnace_age"],
                      0, 30, 1, unit=" yrs")
+                _DSl("Furnace lifespan", hvac_baseline_lifespan, _DEFAULTS["hvac_baseline_lifespan"],
+                     5, 30, 1, unit=" yrs")
+                solara.Markdown(
+                    f"*In-kind replacement: **${hvac_baseline_replace_cost.value:,}***",
+                    style="font-size:0.82em; color:#555; margin-top:2px;")
                 solara.Checkbox(label="Has central AC (baseline)", value=hvac_has_cooling)
                 if hvac_has_cooling.value:
                     _DSl("Central AC SEER", hvac_ac_seer, _DEFAULTS["hvac_ac_seer"], 10, 22, 1)
@@ -2697,7 +3146,12 @@ def WaterHeaterDetail():
                     f"~**{therms:.0f} therms/yr** ≈ {_kwh_eq(therms):,.0f} kWh-eq")
                 _DSl("Gas WH UEF", gas_wh_uef, _DEFAULTS["gas_wh_uef"],
                      0.55, 0.70, 0.01, fmt="{v:.2f}")
-                _DSl("Age", wh_gas_age, _DEFAULTS["wh_gas_age"], 0, 20, 1, unit=" yrs")
+                _DSl("WH age", wh_gas_age, _DEFAULTS["wh_gas_age"], 0, 20, 1, unit=" yrs")
+                _DSl("WH lifespan", wh_baseline_lifespan, _DEFAULTS["wh_baseline_lifespan"],
+                     5, 20, 1, unit=" yrs")
+                solara.Markdown(
+                    f"*In-kind replacement: **${wh_baseline_replace_cost.value:,}***",
+                    style="font-size:0.82em; color:#555; margin-top:2px;")
                 solara.Select(
                     f"Tank size: {gas_wh_tank_gallons.value} gal",
                     value=gas_wh_tank_gallons,
@@ -2888,6 +3342,13 @@ def CooktopDetail():
                      _DEFAULTS["cooktop_gas_therms_per_meal"], 0.03, 0.10, 0.01, fmt="{v:.2f}")
                 _DSl("Meals/week", cooktop_meals_per_week, _DEFAULTS["cooktop_meals_per_week"],
                      3, 21, 1, unit=" /wk")
+                _DSl("Cooktop age", cooktop_age, _DEFAULTS["cooktop_age"],
+                     0, 20, 1, unit=" yrs")
+                _DSl("Cooktop lifespan", cooktop_baseline_lifespan,
+                     _DEFAULTS["cooktop_baseline_lifespan"], 5, 30, 1, unit=" yrs")
+                solara.Markdown(
+                    f"*In-kind replacement: **${cooktop_baseline_replace_cost.value:,}***",
+                    style="font-size:0.82em; color:#555; margin-top:2px;")
             with solara.Column(style=_RIGHT_COL):
                 _DS("Replacement: Induction Cooktop")
                 kwh = _est_induction(cooktop_induction_kwh_per_meal.value,
@@ -2956,6 +3417,13 @@ def DryerDetail():
                      _DEFAULTS["dryer_gas_therms_per_cycle"], 0.15, 0.35, 0.01, fmt="{v:.2f}")
                 _DSl("Loads/week", dryer_loads_per_week, _DEFAULTS["dryer_loads_per_week"],
                      1, 14, 1, unit=" /wk")
+                _DSl("Dryer age", dryer_age, _DEFAULTS["dryer_age"],
+                     0, 15, 1, unit=" yrs")
+                _DSl("Dryer lifespan", dryer_baseline_lifespan,
+                     _DEFAULTS["dryer_baseline_lifespan"], 5, 25, 1, unit=" yrs")
+                solara.Markdown(
+                    f"*In-kind replacement: **${dryer_baseline_replace_cost.value:,}***",
+                    style="font-size:0.82em; color:#555; margin-top:2px;")
             with solara.Column(style=_RIGHT_COL):
                 _DS("Replacement: Heat Pump Dryer")
                 kwh = _est_hp_dryer(dryer_hp_kwh_per_cycle.value, dryer_loads_per_week.value)
@@ -3353,7 +3821,7 @@ def _SocialBody():
                         "<div style='font-size:0.80em; color:#AAAAAA;'>Not included</div>"
                     ))
 
-            # ── Total line ────────────────────────────────────────────────────
+            # ── Total line (natural gas) ──────────────────────────────────────
             if climate_on or health_on:
                 solara.HTML(tag="div", unsafe_innerHTML=(
                     f"<div style='font-size:0.84em; color:#37474F; padding:4px 0;'>"
@@ -3366,6 +3834,45 @@ def _SocialBody():
                 "to public health and the climate from burning gas.</div>"
             ))
 
+            # ── Gasoline externalities ────────────────────────────────────────
+            _GAS_IC = ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                       " stroke-linecap='round' stroke-linejoin='round'>"
+                       "<path d='M3 19h2l1-5h10l1 5h2'/>"
+                       "<path d='M7 14V7a2 2 0 012-2h6a2 2 0 012 2v7'/>"
+                       "<path d='M17 7h2a2 2 0 012 2v3a2 2 0 01-2 2h-2'/></svg>")
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                f"<div class='device-hd' style='margin-top:12px;'>"
+                f"<span class='di'>{_GAS_IC}</span>"
+                f"<span class='dn'>Gasoline Externalities</span>"
+                f"</div>"
+            ))
+            gas_clim_on = gasoline_climate_enabled.value
+            gas_hlth_on = gasoline_health_enabled.value
+            with solara.Column(classes=["device"]):
+                solara.Checkbox(label="Include climate cost", value=gasoline_climate_enabled)
+                if gas_clim_on:
+                    _DSl("Climate cost", gasoline_climate_cost_per_gallon,
+                         _DEFAULTS["gasoline_climate_cost_per_gallon"],
+                         0.50, 4.00, step=0.05, unit=" $/gal", fmt="{v:.2f}")
+                    solara.HTML(tag="div", unsafe_innerHTML=(
+                        "<div style='font-size:0.75em; color:#90A4AE;'>"
+                        "Default: $190/ton SC-CO₂ × 0.00889 t/gal</div>"
+                    ))
+            with solara.Column(classes=["device"]):
+                solara.Checkbox(label="Include health cost", value=gasoline_health_enabled)
+                if gas_hlth_on:
+                    _DSl("Health cost", gasoline_health_cost_per_gallon,
+                         _DEFAULTS["gasoline_health_cost_per_gallon"],
+                         0.25, 2.00, step=0.05, unit=" $/gal", fmt="{v:.2f}")
+            gas_total = (gasoline_climate_cost_per_gallon.value if gas_clim_on else 0.0) \
+                      + (gasoline_health_cost_per_gallon.value  if gas_hlth_on  else 0.0)
+            if gas_clim_on or gas_hlth_on:
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    f"<div style='font-size:0.84em; color:#37474F; padding:4px 0;'>"
+                    f"Total: <strong>${gas_total:.2f}/gal</strong>"
+                    f"<span style='color:#90A4AE;'> added to gasoline cost</span></div>"
+                ))
+
 
 # ── §25.6 Bottom zone routing ─────────────────────────────────────────────────
 
@@ -3377,6 +3884,8 @@ def DetailView(item: str, model):
             HVACDetail()
         elif item == "water_heater":
             WaterHeaterDetail()
+        elif item == "ice":
+            TransportationDetail()
         elif item == "ev":
             EVDetail()
         elif item == "cooktop":
@@ -3412,11 +3921,12 @@ def DetailDock(model):
 
     _DETAIL_ICONS = {
         k: _DEVICE_ICONS.get(k, "")
-        for k in ("hvac", "water_heater", "ev", "cooktop", "dryer",
+        for k in ("hvac", "water_heater", "ice", "ev", "cooktop", "dryer",
                   "panel", "baseload", "home", "solar", "rates")
     }
     _DETAIL_HELP = {
-        "hvac": "hvac", "water_heater": "water_heater", "ev": "ev_charger",
+        "hvac": "hvac", "water_heater": "water_heater",
+        "ice": "transportation", "ev": "ev_charger",
         "cooktop": "cooktop", "dryer": "dryer", "panel": "panel_upgrade",
         "baseload": "baseload", "home": "home_profile", "solar": "solar",
         "rates": "rates",
@@ -3794,7 +4304,7 @@ def JourneyGrid():
             with solara.Row(classes=["jgrid"]):
                 HVACSummaryCard()
                 WHSummaryCard()
-                EVSummaryCard()
+                TransportationSummaryCard()
             # Row 2 — OTHER APPLIANCES
             solara.HTML(tag="div", unsafe_innerHTML=(
                 "<div class='jrow-label'>Other Appliances</div>"))
@@ -3819,20 +4329,27 @@ def Page():
         hvac_starting_state.value, hvac_swap_planned.value, hvac_swap_year.value,
         hvac_install_cost.value, hvac_rebate.value,
         hvac_furnace_age.value, hvac_ac_seer.value, hvac_ac_age.value,
+        hvac_baseline_lifespan.value, hvac_baseline_replace_cost.value,
         wh_starting_state.value, wh_swap_planned.value, wh_swap_year.value,
         wh_install_cost.value, wh_rebate.value,
-        wh_gas_age.value, hw_daily_gallons.value, hw_gallons_user_override.value,
+        wh_gas_age.value, wh_baseline_lifespan.value, wh_baseline_replace_cost.value,
+        hw_daily_gallons.value, hw_gallons_user_override.value,
         dryer_starting_state.value, dryer_swap_planned.value, dryer_swap_year.value,
         dryer_install_cost.value, dryer_rebate.value,
         dryer_gas_therms_per_cycle.value, dryer_loads_per_week.value,
         dryer_hp_kwh_per_cycle.value,
+        dryer_age.value, dryer_baseline_lifespan.value, dryer_baseline_replace_cost.value,
         cooktop_starting_state.value, cooktop_swap_planned.value, cooktop_swap_year.value,
         cooktop_install_cost.value, cooktop_rebate.value,
         cooktop_gas_therms_per_meal.value, cooktop_meals_per_week.value,
         cooktop_induction_kwh_per_meal.value,
-        ev_starting_state.value, ev_swap_planned.value, ev_swap_year.value,
-        ev_install_cost.value, ev_rebate.value,
-        ev_miles_per_year.value, ev_kwh_per_mile.value, ev_charging_efficiency.value,
+        cooktop_age.value, cooktop_baseline_lifespan.value, cooktop_baseline_replace_cost.value,
+        ev_swap_planned.value, ev_swap_year.value, ev_install_cost.value, ev_rebate.value,
+        transport_gasoline_miles.value, transport_mpg.value,
+        transport_plan_electric_miles.value, transport_ev_eff.value, transport_charging_eff.value,
+        gasoline_price.value, gasoline_escalation_pct.value,
+        gasoline_climate_enabled.value, gasoline_climate_cost_per_gallon.value,
+        gasoline_health_enabled.value, gasoline_health_cost_per_gallon.value,
         panel_upgrade_planned.value, panel_upgrade_year.value,
         panel_upgrade_cost.value, panel_upgrade_rebate.value,
         baseload_constant_before.value, baseload_constant_after.value,
