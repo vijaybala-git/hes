@@ -143,6 +143,7 @@ _SLOT_COLORS = {
     "Cooktop":               "#F57C00",
     "EV Charger":            "#388E3C",
     "Transportation":        "#C0392B",
+    "EV Driving":            "#388E3C",
     "Lights and Appliances": "#78909C",
 }
 
@@ -255,10 +256,14 @@ _DEFAULTS = {
     "ev_rebate":              0,
     # Journey — Transportation (§3)
     "transport_gasoline_miles":      12_000,
+    "transport_ice_miles_after":     0,
     "transport_mpg":                 28.0,
     "transport_plan_electric_miles": 12_000,
     "transport_ev_eff":              3.5,
     "transport_charging_eff":        0.88,
+    "transport_pct_home_after":      0.85,
+    "external_ev_price_per_kwh":     0.25,
+    "external_ev_escalation_pct":    3,
     # Gasoline price model (§3)
     "gasoline_price":                    4.50,
     "gasoline_escalation_pct":           0,
@@ -494,12 +499,18 @@ ev_miles_per_year      = solara.reactive(7000)   # mi/yr
 ev_kwh_per_mile        = solara.reactive(0.30)   # kWh/mi
 ev_charging_efficiency = solara.reactive(0.90)   # 0–1
 
-# Transportation (§3)
-transport_gasoline_miles      = solara.reactive(12_000)
+# Transportation (§3) — Wave 3 two-slot model (§3.6)
+transport_gasoline_miles      = solara.reactive(12_000)   # ICE miles/yr now (both scenarios)
+transport_ice_miles_after     = solara.reactive(0)        # ICE miles/yr after switch (journey)
 transport_mpg                 = solara.reactive(28.0)
-transport_plan_electric_miles = solara.reactive(12_000)
+transport_plan_electric_miles = solara.reactive(12_000)   # EV miles/yr after switch (journey)
 transport_ev_eff              = solara.reactive(3.5)     # mi/kWh battery-out
 transport_charging_eff        = solara.reactive(0.88)
+transport_pct_home_after      = solara.reactive(0.85)    # fraction charged at home post-L2 (§3.13)
+
+# External (public/workplace) EV charging price model (§3.13)
+external_ev_price_per_kwh     = solara.reactive(0.25)    # $/kWh
+external_ev_escalation_pct    = solara.reactive(3)       # % per year real change
 
 # Gasoline price model (§3)
 gasoline_price                   = solara.reactive(4.50)
@@ -667,10 +678,14 @@ def reset_to_defaults():
     ev_kwh_per_mile.set(_DEFAULTS["ev_kwh_per_mile"])
     ev_charging_efficiency.set(_DEFAULTS["ev_charging_efficiency"])
     transport_gasoline_miles.set(_DEFAULTS["transport_gasoline_miles"])
+    transport_ice_miles_after.set(_DEFAULTS["transport_ice_miles_after"])
     transport_mpg.set(_DEFAULTS["transport_mpg"])
     transport_plan_electric_miles.set(_DEFAULTS["transport_plan_electric_miles"])
     transport_ev_eff.set(_DEFAULTS["transport_ev_eff"])
     transport_charging_eff.set(_DEFAULTS["transport_charging_eff"])
+    transport_pct_home_after.set(_DEFAULTS["transport_pct_home_after"])
+    external_ev_price_per_kwh.set(_DEFAULTS["external_ev_price_per_kwh"])
+    external_ev_escalation_pct.set(_DEFAULTS["external_ev_escalation_pct"])
     gasoline_price.set(_DEFAULTS["gasoline_price"])
     gasoline_escalation_pct.set(_DEFAULTS["gasoline_escalation_pct"])
     gasoline_climate_enabled.set(_DEFAULTS["gasoline_climate_enabled"])
@@ -859,6 +874,9 @@ def _build_slot_configs() -> list:
             "install_cost": cooktop_install_cost.value,
             "rebate": cooktop_rebate.value,
         },
+        # ── Transportation — two-slot model (§3.6): ICE + EV run concurrently ──
+        # Slot A — ICE: gasoline miles now → reduced/zero after switch. The
+        # "electric_device" here is the post-journey ICE state (still gasoline).
         {
             "name": "Transportation",
             "category": "Transportation",
@@ -873,10 +891,31 @@ def _build_slot_configs() -> list:
             }],
             "existing_age": 0,
             "electric_device": {
+                "class": "GasolineVehicle",
+                "miles_per_year": transport_ice_miles_after.value,
+                "mpg":            transport_mpg.value,
+                "lifespan": 25, "installation_cost": 0,
+            },
+            "swap_year": ev_swap_year.value if ev_swap_planned.value else None,
+            "install_cost": 0,
+            "rebate": 0,
+        },
+        # Slot B — EV: absent from Do Nothing (starting_state="none"); appears in
+        # the journey at swap_year, charging pct_home_after at home (rest external).
+        {
+            "name": "EV Driving",
+            "category": "Transportation",
+            "style_key": "ev",
+            "starting_state": "none",
+            "has_cooling_baseline": False,
+            "baseline_devices": [],
+            "existing_age": 0,
+            "electric_device": {
                 "class": "ElectricVehicle",
-                "miles_per_year":     transport_plan_electric_miles.value,
-                "ev_eff_mi_per_kwh":  transport_ev_eff.value,
+                "miles_per_year":      transport_plan_electric_miles.value,
+                "ev_eff_mi_per_kwh":   transport_ev_eff.value,
                 "charging_efficiency": transport_charging_eff.value,
+                "pct_home_charge":     transport_pct_home_after.value,
                 "lifespan": 25, "installation_cost": 0,
             },
             "swap_year": ev_swap_year.value if ev_swap_planned.value else None,
@@ -995,6 +1034,8 @@ def run_simulation():
         gasoline_climate_cost_per_gallon=gasoline_climate_cost_per_gallon.value,
         gasoline_health_enabled=gasoline_health_enabled.value,
         gasoline_health_cost_per_gallon=gasoline_health_cost_per_gallon.value,
+        external_ev_price_per_kwh=external_ev_price_per_kwh.value,
+        external_ev_escalation_pct=external_ev_escalation_pct.value / 100.0,
     )
     m.run_all()
     df = m.datacollector.get_model_vars_dataframe()
