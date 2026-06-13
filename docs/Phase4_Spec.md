@@ -670,6 +670,12 @@ since the household may already have an EV.
 - [x] External charging rate lives in Energy & Prices panel.
 - [x] `pct_home_charge` on ElectricVehicle; cost split in DeviceSlot.step().
 - [x] Two-event case (get EV first, install charger later) deferred to Phase 5 — rare scenario, adds a second independent year slider.
+- [x] **External EV charging is a separate cost stream** (§3.13) — NOT discounted electricity.
+  Two-pass split in `DeviceSlot.step()`; home portion only counts in `year_elec_opex`
+  (keeps the §8 solar cap clean). External portion still appears in JC totals.
+- [x] **EU.3 reports home-charged kWh only;** external charging surfaced in new EU.6 (§3.14).
+- [x] **New EU.6 Energy-Mix Timeline** — stacked area: Gas, Utility-Elec, Solar-Elec, External-Elec
+  in kWh-equivalent (§3.14).
 - [ ] Default `pct_home_after` (% home charged after L2 install): 0.85 proposed; confirm with advocate feedback.
 - [ ] Default external EV rate: $0.25/kWh proposed (median US public L2); confirm for CA context.
 
@@ -686,8 +692,107 @@ Transportation fuel cost and externalities feed the JC charts on the same footin
 - **JC-5 (Journey Timeline):** EV charger CapExOnlySlot places an EV marker.
   Transportation DeviceSlot places no marker (install_cost=0 guard).
 - **EU.5 (Annual Gasoline):** bar chart of gallons/year, journey vs. do-nothing.
-  External EV kWh appears in EU.3 (Annual kWh) in Wave 3.
+- **EU.3 (Annual kWh by Device):** the EV slot reports **home-charged kWh only**
+  (the portion on the home electric meter). External (public/workplace) charging is
+  **excluded** from EU.3 and surfaced separately in the new EU.6 energy-mix timeline (§3.14).
 - Externalities are **not** shown in EU charts (energy quantities, not costs) — same rule as §6.
+
+---
+
+### 3.13 Wave 3 — Three-Stream Cost Model (locked)
+
+EV charging is split into a **home stream** and an **external stream** that are
+*structurally* distinct — not a single electricity cost at a blended rate. This keeps
+`year_elec_opex` clean, which §8 (Solar) depends on for its savings cap
+(`solar_saving = min(retail_savings + export_credit, year_elec_opex)`).
+
+**Why blending is wrong:** if the EV reports its full home+external cost as
+`fuel_type="electricity"`, that cost lands in `year_elec_opex` (journey.py:
+`if active_dev.fuel_type == "electricity": year_elec_opex += cost`). Solar would then
+be allowed to "offset" public DCFC charging that never appears on the home electric bill.
+
+**The three energy-cost streams and their accounting rules:**
+
+| Stream | Rate array | In `year_elec_opex`? | Solar-offsettable? | Tracked on JourneyHome |
+|---|---|---|---|---|
+| EV home kWh | `elec_rates` (home retail) | **yes** | yes | (part of normal elec opex) |
+| EV external kWh | `external_ev_rates` | **no** | no | `external_ev_cost_history`, `external_ev_kwh_history` |
+| Gasoline | `gasoline_rates` | no | no | `gasoline_gallons_history` (existing) |
+
+**Implementation contract — `DeviceSlot.step()`:**
+
+The EV split is computed two-pass, never as a blended rate:
+
+```
+wall_kwh        = ElectricVehicle.monthly_consumption().sum()   # total wall kWh
+home_kwh        = wall_kwh × pct_home_charge
+external_kwh    = wall_kwh × (1 − pct_home_charge)
+
+home_cost       = home_kwh     × elec_rate            # → counts as electricity OpEx
+external_cost   = external_kwh × external_ev_rate     # → separate stream
+
+slot step_cost  = home_cost + external_cost            # total still flows to year_opex
+```
+
+`DeviceSlot.step()` exposes two new per-step accessors, parallel to the existing
+`_last_gas_therms` / `_last_gasoline_gallons` (journey.py:151–162):
+
+```
+_last_external_ev_kwh   = external_kwh   # 0.0 for every non-EV slot / pct_home_charge == 1.0
+_last_external_ev_cost  = external_cost  # 0.0 likewise
+```
+
+**`JourneyHome.step()` accounting rule:** only the **home portion** of EV cost is added
+to `year_elec_opex`. The external portion is still part of `year_opex` (so it shows in
+JC totals) but is excluded from `year_elec_opex` and therefore from the solar cap:
+
+```
+year_elec_opex += cost − _last_external_ev_cost   # for the EV slot only; external removed
+```
+
+New JourneyHome history lists (parallel to `gasoline_gallons_history`):
+`external_ev_kwh_history`, `external_ev_cost_history` — appended once per step.
+
+**`ElectricVehicle`:** gains `pct_home_charge: float = 1.0`. `monthly_consumption()`
+is unchanged (returns total wall kWh); the split is performed by the slot, not the device.
+
+**`HESModel`:** builds `external_ev_rates` (shape `n_years × 12`) exactly parallel to
+`gasoline_rates` — `external_ev_price_per_kwh × (1 + external_ev_escalation_pct)^yr`.
+Threaded into `JourneyHome` and down to `DeviceSlot.step()` as a new kwarg.
+
+---
+
+### 3.14 Wave 3 — EU.6 Energy-Mix Timeline (new chart)
+
+A stacked-area chart telling the decarbonization story: how the home's annual energy
+**sources** shift across the journey as gas is electrified and solar/EV come online.
+
+**Series (stacked, kWh-equivalent):**
+
+| Series | Source quantity | Conversion | Color |
+|---|---|---|---|
+| Gas | `gas_therms_history` | × 29.3 kWh/therm (`KWH_PER_THERM`, display-only) | `#FB8C00` (gas orange) |
+| Utility-Elec | grid kWh = total home elec kWh − solar self-consumed | — | `#1565C0` (grid blue) |
+| Solar-Elec | `solar_self_consumed_history` | — | `#00897B` (solar teal, `_CC_SOLAR`) |
+| External-Elec | `external_ev_kwh_history` | — | `#C0392B` (external red) |
+
+**Axis & units:** y-axis in **kWh-equivalent** so gas (converted via the 29.3 display
+factor — never in simulation internals, per the hard rule) stacks with the three
+electricity streams. x-axis = simulation year. One chart per home (journey vs. do-nothing
+via the existing `device_chart_home` toggle).
+
+**The story it shows (journey home, typical run):**
+- Year 1: tall gas band + utility-elec band, no solar, no external.
+- Post-electrification: gas band collapses toward zero.
+- Post-solar: utility-elec band shrinks as solar-elec (teal) grows underneath it.
+- External-elec (red) is a thin band that appears when an EV charges partly off-home;
+  it shrinks the more `pct_home_charge` rises.
+
+**Registration:**
+- `CHART_OPTIONS`: add `"Energy Mix Timeline"`.
+- `CHART_CODES`: `"Energy Mix Timeline": "EU.6"`.
+- Chart-function dict: `"Energy Mix Timeline": make_energy_mix_timeline`.
+- Externalities are **not** shown here (energy quantities, not costs) — same rule as §6.
 
 ---
 
