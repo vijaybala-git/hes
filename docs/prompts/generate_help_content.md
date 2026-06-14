@@ -51,6 +51,39 @@ as live.
 
 ---
 
+## List every default value — and where defaults live
+
+Each help page must explicitly state the out-of-the-box default for every control it
+documents, so a reader knows exactly what the app starts with before they touch anything.
+Pull each default from the code's authoritative source, using the FIRST source below that
+applies. Never invent or infer a value the code does not set.
+
+1. **`_DEFAULTS` dict in `src/app.py`** — the canonical default for every user-facing
+   reactive control: sliders, checkboxes, dropdowns, number inputs. This is the primary
+   registry; most page defaults live here (e.g., `transport_mpg`, `solar_panels`,
+   `external_ev_price_per_kwh`, `social_climate_rate`). Match the dict key to the control.
+2. **JSON data files under `data/`** — defaults the UI loads rather than hard-codes:
+   published rates (`data/rates/*.json`), climate constants (`data/climate/*.json`), and the
+   default home/appliance/slot configs (`data/homes/*.json`, `data/appliances/*.json`).
+3. **Dataclass field defaults and function-signature defaults in `src/`** — e.g.,
+   `HomeConfig`, `SolarBatteryConfig`, device `__init__` parameters, and `HESModel.__init__`.
+   These cover physics/engine defaults that are not exposed as a reactive control.
+4. **Module-level constants** — conversion factors and lookup tables (e.g., the
+   bedroom-scaling table, `KWH_PER_THERM`).
+
+Rules:
+- A page lists the defaults for the controls *that page documents* — no more, no less.
+- If the same default is defined in more than one place, the values **must agree**. When
+  they don't, state the one the user actually gets (the `_DEFAULTS`/JSON value) and flag the
+  mismatch in your report.
+- Use one uniform line format for every default so pages read consistently:
+  `Control name — value unit (where to change it)`.
+  Example: `Gasoline price — $4.50/gal (Energy & Prices → detail)`.
+- Defaults are user-facing values, not code identifiers: write "Heat-pump heating
+  efficiency — 3.5" not "`hp_cop_heating` = 3.5".
+
+---
+
 ## Output format (the build script depends on this)
 
 Reproduce the existing structure exactly. Keep the editor-instructions header block at the
@@ -71,6 +104,12 @@ add genuinely new sections — and call those out in your report.
 
 ### Key assumptions
 <the defaults, and what to change if they don't fit this household>
+
+### Default values
+<every control this page documents, one per line, in the uniform format
+"Control name — value unit (where to change it)". Values come from the authoritative
+source per "List every default value" above. Include this section on any page that has at
+least one adjustable control; omit it only for pure explainer pages with no controls.>
 
 ### Data sources
 <every quantitative claim traced to a real source: CPUC, EPA, EIA, NOAA/NREL, PVWatts, AGA, ENERGY STAR, NEC, FHWA>
@@ -115,6 +154,10 @@ Bad: "The `SolarBatteryConfig` derives `self_consumption_fraction` from `battery
    - Every number matches a code default or a cited source.
    - No code identifiers and no unexpanded acronyms leaked into user-facing text.
    - Any specced-but-unimplemented feature is marked "future release," not described as live.
+   - Every page with at least one control has a `### Default values` block, and every
+     control documented on the page appears in it with a value that matches its authoritative
+     source (`_DEFAULTS` / JSON / dataclass / constant). No listed default is one the code
+     does not set.
 5. Write the full updated `docs/help/help_content.md`.
 6. Produce a short **review report** (in chat, not in the file):
    - Sections added / updated / left unchanged.
@@ -122,6 +165,9 @@ Bad: "The `SolarBatteryConfig` derives `self_consumption_fraction` from `battery
    - Spec↔code discrepancies you resolved in favor of the code.
    - Any numbers you could not verify against code or a source — flag these for the author
      to confirm.
+   - Defaults coverage: any control whose default you could not locate in the code, and any
+     default that conflicts between `_DEFAULTS`, JSON data files, and dataclass/function
+     signatures (state which value you published and why).
 
 ---
 
