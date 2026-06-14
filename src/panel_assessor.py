@@ -41,49 +41,93 @@ def _status(util_pct: float) -> str:
 
 
 class PanelAssessor:
-    """NEC Article 220 standard-method load calculation for a dwelling."""
+    """NEC Article 220 dwelling load calculation.
 
-    def __init__(self, floor_area_sqft: int, panel_amps: int):
+    Two methods are supported (selected via ``method``):
+
+      "optional" (default, NEC 220.82) — the general lighting/receptacle load plus
+        ALL non-HVAC appliance loads are pooled and reduced by the Table 220.42
+        demand factor (first 10 kVA at 100%, remainder at 40%); space-conditioning
+        (HVAC) is then added at 100% per 220.82(C). This is the method Bay Area
+        permit offices use (matches the City of Mountain View / local worksheets)
+        and is what lets a fully-electrified home fit under a smaller service.
+
+      "standard" (NEC 220.42/220.52) — the demand factor applies ONLY to general
+        lighting + small-appliance + laundry; every named appliance (HVAC included)
+        is added at 100%. Always yields a higher number; offered for comparison.
+    """
+
+    # Space-conditioning device classes — added at 100% under the optional method.
+    HVAC_CLASSES = {"HeatPumpHVAC", "CentralAC", "GasFurnace"}
+
+    def __init__(self, floor_area_sqft: int, panel_amps: int,
+                 method: str = "optional"):
         self.floor_area_sqft = floor_area_sqft
         self.panel_amps = panel_amps
+        self.method = method
 
-    # ── Step 1 — general load with demand factor ───────────────────────────────
+    # ── General load ───────────────────────────────────────────────────────────
+    def general_nameplate_va(self) -> float:
+        """General lighting + small-appliance + laundry, before any demand factor."""
+        return float(self.floor_area_sqft * GENERAL_VA_PER_SQFT
+                     + SMALL_APPLIANCE_VA + LAUNDRY_VA)
+
+    @staticmethod
+    def _demand_factored(va: float) -> float:
+        """Table 220.42: first 10 kVA at 100%, remainder at 40%."""
+        if va <= DEMAND_THRESHOLD_VA:
+            return float(va)
+        return DEMAND_THRESHOLD_VA + (va - DEMAND_THRESHOLD_VA) * DEMAND_FACTOR_ABOVE
+
     def general_demand_va(self) -> float:
-        g = (self.floor_area_sqft * GENERAL_VA_PER_SQFT
-             + SMALL_APPLIANCE_VA + LAUNDRY_VA)
-        if g <= DEMAND_THRESHOLD_VA:
-            return float(g)
-        return DEMAND_THRESHOLD_VA + (g - DEMAND_THRESHOLD_VA) * DEMAND_FACTOR_ABOVE
+        """Standard-method general bucket (demand factor on general load only)."""
+        return self._demand_factored(self.general_nameplate_va())
 
-    # ── Step 2 — named appliance load (no demand factor) ───────────────────────
-    def appliance_va(self, active_devices: list) -> float:
-        """Sum named-appliance VA for the active electric devices in a given year.
+    # ── Per-device nameplate VA ────────────────────────────────────────────────
+    def _device_va(self, d) -> float:
+        """NEC nameplate VA for one device. Gas → 0; lights folded into general."""
+        if getattr(d, "fuel_type", None) != "electricity":
+            return 0.0
+        cls = type(d).__name__
+        if cls == "InductionCooktop":
+            return RANGE_DEMAND_VA                              # NEC 220.55 fixed
+        if cls == "HeatPumpDryer":
+            return max(DRYER_MIN_VA, d.rated_va)                # NEC 220.54
+        if cls in ("PhysicsEVCharger", "EVCharger", "ElectricVehicle"):
+            factor = EV_CONTINUOUS_FACTOR if d.continuous else 1.0
+            return d.rated_va * factor                          # NEC 625.42 / 210.20
+        if cls == "LightsAndPlugs":
+            return 0.0                                          # in general load
+        return d.rated_va                                      # HPWH, HVAC, etc.
 
-        Gas devices contribute 0 (rated_va == 0). LightsAndPlugs is covered by the
-        general load. Cooktop uses the NEC fixed range allowance, not its nameplate.
-        """
-        total = 0.0
+    def _split_va(self, active_devices: list) -> tuple[float, float]:
+        """Return (hvac_va, other_appliance_va) for the active electric devices."""
+        hvac = other = 0.0
         for d in active_devices:
-            if getattr(d, "fuel_type", None) != "electricity":
+            va = self._device_va(d)
+            if va == 0.0:
                 continue
-            cls = type(d).__name__
-            if cls == "InductionCooktop":
-                total += RANGE_DEMAND_VA                       # NEC 220.55 fixed
-            elif cls == "HeatPumpDryer":
-                total += max(DRYER_MIN_VA, d.rated_va)         # NEC 220.54
-            elif cls in ("PhysicsEVCharger", "EVCharger"):
-                factor = EV_CONTINUOUS_FACTOR if d.continuous else 1.0
-                total += d.rated_va * factor                   # NEC 210.20
-            elif cls == "LightsAndPlugs":
-                continue                                       # in general load
+            if type(d).__name__ in self.HVAC_CLASSES:
+                hvac += va
             else:
-                total += d.rated_va                            # HVAC, HPWH, CentralAC
-        return total
+                other += va
+        return hvac, other
 
-    # ── Step 3 — total service amps ────────────────────────────────────────────
+    def appliance_va(self, active_devices: list) -> float:
+        """Total named-appliance VA at 100% (HVAC + others). Standard-method Step 2."""
+        hvac, other = self._split_va(active_devices)
+        return hvac + other
+
+    # ── Total service load ─────────────────────────────────────────────────────
+    def nec_load_va(self, active_devices: list) -> float:
+        hvac, other = self._split_va(active_devices)
+        if self.method == "optional":
+            pooled = self._demand_factored(self.general_nameplate_va() + other)
+            return pooled + hvac
+        return self.general_demand_va() + hvac + other
+
     def nec_load_amps(self, active_devices: list) -> float:
-        total_va = self.general_demand_va() + self.appliance_va(active_devices)
-        return total_va / SERVICE_VOLTS
+        return self.nec_load_va(active_devices) / SERVICE_VOLTS
 
     # ── Active-device resolution (replicates DeviceSlot.step swap logic) ────────
     @staticmethod
@@ -107,7 +151,11 @@ class PanelAssessor:
                   and ss in ("gas", "none")):
                 if slot.electric_device is not None:
                     active.append(slot.electric_device)
-                if year == slot.swap_year:
+                # Only flag swaps that actually add electrical load — an ICE→ICE
+                # (gasoline) or gas→gas swap changes nothing on the panel.
+                if (year == slot.swap_year
+                        and getattr(slot.electric_device, "fuel_type", None)
+                        == "electricity"):
                     newly.append(slot.name)
             else:
                 active.extend(slot.baseline_devices)

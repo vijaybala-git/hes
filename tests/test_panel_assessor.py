@@ -99,12 +99,41 @@ def test_induction_uses_fixed_range_allowance_not_nameplate():
 
 # ── Total service amps (Step 3) ─────────────────────────────────────────────────
 
-def test_nec_load_amps_worked_example():
-    pa = PanelAssessor(1800, 200)
+def test_nec_load_amps_standard_worked_example():
+    pa = PanelAssessor(1800, 200, method="standard")
     devices = [_hp_hvac(30), _ev(32), _hpwh(15), _induction(40), _hp_dryer(30)]
-    # (9900 + 35600) / 240 = 189.583...
+    # Standard: general 9900 + appliances 35600 at 100% = 45500 → /240 = 189.583
     assert pa.nec_load_amps(devices) == pytest.approx(45500 / SERVICE_VOLTS)
     assert pa.nec_load_amps(devices) == pytest.approx(189.583, abs=0.01)
+
+
+def test_nec_load_amps_optional_worked_example():
+    # Optional (220.82) is the default. Same devices as the standard example:
+    #   general nameplate 9900 + non-HVAC appliances (EV 9600 + HPWH 3600
+    #     + induction 8000 + dryer 7200 = 28400) = 38300 pooled
+    #   demand-factored: 10000 + (38300-10000)*0.40 = 21320
+    #   HVAC 7200 added at 100% → 28520 VA → /240 = 118.83 A
+    pa = PanelAssessor(1800, 200)
+    devices = [_hp_hvac(30), _ev(32), _hpwh(15), _induction(40), _hp_dryer(30)]
+    assert pa.method == "optional"
+    assert pa.nec_load_va(devices) == pytest.approx(28520.0)
+    assert pa.nec_load_amps(devices) == pytest.approx(28520 / SERVICE_VOLTS)
+    assert pa.nec_load_amps(devices) == pytest.approx(118.833, abs=0.01)
+
+
+def test_optional_method_lower_than_standard():
+    devices = [_hp_hvac(30), _ev(32), _hpwh(15), _induction(40), _hp_dryer(30)]
+    opt = PanelAssessor(1800, 200, method="optional").nec_load_amps(devices)
+    std = PanelAssessor(1800, 200, method="standard").nec_load_amps(devices)
+    assert opt < std
+
+
+def test_electric_vehicle_recognized_with_continuous_factor():
+    # The journey models the EV as an ElectricVehicle (not EVCharger) — it must
+    # still get the 1.25 continuous factor in the panel calc.
+    ev = _named("ElectricVehicle", amps=32, continuous=True)
+    pa = PanelAssessor(1800, 200)
+    assert pa._device_va(ev) == pytest.approx(7680 * EV_CONTINUOUS_FACTOR)
 
 
 # ── Status thresholds (Step 4) ──────────────────────────────────────────────────
@@ -170,9 +199,10 @@ def test_timeline_existing_ac_counts_every_year():
 def test_timeline_electric_start_counts_from_year_one():
     slot = _Slot("Water Heater", "electric", [], _hpwh(15), swap_year=None)
     journey = _JourneyStub([slot])
-    pa = PanelAssessor(1800, 200)
+    pa = PanelAssessor(1800, 200)  # optional method (default)
     tl = pa.journey_load_timeline(journey, 3)
-    expected = (9900 + 3600) / 240
+    # Optional: pool = general 9900 + HPWH 3600 = 13500 → 10000 + 3500*0.4 = 11400
+    expected = 11400 / 240
     assert tl[0].service_amps == pytest.approx(expected, abs=0.01)
 
 

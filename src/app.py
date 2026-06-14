@@ -107,6 +107,7 @@ CHART_OPTIONS = [
     "Annual Cost by Year",
     "Cost Breakdown by Category",
     "Equipment Replacements (CapEx)",
+    "Estimated Electrical Load",
     "Electric CAGR Projection",
     "Gas CAGR Projection",
     "ACC Rate Projection",
@@ -126,6 +127,7 @@ CHART_CODES = {
     "Cost Breakdown by Category":     "JC.3",
     "Equipment Replacements (CapEx)": "JC.4",
     "Journey Timeline":               "JC.5",
+    "Estimated Electrical Load":      "JC.6",
     "Cost by Device":                 "EU.1",
     "Energy Use by Device":           "EU.2",
     "Annual kWh by Device":           "EU.3",
@@ -212,6 +214,7 @@ _DEFAULTS = {
     "year_built":             1985,
     "insulation_quality":     "average",
     "panel_amps":             200,
+    "panel_calc_method":      "optional",   # NEC 220.82 optional (default) | standard
     # Electrical nameplate sizing (Phase 3 §2.5)
     "hvac_tonnage":           3.0,
     "ev_charger_amps":        32,
@@ -381,6 +384,7 @@ square_footage     = solara.reactive(1800)
 year_built         = solara.reactive(1985)
 insulation_quality = solara.reactive("average")
 panel_amps         = solara.reactive(200)        # Phase 3 §5 — service size 100/150/200
+panel_calc_method  = solara.reactive("optional") # NEC load calc: "optional" (220.82) | "standard"
 
 # Electrical nameplate sizing (Phase 3 §2.5) — drive panel assessment, inert for energy
 hvac_tonnage    = solara.reactive(3.0)   # slider 2.0–5.0; amps = tonnage × 10
@@ -597,6 +601,7 @@ def reset_to_defaults():
     year_built.set(_DEFAULTS["year_built"])
     insulation_quality.set(_DEFAULTS["insulation_quality"])
     panel_amps.set(_DEFAULTS["panel_amps"])
+    panel_calc_method.set(_DEFAULTS["panel_calc_method"])
     hvac_tonnage.set(_DEFAULTS["hvac_tonnage"])
     ev_charger_amps.set(_DEFAULTS["ev_charger_amps"])
     induction_amps.set(_DEFAULTS["induction_amps"])
@@ -933,6 +938,10 @@ def _build_slot_configs() -> list:
                 "ev_eff_mi_per_kwh":   transport_ev_eff.value,
                 "charging_efficiency": transport_charging_eff.value,
                 "pct_home_charge":     transport_pct_home_after.value,
+                # L2 home charger nameplate → drives the NEC panel load (continuous).
+                # The do-nothing / pre-swap EV charges externally (no circuit) → 0 VA.
+                "circuit_volts": 240, "circuit_amps": ev_charger_amps.value,
+                "continuous": True,
                 "lifespan": 25, "installation_cost": 0,
             },
             "swap_year": ev_swap_year.value if ev_swap_planned.value else None,
@@ -1717,6 +1726,23 @@ def make_capex_v2(df, model, n):
     ax.set_ylabel("Replacement cost", fontsize=11)
     ax.tick_params(labelsize=11)
 
+    # ── Net CapEx over the period (transparency) — journey vs do-nothing total ──
+    # All CapEx is in today's dollars (no inflation/escalation), so these are
+    # straight nominal sums. Positive net = electrification costs more capital.
+    j_total = sum(model.journey_home.capex_by_year.values())
+    b_total = sum(model.baseline_home.capex_by_year.values())
+    net     = j_total - b_total
+    sign    = "+" if net >= 0 else "−"
+    net_clr = "#B23A2E" if net >= 0 else "#2E7D32"
+    box = (f"Net CapEx over {n} yr (today's $)\n"
+           f"Your journey:   ${j_total:,.0f}\n"
+           f"Do nothing:     ${b_total:,.0f}\n"
+           f"Net:           {sign}${abs(net):,.0f}")
+    ax.text(0.985, 0.97, box, transform=ax.transAxes, ha="right", va="top",
+            fontsize=9.5, family="monospace", linespacing=1.4, zorder=6,
+            bbox=dict(boxstyle="round,pad=0.55", facecolor="white",
+                      edgecolor=net_clr, linewidth=1.5, alpha=0.95))
+
     keys_present = [k for k in DEVICE_ORDER
                     if any(model.journey_home.capex_by_device.get(k, {}).values())
                     or any(model.baseline_home.capex_by_device.get(k, {}).values())]
@@ -1955,8 +1981,63 @@ def make_energy_mix_timeline(df, model, n, home="journey"):
     return fig
 
 
+# Chart JC.6 — Estimated Electrical Load (NEC panel load over the journey)
+def make_panel_load_timeline(df, model, n):
+    fig = _new_fig()
+    ax  = fig.add_subplot(111)
+    hc  = model.home_config
+    assessor = PanelAssessor(hc.square_footage, hc.panel_amps,
+                             method=panel_calc_method.value)
+    timeline = assessor.journey_load_timeline(model.journey_home, n)
+    x     = np.arange(1, n + 1)
+    amps  = np.array([t.service_amps for t in timeline], dtype=float)
+    panel = hc.panel_amps
+
+    # Stepped service load — flat until a device activates, then jumps.
+    ax.step(x, amps, where="post", color=_CC_J, lw=2.5, zorder=4,
+            label="Estimated service load")
+    ax.fill_between(x, 0, amps, step="post", color=_CC_J, alpha=0.10, zorder=2)
+
+    # Panel capacity reference line.
+    ax.axhline(panel, color="#C62828", lw=2.0, linestyle="--", zorder=3,
+               label=f"{panel} A panel capacity")
+
+    # Device-activation markers + labels (alternating offset to limit overlap).
+    n_act = 0
+    for t in timeline:
+        if not t.new_device:
+            continue
+        cal = sim_start_year.value + t.year - 1
+        ax.scatter([t.year], [t.service_amps], s=42, color="#F57C00",
+                   edgecolor="white", linewidth=1.0, zorder=6)
+        dy = 22 if (n_act % 2) else 9
+        ax.annotate(f"+ {t.new_device}\n{cal}",
+                    xy=(t.year, t.service_amps),
+                    xytext=(3, dy), textcoords="offset points",
+                    ha="left", va="bottom", fontsize=7.2, color="#5D4037",
+                    linespacing=0.95, zorder=7)
+        n_act += 1
+
+    peak = max(timeline, key=lambda t: t.service_amps)
+    ax.set_ylim(0, max(panel, float(amps.max())) * 1.20)
+    ax.set_xlim(1, n)
+    method_lbl = ("Optional · NEC 220.82" if panel_calc_method.value == "optional"
+                  else "Standard · NEC 220.42")
+    ax.set_title(f"Peak {peak.service_amps:.0f} A of {panel} A  ·  {method_lbl}",
+                 fontsize=9, color=_CC_TICK, loc="left", pad=8)
+    ax.yaxis.set_major_formatter(
+        matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:.0f} A"))
+    ax.set_xlabel("Year")
+    ax.set_ylabel("Service load (A)")
+    ax.legend(fontsize=8, framealpha=0.6, loc="lower right")
+    _style(ax)
+    fig.tight_layout(pad=1.0)
+    return fig
+
+
 CHART_FNS = {
     "Cumulative Energy Costs":        make_cumulative_opex,
+    "Estimated Electrical Load":      make_panel_load_timeline,
     "Annual Cost by Year":            make_annual_cost,
     "Cost Breakdown by Category":     make_cost_breakdown,
     "Equipment Replacements (CapEx)": make_capex_v2,
@@ -2129,7 +2210,8 @@ _CHECK_SVG = ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' "
 def PanelLoadCallout(model):
     """Estimated Electrical Load — compact single-line strip (redesign §C)."""
     hc = model.home_config
-    assessor = PanelAssessor(hc.square_footage, hc.panel_amps)
+    assessor = PanelAssessor(hc.square_footage, hc.panel_amps,
+                             method=panel_calc_method.value)
     timeline = assessor.journey_load_timeline(model.journey_home, model.n_years)
     if not timeline:
         return
@@ -3705,6 +3787,16 @@ def ElecPanelDetail():
     # Current panel size — drives the Estimated Electrical Load assessment (Phase 3 §5)
     with solara.Column(style="max-width:220px; margin-bottom:8px"):
         solara.Select("Current panel size (A)", value=panel_amps, values=[100, 150, 200])
+    # NEC load-calculation method — Optional (220.82) is the Bay Area permit default
+    with solara.Column(style="max-width:260px; margin-bottom:6px"):
+        solara.Select("Load calc method", value=panel_calc_method,
+                      values=["optional", "standard"])
+    solara.HTML(tag="div", unsafe_innerHTML=(
+        "<div style='font-size:0.8em; color:#666; margin-bottom:10px;'>"
+        "<strong>Optional (NEC 220.82)</strong> — Bay Area permit default; pools "
+        "appliances under the 10&nbsp;kVA/40% demand factor (HVAC at 100%). "
+        "<strong>Standard</strong> adds every appliance at 100% — always higher.</div>"
+    ))
     _DSl("Install cost", panel_upgrade_cost, _DEFAULTS["panel_upgrade_cost"],
          2000, 10000, step=500, unit=" $")
     if planned:
@@ -4504,7 +4596,8 @@ def Cockpit(df, n, model):
 
     # ── Zone 3 data — electrical panel guidance ───────────────────────────────
     hc = model.home_config
-    assessor = PanelAssessor(hc.square_footage, hc.panel_amps)
+    assessor = PanelAssessor(hc.square_footage, hc.panel_amps,
+                             method=panel_calc_method.value)
     timeline = assessor.journey_load_timeline(model.journey_home, model.n_years)
     if timeline:
         yr1   = timeline[0]
@@ -4748,7 +4841,8 @@ def Page():
         wh_inlet_temp_f.value, wh_setpoint_f.value,
         gas_wh_tank_gallons.value, hpwh_tank_gallons.value, hpwh_ambient_location.value,
         # Phase 3 §5 — panel sizing inputs
-        panel_amps.value, hvac_tonnage.value, ev_charger_amps.value,
+        panel_amps.value, panel_calc_method.value,
+        hvac_tonnage.value, ev_charger_amps.value,
         induction_amps.value, hpwh_amps.value, dryer_amps.value,
         # Phase 3 §6 — social & health cost of gas
         social_climate_enabled.value, social_climate_rate.value,

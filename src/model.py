@@ -201,7 +201,7 @@ def _make_device(spec: dict, mesa_model: mesa.Model, *,
                                ev_eff_mi_per_kwh=spec.get("ev_eff_mi_per_kwh", 3.5),
                                charging_efficiency=spec.get("charging_efficiency", 0.88),
                                pct_home_charge=spec.get("pct_home_charge", 1.0),
-                               age=age, lifespan=ls, installation_cost=cost)
+                               age=age, lifespan=ls, installation_cost=cost, **elec)
 
     raise ValueError(f"Unknown device class: {cls!r}")
 

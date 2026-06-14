@@ -54,7 +54,26 @@
       "Bash(.venv/Scripts/python.exe -m pytest tests/test_journey.py -q)",
       "Bash(.venv/Scripts/python.exe -m pytest -q)",
       "Bash(.venv/Scripts/python.exe scripts/build_help.py)",
-      "Bash(echo \"exit: $?\")"
+      "Bash(echo \"exit: $?\")",
+      "Bash(curl -s -o /dev/null -w \"index.html -> %{http_code}\\\\n\" http://127.0.0.1:8042/index.html)",
+      "Bash(curl -s -o /dev/null -w \"images/layout.jpg -> %{http_code}\\\\n\" http://127.0.0.1:8042/images/layout.jpg)",
+      "Bash(curl -s -o /dev/null -w \"layout.jpg -> %{http_code}\\\\n\" http://127.0.0.1:8042/layout.jpg)",
+      "Bash(curl -s -o /dev/null -w \"images/hvac-details.jpg -> %{http_code}\\\\n\" http://127.0.0.1:8042/images/hvac-details.jpg)",
+      "Bash(curl -s -o /dev/null -w \"hvac-details.jpg -> %{http_code}\\\\n\" http://127.0.0.1:8042/hvac-details.jpg)",
+      "Bash(rm -f layout.jpg hvac-details.jpg)",
+      "Bash(mv \"images/whywatt-your journey.jpg\" \"images/whywatt-your-journey.jpg\")",
+      "PowerShell($c = Get-NetTCPConnection -LocalPort 8042 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { $c.OwningProcess | Select-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force; \"killed PID $_\" } } else { \"no listener on 8042\" })",
+      "Bash(mkdir -p \"/d/vijay/Documents\")",
+      "Bash(git clone *)",
+      "PowerShell(powershell -ExecutionPolicy Bypass -File \"D:\\\\vijay\\\\MyDocuments\\\\hes\\\\docs\\\\presentations\\\\publish-intro.ps1\")",
+      "Bash(dir src\\\\devices /b)",
+      "Bash(dir src *)",
+      "Bash(cd /d \"D:\\\\vijay\\\\MyDocuments\\\\hes\")",
+      "Bash(echo.)",
+      "mcp__visualize__read_me",
+      "mcp__visualize__show_widget",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/test_panel_assessor.py -q)",
+      "PowerShell(Add-Type -AssemblyName System.Drawing; foreach \\($f in 'Technophile.jpg','EV-famly.jpg'\\) { $p = \"D:\\\\vijay\\\\MyDocuments\\\\hes\\\\docs\\\\presentations\\\\intro_whywatt_v1\\\\images\\\\$f\"; $img = [System.Drawing.Image]::FromFile\\($p\\); \"{0}: {1} x {2}  \\(w/h = {3:N3}\\)\" -f $f, $img.Width, $img.Height, \\($img.Width/$img.Height\\); $img.Dispose\\(\\) })"
     ]
   }
 }
