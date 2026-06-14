@@ -116,6 +116,7 @@ CHART_OPTIONS = [
     "Energy Use by Device",
     "Annual kWh by Device",
     "Annual Gas by Device",
+    "Energy Mix Timeline",
 ]
 
 # Reference codes shown in chart titles and headers — used in help files
@@ -129,6 +130,7 @@ CHART_CODES = {
     "Energy Use by Device":           "EU.2",
     "Annual kWh by Device":           "EU.3",
     "Annual Gas by Device":           "EU.4",
+    "Energy Mix Timeline":            "EU.6",
     "Electric CAGR Projection":       "R.1",
     "Gas CAGR Projection":            "R.2",
     "ACC Rate Projection":            "R.3",
@@ -1898,6 +1900,61 @@ def make_annual_gasoline(df, model, n, home="journey"):
     return fig
 
 
+# EU.6 — Energy-Mix Timeline (stacked area, kWh-equivalent, §3.14)
+def make_energy_mix_timeline(df, model, n, home="journey"):
+    """EU.6 · Annual energy mix in kWh-equivalent — stacked area showing how the
+    home's energy sources shift across the journey: Gas, Utility-Elec, Solar-Elec,
+    External-Elec. Gas is converted via the 29.3 kWh/therm display factor only."""
+    hobj = model.journey_home if home == "journey" else model.baseline_home
+
+    fig = _new_fig(wide=False)
+    ax  = fig.add_subplot(111)
+    x   = np.arange(1, n + 1)
+
+    def _arr(hist):
+        a = np.zeros(n)
+        if hist:
+            v = np.array(hist[:n], dtype=float)
+            a[:len(v)] = v
+        return a
+
+    # Total home electricity use across electricity-fuel slots. The EV slot already
+    # records home-charged kWh only (§3.13), so external charging is excluded here.
+    total_elec = np.zeros(n)
+    for sname, cons in hobj.consumption_history_by_slot.items():
+        raw   = np.array(cons[:n], dtype=float)
+        fuels = np.array(hobj.fuel_history_by_slot.get(sname, ["electricity"] * n)[:n])
+        m = min(len(raw), len(fuels), n)
+        total_elec[:m] += np.where(fuels[:m] == "electricity", raw[:m], 0.0)
+
+    gas_kwh   = _arr(hobj.gas_therms_history) * KWH_PER_THERM
+    solar_kwh = _arr(hobj.solar_self_consumed_history)
+    ext_kwh   = _arr(hobj.external_ev_kwh_history)
+    util_kwh  = np.maximum(0.0, total_elec - solar_kwh)   # grid = home elec − solar self-use
+
+    labels = ["Gas", "Utility-Elec", "Solar-Elec", "External-Elec"]
+    data   = [gas_kwh, util_kwh, solar_kwh, ext_kwh]
+    colors = ["#FB8C00", "#1565C0", _CC_SOLAR, "#C0392B"]
+
+    if sum(d.sum() for d in data) > 0:
+        ax.stackplot(x, *data, labels=labels, colors=colors, alpha=0.85)
+        ax.plot(x, np.sum(data, axis=0), color="#37474F", lw=0.6, alpha=0.4)
+        ax.legend(fontsize=7, framealpha=0.8, loc="upper left")
+    else:
+        ax.text(0.5, 0.5, "No energy use\nin this scenario",
+                ha="center", va="center", transform=ax.transAxes,
+                fontsize=11, color=_CC_TICK, style="italic")
+
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
+    ax.set_xlabel("Year")
+    ax.set_ylabel("kWh-equivalent / year")
+    ax.set_xlim(1, n)
+    ax.margins(x=0)
+    _style(ax)
+    fig.tight_layout(pad=1.0)
+    return fig
+
+
 CHART_FNS = {
     "Cumulative Energy Costs":        make_cumulative_opex,
     "Annual Cost by Year":            make_annual_cost,
@@ -1911,6 +1968,7 @@ CHART_FNS = {
     "Annual kWh by Device":           make_annual_kwh,
     "Annual Gas by Device":           make_annual_gas,
     "Annual Gasoline by Vehicle":     make_annual_gasoline,
+    "Energy Mix Timeline":            make_energy_mix_timeline,
 }
 
 
@@ -1922,6 +1980,7 @@ _TOGGLE_CHART_NAMES = _DEVICE_CHART_NAMES | {
     "Annual kWh by Device",
     "Annual Gas by Device",
     "Annual Gasoline by Vehicle",
+    "Energy Mix Timeline",
 }
 
 
@@ -1978,6 +2037,12 @@ def ChartPane(chart_name, model, df, n):
         with solara.Column(gap="4px"):
             _toggle_buttons(device_chart_home)
             fig = make_annual_gasoline(df, model, n, home=home)
+            solara.FigureMatplotlib(fig)
+    elif chart_name == "Energy Mix Timeline":
+        home = device_chart_home.value
+        with solara.Column(gap="4px"):
+            _toggle_buttons(device_chart_home)
+            fig = make_energy_mix_timeline(df, model, n, home=home)
             solara.FigureMatplotlib(fig)
     elif chart_name == "Electricity Rate Shape":
         fig = make_acc_rate_shape(df, model, n)
