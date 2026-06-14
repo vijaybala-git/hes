@@ -2595,6 +2595,29 @@ def _PlanCheck(planned_rv, label: str = "Plan", right: bool = True):
         )
 
 
+def _Check(label, value, on_value=None):
+    """Circular-icon checkbox matching the appliance 'Plan' style (mdi-check-circle).
+
+    Drop-in for _Check(label=, value=, on_value=) so all page checkboxes
+    share one look.
+    """
+    def _set(v):
+        value.set(v)
+        if on_value is not None:
+            on_value(v)
+    solara.v.Checkbox(
+        v_model=value.value,
+        on_v_model=_set,
+        label=label,
+        dense=True,
+        hide_details=True,
+        ripple=False,
+        color="#3B6FD4",
+        off_icon="mdi-checkbox-blank-circle-outline",
+        on_icon="mdi-check-circle",
+    )
+
+
 def _cost_row(cost_rv, rebate_rv, net: int):
     """Install $ · Rebate $ · Net — compact single line, box-style, integers only."""
     net_color = "var(--positive-ink,#2E7D32)" if net >= 0 else "var(--baseline-ink,#B45B3E)"
@@ -2753,7 +2776,7 @@ def TransportationDetail():
     # Top row: Plan EV + Charger + install-year slider
     with solara.Row(gap="8px", style=_TOP_ROW):
         with solara.Column(style="min-width:150px"):
-            solara.Checkbox(label="Plan EV + Charger", value=ev_swap_planned)
+            _Check(label="Plan EV + Charger", value=ev_swap_planned)
         if planned:
             yr = ev_swap_year.value
             cal_yr = sim_start_year.value + yr - 1
@@ -2982,7 +3005,7 @@ def SolarSummaryCard():
     with solara.Column(classes=["device"]):
         _card_header("solar", "Solar + Battery")
         with solara.Row(gap="10px", style=_ROW_CTRL):
-            solara.Checkbox(label="Add solar", value=solar_planned)
+            _Check(label="Add solar", value=solar_planned)
         if planned:
             # Panels slider
             panels = solar_panels.value
@@ -2996,7 +3019,7 @@ def SolarSummaryCard():
                 ))
             # Battery toggle
             with solara.Row(gap="8px", style="align-items:center"):
-                solara.Checkbox(label="Battery", value=solar_battery_enabled)
+                _Check(label="Battery", value=solar_battery_enabled)
                 if solar_battery_enabled.value:
                     solara.HTML(tag="div", unsafe_innerHTML=(
                         f"<div style='font-size:0.78em; color:#555;'>"
@@ -3112,7 +3135,7 @@ def HVACDetail():
                           values=["gas", "electric", "none"])
         if state != "electric":
             with solara.Column(style="min-width:70px"):
-                solara.Checkbox(label="Plan swap", value=hvac_swap_planned)
+                _Check(label="Plan swap", value=hvac_swap_planned)
         if state != "electric" and hvac_swap_planned.value:
             yr = hvac_swap_year.value
             cal_yr = sim_start_year.value + yr - 1
@@ -3145,7 +3168,7 @@ def HVACDetail():
                 solara.Markdown(
                     f"*In-kind replacement: **${hvac_baseline_replace_cost.value:,}***",
                     style="font-size:0.82em; color:#555; margin-top:2px;")
-                solara.Checkbox(label="Has central AC (baseline)", value=hvac_has_cooling)
+                _Check(label="Has central AC (baseline)", value=hvac_has_cooling)
                 if hvac_has_cooling.value:
                     _DSl("Central AC SEER", hvac_ac_seer, _DEFAULTS["hvac_ac_seer"], 10, 22, 1)
                     _DSl("Central AC age", hvac_ac_age, _DEFAULTS["hvac_ac_age"],
@@ -3215,7 +3238,7 @@ def WaterHeaterDetail():
                           values=["gas", "electric", "none"])
         if state != "electric":
             with solara.Column(style="min-width:70px"):
-                solara.Checkbox(label="Plan swap", value=wh_swap_planned)
+                _Check(label="Plan swap", value=wh_swap_planned)
         if state != "electric" and wh_swap_planned.value:
             yr = wh_swap_year.value
             cal_yr = sim_start_year.value + yr - 1
@@ -3352,7 +3375,7 @@ def EVDetail():
                           values=["none", "electric"])
         if state == "none":
             with solara.Column(style="min-width:80px"):
-                solara.Checkbox(label="Plan to add", value=ev_swap_planned)
+                _Check(label="Plan to add", value=ev_swap_planned)
         if state == "none" and ev_swap_planned.value:
             yr = ev_swap_year.value
             cal_yr = sim_start_year.value + yr - 1
@@ -3426,7 +3449,7 @@ def CooktopDetail():
                           values=["gas", "electric", "none"])
         if state != "electric":
             with solara.Column(style="min-width:70px"):
-                solara.Checkbox(label="Plan swap", value=cooktop_swap_planned)
+                _Check(label="Plan swap", value=cooktop_swap_planned)
         if state != "electric" and cooktop_swap_planned.value:
             yr = cooktop_swap_year.value
             cal_yr = sim_start_year.value + yr - 1
@@ -3501,7 +3524,7 @@ def DryerDetail():
                           values=["gas", "electric", "none"])
         if state != "electric":
             with solara.Column(style="min-width:70px"):
-                solara.Checkbox(label="Plan swap", value=dryer_swap_planned)
+                _Check(label="Plan swap", value=dryer_swap_planned)
         if state != "electric" and dryer_swap_planned.value:
             yr = dryer_swap_year.value
             cal_yr = sim_start_year.value + yr - 1
@@ -3569,7 +3592,7 @@ def ElecPanelDetail():
     planned = panel_upgrade_planned.value
 
     with solara.Row(gap="8px", style=_TOP_ROW):
-        solara.Checkbox(label="Plan 200A panel upgrade", value=panel_upgrade_planned)
+        _Check(label="Plan 200A panel upgrade", value=panel_upgrade_planned)
         if planned:
             yr = panel_upgrade_year.value
             cal_yr = sim_start_year.value + yr - 1
@@ -3614,7 +3637,7 @@ def BaseloadDetail():
     ))
     solara.Markdown("---")
     with solara.Row(gap="8px", style="align-items:center; flex-wrap:wrap; padding:4px 0"):
-        solara.Checkbox(label="Plan efficiency upgrade (LED, smart plugs…)",
+        _Check(label="Plan efficiency upgrade (LED, smart plugs…)",
                         value=baseload_swap_planned)
         if baseload_swap_planned.value:
             yr = baseload_swap_year.value
@@ -3666,7 +3689,7 @@ def SolarDetail(model):
 
     # ── Row 1: checkbox + full-width install-year slider ─────────────────────
     with solara.Row(gap="12px", style=_TOP_ROW + " align-items:center"):
-        solara.Checkbox(label="Adding solar to my journey", value=solar_planned)
+        _Check(label="Adding solar to my journey", value=solar_planned)
         if planned:
             yr     = solar_install_year.value
             cal_yr = sim_start_year.value + yr - 1
@@ -3720,7 +3743,7 @@ def SolarDetail(model):
 
                 # Single line: [x] Battery  [13.5 kWh]  |  ⦿ NEM 3.0/NBT  ○ NEM 2.0
                 with solara.Row(gap="4px", style="align-items:center; flex-wrap:wrap"):
-                    solara.Checkbox(label="Battery", value=solar_battery_enabled,
+                    _Check(label="Battery", value=solar_battery_enabled,
                                     on_value=_on_battery)
                     if battery_on:
                         with solara.Column(style="width:80px; flex-shrink:0"):
@@ -3984,7 +4007,7 @@ def RatesDetail():
     solara.HTML(tag="div", unsafe_innerHTML=(
         "<div style='border-top:1px solid #E0E0E0; margin:10px 0 6px'></div>"
     ))
-    solara.Checkbox(label="Compare two scenarios (A vs B)", value=comparison_mode)
+    _Check(label="Compare two scenarios (A vs B)", value=comparison_mode)
     if comparison_mode.value:
         solara.HTML(tag="div", unsafe_innerHTML=(
             "<div style='font-size:0.80em; color:#888; margin:4px 0 2px'>"
@@ -4053,8 +4076,6 @@ def _SocialBody():
     """Social & Health Cost of Gas — card-bd content (two .device sub-cards)."""
     climate_on = social_climate_enabled.value
     health_on  = social_health_enabled.value
-    total = (social_climate_rate.value if climate_on else 0.0) \
-          + (social_health_rate.value  if health_on  else 0.0)
 
     _CLIMATE_IC = ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
                    " stroke-linecap='round' stroke-linejoin='round'>"
@@ -4074,7 +4095,7 @@ def _SocialBody():
                     f"<span class='dn'>Climate Cost</span>"
                     f"</div>"
                 ))
-                solara.Checkbox(label="Include CO₂ + methane cost", value=social_climate_enabled)
+                _Check(label="Include CO₂ + methane cost", value=social_climate_enabled)
                 if climate_on:
                     SliderWithDefault("Rate", social_climate_rate,
                                       _DEFAULTS["social_climate_rate"], 1.00, 2.00, 0.01,
@@ -4092,7 +4113,7 @@ def _SocialBody():
                     f"<span class='dn'>Health Cost</span>"
                     f"</div>"
                 ))
-                solara.Checkbox(label="Include air quality cost", value=social_health_enabled)
+                _Check(label="Include air quality cost", value=social_health_enabled)
                 if health_on:
                     SliderWithDefault("Rate", social_health_rate,
                                       _DEFAULTS["social_health_rate"], 0.50, 2.00, 0.01,
@@ -4101,14 +4122,6 @@ def _SocialBody():
                     solara.HTML(tag="div", unsafe_innerHTML=(
                         "<div style='font-size:0.80em; color:#AAAAAA;'>Not included</div>"
                     ))
-
-            # ── Total line (natural gas) ──────────────────────────────────────
-            if climate_on or health_on:
-                solara.HTML(tag="div", unsafe_innerHTML=(
-                    f"<div style='font-size:0.84em; color:#37474F; padding:4px 0;'>"
-                    f"Total: <strong>${total:.2f}/therm</strong>"
-                    f"<span style='color:#90A4AE;'> added to gas cost</span></div>"
-                ))
 
             # ── Gasoline externalities ────────────────────────────────────────
             _GAS_IC = ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
@@ -4125,14 +4138,14 @@ def _SocialBody():
             gas_clim_on = gasoline_climate_enabled.value
             gas_hlth_on = gasoline_health_enabled.value
             with solara.Column(classes=["device"]):
-                solara.Checkbox(label="Include climate cost", value=gasoline_climate_enabled)
+                _Check(label="Include climate cost", value=gasoline_climate_enabled)
                 if gas_clim_on:
                     _DSl("Climate cost", gasoline_climate_cost_per_gallon,
                          _DEFAULTS["gasoline_climate_cost_per_gallon"],
                          0.50, 4.00, step=0.05, unit=" $/gal", fmt="{v:.2f}",
                          show_delta=False)
             with solara.Column(classes=["device"]):
-                solara.Checkbox(label="Include health cost", value=gasoline_health_enabled)
+                _Check(label="Include health cost", value=gasoline_health_enabled)
                 if gas_hlth_on:
                     _DSl("Health cost", gasoline_health_cost_per_gallon,
                          _DEFAULTS["gasoline_health_cost_per_gallon"],
