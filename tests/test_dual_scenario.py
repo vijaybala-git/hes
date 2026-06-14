@@ -139,12 +139,18 @@ def test_stress_elec_rate_exceeds_moderate_elec_rate():
 
 
 def test_stress_gas_rate_exceeds_moderate_gas_rate():
-    """Scenario B (stress) gas rates must exceed Scenario A (moderate) at year 20."""
+    """Scenario B (stress) gas rates must exceed Scenario A (moderate) at year 20.
+
+    Pins both scenarios to the CAGR-flat rate model so the comparison isolates the
+    scenario-preset CAGR (8% vs 12%). The default B rate models (acc_seasonal) ignore
+    the scenario preset by design (§23), so without pinning the gas CAGR is identical.
+    """
     from model import HESModel
     m = HESModel(n_years=20,
                  scenario_a="moderate",
                  scenario_b="stress",
-                 comparison_mode=True)
+                 comparison_mode=True,
+                 gas_rate_model_a="cagr_flat", gas_rate_model_b="cagr_flat")
     m.run_all()
     df = m.datacollector.get_model_vars_dataframe()
     assert df["Gas Rate B"].iloc[-1] > df["Gas Rate"].iloc[-1]
@@ -166,12 +172,19 @@ def test_conservative_baseline_below_moderate_baseline():
 # ═════════════════════════════════════════════════════════════════════════════
 
 def test_identical_scenarios_produce_identical_trajectories():
-    """When scenario_a == scenario_b, all four homes produce the same costs."""
+    """When scenario_a == scenario_b (and same rate model), all four homes match.
+
+    Both scenarios are pinned to cagr_flat: the default B rate models differ from A
+    by design (§23: B defaults to ACC), so identity only holds when the rate model
+    is also identical.
+    """
     from model import HESModel
     m = HESModel(n_years=10,
                  scenario_a="moderate",
                  scenario_b="moderate",
-                 comparison_mode=True)
+                 comparison_mode=True,
+                 elec_rate_model_a="cagr_flat", gas_rate_model_a="cagr_flat",
+                 elec_rate_model_b="cagr_flat", gas_rate_model_b="cagr_flat")
     m.run_all()
 
     np.testing.assert_allclose(
@@ -194,7 +207,9 @@ def test_identical_scenarios_datacollector_matches():
     m = HESModel(n_years=5,
                  scenario_a="conservative",
                  scenario_b="conservative",
-                 comparison_mode=True)
+                 comparison_mode=True,
+                 elec_rate_model_a="cagr_flat", gas_rate_model_a="cagr_flat",
+                 elec_rate_model_b="cagr_flat", gas_rate_model_b="cagr_flat")
     m.run_all()
     df = m.datacollector.get_model_vars_dataframe()
 

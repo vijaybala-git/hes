@@ -44,7 +44,17 @@
       "PowerShell(& \"D:\\\\vijay\\\\MyDocuments\\\\hes\\\\.venv\\\\Scripts\\\\python.exe\" -c \"import mesa; print\\('mesa OK'\\); from ui.device_style import DEVICE_ORDER, dstyle; print\\('device_style OK'\\)\" 2>&1)",
       "PowerShell($py = \"D:\\\\vijay\\\\MyDocuments\\\\hes\\\\.venv\\\\Scripts\\\\python.exe\"; Set-Location \"D:\\\\vijay\\\\MyDocuments\\\\hes\\\\src\"; & $py -c \"from ui.device_style import DEVICE_ORDER, dstyle; print\\('device_style OK'\\)\" 2>&1)",
       "Bash(.venv\\\\Scripts\\\\python.exe -m pytest tests/ -x -q)",
-      "Bash(.venv\\\\Scripts\\\\python.exe -m pytest tests/test_transportation.py -q)"
+      "Bash(.venv\\\\Scripts\\\\python.exe -m pytest tests/test_transportation.py -q)",
+      "PowerShell(& \".venv\\\\Scripts\\\\python.exe\" -m pytest tests/ -q 2>&1)",
+      "PowerShell(Set-Location D:\\\\vijay\\\\MyDocuments\\\\hes; $python = \"D:\\\\vijay\\\\MyDocuments\\\\hes\\\\.venv\\\\Scripts\\\\python.exe\"; & $python -m pytest tests/ -q 2>&1 | Select-Object -Last 15)",
+      "Bash(git stash *)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/test_dual_scenario.py -q)",
+      "Bash(.venv/Scripts/python.exe -c ' *)",
+      "Bash(.venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('src/app.py',encoding='utf-8'\\).read\\(\\)\\); print\\('syntax OK'\\)\")",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/test_journey.py -q)",
+      "Bash(.venv/Scripts/python.exe -m pytest -q)",
+      "Bash(.venv/Scripts/python.exe scripts/build_help.py)",
+      "Bash(echo \"exit: $?\")"
     ]
   }
 }
