@@ -2235,8 +2235,13 @@ def SummaryStats(df, n, model):
 
 
 @solara.component
-def SliderWithDefault(label, value, default, min, max, step=1, unit="", fmt="{v}"):
-    """Slider with a default-position tick mark and a delta label when changed."""
+def SliderWithDefault(label, value, default, min, max, step=1, unit="", fmt="{v}",
+                      show_delta=True):
+    """Slider with a default-position tick mark and a delta label when changed.
+
+    show_delta=False suppresses the "+X from default (Y)" sub-line (used where the
+    caller wants a more compact slider).
+    """
     v = value.value
     at_default = abs(v - default) < (step * 0.01)
     delta = v - default
@@ -2263,7 +2268,7 @@ def SliderWithDefault(label, value, default, min, max, step=1, unit="", fmt="{v}
             ),
         )
 
-        if not at_default:
+        if show_delta and not at_default:
             sign = "+" if delta > 0 else ""
             color = "#D0302D" if delta < 0 else "#2E7D32"
             solara.HTML(
@@ -2352,10 +2357,11 @@ def _DS(heading: str):
 
 
 @solara.component
-def _DSl(label, rv, default, lo, hi, step=1, unit="", fmt="{v}"):
+def _DSl(label, rv, default, lo, hi, step=1, unit="", fmt="{v}", show_delta=True):
     """DetailSlider — wraps SliderWithDefault for use inside detail columns."""
     with solara.Column(gap="0px", style="margin-bottom:4px"):
-        SliderWithDefault(label, rv, default, lo, hi, step, unit=unit, fmt=fmt)
+        SliderWithDefault(label, rv, default, lo, hi, step, unit=unit, fmt=fmt,
+                          show_delta=show_delta)
 
 
 def _elec_display(volts: int, amps: int):
@@ -4073,11 +4079,6 @@ def _SocialBody():
                     SliderWithDefault("Rate", social_climate_rate,
                                       _DEFAULTS["social_climate_rate"], 1.00, 2.00, 0.01,
                                       unit=" $/therm", fmt="{v:.2f}")
-                    solara.HTML(tag="div", unsafe_innerHTML=(
-                        "<div style='display:flex; justify-content:space-between;"
-                        " font-size:0.72em; color:#90A4AE; margin-top:-2px;'>"
-                        "<span>$1.00/therm</span><span>$2.00/therm</span></div>"
-                    ))
                 else:
                     solara.HTML(tag="div", unsafe_innerHTML=(
                         "<div style='font-size:0.80em; color:#AAAAAA;'>Not included</div>"
@@ -4096,11 +4097,6 @@ def _SocialBody():
                     SliderWithDefault("Rate", social_health_rate,
                                       _DEFAULTS["social_health_rate"], 0.50, 2.00, 0.01,
                                       unit=" $/therm", fmt="{v:.2f}")
-                    solara.HTML(tag="div", unsafe_innerHTML=(
-                        "<div style='display:flex; justify-content:space-between;"
-                        " font-size:0.72em; color:#90A4AE; margin-top:-2px;'>"
-                        "<span>$0.50/therm</span><span>$2.00/therm</span></div>"
-                    ))
                 else:
                     solara.HTML(tag="div", unsafe_innerHTML=(
                         "<div style='font-size:0.80em; color:#AAAAAA;'>Not included</div>"
@@ -4113,11 +4109,6 @@ def _SocialBody():
                     f"Total: <strong>${total:.2f}/therm</strong>"
                     f"<span style='color:#90A4AE;'> added to gas cost</span></div>"
                 ))
-            solara.HTML(tag="div", unsafe_innerHTML=(
-                "<div style='font-size:0.74em; color:#90A4AE; font-style:italic;'>"
-                "These costs do not appear on your utility bill — they represent damage "
-                "to public health and the climate from burning gas.</div>"
-            ))
 
             # ── Gasoline externalities ────────────────────────────────────────
             _GAS_IC = ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
@@ -4138,25 +4129,15 @@ def _SocialBody():
                 if gas_clim_on:
                     _DSl("Climate cost", gasoline_climate_cost_per_gallon,
                          _DEFAULTS["gasoline_climate_cost_per_gallon"],
-                         0.50, 4.00, step=0.05, unit=" $/gal", fmt="{v:.2f}")
-                    solara.HTML(tag="div", unsafe_innerHTML=(
-                        "<div style='font-size:0.75em; color:#90A4AE;'>"
-                        "Default: $190/ton SC-CO₂ × 0.00889 t/gal</div>"
-                    ))
+                         0.50, 4.00, step=0.05, unit=" $/gal", fmt="{v:.2f}",
+                         show_delta=False)
             with solara.Column(classes=["device"]):
                 solara.Checkbox(label="Include health cost", value=gasoline_health_enabled)
                 if gas_hlth_on:
                     _DSl("Health cost", gasoline_health_cost_per_gallon,
                          _DEFAULTS["gasoline_health_cost_per_gallon"],
-                         0.25, 2.00, step=0.05, unit=" $/gal", fmt="{v:.2f}")
-            gas_total = (gasoline_climate_cost_per_gallon.value if gas_clim_on else 0.0) \
-                      + (gasoline_health_cost_per_gallon.value  if gas_hlth_on  else 0.0)
-            if gas_clim_on or gas_hlth_on:
-                solara.HTML(tag="div", unsafe_innerHTML=(
-                    f"<div style='font-size:0.84em; color:#37474F; padding:4px 0;'>"
-                    f"Total: <strong>${gas_total:.2f}/gal</strong>"
-                    f"<span style='color:#90A4AE;'> added to gasoline cost</span></div>"
-                ))
+                         0.25, 2.00, step=0.05, unit=" $/gal", fmt="{v:.2f}",
+                         show_delta=False)
 
 
 # ── §25.6 Bottom zone routing ─────────────────────────────────────────────────
