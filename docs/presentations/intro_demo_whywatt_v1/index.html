@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhyWatt? — Home Electrification Explorer Slide Deck</title>
+  <link rel="stylesheet" href="presentation.css">
+  <script src="presentation.js" defer></script>
+</head>
+<body>
+  <div class="presentation">
+    
+    <!-- Header/Masthead -->
+    <header class="masthead">
+      <div class="brand">
+        <!-- Scale-down WhyWatt Brand Mark SVG -->
+        <svg width="140" height="40" viewBox="0 0 320 92" xmlns="http://www.w3.org/2000/svg" aria-label="WhyWatt Logo">
+          <path d="M8 84 L8 44 L44 8 L80 44 L80 84 Z" fill="#EEF2FF" stroke="#0D47A1" stroke-width="3.5" stroke-linejoin="round"/>
+          <rect x="30" y="45" width="8" height="18" rx="4" fill="#EC9B1E"/>
+          <rect x="46" y="48" width="8" height="13" rx="4" fill="#EC9B1E"/>
+          <path d="M40 67 L40 72 Q44 77 48 72 L48 67 Z" fill="#EC9B1E"/>
+          <text x="96" y="50" font-family="system-ui,-apple-system,sans-serif" font-size="29" font-weight="800" fill="#0D47A1">Why<tspan fill="#1565C0">Watt</tspan><tspan fill="#EC9B1E">?</tspan></text>
+          <text x="96" y="71" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#78909C">Home Electrification Explorer</text>
+        </svg>
+      </div>
+      
+      <!-- Context strip matching Solara dashboard -->
+      <div class="context-strip">
+        <span>📍 San Jose, CA</span>
+        <span class="dot">·</span>
+        <span>ZIP 95112</span>
+        <span class="dot">·</span>
+        <span>CZ 12</span>
+        <span class="dot">·</span>
+        <span>3 bed</span>
+        <span class="dot">·</span>
+        <span>1,800 sq ft</span>
+        <span class="dot">·</span>
+        <span>Built 1985</span>
+      </div>
+
+      <div style="display: flex; gap: 8px;">
+        <button class="nav-btn" style="border-radius: 20px; width: auto; height: 36px; padding: 0 16px; font-size: 12.5px; font-weight: 600;" disabled>Reset to defaults</button>
+        <button class="nav-btn" style="border-radius: 20px; width: auto; height: 36px; padding: 0 16px; font-size: 12.5px; font-weight: 600; background-color: var(--journey); color: white; border-color: var(--journey);" disabled>Help</button>
+      </div>
+    </header>
+
+    <!-- Top progress bar -->
+    <div class="progress-container">
+      <div class="progress-bar"></div>
+    </div>
+
+    <!-- Slides Window -->
+    <main class="slides-window">
+      <div class="slides-wrapper">
+        
+        <!-- SLIDE 1: INTRO -->
+        <section class="slide" id="slide-1">
+          <div class="slide-content">
+            <div class="info-panel">
+              <span class="slide-eyebrow">01. Introduction</span>
+              <h2 class="slide-title">Home Electrification Simulator</h2>
+              <p class="slide-subtitle">
+                A dynamic tool built to help California climate advocates guide homeowners through long-term cost benefits of their electrification journey.
+              </p>
+              
+              <div class="description-card">
+                <h4>WhyWatt? Purpose Statement</h4>
+                <p>
+                  Electrification planning involves balancing capital investments (like heat pump HVACs) against escalating gas and electric rate schedules. WhyWatt? simulates a homeowner's custom timeline, running a parallel "do nothing" baseline to project cumulative operating costs, carbon offsets, and electrical capacity over a 30-year horizon.
+                </p>
+              </div>
+
+              <!-- Interactive horizon slider -->
+              <div class="horizon-control">
+                <label for="horizon-slider">
+                  <span>Simulate Model Horizon</span>
+                  <span id="horizon-val" class="horizon-val">20 yrs</span>
+                </label>
+                <div class="slider-wrap">
+                  <span class="mono" style="font-size: 11px; color: var(--journey-ink);">5 yrs</span>
+                  <input type="range" id="horizon-slider" min="5" max="30" value="20" aria-label="Model Horizon Years">
+                  <span class="mono" style="font-size: 11px; color: var(--journey-ink);">30 yrs</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Ambient art: interactive cost curves -->
+            <div class="visual-panel">
+              <div class="chart-container">
+                <div class="payback-glow-container">
+                  <div class="payback-glow-badge" id="payback-badge">
+                    ✓ Payback Reached at <span id="payback-year" style="font-family: var(--font-mono); margin-left: 2px;">Year 12</span>
+                  </div>
+                </div>
+                <h4 style="font-size: 13.5px; font-weight: 700; margin-bottom: 2px; color: var(--ink);">Diverging Cost Projection ($k)</h4>
+                <p style="font-size: 11px; color: var(--ink-3); margin-bottom: 16px;">Cumulative cash flow projection showing capital investments vs. operating costs</p>
+                
+                <svg id="ambient-svg-chart" viewBox="0 0 600 340" class="svg-chart-ambient"></svg>
+                
+                <div class="chart-legend">
+                  <span class="legend-item"><span class="legend-color" style="background-color: var(--baseline);"></span>Do nothing</span>
+                  <span class="legend-item"><span class="legend-color" style="background-color: var(--journey);"></span>Your journey</span>
+                  <span class="legend-item"><span class="legend-color dashed" style="border-color: var(--baseline);"></span>Do nothing + social cost</span>
+                  <span class="legend-item"><span class="legend-color dashed" style="border-color: var(--journey);"></span>Your journey + social cost</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SLIDE 2: LAYOUT OVERVIEW -->
+        <section class="slide" id="slide-2">
+          <div class="slide-content">
+            <div class="info-panel">
+              <span class="slide-eyebrow">02. App Layout</span>
+              <h2 class="slide-title">Unified Dashboard Design</h2>
+              <p class="slide-subtitle">
+                All controls, projections, and appliance models are organized in a single responsive canvas to facilitate live coaching.
+              </p>
+              
+              <!-- Interactive legend selector -->
+              <div class="interactive-legend">
+                <button class="legend-btn" data-section="verdict">
+                  <div class="legend-num">1</div>
+                  <div class="legend-btn-text">
+                    <span class="legend-btn-title">Cockpit Results Banner</span>
+                    <span class="legend-btn-desc">Financial payback indicators & electrical panel limits</span>
+                  </div>
+                </button>
+                <button class="legend-btn" data-section="chart">
+                  <div class="legend-num">2</div>
+                  <div class="legend-btn-text">
+                    <span class="legend-btn-title">Two-Futures Charts</span>
+                    <span class="legend-btn-desc">Projections of cumulative costs & multi-category splits</span>
+                  </div>
+                </button>
+                <button class="legend-btn" data-section="devices">
+                  <div class="legend-num">3</div>
+                  <div class="legend-btn-text">
+                    <span class="legend-btn-title">Your Electrification Journey</span>
+                    <span class="legend-btn-desc">Two rows of appliance slots to sequence replacements</span>
+                  </div>
+                </button>
+              </div>
+
+              <!-- Display text dynamically -->
+              <div class="description-card" style="border-left: 4px solid var(--journey);">
+                <p id="layout-detail-text">Click an index above to highlight the dashboard region.</p>
+              </div>
+            </div>
+
+            <!-- Dashboard Mockup Stack -->
+            <div class="visual-panel">
+              <div class="mockup-wrapper" style="max-height: 480px; overflow-y: auto;">
+                <div style="position: relative; width: 100%;">
+                  <img src="assets/01-dashboard.png" alt="Dashboard Cockpit and Charts" class="mockup-img">
+                  <img src="assets/03-journey.png" alt="Journey Grid Section" class="mockup-img">
+                  
+                  <!-- Overlay Highlights -->
+                  <div class="highlight-overlay" id="overlay-verdict" style="top: 8.5%; left: 1.5%; width: 97%; height: 12.5%;"></div>
+                  <div class="highlight-overlay" id="overlay-chart" style="top: 22.5%; left: 1.5%; width: 97%; height: 34%;"></div>
+                  <div class="highlight-overlay" id="overlay-devices" style="top: 57.5%; left: 1.5%; width: 97%; height: 42%;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SLIDE 3: CASE STUDY 1 (THE TECHNOPHILE) -->
+        <section class="slide" id="slide-3">
+          <div class="slide-content">
+            <div class="info-panel">
+              <span class="slide-eyebrow">03. User Scenarios</span>
+              <h2 class="slide-title">The Technophile Persona</h2>
+              <p class="slide-subtitle">
+                <strong>Scenario 1:</strong> Swapping appliances sequentially at their natural end-of-life cycles ("replace-on-failure").
+              </p>
+              
+              <div class="description-card">
+                <p>
+                  Technophiles value cutting-edge specs (e.g., high-efficiency heat pumps) but coordinate installations with failure cycles. WhyWatt? maps this timeline, letting users model specific years for swaps. In this detail view of the HVAC sub-panel:
+                </p>
+              </div>
+
+              <!-- Details card driven by hotspots -->
+              <div class="hotspot-card" id="hvac-detail-card">
+                <h5>Select a hotspot</h5>
+                <p>Hover or click on the pulsing hotspots to examine key parameters inside the HVAC configuration editor.</p>
+              </div>
+            </div>
+
+            <!-- Detail modal image with hotspots -->
+            <div class="visual-panel">
+              <div class="mockup-wrapper" style="border: none; box-shadow: var(--shadow-md);">
+                <div style="position: relative; display: inline-block; width: 100%;">
+                  <img src="assets/06-hvac-detail.png" alt="HVAC Detail Modal Screenshot" class="mockup-img" style="border-radius: var(--r-md); border: 1px solid var(--border);">
+                  
+                  <!-- Pulsing Hotspots -->
+                  <div class="hotspot" id="hotspot-swap" data-card="hvac-detail-card" style="top: 15%; left: 24%;" aria-label="Plan-swap toggle"></div>
+                  <div class="hotspot hotspot-amber" id="hotspot-cop" data-card="hvac-detail-card" style="top: 48%; left: 45%;" aria-label="COP Slider"></div>
+                  <div class="hotspot hotspot-green" id="hotspot-cost" data-card="hvac-detail-card" style="top: 86.5%; left: 81%;" aria-label="Net-cost row"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SLIDE 4: CASE STUDY 2 (THE EV FAMILY) -->
+        <section class="slide" id="slide-4">
+          <div class="slide-content">
+            <div class="info-panel">
+              <span class="slide-eyebrow">04. User Scenarios</span>
+              <h2 class="slide-title">The EV Family Persona</h2>
+              <p class="slide-subtitle">
+                <strong>Scenario 2:</strong> High electrical loads under strict panel constraints (EV charging + induction cooking).
+              </p>
+              
+              <div class="description-card">
+                <p>
+                  High-load families add electric vehicles and switch cooktops/dryers to electric. Peak demand accumulates rapidly, making electrical panel capacity critical. WhyWatt? aggregates concurrent demands and guides advocates on whether a 200 A service panel is required, or if smart load coordination avoids a service upgrade.
+                </p>
+              </div>
+
+              <!-- Details card driven by hotspots -->
+              <div class="hotspot-card" id="family-detail-card">
+                <h5>Select a hotspot</h5>
+                <p>Hover or click on the pulsing hotspots to inspect how electrification slots affect household loads.</p>
+              </div>
+            </div>
+
+            <!-- Grid mockup with hotspots -->
+            <div class="visual-panel">
+              <div class="mockup-wrapper" style="max-height: 480px; overflow-y: auto;">
+                <div style="position: relative; width: 100%;">
+                  <img src="assets/03-journey.png" alt="Journey Devices Grid" class="mockup-img">
+                  <img src="assets/04-split.png" alt="Split Panel and Baseload" class="mockup-img">
+                  
+                  <!-- Hotspots on stacked images -->
+                  <!-- Note: adjusted percentages since we are stacking two images -->
+                  <div class="hotspot" id="hotspot-ev" data-card="family-detail-card" style="top: 31%; left: 82.5%;" aria-label="EV Charger"></div>
+                  <div class="hotspot" id="hotspot-cooktop" data-card="family-detail-card" style="top: 68%; left: 16%;" aria-label="Cooktop"></div>
+                  <div class="hotspot" id="hotspot-dryer" data-card="family-detail-card" style="top: 68%; left: 50.5%;" aria-label="Dryer"></div>
+                  <div class="hotspot hotspot-amber" id="hotspot-panel" data-card="family-detail-card" style="top: 80%; left: 81%;" aria-label="Electrical Panel & Baseload split card"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SLIDE 5: HOW YOU CAN HELP -->
+        <section class="slide" id="slide-5">
+          <div class="slide-content" style="grid-template-columns: 1fr 1.3fr;">
+            <div class="info-panel">
+              <span class="slide-eyebrow">05. Support WhyWatt</span>
+              <h2 class="slide-title">How You Can Help</h2>
+              <p class="slide-subtitle">
+                WhyWatt? is an open-source, community-driven simulator. Help us empower community coaches across California.
+              </p>
+              
+              <div class="description-card" style="background-color: var(--journey-soft); border-color: rgba(59, 111, 212, 0.2);">
+                <h4 style="color: var(--journey-ink);">Project Status</h4>
+                <p style="color: var(--ink-2); line-height: 1.5;">
+                  Phase 2 (physics-based appliance math & PG&E tariffs) is complete. We are actively entering user testing and defining goals for Phase 3!
+                </p>
+              </div>
+            </div>
+
+            <!-- Opportunities list deck -->
+            <div class="visual-panel">
+              <div class="help-deck">
+                
+                <!-- Card 1 -->
+                <div class="help-card">
+                  <div class="help-card-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                  </div>
+                  <h4 class="help-card-title">Extend Simulation Features</h4>
+                  <p class="help-card-desc">Contribute to Phase 3 goals: build Monte Carlo uncertainty bands, code income-qualified rebate scales, and enable SCE & SDG&E tariff logic.</p>
+                  <span class="help-card-action">View Spec →</span>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="help-card help-green">
+                  <div class="help-card-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                  </div>
+                  <h4 class="help-card-title">Audit Utility Rates</h4>
+                  <p class="help-card-desc">Audit PG&E E-1/G-1 rate timelines and CAGR projections. Validate the physics models (UA heat loads, water inlet temperatures) against CEC reports.</p>
+                  <span class="help-card-action">Audit Data →</span>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="help-card">
+                  <div class="help-card-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                  </div>
+                  <h4 class="help-card-title">Community Coaching</h4>
+                  <p class="help-card-desc">Organize pilot sessions with homeowners. Gather feedback on app navigation clarity, default home assumptions, and visual reports.</p>
+                  <span class="help-card-action">Coaches Guide →</span>
+                </div>
+
+                <!-- Card 4 -->
+                <div class="help-card">
+                  <div class="help-card-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                  </div>
+                  <h4 class="help-card-title">Refine Documentation</h4>
+                  <p class="help-card-desc">Review and maintain the codebase manuals, engineering docs, design systems, rate loaders specs, and unit testing protocols.</p>
+                  <span class="help-card-action">Read Docs →</span>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <!-- Presentation Navigation Footer -->
+    <footer class="pres-footer">
+      <div class="keyboard-hints">
+        <span>Use <span class="key-badge">←</span> or <span class="key-badge">→</span> keys</span>
+        <span>·</span>
+        <span>Press <span class="key-badge">Space</span> to advance</span>
+      </div>
+
+      <div class="navigation-controls">
+        <button class="nav-btn" id="prev-btn" aria-label="Previous Slide">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></polyline><polyline points="12 19 5 12 12 5"></polyline></svg>
+        </button>
+        
+        <div class="slide-dots"></div>
+
+        <button class="nav-btn" id="next-btn" aria-label="Next Slide">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></polyline><polyline points="12 5 19 12 12 19"></polyline></svg>
+        </button>
+      </div>
+
+      <div class="mono" style="font-size: 13px; color: var(--ink-2); font-weight: 600;">
+        Slide <span id="current-slide" style="color: var(--journey-ink)">1</span> / <span id="total-slide-num">5</span>
+      </div>
+    </footer>
+
+  </div>
+</body>
+</html>

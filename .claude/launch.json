@@ -6,6 +6,12 @@
       "runtimeExecutable": ".venv/Scripts/solara.exe",
       "runtimeArgs": ["run", "src/app.py", "--host", "127.0.0.1", "--port", "8767", "--no-open"],
       "port": 8767
+    },
+    {
+      "name": "intro-deck",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8042", "--bind", "127.0.0.1", "--directory", "docs/presentations/intro_whywatt_v1"],
+      "port": 8042
     }
   ]
 }

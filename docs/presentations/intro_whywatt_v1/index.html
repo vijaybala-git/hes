@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WhyWatt? — Home Electrification Explorer</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.1.0/reveal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.1.0/theme/white.min.css" id="theme">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --journey:#1f5fbf;      /* the blue "your journey" line */
+    --journey-deep:#13407f;
+    --nothing:#c8553d;      /* the terracotta "do nothing" line */
+    --solar:#0f8a6f;        /* journey + solar green */
+    --ink:#16202e;
+    --slate:#5a6b7e;
+    --line:#dfe5ec;
+    --paper:#fbfcfe;
+    --cream:#f4f7fb;
+    --gain:#0f8a6f;
+  }
+
+  .reveal{
+    font-family:'Inter',system-ui,sans-serif;
+    color:var(--ink);
+    font-size:30px;
+  }
+  .reveal .slides{ text-align:left; }
+  .reveal section{ height:100%; }
+
+  /* shared scaffolding ------------------------------------------------ */
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:.52em;
+    letter-spacing:.22em;
+    text-transform:uppercase;
+    color:var(--journey);
+    margin:0 0 .4em;
+  }
+  .reveal h1,.reveal h2{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    color:var(--ink);
+    line-height:1.04;
+    letter-spacing:-.015em;
+    margin:0 0 .35em;
+    text-transform:none;
+  }
+  .reveal h1{ font-size:2.0em; }
+  .reveal h2{ font-size:1.42em; }
+  .reveal p{ line-height:1.5; }
+  .lede{ font-size:.92em; color:var(--slate); max-width:24em; }
+  strong{ color:var(--ink); font-weight:600; }
+  .ej{ color:var(--journey); font-weight:600; }
+  .en{ color:var(--nothing); font-weight:600; }
+  .es{ color:var(--solar); font-weight:600; }
+
+  .stage{
+    height:100%;
+    box-sizing:border-box;
+    padding:6% 7%;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+  }
+
+  /* slide 1 — title ---------------------------------------------------- */
+  #s-intro{ position:relative; overflow:hidden; }
+  /* the two trajectory lines as ambient art */
+  .curves{ position:absolute; inset:0; z-index:0; opacity:.9; }
+  .brandrow{ display:flex; align-items:center; gap:.55em; margin-bottom:1.1em; }
+  .mark{
+    width:1.5em;height:1.5em;border-radius:.34em;
+    background:linear-gradient(135deg,var(--journey),var(--journey-deep));
+    display:flex;align-items:center;justify-content:center;flex:none;
+    box-shadow:0 6px 18px rgba(31,95,191,.28);
+  }
+  .mark svg{ width:62%;height:62%; }
+  .brandname{ font-family:'Fraunces',serif;font-weight:500;font-size:.84em;letter-spacing:-.02em; }
+  .brandname b{ font-weight:700; }
+  .brandsub{ font-family:'JetBrains Mono',monospace;font-size:.42em;letter-spacing:.18em;text-transform:uppercase;color:var(--slate);display:block;margin-top:.1em; }
+  #s-intro .stage{ position:relative;z-index:2; }
+  #s-intro .brandrow{ margin-bottom:.8em; }
+  #s-intro .pillrow{ margin-top:.8em; }
+  #s-intro .footmark{ bottom:3%; }
+  #s-intro h1{ font-size:1.5em;max-width:20ch; }
+  #s-intro .h1-sub{ font-size:.66em;color:var(--slate);font-weight:500; }
+  #s-intro .lede{ font-size:.82em;max-width:30em;margin-top:.2em; }
+  .pillrow{ display:flex;gap:.5em;flex-wrap:wrap;margin-top:1.1em; }
+  .pill{
+    font-family:'JetBrains Mono',monospace;font-size:.48em;letter-spacing:.06em;
+    border:1px solid var(--line);border-radius:2em;padding:.55em 1.1em;color:var(--slate);
+    background:rgba(255,255,255,.7);backdrop-filter:blur(2px);
+  }
+  .pill b{ color:var(--journey); }
+
+  /* generic two-column with screenshot -------------------------------- */
+  .split{ display:grid;grid-template-columns:1.08fr 1fr;gap:4%;align-items:center;height:100%; }
+  .shotwrap{ position:relative; }
+  .shot{
+    width:100%;border-radius:10px;border:1px solid var(--line);
+    box-shadow:0 18px 50px -18px rgba(22,32,46,.35);display:block;
+  }
+  .shotwrap.crop{ overflow:hidden;border-radius:10px;border:1px solid var(--line);box-shadow:0 18px 50px -18px rgba(22,32,46,.35); }
+  .shotwrap.crop .shot{ border:0;border-radius:0;box-shadow:none; }
+
+  /* callout annotations layered on the screenshot */
+  .anno{
+    position:absolute;z-index:3;
+    font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.25;
+    background:var(--ink);color:#fff;padding:.5em .7em;border-radius:7px;
+    box-shadow:0 8px 20px -6px rgba(0,0,0,.5);max-width:190px;
+  }
+  .anno b{ color:#ffd; }
+  .anno.j{ background:var(--journey); }
+  .anno.n{ background:var(--nothing); }
+  .anno.s{ background:var(--solar); }
+  .ring{
+    position:absolute;z-index:2;border:2.5px solid var(--journey);border-radius:10px;
+    box-shadow:0 0 0 4px rgba(31,95,191,.14);
+  }
+  .ring.n{ border-color:var(--nothing);box-shadow:0 0 0 4px rgba(200,85,61,.14); }
+  .ring.s{ border-color:var(--solar);box-shadow:0 0 0 4px rgba(15,138,111,.14); }
+
+  /* numbered structure list */
+  .steps{ list-style:none;margin:1em 0 0;padding:0; }
+  .steps li{ display:flex;gap:.7em;margin-bottom:.62em;align-items:flex-start; }
+  .steps .n{
+    font-family:'JetBrains Mono',monospace;font-size:.55em;font-weight:600;
+    color:var(--journey);border:1.5px solid var(--journey);border-radius:6px;
+    min-width:1.9em;height:1.9em;display:flex;align-items:center;justify-content:center;flex:none;margin-top:.15em;
+  }
+  .steps .t{ font-size:.66em;line-height:1.4;color:var(--slate); }
+  .steps .t b{ color:var(--ink);font-weight:600;display:block;font-size:1.05em;margin-bottom:.05em; }
+
+  /* persona scenario layout ------------------------------------------- */
+  .persona-head{ display:flex;align-items:baseline;gap:.6em;margin-bottom:.1em; }
+  .ptag{ font-family:'JetBrains Mono',monospace;font-size:.5em;letter-spacing:.12em;text-transform:uppercase;color:#fff;background:var(--journey);padding:.35em .7em;border-radius:4px; }
+  .ptag.s2{ background:var(--solar); }
+  .traits{ list-style:none;margin:.7em 0 0;padding:0; }
+  .traits li{ position:relative;padding-left:1.3em;margin-bottom:.5em;font-size:.66em;line-height:1.4;color:var(--slate); }
+  .traits li::before{ content:"";position:absolute;left:0;top:.55em;width:.5em;height:.5em;border-radius:50%;background:var(--journey); }
+  .traits.s2 li::before{ background:var(--solar); }
+  .traits li b{ color:var(--ink);font-weight:600; }
+
+  .planchips{ display:flex;gap:.5em;flex-wrap:wrap;margin-top:1.1em; }
+  .chip{
+    font-family:'JetBrains Mono',monospace;font-size:.5em;letter-spacing:.04em;
+    border-radius:7px;padding:.6em .85em;border:1px solid var(--line);background:var(--paper);color:var(--slate);
+  }
+  .chip b{ color:var(--ink); }
+  .chip.on{ border-color:var(--journey);background:rgba(31,95,191,.07);color:var(--journey-deep); }
+  .chip.on b{ color:var(--journey-deep); }
+  .chip.s2.on{ border-color:var(--solar);background:rgba(15,138,111,.08);color:#0a5c4a; }
+  .chip.s2.on b{ color:#0a5c4a; }
+
+  .outcome{
+    margin-top:1.2em;border-left:3px solid var(--gain);padding:.2em 0 .2em .9em;
+  }
+  .outcome .k{ font-family:'JetBrains Mono',monospace;font-size:.46em;letter-spacing:.14em;text-transform:uppercase;color:var(--slate); }
+  .outcome .v{ font-family:'Fraunces',serif;font-size:1.35em;font-weight:600;color:var(--gain);line-height:1.1; }
+
+  /* footer / progress -------------------------------------------------- */
+  .reveal .slide-number{ font-family:'JetBrains Mono',monospace;font-size:13px;background:transparent;color:var(--slate); }
+  .footmark{
+    position:absolute;left:7%;bottom:4.2%;z-index:5;
+    font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.14em;
+    text-transform:uppercase;color:#aab6c4;
+  }
+  .footmark b{ color:var(--journey); }
+
+  .reveal .progress{ color:var(--journey);height:4px; }
+
+  /* UI walkthrough slides --------------------------------------------- */
+  .ui-split{ display:grid;grid-template-columns:1.32fr .82fr;gap:4%;align-items:center;height:100%; }
+  .ui-split.flip{ grid-template-columns:.82fr 1.32fr; }
+  .feat{ list-style:none;margin:.8em 0 0;padding:0; }
+  .feat li{ position:relative;padding-left:1.25em;margin-bottom:.62em;font-size:.62em;line-height:1.42;color:var(--slate); }
+  .feat li::before{ content:"";position:absolute;left:0;top:.5em;width:.5em;height:.5em;border-radius:2px;background:var(--journey); }
+  .feat li b{ color:var(--ink);font-weight:600; }
+  .metric{ font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--journey-deep); }
+  .metric.n{ color:var(--nothing); }
+  .metric.s{ color:var(--solar); }
+
+  /* scenario screenshot placeholder ----------------------------------- */
+  .placeholder{
+    width:100%;border:2px dashed var(--line);border-radius:10px;background:var(--cream);
+    aspect-ratio:16/10;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:1.4em;color:var(--slate);
+  }
+  .placeholder .ico{ font-size:1.6em;margin-bottom:.3em;opacity:.5; }
+  .placeholder .lbl{ font-family:'JetBrains Mono',monospace;font-size:.46em;letter-spacing:.1em;text-transform:uppercase; }
+  .placeholder .path{ font-family:'JetBrains Mono',monospace;font-size:.44em;color:var(--journey);margin-top:.5em;word-break:break-all; }
+
+  @media (max-width:900px){
+    .split,.ui-split,.ui-split.flip{ grid-template-columns:1fr;gap:1.2em; }
+    .reveal{ font-size:24px; }
+  }
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ============ SLIDE 1 — INTRO ============ -->
+<section id="s-intro" data-background-color="#fbfcfe">
+  <div class="stage">
+    <div class="split" style="grid-template-columns:1.02fr .98fr;">
+      <div>
+        <div class="brandrow">
+          <span class="mark">
+            <svg viewBox="0 0 88 92" xmlns="http://www.w3.org/2000/svg">
+              <path d="M8 84 L8 44 L44 8 L80 44 L80 84 Z" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.85)" stroke-width="3.5" stroke-linejoin="round"/>
+              <rect x="30.973" y="44.513" width="8" height="18" rx="4" fill="#fff"/>
+              <rect x="49.895" y="47.27" width="8" height="13" rx="4" fill="#fff"/>
+              <path d="M40.487 67 L40.487 72 C43.154 75.333 45.82 75.333 48.487 72 L48.487 67 Z" fill="#fff"/>
+            </svg>
+          </span>
+          <span>
+            <span class="brandname">Why<b>Watt?</b></span>
+            <span class="brandsub">Home Electrification Explorer</span>
+          </span>
+        </div>
+
+        <h1>Map your home electrification journey. <span class="h1-sub">Weigh the cost-benefit, then decide.</span></h1>
+        <p class="lede">
+          WhyWatt? is a <strong>community-developed, open and transparent</strong> tool to explore your
+          electrification options, timeline, and benefits for your home.
+        </p>
+
+        <div class="pillrow">
+          <span class="pill"><b>Open</b> &nbsp;source &amp; method</span>
+          <span class="pill"><b>CA</b> &nbsp;climate zones + IOU rates</span>
+          <span class="pill"><b>20-yr</b> &nbsp;cost trajectories</span>
+        </div>
+      </div>
+
+      <div class="shotwrap">
+        <img class="shot" src="images/whywatt-journey.jpg" alt="WhyWatt Journey Timeline — your electrification journey of device swaps vs. doing nothing, plotted over 20 years">
+        <div class="anno j" style="left:-2%;top:-7%;font-size:11px;max-width:165px;">Your <b>journey</b> — each device swap, placed on a 20-year timeline.</div>
+        <div class="anno n" style="right:-3%;bottom:-7%;font-size:11px;max-width:160px;">vs. <b>doing nothing</b> — the same devices, replaced like-for-like.</div>
+      </div>
+    </div>
+  </div>
+  <div class="footmark"><b>Why</b>Watt? · community electrification collaboration</div>
+</section>
+
+<!-- ============ SLIDE 2 — UI: THE COCKPIT ============ -->
+<section data-background-color="#ffffff">
+  <div class="stage" style="padding:5% 6%;">
+    <p class="eyebrow">02 · The interface · 1 of 4</p>
+    <h2 style="margin-bottom:.45em;">The cockpit — your bottom line, up front</h2>
+    <div class="ui-split">
+      <div class="shotwrap">
+        <img class="shot" src="images/whywatt-top-cockpit.jpg" alt="WhyWatt cockpit — verdict, two cost bars, cumulative-cost chart, journey timeline, and panel guidance">
+        <div class="ring" style="left:1%;top:16%;width:21%;height:18%;"></div>
+        <div class="ring s" style="left:22%;top:16%;width:54%;height:18%;"></div>
+        <div class="ring n" style="left:77.5%;top:16%;width:19%;height:18%;"></div>
+        <div class="anno j" style="left:0;top:104%;font-size:11px;max-width:150px;">① <b>The verdict</b> — payback &amp; social cost avoided.</div>
+        <div class="anno s" style="left:34%;top:104%;font-size:11px;max-width:150px;">② <b>Two futures</b>, side by side.</div>
+        <div class="anno n" style="right:0;top:104%;font-size:11px;max-width:150px;">③ <b>Panel guidance</b> — amps vs. capacity.</div>
+      </div>
+      <div>
+        <ul class="feat">
+          <li><b>The verdict.</b> Net result over 20 years, here <span class="metric n">−$10,216</span>, with <span class="metric s">+$21,258</span> in net social cost avoided.</li>
+          <li><b>Two futures, one glance.</b> <span class="ej">Your journey</span> <span class="metric">$132,691</span> vs. <span class="en">do nothing</span> <span class="metric n">$122,475</span>.</li>
+          <li><b>Left chart.</b> Select a graph from the dropdown — here, cumulative cost: both paths year by year, with gas- and solar-saves shaded.</li>
+          <li><b>Right chart.</b> Select a graph from the dropdown to compare — here, the journey timeline of every device swap.</li>
+          <li><b>Panel guidance.</b> Present <span class="metric">41 A</span> vs. <span class="metric n">150 A</span> peak — flags when an upgrade is needed.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="footmark"><b>Why</b>Watt? · interface · the cockpit</div>
+</section>
+
+<!-- ============ SLIDE 3 — UI: SETUP YOUR HOME ============ -->
+<section data-background-color="#fbfcfe">
+  <div class="stage" style="padding:5% 6%;">
+    <p class="eyebrow">03 · The interface · 2 of 4</p>
+    <h2 style="margin-bottom:.45em;">Set up your home</h2>
+    <div class="ui-split flip">
+      <div>
+        <ul class="feat">
+          <li><b>Home &amp; Solar.</b> ZIP, bedrooms, square footage, and California climate zone — plus an optional solar + battery add.</li>
+          <li><b>Energy &amp; Prices.</b> Model horizon (<span class="metric">20 yrs</span>) and rate models: electricity <span class="metric">+7%/yr</span>, gas <span class="metric n">+8%/yr</span>, gasoline and EV-charging rates too.</li>
+          <li><b>Social &amp; Health.</b> Optional climate cost (CO₂ + methane, <span class="metric">1.07 $/therm</span>) and air-quality cost (<span class="metric">1.23 $/therm</span>), plus gasoline externalities.</li>
+          <li><b>Sensible defaults.</b> Everything is pre-filled for a Bay Area home — adjust only what you know.</li>
+        </ul>
+      </div>
+      <div class="shotwrap">
+        <img class="shot" src="images/whywatt-homesetup.jpg" alt="Setup your home — Home & Solar, Energy & Prices, and Social & Health panels">
+        <div class="anno j" style="left:0;top:-7%;font-size:11px;max-width:150px;">Three panels — collapse together when you're done.</div>
+      </div>
+    </div>
+  </div>
+  <div class="footmark"><b>Why</b>Watt? · interface · setup</div>
+</section>
+
+<!-- ============ SLIDE 4 — UI: YOUR JOURNEY ============ -->
+<section data-background-color="#ffffff">
+  <div class="stage" style="padding:5% 6%;">
+    <p class="eyebrow">04 · The interface · 3 of 4</p>
+    <h2 style="margin-bottom:.45em;">Plan your electrification journey</h2>
+    <div class="ui-split">
+      <div class="shotwrap">
+        <img class="shot" src="images/whywatt-your-journey.jpg" alt="Your electrification journey — six device cards: HVAC, water heater, transportation, cooktop, dryer, electrical panel and baseload">
+        <div class="anno j" style="left:0;top:-7%;font-size:11px;max-width:150px;">Major loads — HVAC, water heater, transportation.</div>
+        <div class="anno" style="right:0;bottom:-7%;font-size:11px;max-width:150px;background:var(--journey);">Other appliances — cooktop, dryer, panel, baseload.</div>
+      </div>
+      <div>
+        <ul class="feat">
+          <li><b>Six device cards.</b> Each holds a starting fuel, a <b>swap year</b> slider, and install / rebate / net cost.</li>
+          <li><b>HVAC</b> → heat pump, <span class="metric">Yr 3 · 2027</span>, net <span class="metric s">$10,500</span>.</li>
+          <li><b>Water heater</b> → HPWH, <span class="metric">Yr 5 · 2029</span>, net <span class="metric s">$2,000</span>.</li>
+          <li><b>Transportation.</b> Add an EV charger from miles driven, MPG, and efficiency.</li>
+          <li><b>Cooktop, dryer, panel &amp; baseload.</b> The rest of the home, each on its own timeline.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="footmark"><b>Why</b>Watt? · interface · journey</div>
+</section>
+
+<!-- ============ SLIDE 5 — UI: DETAIL PAGES ============ -->
+<section data-background-color="#fbfcfe">
+  <div class="stage" style="padding:5% 6%;">
+    <p class="eyebrow">05 · The interface · 4 of 4</p>
+    <h2 style="margin-bottom:.45em;">Go deep — detail page per device</h2>
+    <div class="ui-split flip">
+      <div>
+        <p class="lede" style="font-size:.66em;margin-bottom:.2em;">
+          Every card opens a full detail page. Here's the <strong>water heater</strong> — gas today, heat pump planned for year&nbsp;5.
+        </p>
+        <ul class="feat">
+          <li><b>Side-by-side physics.</b> Current gas WH <span class="metric n">~182 therms/yr</span> vs. replacement HPWH <span class="metric s">~993 kWh/yr</span>.</li>
+          <li><b>Real parameters.</b> Daily hot water, inlet &amp; setpoint temps, UEF <span class="metric n">0.65</span> → <span class="metric s">3.5</span>, tank size, age &amp; lifespan.</li>
+          <li><b>Electrical reality.</b> Shows the breaker the HPWH needs — <span class="metric">240 V · 15 A</span>.</li>
+          <li><b>Costs &amp; rebates.</b> Install <span class="metric">$2,500</span> − rebate <span class="metric">$500</span> = net <span class="metric s">$2,000</span>.</li>
+        </ul>
+      </div>
+      <div class="shotwrap">
+        <img class="shot" src="images/whywatt-details-wh.jpg" alt="Water heater detail page — gas vs. heat-pump water heater physics, parameters, and costs">
+      </div>
+    </div>
+  </div>
+  <div class="footmark"><b>Why</b>Watt? · interface · detail pages</div>
+</section>
+
+<!-- ============ SLIDE 6 — SCENARIO 1: TECHNOPHILE ============ -->
+<section data-background-color="#fbfcfe">
+  <div class="stage" style="padding:5% 6%;">
+    <div class="persona-head">
+      <span class="ptag">Scenario 01</span>
+      <p class="eyebrow" style="margin:0;color:var(--slate);">Replace-on-failure</p>
+    </div>
+    <h2>The Technophile</h2>
+    <div class="split" style="grid-template-columns:1fr .82fr;">
+      <!-- left: persona + the three messages -->
+      <div>
+        <p class="lede" style="font-size:.66em;">
+          Researches carefully, replaces on failure, and isn't especially price-sensitive.
+          Goes heat pump for both heating and hot water.
+        </p>
+        <ul class="feat">
+          <li><b>No real payback.</b> Even at <span class="metric">year 22</span> the journey is only <span class="metric s">+$632</span> ahead on energy alone — essentially break-even.</li>
+          <li><b>Social cost makes the case.</b> Count avoided CO₂, methane &amp; air-quality harm and it's <span class="metric s">+$20,561</span> better — that's where the real value sits.</li>
+          <li><b>You're buying cooling, too.</b> The Bay Area default has <b>no AC</b>. The heat pump adds cooling the home never had — so part of the spend buys comfort, not just fuel savings.</li>
+        </ul>
+      </div>
+
+      <!-- right: full-app screenshot, payback / social-cost box ringed -->
+      <div class="shotwrap" style="max-width:465px;justify-self:center;align-self:center;">
+        <img class="shot" src="images/Technophile.jpg" alt="Technophile scenario — payback only +$632 at year 22, +$20,561 social cost avoided, heat-pump HVAC and water heater">
+        <div class="ring s" style="left:1.5%;top:5.5%;width:21%;height:8.5%;"></div>
+      </div>
+    </div>
+  </div>
+  <div class="footmark"><b>Why</b>Watt? · scenario 01</div>
+</section>
+
+<!-- ============ SLIDE 7 — SCENARIO 2: EV / SOCIALLY-MINDED ============ -->
+<section data-background-color="#ffffff">
+  <div class="stage" style="padding:5% 6%;">
+    <div class="persona-head">
+      <span class="ptag s2">Scenario 02</span>
+      <p class="eyebrow" style="margin:0;color:var(--slate);">Appliance refresh + EV</p>
+    </div>
+    <h2>The EV Family</h2>
+    <div class="split" style="grid-template-columns:.82fr 1fr;">
+      <!-- left: full-app screenshot — panel, payback & solar ringed -->
+      <div class="shotwrap" style="max-width:450px;justify-self:center;align-self:center;">
+        <img class="shot" src="images/EV-famly.jpg" alt="EV Family scenario — peak demand 119A exceeds 100A forcing a panel upgrade; solar brings payback in year 13 at +$11,380">
+        <div class="ring" style="left:1.5%;top:5.5%;width:21%;height:8.5%;"></div>
+        <div class="ring n" style="left:80%;top:5.5%;width:19%;height:9%;"></div>
+        <div class="ring s" style="left:10.5%;top:19.5%;width:18%;height:9%;"></div>
+      </div>
+
+      <!-- right: persona + the messages -->
+      <div>
+        <p class="lede" style="font-size:.66em;">
+          An EV-owning, socially-minded household — adds a charger, moves appliances off gas,
+          and layers in solar + battery.
+        </p>
+        <ul class="feat s2">
+          <li><b>The panel becomes the constraint.</b> Adding EV charging pushes peak demand to <span class="metric n">119 A</span> — past the 100 A limit, forcing a <span class="metric n">200 A panel upgrade</span>.</li>
+          <li><b>Solar is what tips it positive.</b> With <span class="metric s">solar + battery</span> layered in, the journey reaches payback in <span class="metric">year 13 (2037)</span>, <span class="metric s">+$11,380</span> ahead — without it, it stays underwater.</li>
+          <li><b>Strong social return, too.</b> <span class="metric s">+$20,599</span> in avoided climate &amp; health cost on top.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="footmark"><b>Why</b>Watt? · scenario 02</div>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.1.0/reveal.min.js"></script>
+<script>
+  Reveal.initialize({
+    hash:true,
+    slideNumber:'c/t',
+    transition:'slide',
+    transitionSpeed:'default',
+    controlsTutorial:true,
+    width:1280,
+    height:720,
+    margin:0.04
+  });
+</script>
+</body>
+</html>
