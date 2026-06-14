@@ -1,19 +1,27 @@
 # deploy_hf.ps1
-# Deploys WhyWatt to the Hugging Face Space via the `hf-whywatt` remote.
-# Run from repo root:  .\deploy_hf.ps1            (deploys main)
-#                      .\deploy_hf.ps1 -Branch x  (deploys branch x)
+# Deploys WhyWatt to the Hugging Face Space.
+# Run from repo root:  .\deploy_hf.ps1                 (deploys main)
+#                      .\deploy_hf.ps1 -Branch x       (deploys branch x)
+#                      .\deploy_hf.ps1 -Remote hf      (override remote name)
 #
 # HF builds the Space from the Dockerfile, which copies src/, data/,
 # docs/assets/ and public/ into the image. Only those paths affect the
-# running Space; everything else in the repo is just along for the ride,
-# so there is no need to rewrite history before pushing.
+# running Space.
+#
+# Some repo folders (e.g. docs/presentations/ — slide decks + images) are
+# NOT part of the Space and we do not want their blobs uploaded to HF. The
+# script strips the paths in $ExcludePaths from history *in a throwaway
+# clone*, then force-pushes that cleaned history to the Space's main branch.
+# Your local repo (and GitHub) are never rewritten.
 
 param(
-    [string]$Branch = "main",
-    [string]$Remote = "hf-whywatt"
+    [string]   $Branch       = "main",
+    [string]   $Remote       = "hf",
+    [string[]] $ExcludePaths = @("docs/presentations")
 )
 
 $ErrorActionPreference = "Stop"
+$RepoRoot = (Get-Location).Path
 
 # --- Safety checks ----------------------------------------------------------
 if (-not (Test-Path ".git")) {
@@ -30,27 +38,74 @@ if ($LASTEXITCODE -ne 0) {
     throw "Branch '$Branch' not found. Merge your changes into '$Branch' first, or pass -Branch."
 }
 
-$spaceUrl = git remote get-url $Remote
-Write-Host "Deploying '$Branch' to $Remote (-> main) ..." -ForegroundColor Cyan
-Write-Host "  Space: $spaceUrl" -ForegroundColor DarkGray
+$spaceUrl = (git remote get-url $Remote).Trim()
 
-# Push the chosen branch straight to the Space's main branch.
-# --force because the Space's main is a deploy target, not a shared history.
-git push $Remote "${Branch}:main" --force
+# --- Resolve a git-filter-repo invocation ----------------------------------
+# Tries, in order: the `git filter-repo` subcommand, the repo venv's python,
+# then a system python. Returns a hashtable @{ Exe; Pre }.
+function Get-FilterRepo {
+    $venvPy = Join-Path $RepoRoot ".venv\Scripts\python.exe"
+    $tries = @(
+        @{ Exe = "git";    Pre = @("filter-repo") },
+        @{ Exe = $venvPy;  Pre = @("-m", "git_filter_repo") },
+        @{ Exe = "python"; Pre = @("-m", "git_filter_repo") }
+    )
+    foreach ($t in $tries) {
+        if ($t.Exe -ne "git" -and $t.Exe -ne "python" -and -not (Test-Path $t.Exe)) { continue }
+        try {
+            & $t.Exe @($t.Pre + @("--version")) *> $null
+            if ($LASTEXITCODE -eq 0) { return $t }
+        } catch { }
+    }
+    throw "git-filter-repo not found. Install it with:  pip install git-filter-repo"
+}
 
-Write-Host "Done. HF deploy complete." -ForegroundColor Green
-Write-Host "Watch the build under the 'Logs' tab on the Space page." -ForegroundColor DarkGray
+# --- Force-remove a directory tree (handles read-only .git pack files) ------
+function Remove-TreeForce([string]$path) {
+    if (-not (Test-Path $path)) { return }
+    try {
+        Get-ChildItem -Path $path -Recurse -Force -ErrorAction SilentlyContinue |
+            ForEach-Object { try { $_.Attributes = 'Normal' } catch { } }
+    } catch { }
+    Remove-Item -Recurse -Force $path -ErrorAction SilentlyContinue
+}
 
-# --- Note on stripping large/binary files -----------------------------------
-# The previous version ran `git filter-repo` to strip docs/HES-design.zip from
-# history. That file is no longer tracked, and filter-repo rewrites EVERY local
-# ref (including main), which would diverge your local repo from GitHub.
-# If you ever need to keep a large binary out of the pushed history, do it in a
-# throwaway clone so the working repo is never rewritten, e.g.:
-#
-#   git clone . ../whywatt-hf-tmp
-#   cd ../whywatt-hf-tmp
-#   python -m git_filter_repo --path <big/file> --invert-paths --force
-#   git remote add hf <space-url>
-#   git push hf HEAD:main --force
-#   cd ..; Remove-Item -Recurse -Force ../whywatt-hf-tmp
+# --- Deploy in a throwaway clone -------------------------------------------
+$fr  = Get-FilterRepo
+$tmp = Join-Path $env:TEMP ("whywatt-hf-deploy-" + [System.Guid]::NewGuid().ToString("N").Substring(0, 8))
+
+Write-Host "Deploying '$Branch' to '$Remote' (-> main) ..." -ForegroundColor Cyan
+Write-Host "  Space:    $spaceUrl"                          -ForegroundColor DarkGray
+Write-Host "  Excluded: $($ExcludePaths -join ', ')"        -ForegroundColor DarkGray
+Write-Host "  Workdir:  $tmp"                               -ForegroundColor DarkGray
+
+try {
+    git clone --quiet --branch $Branch --single-branch "$RepoRoot" "$tmp"
+    if ($LASTEXITCODE -ne 0) { throw "Failed to clone '$Branch' into the temp workdir." }
+
+    # Strip the excluded paths from the clone's history.
+    $frArgs = @()
+    foreach ($p in $ExcludePaths) { $frArgs += @("--path", $p) }
+    $frArgs += @("--invert-paths", "--force")
+
+    Push-Location $tmp
+    try {
+        & $fr.Exe @($fr.Pre + $frArgs)
+        if ($LASTEXITCODE -ne 0) { throw "git-filter-repo failed while stripping excluded paths." }
+
+        # filter-repo drops remotes; re-add the Space and push the cleaned history.
+        # --force because the Space's main is a deploy target, not a shared history.
+        git remote add hf "$spaceUrl"
+        git push hf "HEAD:main" --force
+        if ($LASTEXITCODE -ne 0) { throw "Push to the Space failed." }
+    }
+    finally {
+        Pop-Location
+    }
+
+    Write-Host "Done. HF deploy complete." -ForegroundColor Green
+    Write-Host "Watch the build under the 'Logs' tab on the Space page." -ForegroundColor DarkGray
+}
+finally {
+    Remove-TreeForce $tmp
+}
