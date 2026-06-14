@@ -3066,14 +3066,39 @@ def _model_toggle(label: str, rv, options: list, color: str):
 
 @solara.component
 def RatesSummaryCard():
-    """Energy & Prices summary (§3.8) — timeline on top, then 4 rate rows."""
+    """Energy & Prices summary (§3.8) — three balance-matched sub-cards:
+    Model Timeline · Home Energy Prices · External Energy Price."""
     elec_model = elec_rate_model_a.value
     gas_model  = gas_rate_model_a.value
+
+    def _hd(title, show_help=False):
+        """Sub-card header: rates icon + title + (optional help) + ⋮ detail opener."""
+        icon_svg = _DEVICE_ICONS.get("rates", "")
+        with solara.Row(classes=["device-hd"], gap="0px", style="align-items:center; gap:8px"):
+            if icon_svg:
+                solara.HTML(tag="span", unsafe_innerHTML=f"<span class='di'>{icon_svg}</span>")
+            solara.HTML(tag="span", unsafe_innerHTML=f"<span class='dn'>{title}</span>",
+                        style="flex:1")
+            if show_help:
+                HelpButton("rates")
+            solara.Button(
+                "",
+                on_click=lambda: detail_open.set(None if detail_open.value == "rates" else "rates"),
+                classes=["iconbtn"],
+                children=[solara.HTML(tag="span", unsafe_innerHTML=(
+                    "<svg viewBox='0 0 24 24' fill='currentColor'>"
+                    "<circle cx='5' cy='12' r='1.8'/><circle cx='12' cy='12' r='1.8'/>"
+                    "<circle cx='19' cy='12' r='1.8'/></svg>"))],
+            )
+
+    # ── Card 1: Model Timeline ────────────────────────────────────────────────
     with solara.Column(classes=["device"]):
-        _card_header("rates", "Energy & Prices")
-        # Row 0 (top): model timeline
+        _hd("Model Timeline", show_help=True)
         solara.SliderInt(f"⏱ Model: {years.value} yrs", value=years, min=5, max=30)
-        # Row 1: electricity rate model
+
+    # ── Card 2: Home Energy Prices (electricity + gas) ────────────────────────
+    with solara.Column(classes=["device"]):
+        _hd("Home Energy Prices")
         solara.HTML(tag="div", unsafe_innerHTML=(
             f"<div style='font-size:0.78em; font-weight:600; color:{C_RATE_ELEC};"
             " margin-bottom:2px; margin-top:4px'>⚡ Electricity Rate Model</div>"
@@ -3086,10 +3111,9 @@ def RatesSummaryCard():
                     f"<span style='font-size:0.80em; color:#546E7A;'>"
                     f"+{elec_cagr_pct_a.value}%/yr</span>"
                 ))
-        # Row 2: gas rate model
         solara.HTML(tag="div", unsafe_innerHTML=(
             f"<div style='font-size:0.78em; font-weight:600; color:{C_RATE_GAS};"
-            " margin-bottom:2px; margin-top:4px'>🔥 Gas Rate Model</div>"
+            " margin-bottom:2px; margin-top:8px'>🔥 Gas Rate Model</div>"
         ))
         with solara.Row(gap="6px", style="align-items:center; flex-wrap:wrap"):
             _model_toggle("🔥", gas_rate_model_a,
@@ -3099,26 +3123,26 @@ def RatesSummaryCard():
                     f"<span style='font-size:0.80em; color:#546E7A;'>"
                     f"+{gas_cagr_pct_a.value}%/yr</span>"
                 ))
-        # Row 3 + 4: shared transport fuels (not scenario-split) — expanded for
-        # visual balance with the Home & Solar / Social & Health columns.
-        gpr = gasoline_price.value
-        gesc = gasoline_escalation_pct.value
-        epr = external_ev_price_per_kwh.value
-        eesc = external_ev_escalation_pct.value
-        _kv = ("<div style='display:flex; justify-content:space-between;"
-               " align-items:baseline; font-size:0.86em; padding:3px 0 3px 4px;'>"
-               "<span style='color:#607D8B'>{k}</span>"
-               "<strong style='color:#263238'>{v}</strong></div>")
-        # ⛽ Gasoline Rate & CAGR
+
+    # ── Card 3: External Energy Price (gasoline + external EV) ─────────────────
+    gpr = gasoline_price.value
+    gesc = gasoline_escalation_pct.value
+    epr = external_ev_price_per_kwh.value
+    eesc = external_ev_escalation_pct.value
+    _kv = ("<div style='display:flex; justify-content:space-between;"
+           " align-items:baseline; font-size:0.86em; padding:3px 0 3px 4px;'>"
+           "<span style='color:#607D8B'>{k}</span>"
+           "<strong style='color:#263238'>{v}</strong></div>")
+    with solara.Column(classes=["device"]):
+        _hd("External Energy Price")
         solara.HTML(tag="div", unsafe_innerHTML=(
             "<div style='font-size:0.78em; font-weight:600; color:#B8860B;"
-            " margin-bottom:2px; margin-top:8px'>⛽ Gasoline Rate &amp; CAGR</div>"
+            " margin-bottom:2px; margin-top:4px'>⛽ Gasoline Rate &amp; CAGR</div>"
         ))
         solara.HTML(tag="div", unsafe_innerHTML=(
             _kv.format(k="Gasoline Price", v=f"${gpr:.2f}/gal")
             + _kv.format(k="Gasoline CAGR", v=f"+{gesc}%/yr")
         ))
-        # 🔌 External EV Charging Rate & CAGR
         solara.HTML(tag="div", unsafe_innerHTML=(
             "<div style='font-size:0.78em; font-weight:600; color:#1D9E75;"
             " margin-bottom:2px; margin-top:8px'>🔌 External EV Charging Rate &amp; CAGR</div>"
