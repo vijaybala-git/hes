@@ -3099,24 +3099,33 @@ def RatesSummaryCard():
                     f"<span style='font-size:0.80em; color:#546E7A;'>"
                     f"+{gas_cagr_pct_a.value}%/yr</span>"
                 ))
-        # Row 3 + 4: shared transport fuels (not scenario-split) — first-class lines
+        # Row 3 + 4: shared transport fuels (not scenario-split) — expanded for
+        # visual balance with the Home & Solar / Social & Health columns.
         gpr = gasoline_price.value
         gesc = gasoline_escalation_pct.value
         epr = external_ev_price_per_kwh.value
         eesc = external_ev_escalation_pct.value
+        _kv = ("<div style='display:flex; justify-content:space-between;"
+               " align-items:baseline; font-size:0.86em; padding:3px 0 3px 4px;'>"
+               "<span style='color:#607D8B'>{k}</span>"
+               "<strong style='color:#263238'>{v}</strong></div>")
+        # ⛽ Gasoline Rate & CAGR
         solara.HTML(tag="div", unsafe_innerHTML=(
-            "<div style='margin-top:8px; line-height:2.0'>"
-            "<div style='font-size:0.95em'>"
-            "<strong style='color:#B8860B'>⛽ Gasoline</strong> &nbsp;"
-            f"<strong style='color:#263238'>${gpr:.2f}/gal</strong>"
-            f" <span style='color:#B0BEC5'>·</span> "
-            f"<span style='color:#546E7A'>+{gesc}%/yr</span></div>"
-            "<div style='font-size:0.95em'>"
-            "<strong style='color:#1D9E75'>🔌 External EV</strong> &nbsp;"
-            f"<strong style='color:#263238'>${epr:.2f}/kWh</strong>"
-            f" <span style='color:#B0BEC5'>·</span> "
-            f"<span style='color:#546E7A'>+{eesc}%/yr</span></div>"
-            "</div>"
+            "<div style='font-size:0.78em; font-weight:600; color:#B8860B;"
+            " margin-bottom:2px; margin-top:8px'>⛽ Gasoline Rate &amp; CAGR</div>"
+        ))
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            _kv.format(k="Gasoline Price", v=f"${gpr:.2f}/gal")
+            + _kv.format(k="Gasoline CAGR", v=f"+{gesc}%/yr")
+        ))
+        # 🔌 External EV Charging Rate & CAGR
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            "<div style='font-size:0.78em; font-weight:600; color:#1D9E75;"
+            " margin-bottom:2px; margin-top:8px'>🔌 External EV Charging Rate &amp; CAGR</div>"
+        ))
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            _kv.format(k="EV Charging Rate", v=f"${epr:.2f}/kWh")
+            + _kv.format(k="EV Charging CAGR", v=f"+{eesc}%/yr")
         ))
 
 
