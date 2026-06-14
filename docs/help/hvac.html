@@ -58,17 +58,35 @@
 <li>HDD = heating degree-days (base 65°F) for your climate zone</li>
 <li>CDD = cooling degree-days (base 65°F)</li>
 <li>UA = home heat loss rate (BTU/hr/°F) — set by insulation quality</li>
-<li>AFUE = furnace efficiency (e.g., 0.80 = 80%)</li>
-<li>COP = heat pump heating efficiency (e.g., 3.5 means 3.5x more heat than electricity used)</li>
-<li>SEER = heat pump cooling efficiency rating</li>
+<li>AFUE = furnace efficiency, the annual fuel use efficiency (e.g., 0.80 = 80%)</li>
+<li>COP = coefficient of performance, heat pump heating efficiency (e.g., 3.5 means</li>
+</ul>
+<p>3.5 units of heat per unit of electricity used)</p>
+<ul>
+<li>SEER = seasonal energy efficiency ratio, the heat pump cooling efficiency rating</li>
 </ul>
 
     <h2 id="key-assumptions">Key assumptions</h2>
     <ul>
 <li>Bay Area default: 1,910 HDD and 340 CDD (NOAA TMY3, San Jose Mineta)</li>
 <li>UA classes: Poor = 650, Average = 500, Good = 350 BTU/hr/°F</li>
-<li>Default heat pump: COP 3.5 heating, SEER 22 cooling</li>
-<li>Default gas furnace: AFUE 0.80</li>
+<li>Most Bay Area homes have no central air conditioning today; adding a heat pump</li>
+</ul>
+<p>brings cooling as a clean addition, modeled as one combined install.</p>
+
+    <h2 id="default-values">Default values</h2>
+    <ul>
+<li>Starting state — Gas</li>
+<li>Heat-pump heating efficiency (COP) — 3.5</li>
+<li>Heat-pump cooling efficiency (SEER) — 22</li>
+<li>Gas furnace efficiency (AFUE) — 0.80</li>
+<li>Has central AC today — off</li>
+<li>Heat-pump size — 3.0 tons</li>
+<li>Swap — planned, Year 3</li>
+<li>Install cost — $14,000</li>
+<li>Rebate — $3,500</li>
+<li>Existing furnace age — 10 years; baseline lifespan — 20 years; replacement cost — $6,000</li>
+<li>Existing central AC efficiency — SEER 14; age — 7 years</li>
 </ul>
 
     <h2 id="data-sources">Data sources</h2>

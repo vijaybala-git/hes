@@ -29,14 +29,14 @@
 @keys: journey_planner
 @popup: The Journey Planner lets you schedule when each gas appliance gets
   replaced with an electric alternative. A "Do Nothing" baseline runs in
-  parallel so you can see the cost difference year by year over 20 years.
+  parallel so you can see the cost difference year by year over the modeled period.
 
 ### What this means for you
 
 The Journey Planner shows what happens to your energy costs if you swap gas
 appliances for electric alternatives one by one, on a schedule you choose —
-compared to doing nothing for 20 years. You set which appliances to replace
-and in which year; WhyWatt does the math.
+compared to doing nothing for the full modeled period. You set which appliances
+to replace and in which year; WhyWatt does the math.
 
 The result is two cost curves on the same chart: Your Journey and Do Nothing.
 The gap between them — and the year they cross — is your payback.
@@ -51,28 +51,40 @@ scheduled a swap, the old appliance is replaced:
 - All other appliances remain unchanged until their own swap year
 
 Do Nothing runs in parallel automatically. It uses exactly the same starting
-appliances — including any that are already electric — and keeps them for the
-full 20 years. No swaps, no upgrades, no rebates.
+appliances — including any that are already electric, and any gas car or existing
+electric car you drive today — and keeps them for the full modeled period. No swaps,
+no upgrades, no rebates.
 
 ### What "swap year" means
 
 Example: You schedule the HVAC swap in Year 3. In simulation year 3, the model
 applies the install cost ($14,000 minus $3,500 rebate = $10,500 net). From year
-4 onward, the heat pump's electricity cost replaces the gas furnace's gas cost.
+3 onward, the heat pump's electricity cost replaces the gas furnace's gas cost.
 Years 1-2 still use the gas furnace.
 
 The calendar year label next to the slider (e.g., "Yr 3 (2028)") is derived
-from the current calendar year when you run the simulation.
+from the simulation start year.
 
 ### Key assumptions
 
 - The simulation is deterministic — no randomness, no uncertainty bands.
   The same inputs always produce the same outputs.
-- Appliance lifespans and end-of-life replacement costs are not modeled beyond
-  your planned swaps.
+- Appliance lifespans and end-of-life replacement costs are modeled where you
+  set them in the device detail panels; otherwise the planned swaps drive the timeline.
 - Energy consumption is based on your home profile and appliance efficiency
   ratings — not your actual meter readings.
-- Rate escalation is applied uniformly each year at your chosen scenario rate.
+- Rate escalation is applied each year at the rate you choose in Energy & Prices.
+
+### Default values
+
+- Modeled period — 20 years (Energy & Prices → Model Timeline)
+- Simulation start year — 2025 (Energy & Prices → detail)
+- HVAC swap — planned, Year 3 (HVAC card)
+- Water heater swap — planned, Year 5 (Water Heater card)
+- Dryer swap — not planned, Year 8 if enabled (Dryer card)
+- Cooktop swap — not planned, Year 10 if enabled (Cooktop card)
+- EV + charger — not planned, Year 2 if enabled (Transportation card)
+- Baseload efficiency upgrade — not planned, Year 2 if enabled (Baseload card)
 
 ---
 
@@ -103,7 +115,8 @@ Bay Area should treat the heating and cooling numbers as approximate.
 
 ### Insulation quality
 
-The UA value (BTU/hr/°F) measures how fast your home loses heat:
+The UA value (heat loss rate, in BTU per hour per degree Fahrenheit) measures how
+fast your home loses heat:
 
 - Poor insulation: UA = 650 (older home, single-pane windows)
 - Average insulation: UA = 500 (typical 1980s-2000s home)
@@ -115,6 +128,16 @@ The UA value (BTU/hr/°F) measures how fast your home loses heat:
   statistical average, not any single year.
 - Floor area and bedroom count scale the baseload (lights and plugs) consumption.
 
+### Default values
+
+- ZIP code — 95112 (San Jose)
+- Climate zone — CZ12
+- Bedrooms — 3
+- Floor area — 1,800 sq ft
+- Year built — 1985
+- Insulation quality — Average (UA = 500)
+- Main panel size — 200 amps
+
 ### Data sources
 
 - CEC Title 24 ZIP-to-climate-zone table
@@ -122,43 +145,62 @@ The UA value (BTU/hr/°F) measures how fast your home loses heat:
 
 ---
 
-## §3 · Energy Rates
+## §3 · Energy & Prices
 @file: rates.html
 @keys: energy_prices, rates, chart_r1
-@popup: Energy prices are based on current PG&E tariff rates with a projected
-  escalation rate applied each year. You can adjust the escalation scenario
-  in the Rate details panel.
+@popup: Energy prices start from current PG&E tariff rates and are projected
+  forward each year. This panel sets electricity, gas, gasoline, and external
+  EV-charging prices, plus how many years to model.
 
 ### What this means for you
 
 WhyWatt uses real PG&E tariff rates as the starting point and projects them
-forward using three escalation scenarios. The scenario you choose has a large
-effect on the 20-year cost totals — higher escalation makes electrification
-look better because gas prices rise faster.
+forward each year. The escalation you choose has a large effect on the long-term
+totals — higher escalation makes electrification look better because gas prices
+rise faster. This is also where you set how many years the simulation covers.
+
+The panel groups four price streams: home electricity, natural gas, gasoline, and
+external (public or workplace) EV charging. Electricity and gas can each be compared
+across two scenarios; gasoline and external EV charging are single shared prices that
+apply to both scenarios.
 
 ### Escalation scenarios
 
 - Conservative: electricity +4%/yr, gas +4%/yr
-- Moderate (default): electricity +7%/yr, gas +8%/yr — matches 10-year historical average
+- Moderate (default): electricity +7%/yr, gas +8%/yr — matches the 10-year historical average
 - Stress (CEC): electricity +10%/yr, gas +12%/yr
 
 ### Base rates (2025)
 
 - Electricity (PG&E E-1): $0.386/kWh (Cal Advocates Q2 2025 report)
 - Gas (PG&E G-1): $2.08/therm (PG&E Advice Letter 5014-G1, Jan 2025)
+- Gasoline: $4.50/gallon (California retail average)
+- External EV charging: $0.25/kWh (median US public Level 2 rate)
 
 ### Key assumptions
 
 - Rates escalate at a constant annual rate — actual utility rate changes
   may differ year to year.
+- Gasoline and external EV-charging prices are shared across both comparison
+  scenarios; only electricity and gas are scenario-split.
 - All homes in the simulation use PG&E rates. Other California utilities
   (SCE, SDG&E) will be supported in a future release.
+
+### Default values
+
+- Model timeline — 20 years
+- Electricity rate model — CAGR Flat, +7%/yr
+- Gas rate model — CAGR Flat, +8%/yr
+- Gasoline price — $4.50/gal, +0%/yr
+- External EV charging price — $0.25/kWh, +3%/yr
+- Compare two scenarios (A vs B) — off
 
 ### Data sources
 
 - PG&E E-1 tariff: Cal Advocates Q2 2025 report
 - PG&E G-1 tariff: PG&E Advice Letter 5014-G1, January 2025
 - Historical CAGR: EIA retail electricity and gas price series, 2014-2024
+- External EV charging: published public Level 2 charging rates (2024)
 
 ---
 
@@ -194,16 +236,31 @@ Where:
 - HDD = heating degree-days (base 65°F) for your climate zone
 - CDD = cooling degree-days (base 65°F)
 - UA = home heat loss rate (BTU/hr/°F) — set by insulation quality
-- AFUE = furnace efficiency (e.g., 0.80 = 80%)
-- COP = heat pump heating efficiency (e.g., 3.5 means 3.5x more heat than electricity used)
-- SEER = heat pump cooling efficiency rating
+- AFUE = furnace efficiency, the annual fuel use efficiency (e.g., 0.80 = 80%)
+- COP = coefficient of performance, heat pump heating efficiency (e.g., 3.5 means
+  3.5 units of heat per unit of electricity used)
+- SEER = seasonal energy efficiency ratio, the heat pump cooling efficiency rating
 
 ### Key assumptions
 
 - Bay Area default: 1,910 HDD and 340 CDD (NOAA TMY3, San Jose Mineta)
 - UA classes: Poor = 650, Average = 500, Good = 350 BTU/hr/°F
-- Default heat pump: COP 3.5 heating, SEER 22 cooling
-- Default gas furnace: AFUE 0.80
+- Most Bay Area homes have no central air conditioning today; adding a heat pump
+  brings cooling as a clean addition, modeled as one combined install.
+
+### Default values
+
+- Starting state — Gas
+- Heat-pump heating efficiency (COP) — 3.5
+- Heat-pump cooling efficiency (SEER) — 22
+- Gas furnace efficiency (AFUE) — 0.80
+- Has central AC today — off
+- Heat-pump size — 3.0 tons
+- Swap — planned, Year 3
+- Install cost — $14,000
+- Rebate — $3,500
+- Existing furnace age — 10 years; baseline lifespan — 20 years; replacement cost — $6,000
+- Existing central AC efficiency — SEER 14; age — 7 years
 
 ### Data sources
 
@@ -222,7 +279,7 @@ Where:
 ### What this means for you
 
 Water heating is typically the second-largest energy cost in a home after
-HVAC. A heat pump water heater (HPWH) uses roughly one-third the energy
+HVAC. A heat pump water heater uses roughly one-third the energy
 of a gas water heater for the same amount of hot water.
 
 ### How we calculate it
@@ -235,15 +292,26 @@ Gas water heater:
 Heat pump water heater:
   annual kWh = heat_load × 365 / (UEF × 3,412)
 
-Where inlet temperature varies monthly with your climate zone.
+Where inlet temperature varies monthly with your climate zone, and UEF is the
+uniform energy factor — the appliance's overall water-heating efficiency.
 
 ### Key assumptions
 
 - Default daily hot water use: 65 gallons (DOE reference household)
 - Scales with bedrooms: 1BR=30 gal, 2BR=50 gal, 3BR=65 gal, 4BR=75 gal, 5BR=85 gal
-- Default gas UEF: 0.65
-- Default HPWH UEF: 3.5
 - Target water temperature: 120°F
+
+### Default values
+
+- Starting state — Gas
+- Gas water-heater efficiency (UEF) — 0.65
+- Heat-pump water-heater efficiency (UEF) — 3.5
+- Daily hot water use — 65 gallons
+- Target temperature — 120°F
+- Swap — planned, Year 5
+- Install cost — $2,500
+- Rebate — $500
+- Existing water-heater age — 10 years; baseline lifespan — 12 years; replacement cost — $1,200
 
 ### Data sources
 
@@ -280,6 +348,17 @@ when you account for the full energy chain.
   electricity is negligible and not separately modeled.
 - Loads per week can be adjusted in the dryer detail panel.
 
+### Default values
+
+- Starting state — Gas
+- Gas energy per load — 0.22 therms
+- Heat-pump energy per load — 1.8 kWh
+- Loads per week — 5
+- Swap — not planned, Year 8 if enabled
+- Install cost — $1,200
+- Rebate — $0
+- Existing dryer age — 10 years; baseline lifespan — 15 years; replacement cost — $800
+
 ### Data sources
 
 - ENERGY STAR clothes dryer specification and reference data (2024)
@@ -289,7 +368,7 @@ when you account for the full energy chain.
 ## §7 · Cooktop — Gas vs. Induction
 @file: cooktop.html
 @keys: cooktop
-@popup: Cooking energy is estimated from daily cook time. Gas burners
+@popup: Cooking energy is estimated from meals cooked per week. Gas burners
   convert only about 40% of combustion energy to heat; induction
   transfers about 85% directly to the cookware.
 
@@ -320,6 +399,17 @@ directly to the pan.
   cooktop detail panel to match your household.
 - The oven is not separately modeled in the cooktop slot.
 
+### Default values
+
+- Starting state — Gas
+- Gas energy per meal — 0.05 therms
+- Induction energy per meal — 0.9 kWh
+- Meals per week — 14
+- Swap — not planned, Year 10 if enabled
+- Install cost — $1,500
+- Rebate — $0
+- Existing cooktop age — 10 years; baseline lifespan — 20 years; replacement cost — $1,000
+
 ### Data sources
 
 - American Gas Association (AGA) residential cooking reference data
@@ -327,85 +417,166 @@ directly to the pan.
 
 ---
 
-## §8 · EV Charger
+## §8 · Transportation — Driving, EVs & Charging
 @file: ev.html
 @keys: ev_charger
-@popup: EV charging energy is estimated from your annual miles driven, your
-  vehicle's efficiency (kWh per mile), and a charging-efficiency factor for home
-  charging losses. Level 2 home charging (240V) is assumed.
+@popup: Transportation models your driving as gasoline miles and electric miles.
+  Your Journey can add an electric vehicle and a home Level 2 charger, shifting
+  charging from costly public stations to your home electricity rate.
 
 ### What this means for you
 
-Adding an EV to an electrified home increases electricity use but
-eliminates gasoline costs entirely. WhyWatt models the electricity
-cost of home charging — it does not currently model gasoline savings
-(the financial case for an EV is in the vehicle purchase decision,
-not the home energy decision).
+Transportation captures the cars you drive and how they're fueled. WhyWatt models
+two things that move money: the gasoline your gas car burns, and the electricity an
+electric vehicle (EV) uses. Both scenarios start from your current driving; in Your
+Journey you can add an EV and a home charger.
+
+The core story is the home Level 2 charger. Without one, an EV charges at public or
+workplace stations at a higher rate. With one, most charging shifts to your home
+electricity rate, which is usually cheaper and far more convenient — and only home
+charging can be offset by rooftop solar.
+
+### The two scenarios
+
+Do Nothing keeps your current vehicles every year: your gas car keeps burning
+gasoline, and if you already drive an EV today, it keeps charging at public stations.
+
+Your Journey, in the year you choose, can reduce or eliminate your gas miles and add
+an EV charging mostly at home. The home charger is a one-time hardware cost; the car
+purchase itself is not modeled.
 
 ### How we calculate it
 
-  annual kWh = miles_per_year × kWh_per_mile / charging_efficiency
+Gas car fuel:
 
-- miles_per_year: how far you drive in a year (default 7,000)
-- kWh_per_mile: your vehicle's energy use (default 0.30 kWh/mile, about 3.3 miles/kWh) —
-  efficient cars are lower, large trucks and SUVs are higher
-- charging_efficiency: the share of energy drawn from the wall that actually reaches the
-  battery (default 90%; the other ~10% is lost as heat while charging)
+  annual gallons = gas_miles_per_year / MPG
 
-Default: 7,000 × 0.30 / 0.90 ≈ 2,333 kWh/yr.
+EV charging energy (electricity drawn from the wall):
+
+  annual kWh = electric_miles_per_year / efficiency_mi_per_kWh / charging_efficiency
+
+EV charging is then split into two streams:
+
+  home kWh     = annual kWh × percent_charged_at_home
+  external kWh = annual kWh × (1 − percent_charged_at_home)
+
+Home charging is billed at your home electricity rate; external charging is billed at
+the External EV charging rate set in Energy & Prices. Only the home portion counts as
+part of your home electricity bill, so only the home portion can be offset by solar.
+
+### Existing EV today
+
+If you already drive an EV before any home charger, set "EV miles/yr today" above zero.
+That EV appears in Do Nothing too, charging entirely at external stations (there is no
+home charger in the Do Nothing world). In Your Journey, installing the home charger
+shifts it to mostly home charging.
 
 ### Key assumptions
 
-- Level 2 home charging (240V) is assumed — the most common home installation
-- Charging efficiency is modeled explicitly with its own slider (default 90%), so the
-  wall energy you are billed for is higher than the energy that reaches the battery
-- The EV charger slot models home charging only, not workplace or public charging
+- Level 2 home charging (240V) is assumed for the home charger.
+- Charging efficiency is modeled explicitly: the wall energy you are billed for is
+  higher than the energy that reaches the battery (the difference is lost as heat).
+- Gasoline price is set in Energy & Prices; gasoline's health and climate damages are
+  shown in the Social & Health panel.
+
+### Default values
+
+- Gas miles per year (today) — 12,000
+- Fuel economy — 28 MPG
+- Gas miles per year after switch — 0 (fully replaced)
+- EV miles per year today — 0 (no EV today)
+- EV miles per year after switch — 12,000
+- EV efficiency — 3.5 miles/kWh
+- Charging efficiency — 0.88 (88%)
+- Percent charged at home (after charger) — 85%
+- Plan EV + charger — not planned, Year 2 if enabled
+- Home charger amperage — 32 A; install cost — $800; rebate — $0
+- Gasoline price — $4.50/gal (Energy & Prices)
+- External EV charging price — $0.25/kWh (Energy & Prices)
 
 ### Data sources
 
-- US average VMT: Federal Highway Administration (FHWA) 2024
+- US average vehicle miles traveled: Federal Highway Administration (FHWA) 2024
 - Vehicle efficiency: EPA fuel economy data (2024)
+- External charging rate: published public Level 2 charging rates (2024)
 
 ---
 
 ## §9 · Solar & Battery
 @file: solar.html
 @keys: solar
-@popup: Solar savings are modeled as a reduction in net electricity
-  purchased from the grid each year. Battery storage shifts solar
-  generation to evening hours.
+@popup: Solar is modeled from your system size and yield. The energy you use on-site
+  saves at your retail rate; the surplus you export earns a credit. A battery lets you
+  use more of your own solar instead of exporting it cheaply.
 
 ### What this means for you
 
-Solar panels reduce your electricity bill by generating power on-site.
-WhyWatt models solar as a percentage of your annual electricity use that
-you no longer buy from the grid. Battery storage lets you use solar energy
-at night instead of sending it back to the grid at a lower NEM export rate.
+Solar panels reduce your electricity bill by generating power on-site. WhyWatt models
+your actual system size — number of panels times kilowatts per panel — and how much it
+produces each year. Energy you use the moment it's produced saves you the full retail
+rate. Energy you don't use is exported to the grid for a credit, which under today's
+rules is worth much less than retail.
+
+A home battery stores your midday solar so you can use it in the evening instead of
+selling it back cheaply — raising the share of your own solar you actually consume.
 
 ### How we calculate it
 
-Solar savings are applied as a coverage percentage of total annual
-electricity consumption:
+System production:
 
-  annual_savings_kWh = total_electricity_kWh × solar_coverage_pct / 100
-  annual_savings_$ = annual_savings_kWh × electricity_rate
+  annual production kWh = system_kW × specific_yield
+  system_kW = number_of_panels × kW_per_panel
 
-Battery is modeled as an incremental improvement to coverage — shifting
-self-consumption from daytime to evening, improving the effective rate
-at which solar offsets purchased electricity.
+Self-consumption split:
+
+  self-used kWh = production × self_consumption_fraction
+  exported  kWh = production × (1 − self_consumption_fraction)
+
+Yearly savings:
+
+  savings = (self-used kWh × retail_rate) + (exported kWh × export_rate)
+
+Savings are capped at your actual electricity spending that year — solar cannot reduce
+your bill below zero.
+
+### Export credit: NEM 3.0 vs NEM 2.0
+
+The export rate depends on your net-metering era:
+
+- NEM 3.0 / NBT (Net Billing Tariff, today's default for new systems): exports earn the
+  utility's avoided-cost value, which averages roughly $0.06/kWh — far below retail. This
+  is why self-consumption and batteries matter so much under the current rules.
+- NEM 2.0 (older systems): exports earn the retail rate minus a small non-bypassable
+  charge (about $0.025/kWh).
 
 ### Key assumptions
 
-- Solar coverage percentage is user-set (e.g., 80% means solar covers 80%
-  of your annual electricity use)
-- Degradation, shading, and panel orientation are not separately modeled
-- NEM (net energy metering) export credit is not separately calculated —
-  coverage percentage captures the net effect
+- Self-consumption fraction defaults to 80% with a battery and 35% without — you can
+  adjust it directly. The battery default suggests 80% when enabled.
+- Degradation, shading, and panel orientation are not separately modeled; specific
+  yield (kWh per kW per year) captures local production — roughly 1,400 on the foggy
+  coast to 1,650 inland.
+- You enter the total installed system cost from a contractor quote, minus any rebate.
+
+### Default values
+
+- Add solar — off
+- Install year — 1
+- Number of panels — 15
+- Kilowatts per panel — 0.42 (about a 6.3 kW system)
+- Specific yield — 1,500 kWh per kW per year (about 9,450 kWh/yr)
+- Battery storage — on, 13.5 kWh
+- Self-consumption — 80%
+- Net-metering mode — NEM 3.0 / NBT
+- Non-bypassable charge (NEM 2.0) — $0.025/kWh
+- Total installed cost — $30,000
+- Rebate — $0
 
 ### Data sources
 
-- Typical residential solar system sizing: NREL PVWatts tool
-- Battery storage modeling: simplified from CEC self-consumption analysis
+- Typical residential solar sizing and yield: NREL PVWatts tool
+- NEM 3.0 avoided-cost export values: CPUC Avoided Cost Calculator (2024)
+- Non-bypassable charge: PG&E NEM 2.0 tariff
 
 ---
 
@@ -413,8 +584,8 @@ at which solar offsets purchased electricity.
 @file: baseload.html
 @keys: baseload
 @popup: Baseload covers lights, outlets, refrigerator, and other
-  always-on electricity uses. It scales with the number of
-  bedrooms using DOE occupancy data.
+  always-on electricity uses. It scales with floor area and the number of
+  bedrooms using DOE and EIA reference data.
 
 ### What this means for you
 
@@ -442,6 +613,14 @@ constant — from 500 down to 300 kWh/yr by default.
 - 3-bedroom home is the DOE reference household
 - Baseload is always electric — gas is not used for lights or plugs
 
+### Default values
+
+- Always-on constant (before upgrade) — 500 kWh/yr
+- Always-on constant (after upgrade) — 300 kWh/yr
+- Efficiency upgrade — not planned, Year 2 if enabled
+- Install cost — $400
+- Rebate — $0
+
 ### Data sources
 
 - DOE/ENERGY STAR residential energy consumption reference data
@@ -459,17 +638,18 @@ constant — from 500 down to 300 kWh/yr by default.
 
 ### What this means for you
 
-Most pre-1980s homes have 100-amp electrical service. Adding a heat pump
-(30A), an EV charger (32A), and an induction range (40A) can push a 100A
-panel to or beyond its limit. A 200A panel upgrade costs $3,000-$8,000
-and requires a licensed electrician and utility coordination.
+Most pre-1980s homes have 100-amp electrical service. Adding a heat pump,
+an EV charger, and an induction range can push a 100A panel to or beyond its
+limit. A 200A panel upgrade costs $3,000-$8,000 and requires a licensed
+electrician and utility coordination.
 
 The good news: California has active programs to help — TECH+ rebates,
 simplified permit processes, and utility co-funding in some territories.
 
 ### How we estimate panel load (NEC Article 220)
 
-This is the same calculation an electrician uses to size a service entrance:
+This is the same calculation an electrician uses to size a service entrance,
+using the NEC (National Electrical Code) Article 220 standard method:
 
 Step 1 — General load (with demand factor):
   general VA = (floor area sq ft × 3) + 3,000 + 1,500
@@ -500,6 +680,14 @@ Step 3 — Service amperage:
 This estimate is for planning purposes only. A licensed electrician
 must verify before any work is performed.
 
+### Default values
+
+- Main panel size — 200 amps
+- EV charger nameplate — 32 A; induction — 40 A; heat-pump water heater — 15 A; dryer — 30 A
+- Plan 200A upgrade — not planned, Year 1 if enabled
+- Upgrade cost — $3,000
+- Rebate — $0
+
 ### Data sources
 
 - NEC Article 220 Standard Method for Dwelling Units
@@ -510,7 +698,7 @@ must verify before any work is performed.
 ## §12 · ACC — Avoided Cost of Carbon
 @file: acc.html
 @keys: chart_r2
-@popup: The ACC (Avoided Cost of Carbon) seasonal shape shows how the
+@popup: The ACC (Avoided Cost Calculator) seasonal shape shows how the
   effective electricity rate varies by month under the CPUC's
   avoided-cost framework. Summer peak hours carry the highest rate.
 
@@ -523,7 +711,8 @@ Summer afternoon peak hours are the most expensive — that's when gas peaker
 plants run and carbon costs are highest.
 
 WhyWatt uses the ACC seasonal shape to apply a more realistic monthly rate
-pattern to electricity costs, rather than a flat annual average.
+pattern to electricity costs, rather than a flat annual average. The same
+avoided-cost values also set the export credit for solar under NEM 3.0.
 
 ### How the ACC shape works
 
@@ -537,8 +726,13 @@ air conditioning in July costs more per kWh than heating in January.
 ### Key assumptions
 
 - ACC shape is from E3's 2024 Avoided Cost Calculator, Electric CZ12 (PG&E territory)
-- ACC shape is only available when PG&E is selected as the rate source
+- ACC-shaped rates apply when you choose the ACC option for electricity or gas
 - The base rate (before ACC adjustment) is still the PG&E E-1 tariff
+
+### Default values
+
+- Electricity rate model — CAGR Flat (switch to ACC-Shaped in Energy & Prices)
+- Rate-shape preview year — Year 1 (chart slider)
 
 ### Data sources
 
@@ -547,27 +741,25 @@ air conditioning in July costs more per kWh than heating in January.
 
 ---
 
-## §13 · Social & Health Cost of Gas
+## §13 · Social & Health Cost of Gas & Gasoline
 @file: social_cost.html
 @keys: social_cost
-@popup: These costs represent damage to public health and the climate
-  caused by burning natural gas — costs that do not appear on your
-  utility bill but are real and quantified by official sources.
+@popup: These costs represent damage to public health and the climate caused by
+  burning natural gas and gasoline — costs that do not appear on your bill but
+  are real and quantified by official sources.
 
 ### What this means for you
 
-The utility bill only shows the market price of gas. It does not show the
-cost that gas combustion imposes on public health (air quality damage,
-respiratory illness) and on the global climate (CO2 and methane emissions).
+Your utility bill and the price at the pump show only the market price of fuel.
+They do not show the cost that combustion imposes on public health (air quality
+damage, respiratory illness) and on the global climate (CO2 and methane emissions).
 
-At the default settings, these hidden costs total about $2.30 per therm —
-nearly equal to the $2.08/therm market price. The "true" cost of a therm
-of natural gas is roughly double what appears on the bill.
+For natural gas, at the default settings these hidden costs total about $2.30 per
+therm — nearly equal to the $2.08/therm market price. For gasoline, the default
+hidden cost is about $2.44 per gallon on top of the pump price. This panel is
+informational: advocates can use it to show homeowners the full picture.
 
-These costs do not appear on your utility bill. This panel is informational —
-advocates can use it to show homeowners the full picture.
-
-### Climate cost ($1.07/therm default)
+### Natural gas — climate cost ($1.07/therm default)
 
 Based on EPA 2023 Social Cost of CO2 ($190/tonne CO2) applied to the EIA
 combustion emission factor (5.3 kg CO2/therm), plus an allowance for
@@ -575,7 +767,7 @@ upstream methane leakage at a 2% pipeline leakage rate.
 
 Slider range: $1.00 (EPA SC-CO2 only, no leakage) to $2.00 (high leakage + high scenario).
 
-### Health cost ($1.23/therm default)
+### Natural gas — health cost ($1.23/therm default)
 
 Based on CPUC Decision D.24-07-015 (July 2024), using E3's "Quantifying
 Air Quality Impacts of Decarbonization" report. Computed using the EPA
@@ -585,14 +777,31 @@ air quality damage (NO2, PM2.5) from building gas combustion.
 Slider range: $0.50 (conservative/skeptical) to $2.00 (includes indoor
 air quality — NO2 and benzene exposure not yet in the CPUC figure).
 
+### Gasoline externalities
+
+Gasoline combustion in your gas car carries the same kinds of hidden costs:
+
+- Climate cost: $1.69/gallon default — EPA Social Cost of CO2 applied to the
+  combustion emission factor of about 8.89 kg CO2 per gallon.
+- Health cost: $0.75/gallon default — outdoor air quality damage from tailpipe
+  pollution.
+
+Both are added to the modeled gasoline cost only when their checkboxes are on.
+
 ### Important caveats
 
 - The EPA 2023 SC-CO2 figure has uncertain federal regulatory status as of 2025-2026.
   California's CPUC adopted the lower IWG 2021 value ($51/tonne = $0.27/therm)
   for regulatory proceedings.
-- The health adder covers outdoor air quality only — indoor health effects
+- The health adders cover outdoor air quality only — indoor health effects
   from gas stove NO2 and benzene are additional and not yet officially monetized.
-- Gas cars are not included in this calculation (Phase 4 candidate).
+
+### Default values
+
+- Include natural-gas climate cost — on, $1.07/therm
+- Include natural-gas health cost — on, $1.23/therm
+- Include gasoline climate cost — on, $1.69/gal
+- Include gasoline health cost — on, $0.75/gal
 
 ### Data sources
 
@@ -600,7 +809,7 @@ air quality — NO2 and benzene exposure not yet in the CPUC figure).
 - IWG Technical Support Document: Social Cost of Carbon (February 2021)
 - CPUC Decision D.24-07-015 (July 2024)
 - E3: Quantifying Air Quality Impacts of Decarbonization (2022)
-- EIA emission factor: 5.306 kg CO2/therm (EPA/EIA 2024)
+- EIA emission factors: 5.306 kg CO2/therm gas, ~8.89 kg CO2/gal gasoline (EPA/EIA 2024)
 
 ---
 
@@ -613,44 +822,59 @@ air quality — NO2 and benzene exposure not yet in the CPUC figure).
 
 ### Journey Costs (JC)
 
-JC-1 Annual Cost — Your Journey vs. Do Nothing
-Shows the total energy bill (electricity + gas) for each year of the
-simulation, for both scenarios side by side. The gap in a given year
-is your annual saving or cost.
+Annual Cost — Your Journey vs. Do Nothing
+Shows the total energy bill (electricity, gas, gasoline, and external EV charging)
+for each year of the simulation, for both scenarios side by side. The gap in a given
+year is your annual saving or cost.
 
-JC-2 Cumulative Cost & Payback Crossover
+Cumulative Cost & Payback Crossover
 Adds up every year's total bill from year 1 onward. The crossover point
 — where the Journey line dips below Do Nothing — is your payback year.
 This is often the most compelling chart to show homeowners.
 
-JC-3 20-Year Summary Bar
-A single side-by-side bar showing total 20-year spend for each scenario.
-The difference is your estimated lifetime savings from electrification.
+Cost Breakdown by Category
+A stacked area where each band is one category's share of the cumulative
+bill — heating, cooling, water heating, baseload, and transportation.
 
-JC-4 Annual Cost Breakdown by Appliance
-A stacked bar where each segment is one appliance's share of the annual
-energy bill. Watch across years to see which swaps have the biggest impact.
+Equipment Replacements (CapEx)
+The one-time install costs of your planned swaps, plotted in the year they occur,
+so you can see the upfront investment alongside the running savings.
+
+Journey Timeline
+A visual timeline of your electrification journey: which appliance is swapped in
+which year, and when the EV charger and solar come online.
 
 ### Rates (R)
 
-R-1 Rate Projection
-Electricity and gas rates projected forward from today's PG&E tariff
-using your chosen escalation scenario (conservative / moderate / stress).
+Electricity and Gas Rate Projection
+Rates projected forward from today's PG&E tariff using your chosen escalation.
 
-R-2 ACC Seasonal Rate Shape
+ACC Seasonal Rate Shape
 Monthly variation in the effective electricity rate under the CPUC
 Avoided Cost Calculator framework. Summer afternoon peak hours carry
 the highest effective rate.
 
 ### Energy Use (EU)
 
-EU-1 Annual Energy Consumption by Fuel
-Total annual energy in physical units — kWh for electricity, therms for
-gas. Shows energy quantity before pricing is applied.
+Cost by Device and Energy Use by Device
+Per-appliance breakdowns of annual cost and energy. Compare journey vs.
+do-nothing to see which swaps matter most.
 
-EU-2 Per-Appliance Energy Breakdown
-Stacked breakdown of energy consumption by appliance. Compare journey vs.
-do-nothing to see which swaps reduce energy use most.
+Annual kWh by Device and Annual Gas by Device
+Electricity (kilowatt-hours) and gas (therms) used by each appliance per year.
+For an electric vehicle, the kWh chart counts home charging only.
+
+Energy Mix Timeline
+A stacked view of where your home's energy comes from each year, in
+kilowatt-hour-equivalent terms: natural gas, grid electricity, your own solar,
+and external EV charging. It tells the decarbonization story at a glance — gas
+shrinking, solar growing, and grid use falling as your journey unfolds.
+
+### Default values
+
+- Left chart — Cumulative Energy Costs
+- Right chart — Journey Timeline
+- Device chart scenario toggle — Your Journey
 
 ---
 
@@ -658,15 +882,15 @@ do-nothing to see which swaps reduce energy use most.
 @file: about.html
 @keys:
 @popup: WhyWatt is a home electrification cost simulator for California
-  community advocates, showing the 20-year cost of an electrification
+  community advocates, showing the long-term cost of an electrification
   journey vs. doing nothing.
 
 ### What WhyWatt is
 
 WhyWatt is a home electrification cost simulator for California community
 advocates. It shows the long-term cost of an electrification journey —
-replacing gas appliances with electric alternatives over time — compared
-to doing nothing for 20 years.
+replacing gas appliances with electric alternatives over time, and switching
+from gasoline to an electric vehicle — compared to doing nothing.
 
 The primary audience is electrification advocates running sessions with
 homeowners: people who want to show, with real numbers, what switching to
@@ -676,9 +900,9 @@ heat pumps, induction, and electric vehicles actually costs and saves.
 
 WhyWatt simulates a single home running two scenarios in parallel:
 - Your Journey — you choose which appliances to swap, and in which year
-- Do Nothing — all current appliances stay in place for 20 years
+- Do Nothing — all current appliances and vehicles stay in place for the modeled period
 
-For each year WhyWatt calculates energy consumption, utility costs with
+For each year WhyWatt calculates energy consumption, utility and fuel costs with
 escalation, capital expenditure for appliance swaps, and solar savings.
 
 ### Data sources
@@ -692,7 +916,8 @@ escalation, capital expenditure for appliance swaps, and solar savings.
 
 ### Limitations
 
-- Appliance end-of-life replacement is not modeled beyond scheduled swaps
+- Appliance end-of-life replacement is modeled where you set ages and lifespans;
+  otherwise the timeline follows your scheduled swaps
 - Income-qualified rebate programs are coming in a future release
 - Monte Carlo uncertainty bands are coming in a future release
 - Only PG&E rates are currently supported (SCE, SDG&E in a future release)

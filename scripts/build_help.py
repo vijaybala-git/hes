@@ -453,12 +453,12 @@ def main():
     PUBLIC_HELP.mkdir(parents=True, exist_ok=True)
     for html in HELP_DIR.glob("*.html"):
         shutil.copy2(html, PUBLIC_HELP / html.name)
-    print(f"  synced {len(list(HELP_DIR.glob('*.html')))} html → {PUBLIC_HELP.relative_to(ROOT)}")
+    print(f"  synced {len(list(HELP_DIR.glob('*.html')))} html -> {PUBLIC_HELP.relative_to(ROOT)}")
     logo = ROOT / "docs" / "assets" / "whywatt_logo.svg"
     if logo.exists():
         PUBLIC_ASSETS.mkdir(parents=True, exist_ok=True)
         shutil.copy2(logo, PUBLIC_ASSETS / logo.name)
-        print(f"  synced logo → {(PUBLIC_ASSETS / logo.name).relative_to(ROOT)}")
+        print(f"  synced logo -> {(PUBLIC_ASSETS / logo.name).relative_to(ROOT)}")
 
     print(f"\nDone. {len(written_html)} HTML files + help_content.py regenerated.")
     print("\nNext steps:")

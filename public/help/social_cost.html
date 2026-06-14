@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>WhyWatt Help — Social &amp; Health Cost of Gas</title>
+  <title>WhyWatt Help — Social &amp; Health Cost of Gas &amp; Gasoline</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                max-width: 760px; margin: 2rem auto; padding: 0 1.5rem;
@@ -36,7 +36,7 @@
   <header>
     <img src="../assets/whywatt_logo.svg" alt="WhyWatt"
          onerror="this.style.display='none'">
-    <h1>Social &amp; Health Cost of Gas</h1>
+    <h1>Social &amp; Health Cost of Gas &amp; Gasoline</h1>
   </header>
   <nav>
     <a href="index.html">← Help Index</a>
@@ -44,17 +44,28 @@
   <main>
 
     <h2 id="what-this-means-for-you">What this means for you</h2>
-    <p>The utility bill only shows the market price of gas. It does not show the cost that gas combustion imposes on public health (air quality damage, respiratory illness) and on the global climate (CO2 and methane emissions).</p>
-<p>At the default settings, these hidden costs total about $2.30 per therm — nearly equal to the $2.08/therm market price. The "true" cost of a therm of natural gas is roughly double what appears on the bill.</p>
-<p>These costs do not appear on your utility bill. This panel is informational — advocates can use it to show homeowners the full picture.</p>
+    <p>Your utility bill and the price at the pump show only the market price of fuel. They do not show the cost that combustion imposes on public health (air quality damage, respiratory illness) and on the global climate (CO2 and methane emissions).</p>
+<p>For natural gas, at the default settings these hidden costs total about $2.30 per therm — nearly equal to the $2.08/therm market price. For gasoline, the default hidden cost is about $2.44 per gallon on top of the pump price. This panel is informational: advocates can use it to show homeowners the full picture.</p>
 
-    <h2 id="climate-cost-1-07-therm-default">Climate cost ($1.07/therm default)</h2>
+    <h2 id="natural-gas-climate-cost-1-07-therm-default">Natural gas — climate cost ($1.07/therm default)</h2>
     <p>Based on EPA 2023 Social Cost of CO2 ($190/tonne CO2) applied to the EIA combustion emission factor (5.3 kg CO2/therm), plus an allowance for upstream methane leakage at a 2% pipeline leakage rate.</p>
 <p>Slider range: $1.00 (EPA SC-CO2 only, no leakage) to $2.00 (high leakage + high scenario).</p>
 
-    <h2 id="health-cost-1-23-therm-default">Health cost ($1.23/therm default)</h2>
+    <h2 id="natural-gas-health-cost-1-23-therm-default">Natural gas — health cost ($1.23/therm default)</h2>
     <p>Based on CPUC Decision D.24-07-015 (July 2024), using E3's "Quantifying Air Quality Impacts of Decarbonization" report. Computed using the EPA COBRA tool with California population and pollution data. Covers outdoor air quality damage (NO2, PM2.5) from building gas combustion.</p>
 <p>Slider range: $0.50 (conservative/skeptical) to $2.00 (includes indoor air quality — NO2 and benzene exposure not yet in the CPUC figure).</p>
+
+    <h2 id="gasoline-externalities">Gasoline externalities</h2>
+    <p>Gasoline combustion in your gas car carries the same kinds of hidden costs:</p>
+<ul>
+<li>Climate cost: $1.69/gallon default — EPA Social Cost of CO2 applied to the</li>
+</ul>
+<p>combustion emission factor of about 8.89 kg CO2 per gallon.</p>
+<ul>
+<li>Health cost: $0.75/gallon default — outdoor air quality damage from tailpipe</li>
+</ul>
+<p>pollution.</p>
+<p>Both are added to the modeled gasoline cost only when their checkboxes are on.</p>
 
     <h2 id="important-caveats">Important caveats</h2>
     <ul>
@@ -62,11 +73,16 @@
 </ul>
 <p>California's CPUC adopted the lower IWG 2021 value ($51/tonne = $0.27/therm) for regulatory proceedings.</p>
 <ul>
-<li>The health adder covers outdoor air quality only — indoor health effects</li>
+<li>The health adders cover outdoor air quality only — indoor health effects</li>
 </ul>
 <p>from gas stove NO2 and benzene are additional and not yet officially monetized.</p>
-<ul>
-<li>Gas cars are not included in this calculation (Phase 4 candidate).</li>
+
+    <h2 id="default-values">Default values</h2>
+    <ul>
+<li>Include natural-gas climate cost — on, $1.07/therm</li>
+<li>Include natural-gas health cost — on, $1.23/therm</li>
+<li>Include gasoline climate cost — on, $1.69/gal</li>
+<li>Include gasoline health cost — on, $0.75/gal</li>
 </ul>
 
     <h2 id="data-sources">Data sources</h2>
@@ -75,13 +91,13 @@
 <li>IWG Technical Support Document: Social Cost of Carbon (February 2021)</li>
 <li>CPUC Decision D.24-07-015 (July 2024)</li>
 <li>E3: Quantifying Air Quality Impacts of Decarbonization (2022)</li>
-<li>EIA emission factor: 5.306 kg CO2/therm (EPA/EIA 2024)</li>
+<li>EIA emission factors: 5.306 kg CO2/therm gas, ~8.89 kg CO2/gal gasoline (EPA/EIA 2024)</li>
 </ul>
 <p>---</p>
   </main>
   <footer>
     <span>WhyWatt v3.0 &middot; <a href="about.html" style="color:#9E9E9E">About</a></span>
-    <span class="section-tag">§13 · Social &amp; Health Cost of Gas &middot; edit help_content.md §13</span>
+    <span class="section-tag">§13 · Social &amp; Health Cost of Gas &amp; Gasoline &middot; edit help_content.md §13</span>
   </footer>
 </body>
 </html>

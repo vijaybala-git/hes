@@ -45,7 +45,7 @@
 
     <h2 id="what-this-means-for-you">What this means for you</h2>
     <p>The Avoided Cost Calculator (ACC) is a CPUC/E3 framework that estimates the true value of electricity at different times of day and year, based on what it would cost to avoid generating that electricity from fossil fuels. Summer afternoon peak hours are the most expensive — that's when gas peaker plants run and carbon costs are highest.</p>
-<p>WhyWatt uses the ACC seasonal shape to apply a more realistic monthly rate pattern to electricity costs, rather than a flat annual average.</p>
+<p>WhyWatt uses the ACC seasonal shape to apply a more realistic monthly rate pattern to electricity costs, rather than a flat annual average. The same avoided-cost values also set the export credit for solar under NEM 3.0.</p>
 
     <h2 id="how-the-acc-shape-works">How the ACC shape works</h2>
     <p>The ACC produces a ratio for each month (e.g., July = 1.35× average, January = 0.78× average). WhyWatt multiplies the base electricity rate by these monthly ratios to get a seasonal rate profile.</p>
@@ -54,8 +54,14 @@
     <h2 id="key-assumptions">Key assumptions</h2>
     <ul>
 <li>ACC shape is from E3's 2024 Avoided Cost Calculator, Electric CZ12 (PG&E territory)</li>
-<li>ACC shape is only available when PG&E is selected as the rate source</li>
+<li>ACC-shaped rates apply when you choose the ACC option for electricity or gas</li>
 <li>The base rate (before ACC adjustment) is still the PG&E E-1 tariff</li>
+</ul>
+
+    <h2 id="default-values">Default values</h2>
+    <ul>
+<li>Electricity rate model — CAGR Flat (switch to ACC-Shaped in Energy & Prices)</li>
+<li>Rate-shape preview year — Year 1 (chart slider)</li>
 </ul>
 
     <h2 id="data-sources">Data sources</h2>

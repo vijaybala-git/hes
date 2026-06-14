@@ -44,7 +44,7 @@
   <main>
 
     <h2 id="what-this-means-for-you">What this means for you</h2>
-    <p>The Journey Planner shows what happens to your energy costs if you swap gas appliances for electric alternatives one by one, on a schedule you choose — compared to doing nothing for 20 years. You set which appliances to replace and in which year; WhyWatt does the math.</p>
+    <p>The Journey Planner shows what happens to your energy costs if you swap gas appliances for electric alternatives one by one, on a schedule you choose — compared to doing nothing for the full modeled period. You set which appliances to replace and in which year; WhyWatt does the math.</p>
 <p>The result is two cost curves on the same chart: Your Journey and Do Nothing. The gap between them — and the year they cross — is your payback.</p>
 
     <h2 id="the-two-scenarios">The two scenarios</h2>
@@ -54,11 +54,11 @@
 <li>From that year forward, the new appliance's operating cost replaces the old one</li>
 <li>All other appliances remain unchanged until their own swap year</li>
 </ul>
-<p>Do Nothing runs in parallel automatically. It uses exactly the same starting appliances — including any that are already electric — and keeps them for the full 20 years. No swaps, no upgrades, no rebates.</p>
+<p>Do Nothing runs in parallel automatically. It uses exactly the same starting appliances — including any that are already electric, and any gas car or existing electric car you drive today — and keeps them for the full modeled period. No swaps, no upgrades, no rebates.</p>
 
     <h2 id="what-swap-year-means">What "swap year" means</h2>
-    <p>Example: You schedule the HVAC swap in Year 3. In simulation year 3, the model applies the install cost ($14,000 minus $3,500 rebate = $10,500 net). From year 4 onward, the heat pump's electricity cost replaces the gas furnace's gas cost. Years 1-2 still use the gas furnace.</p>
-<p>The calendar year label next to the slider (e.g., "Yr 3 (2028)") is derived from the current calendar year when you run the simulation.</p>
+    <p>Example: You schedule the HVAC swap in Year 3. In simulation year 3, the model applies the install cost ($14,000 minus $3,500 rebate = $10,500 net). From year 3 onward, the heat pump's electricity cost replaces the gas furnace's gas cost. Years 1-2 still use the gas furnace.</p>
+<p>The calendar year label next to the slider (e.g., "Yr 3 (2028)") is derived from the simulation start year.</p>
 
     <h2 id="key-assumptions">Key assumptions</h2>
     <ul>
@@ -66,15 +66,27 @@
 </ul>
 <p>The same inputs always produce the same outputs.</p>
 <ul>
-<li>Appliance lifespans and end-of-life replacement costs are not modeled beyond</li>
+<li>Appliance lifespans and end-of-life replacement costs are modeled where you</li>
 </ul>
-<p>your planned swaps.</p>
+<p>set them in the device detail panels; otherwise the planned swaps drive the timeline.</p>
 <ul>
 <li>Energy consumption is based on your home profile and appliance efficiency</li>
 </ul>
 <p>ratings — not your actual meter readings.</p>
 <ul>
-<li>Rate escalation is applied uniformly each year at your chosen scenario rate.</li>
+<li>Rate escalation is applied each year at the rate you choose in Energy & Prices.</li>
+</ul>
+
+    <h2 id="default-values">Default values</h2>
+    <ul>
+<li>Modeled period — 20 years (Energy & Prices → Model Timeline)</li>
+<li>Simulation start year — 2025 (Energy & Prices → detail)</li>
+<li>HVAC swap — planned, Year 3 (HVAC card)</li>
+<li>Water heater swap — planned, Year 5 (Water Heater card)</li>
+<li>Dryer swap — not planned, Year 8 if enabled (Dryer card)</li>
+<li>Cooktop swap — not planned, Year 10 if enabled (Cooktop card)</li>
+<li>EV + charger — not planned, Year 2 if enabled (Transportation card)</li>
+<li>Baseload efficiency upgrade — not planned, Year 2 if enabled (Baseload card)</li>
 </ul>
 <p>---</p>
   </main>

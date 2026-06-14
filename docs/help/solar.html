@@ -44,28 +44,62 @@
   <main>
 
     <h2 id="what-this-means-for-you">What this means for you</h2>
-    <p>Solar panels reduce your electricity bill by generating power on-site. WhyWatt models solar as a percentage of your annual electricity use that you no longer buy from the grid. Battery storage lets you use solar energy at night instead of sending it back to the grid at a lower NEM export rate.</p>
+    <p>Solar panels reduce your electricity bill by generating power on-site. WhyWatt models your actual system size — number of panels times kilowatts per panel — and how much it produces each year. Energy you use the moment it's produced saves you the full retail rate. Energy you don't use is exported to the grid for a credit, which under today's rules is worth much less than retail.</p>
+<p>A home battery stores your midday solar so you can use it in the evening instead of selling it back cheaply — raising the share of your own solar you actually consume.</p>
 
     <h2 id="how-we-calculate-it">How we calculate it</h2>
-    <p>Solar savings are applied as a coverage percentage of total annual electricity consumption:</p>
-<p>annual_savings_kWh = total_electricity_kWh × solar_coverage_pct / 100 annual_savings_$ = annual_savings_kWh × electricity_rate</p>
-<p>Battery is modeled as an incremental improvement to coverage — shifting self-consumption from daytime to evening, improving the effective rate at which solar offsets purchased electricity.</p>
+    <p>System production:</p>
+<p>annual production kWh = system_kW × specific_yield system_kW = number_of_panels × kW_per_panel</p>
+<p>Self-consumption split:</p>
+<p>self-used kWh = production × self_consumption_fraction exported  kWh = production × (1 − self_consumption_fraction)</p>
+<p>Yearly savings:</p>
+<p>savings = (self-used kWh × retail_rate) + (exported kWh × export_rate)</p>
+<p>Savings are capped at your actual electricity spending that year — solar cannot reduce your bill below zero.</p>
+
+    <h2 id="export-credit-nem-3-0-vs-nem-2-0">Export credit: NEM 3.0 vs NEM 2.0</h2>
+    <p>The export rate depends on your net-metering era:</p>
+<ul>
+<li>NEM 3.0 / NBT (Net Billing Tariff, today's default for new systems): exports earn the</li>
+</ul>
+<p>utility's avoided-cost value, which averages roughly $0.06/kWh — far below retail. This is why self-consumption and batteries matter so much under the current rules.</p>
+<ul>
+<li>NEM 2.0 (older systems): exports earn the retail rate minus a small non-bypassable</li>
+</ul>
+<p>charge (about $0.025/kWh).</p>
 
     <h2 id="key-assumptions">Key assumptions</h2>
     <ul>
-<li>Solar coverage percentage is user-set (e.g., 80% means solar covers 80%</li>
+<li>Self-consumption fraction defaults to 80% with a battery and 35% without — you can</li>
 </ul>
-<p>of your annual electricity use)</p>
+<p>adjust it directly. The battery default suggests 80% when enabled.</p>
 <ul>
-<li>Degradation, shading, and panel orientation are not separately modeled</li>
-<li>NEM (net energy metering) export credit is not separately calculated —</li>
+<li>Degradation, shading, and panel orientation are not separately modeled; specific</li>
 </ul>
-<p>coverage percentage captures the net effect</p>
+<p>yield (kWh per kW per year) captures local production — roughly 1,400 on the foggy coast to 1,650 inland.</p>
+<ul>
+<li>You enter the total installed system cost from a contractor quote, minus any rebate.</li>
+</ul>
+
+    <h2 id="default-values">Default values</h2>
+    <ul>
+<li>Add solar — off</li>
+<li>Install year — 1</li>
+<li>Number of panels — 15</li>
+<li>Kilowatts per panel — 0.42 (about a 6.3 kW system)</li>
+<li>Specific yield — 1,500 kWh per kW per year (about 9,450 kWh/yr)</li>
+<li>Battery storage — on, 13.5 kWh</li>
+<li>Self-consumption — 80%</li>
+<li>Net-metering mode — NEM 3.0 / NBT</li>
+<li>Non-bypassable charge (NEM 2.0) — $0.025/kWh</li>
+<li>Total installed cost — $30,000</li>
+<li>Rebate — $0</li>
+</ul>
 
     <h2 id="data-sources">Data sources</h2>
     <ul>
-<li>Typical residential solar system sizing: NREL PVWatts tool</li>
-<li>Battery storage modeling: simplified from CEC self-consumption analysis</li>
+<li>Typical residential solar sizing and yield: NREL PVWatts tool</li>
+<li>NEM 3.0 avoided-cost export values: CPUC Avoided Cost Calculator (2024)</li>
+<li>Non-bypassable charge: PG&E NEM 2.0 tariff</li>
 </ul>
 <p>---</p>
   </main>

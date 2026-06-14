@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>WhyWatt Help — Energy Rates</title>
+  <title>WhyWatt Help — Energy &amp; Prices</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                max-width: 760px; margin: 2rem auto; padding: 0 1.5rem;
@@ -36,7 +36,7 @@
   <header>
     <img src="../assets/whywatt_logo.svg" alt="WhyWatt"
          onerror="this.style.display='none'">
-    <h1>Energy Rates</h1>
+    <h1>Energy &amp; Prices</h1>
   </header>
   <nav>
     <a href="index.html">← Help Index</a>
@@ -44,12 +44,13 @@
   <main>
 
     <h2 id="what-this-means-for-you">What this means for you</h2>
-    <p>WhyWatt uses real PG&E tariff rates as the starting point and projects them forward using three escalation scenarios. The scenario you choose has a large effect on the 20-year cost totals — higher escalation makes electrification look better because gas prices rise faster.</p>
+    <p>WhyWatt uses real PG&E tariff rates as the starting point and projects them forward each year. The escalation you choose has a large effect on the long-term totals — higher escalation makes electrification look better because gas prices rise faster. This is also where you set how many years the simulation covers.</p>
+<p>The panel groups four price streams: home electricity, natural gas, gasoline, and external (public or workplace) EV charging. Electricity and gas can each be compared across two scenarios; gasoline and external EV charging are single shared prices that apply to both scenarios.</p>
 
     <h2 id="escalation-scenarios">Escalation scenarios</h2>
     <ul>
 <li>Conservative: electricity +4%/yr, gas +4%/yr</li>
-<li>Moderate (default): electricity +7%/yr, gas +8%/yr — matches 10-year historical average</li>
+<li>Moderate (default): electricity +7%/yr, gas +8%/yr — matches the 10-year historical average</li>
 <li>Stress (CEC): electricity +10%/yr, gas +12%/yr</li>
 </ul>
 
@@ -57,6 +58,8 @@
     <ul>
 <li>Electricity (PG&E E-1): $0.386/kWh (Cal Advocates Q2 2025 report)</li>
 <li>Gas (PG&E G-1): $2.08/therm (PG&E Advice Letter 5014-G1, Jan 2025)</li>
+<li>Gasoline: $4.50/gallon (California retail average)</li>
+<li>External EV charging: $0.25/kWh (median US public Level 2 rate)</li>
 </ul>
 
     <h2 id="key-assumptions">Key assumptions</h2>
@@ -65,21 +68,36 @@
 </ul>
 <p>may differ year to year.</p>
 <ul>
+<li>Gasoline and external EV-charging prices are shared across both comparison</li>
+</ul>
+<p>scenarios; only electricity and gas are scenario-split.</p>
+<ul>
 <li>All homes in the simulation use PG&E rates. Other California utilities</li>
 </ul>
 <p>(SCE, SDG&E) will be supported in a future release.</p>
+
+    <h2 id="default-values">Default values</h2>
+    <ul>
+<li>Model timeline — 20 years</li>
+<li>Electricity rate model — CAGR Flat, +7%/yr</li>
+<li>Gas rate model — CAGR Flat, +8%/yr</li>
+<li>Gasoline price — $4.50/gal, +0%/yr</li>
+<li>External EV charging price — $0.25/kWh, +3%/yr</li>
+<li>Compare two scenarios (A vs B) — off</li>
+</ul>
 
     <h2 id="data-sources">Data sources</h2>
     <ul>
 <li>PG&E E-1 tariff: Cal Advocates Q2 2025 report</li>
 <li>PG&E G-1 tariff: PG&E Advice Letter 5014-G1, January 2025</li>
 <li>Historical CAGR: EIA retail electricity and gas price series, 2014-2024</li>
+<li>External EV charging: published public Level 2 charging rates (2024)</li>
 </ul>
 <p>---</p>
   </main>
   <footer>
     <span>WhyWatt v3.0 &middot; <a href="about.html" style="color:#9E9E9E">About</a></span>
-    <span class="section-tag">§3 · Energy Rates &middot; edit help_content.md §3</span>
+    <span class="section-tag">§3 · Energy &amp; Prices &middot; edit help_content.md §3</span>
   </footer>
 </body>
 </html>

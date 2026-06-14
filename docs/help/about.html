@@ -44,16 +44,16 @@
   <main>
 
     <h2 id="what-whywatt-is">What WhyWatt is</h2>
-    <p>WhyWatt is a home electrification cost simulator for California community advocates. It shows the long-term cost of an electrification journey — replacing gas appliances with electric alternatives over time — compared to doing nothing for 20 years.</p>
+    <p>WhyWatt is a home electrification cost simulator for California community advocates. It shows the long-term cost of an electrification journey — replacing gas appliances with electric alternatives over time, and switching from gasoline to an electric vehicle — compared to doing nothing.</p>
 <p>The primary audience is electrification advocates running sessions with homeowners: people who want to show, with real numbers, what switching to heat pumps, induction, and electric vehicles actually costs and saves.</p>
 
     <h2 id="what-it-models">What it models</h2>
     <p>WhyWatt simulates a single home running two scenarios in parallel:</p>
 <ul>
 <li>Your Journey — you choose which appliances to swap, and in which year</li>
-<li>Do Nothing — all current appliances stay in place for 20 years</li>
+<li>Do Nothing — all current appliances and vehicles stay in place for the modeled period</li>
 </ul>
-<p>For each year WhyWatt calculates energy consumption, utility costs with escalation, capital expenditure for appliance swaps, and solar savings.</p>
+<p>For each year WhyWatt calculates energy consumption, utility and fuel costs with escalation, capital expenditure for appliance swaps, and solar savings.</p>
 
     <h2 id="data-sources">Data sources</h2>
     <ul>
@@ -67,7 +67,10 @@
 
     <h2 id="limitations">Limitations</h2>
     <ul>
-<li>Appliance end-of-life replacement is not modeled beyond scheduled swaps</li>
+<li>Appliance end-of-life replacement is modeled where you set ages and lifespans;</li>
+</ul>
+<p>otherwise the timeline follows your scheduled swaps</p>
+<ul>
 <li>Income-qualified rebate programs are coming in a future release</li>
 <li>Monte Carlo uncertainty bands are coming in a future release</li>
 <li>Only PG&E rates are currently supported (SCE, SDG&E in a future release)</li>

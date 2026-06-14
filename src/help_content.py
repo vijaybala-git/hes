@@ -10,7 +10,8 @@ HELP_POPUPS: dict[str, tuple[str, str]] = {
     "journey_planner": (
         "The Journey Planner lets you schedule when each gas appliance gets"
         " replaced with an electric alternative. A \"Do Nothing\" baseline runs in"
-        " parallel so you can see the cost difference year by year over 20 years.",
+        " parallel so you can see the cost difference year by year over the"
+        " modeled period.",
         "journey.html",
     ),
     "home_profile": (
@@ -28,15 +29,15 @@ HELP_POPUPS: dict[str, tuple[str, str]] = {
         "climate.html",
     ),
     "energy_prices": (
-        "Energy prices are based on current PG&E tariff rates with a projected"
-        " escalation rate applied each year. You can adjust the escalation"
-        " scenario in the Rate details panel.",
+        "Energy prices start from current PG&E tariff rates and are projected"
+        " forward each year. This panel sets electricity, gas, gasoline, and"
+        " external EV-charging prices, plus how many years to model.",
         "rates.html",
     ),
     "rates": (
-        "Energy prices are based on current PG&E tariff rates with a projected"
-        " escalation rate applied each year. You can adjust the escalation"
-        " scenario in the Rate details panel.",
+        "Energy prices start from current PG&E tariff rates and are projected"
+        " forward each year. This panel sets electricity, gas, gasoline, and"
+        " external EV-charging prices, plus how many years to model.",
         "rates.html",
     ),
     "hvac": (
@@ -58,27 +59,29 @@ HELP_POPUPS: dict[str, tuple[str, str]] = {
         "dryer.html",
     ),
     "cooktop": (
-        "Cooking energy is estimated from daily cook time. Gas burners convert"
-        " only about 40% of combustion energy to heat; induction transfers about"
-        " 85% directly to the cookware.",
+        "Cooking energy is estimated from meals cooked per week. Gas burners"
+        " convert only about 40% of combustion energy to heat; induction transfers"
+        " about 85% directly to the cookware.",
         "cooktop.html",
     ),
     "ev_charger": (
-        "EV charging energy is estimated from your annual miles driven, your"
-        " vehicle's efficiency (kWh per mile), and a charging-efficiency factor"
-        " for home charging losses. Level 2 home charging (240V) is assumed.",
+        "Transportation models your driving as gasoline miles and electric miles."
+        " Your Journey can add an electric vehicle and a home Level 2 charger,"
+        " shifting charging from costly public stations to your home electricity"
+        " rate.",
         "ev.html",
     ),
     "solar": (
-        "Solar savings are modeled as a reduction in net electricity purchased"
-        " from the grid each year. Battery storage shifts solar generation to"
-        " evening hours.",
+        "Solar is modeled from your system size and yield. The energy you use on-"
+        " site saves at your retail rate; the surplus you export earns a credit. A"
+        " battery lets you use more of your own solar instead of exporting it"
+        " cheaply.",
         "solar.html",
     ),
     "baseload": (
         "Baseload covers lights, outlets, refrigerator, and other always-on"
-        " electricity uses. It scales with the number of bedrooms using DOE"
-        " occupancy data.",
+        " electricity uses. It scales with floor area and the number of bedrooms"
+        " using DOE and EIA reference data.",
         "baseload.html",
     ),
     "panel_upgrade": (
@@ -99,8 +102,8 @@ HELP_POPUPS: dict[str, tuple[str, str]] = {
     ),
     "social_cost": (
         "These costs represent damage to public health and the climate caused by"
-        " burning natural gas — costs that do not appear on your utility bill but"
-        " are real and quantified by official sources.",
+        " burning natural gas and gasoline — costs that do not appear on your bill"
+        " but are real and quantified by official sources.",
         "social_cost.html",
     ),
 

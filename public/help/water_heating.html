@@ -44,21 +44,32 @@
   <main>
 
     <h2 id="what-this-means-for-you">What this means for you</h2>
-    <p>Water heating is typically the second-largest energy cost in a home after HVAC. A heat pump water heater (HPWH) uses roughly one-third the energy of a gas water heater for the same amount of hot water.</p>
+    <p>Water heating is typically the second-largest energy cost in a home after HVAC. A heat pump water heater uses roughly one-third the energy of a gas water heater for the same amount of hot water.</p>
 
     <h2 id="how-we-calculate-it">How we calculate it</h2>
     <p>heat load = daily_gallons × 8.33 × (120°F - inlet_temp°F)  [BTU/day]</p>
 <p>Gas water heater: annual therms = heat_load × 365 / (UEF × 100,000)</p>
 <p>Heat pump water heater: annual kWh = heat_load × 365 / (UEF × 3,412)</p>
-<p>Where inlet temperature varies monthly with your climate zone.</p>
+<p>Where inlet temperature varies monthly with your climate zone, and UEF is the uniform energy factor — the appliance's overall water-heating efficiency.</p>
 
     <h2 id="key-assumptions">Key assumptions</h2>
     <ul>
 <li>Default daily hot water use: 65 gallons (DOE reference household)</li>
 <li>Scales with bedrooms: 1BR=30 gal, 2BR=50 gal, 3BR=65 gal, 4BR=75 gal, 5BR=85 gal</li>
-<li>Default gas UEF: 0.65</li>
-<li>Default HPWH UEF: 3.5</li>
 <li>Target water temperature: 120°F</li>
+</ul>
+
+    <h2 id="default-values">Default values</h2>
+    <ul>
+<li>Starting state — Gas</li>
+<li>Gas water-heater efficiency (UEF) — 0.65</li>
+<li>Heat-pump water-heater efficiency (UEF) — 3.5</li>
+<li>Daily hot water use — 65 gallons</li>
+<li>Target temperature — 120°F</li>
+<li>Swap — planned, Year 5</li>
+<li>Install cost — $2,500</li>
+<li>Rebate — $500</li>
+<li>Existing water-heater age — 10 years; baseline lifespan — 12 years; replacement cost — $1,200</li>
 </ul>
 
     <h2 id="data-sources">Data sources</h2>
