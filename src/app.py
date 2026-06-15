@@ -113,8 +113,8 @@ CHART_OPTIONS = [
     "ACC Rate Projection",
     "Electricity Rate Shape",
     "Journey Timeline",
-    "Cost by Device",
-    "Energy Use by Device",
+    "Home Energy Cost by Device",
+    "Home Energy Use by Device",
     "Annual kWh by Device",
     "Annual Gas by Device",
     "Energy Mix Timeline",
@@ -128,8 +128,8 @@ CHART_CODES = {
     "Equipment Replacements (CapEx)": "JC.4",
     "Journey Timeline":               "JC.5",
     "Estimated Electrical Load":      "JC.6",
-    "Cost by Device":                 "EU.1",
-    "Energy Use by Device":           "EU.2",
+    "Home Energy Cost by Device":     "EU.1",
+    "Home Energy Use by Device":      "EU.2",
     "Annual kWh by Device":           "EU.3",
     "Annual Gas by Device":           "EU.4",
     "Energy Mix Timeline":            "EU.6",
@@ -152,6 +152,7 @@ _SLOT_COLORS = {
 }
 
 KWH_PER_THERM = 29.3
+KWH_PER_GALLON_GASOLINE = 33.7   # EPA energy content of gasoline (MPGe basis), display only
 
 UA_MAP = {"poor": 650, "average": 500, "good": 350}
 
@@ -199,10 +200,10 @@ def _kwh_eq(therms: float) -> float:
     return therms * KWH_PER_THERM
 
 
-_SLOT_DISPLAY_ORDER = ["HVAC", "Water Heater", "Dryer", "Cooktop", "Lights and Appliances"]
-DEVICE_LABELS = ["HVAC", "Water Heater", "Dryer", "Cooktop", "Baseload"]
-DEVICE_COLORS = ["#0D47A1", "#1565C0", "#D0302D", "#EC9B1E", "#78909C"]
-DEVICE_ALPHAS = [0.70,      0.60,       0.55,      0.55,      0.45]
+_SLOT_DISPLAY_ORDER = ["HVAC", "Water Heater", "Dryer", "Cooktop", "EV Driving", "Lights and Appliances"]
+DEVICE_LABELS = ["HVAC", "Water Heater", "Dryer", "Cooktop", "EV Charging", "Baseload"]
+DEVICE_COLORS = ["#0D47A1", "#1565C0", "#D0302D", "#EC9B1E", "#388E3C", "#78909C"]
+DEVICE_ALPHAS = [0.70,      0.60,       0.55,      0.55,      0.55,       0.45]
 
 # ── Defaults (single source of truth for reset) ──────────────────────────────
 _DEFAULTS = {
@@ -1784,14 +1785,27 @@ def render_device_chart(model, home: str = "journey",
         y_label = "kWh-eq / yr"
 
     for i, name in enumerate(_SLOT_DISPLAY_ORDER):
+        # "Home energy" = what lands on the home meter. Exclude gasoline
+        # (transportation) and external/public EV charging in both modes.
+        fuels = np.array(
+            jh.fuel_history_by_slot.get(name, ["electricity"] * n))[:n]
         if is_cost:
             data = np.array(
-                jh.cost_history_by_slot.get(name, [0] * n), dtype=float)
+                jh.cost_history_by_slot.get(name, [0] * n), dtype=float)[:n]
+            # Drop gasoline-phase cost (e.g. the EV slot's gas-car phase).
+            data = np.where(fuels == "gasoline", 0.0, data)
+            # Drop external (public/workplace) EV charging — off the home meter.
+            if name == "EV Driving" and jh.external_ev_cost_history:
+                ext = np.array(jh.external_ev_cost_history[:n], dtype=float)
+                m = min(len(ext), len(data))
+                data[:m] = np.maximum(0.0, data[:m] - ext[:m])
         else:
             raw   = np.array(
-                jh.consumption_history_by_slot.get(name, [0] * n), dtype=float)
-            fuels = jh.fuel_history_by_slot.get(name, ["electricity"] * n)
-            data  = np.where(np.array(fuels) == "gas", raw * KWH_PER_THERM, raw)
+                jh.consumption_history_by_slot.get(name, [0] * n), dtype=float)[:n]
+            # Gas → kWh-equivalent; gasoline excluded; EV consumption already
+            # records home-charged kWh only (§3.13), so external is excluded.
+            data  = np.where(fuels == "gas", raw * KWH_PER_THERM, raw)
+            data  = np.where(fuels == "gasoline", 0.0, data)
 
         ax.fill_between(cal_years, stack, stack + data,
                         color=DEVICE_COLORS[i], alpha=DEVICE_ALPHAS[i], linewidth=0)
@@ -1821,7 +1835,7 @@ def render_device_chart(model, home: str = "journey",
     ax.grid(axis="y", color="#78909C", alpha=0.12, linewidth=0.5)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.legend(handles=patches, loc="upper left", fontsize=8, framealpha=0.9, ncol=5)
+    ax.legend(handles=patches, loc="upper left", fontsize=8, framealpha=0.9, ncol=6)
 
     fig.tight_layout(pad=1.0)
     return fig
@@ -1929,8 +1943,9 @@ def make_annual_gasoline(df, model, n, home="journey"):
 # EU.6 — Energy-Mix Timeline (stacked area, kWh-equivalent, §3.14)
 def make_energy_mix_timeline(df, model, n, home="journey"):
     """EU.6 · Annual energy mix in kWh-equivalent — stacked area showing how the
-    home's energy sources shift across the journey: Gas, Utility-Elec, Solar-Elec,
-    External-Elec. Gas is converted via the 29.3 kWh/therm display factor only."""
+    home's energy sources shift across the journey: Gas, Gasoline, Utility-Elec,
+    Solar-Elec, External-Elec. Gas is converted via the 29.3 kWh/therm factor and
+    gasoline via the 33.7 kWh/gallon (MPGe) factor — display only."""
     hobj = model.journey_home if home == "journey" else model.baseline_home
 
     fig = _new_fig(wide=False)
@@ -1953,14 +1968,15 @@ def make_energy_mix_timeline(df, model, n, home="journey"):
         m = min(len(raw), len(fuels), n)
         total_elec[:m] += np.where(fuels[:m] == "electricity", raw[:m], 0.0)
 
-    gas_kwh   = _arr(hobj.gas_therms_history) * KWH_PER_THERM
-    solar_kwh = _arr(hobj.solar_self_consumed_history)
-    ext_kwh   = _arr(hobj.external_ev_kwh_history)
-    util_kwh  = np.maximum(0.0, total_elec - solar_kwh)   # grid = home elec − solar self-use
+    gas_kwh      = _arr(hobj.gas_therms_history) * KWH_PER_THERM
+    gasoline_kwh = _arr(hobj.gasoline_gallons_history) * KWH_PER_GALLON_GASOLINE
+    solar_kwh    = _arr(hobj.solar_self_consumed_history)
+    ext_kwh      = _arr(hobj.external_ev_kwh_history)
+    util_kwh     = np.maximum(0.0, total_elec - solar_kwh)  # grid = home elec − solar self-use
 
-    labels = ["Gas", "Utility-Elec", "Solar-Elec", "External-Elec"]
-    data   = [gas_kwh, util_kwh, solar_kwh, ext_kwh]
-    colors = ["#FB8C00", "#1565C0", _CC_SOLAR, "#C0392B"]
+    labels = ["Gas", "Gasoline", "Utility-Elec", "Solar-Elec", "External-Elec"]
+    data   = [gas_kwh, gasoline_kwh, util_kwh, solar_kwh, ext_kwh]
+    colors = ["#FB8C00", "#6D4C41", "#1565C0", _CC_SOLAR, "#C0392B"]
 
     if sum(d.sum() for d in data) > 0:
         ax.stackplot(x, *data, labels=labels, colors=colors, alpha=0.85)
@@ -2055,7 +2071,7 @@ CHART_FNS = {
 
 # ── Sub-components ─────────────────────────────────────────────────────────────
 
-_DEVICE_CHART_NAMES = {"Cost by Device", "Energy Use by Device"}
+_DEVICE_CHART_NAMES = {"Home Energy Cost by Device", "Home Energy Use by Device"}
 _TOGGLE_CHART_NAMES = _DEVICE_CHART_NAMES | {
     "Cost Breakdown by Category",
     "Annual kWh by Device",
@@ -2089,7 +2105,7 @@ def _toggle_buttons(active_rv):
 @solara.component
 def ChartPane(chart_name, model, df, n):
     if chart_name in _DEVICE_CHART_NAMES:
-        chart_type = "device_cost" if chart_name == "Cost by Device" else "device_consumption"
+        chart_type = "device_cost" if chart_name == "Home Energy Cost by Device" else "device_consumption"
         home = device_chart_home.value
         with solara.Column(gap="4px"):
             _toggle_buttons(device_chart_home)
@@ -4995,6 +5011,21 @@ def Page():
                 ".btn.done{background:var(--positive,#2E7D32)!important;color:#fff!important;"
                 "border:none!important;border-radius:6px!important;padding:4px 14px!important;"
                 "font-size:.84em!important;font-weight:600!important;cursor:pointer!important}"
+                # ── Detail dock → reads as an inline popup so users notice "Done" ──
+                # (.card.detail-dock beats Vuetify's .v-sheet.elevation-0 box-shadow)
+                ".card.detail-dock{border:3px solid var(--border-strong,#c4c9d2)!important;"
+                "box-shadow:0 16px 40px rgba(20,28,46,.26),"
+                "0 4px 12px rgba(20,28,46,.14)!important;"
+                "border-radius:14px!important;overflow:hidden!important;"
+                "margin-top:6px!important}"
+                ".detail-dock .modal-hd{background:var(--accent-soft,#EEF2FC)!important;"
+                "border-bottom:1px solid var(--border,#e2e5ed)!important}"
+                ".detail-dock .btn.done{font-size:.92em!important;padding:8px 22px!important;"
+                "box-shadow:0 0 0 3px rgba(46,125,50,.22),0 3px 8px rgba(46,125,50,.30)!important;"
+                "animation:donePulse 2.4s ease-in-out infinite}"
+                "@keyframes donePulse{0%,100%{box-shadow:0 0 0 3px rgba(46,125,50,.22),"
+                "0 3px 8px rgba(46,125,50,.30)}"
+                "50%{box-shadow:0 0 0 6px rgba(46,125,50,.10),0 3px 8px rgba(46,125,50,.30)}}"
                 ".foot{margin-top:16px;padding:10px 14px;"
                 "border-top:1px solid var(--border,#e2e5ed);"
                 "background:var(--surface-2,#F4F6FB);border-radius:0 0 8px 8px}"
