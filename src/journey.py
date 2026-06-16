@@ -160,6 +160,10 @@ class DeviceSlot:
                     # and year_elec_opex see home-charged kWh/cost, not the external part.
                     active.history["consumption"].append(wall_kwh * pct_home)
                     active.history["cost"].append(home_cost)
+                    active.history["monthly_consumption"].append(
+                        np.asarray(monthly_cons * pct_home, dtype=float))
+                    active.history["monthly_cost"].append(
+                        np.asarray(monthly_cons * pct_home * rates, dtype=float))
                     active.age += 1
                     step_cost += home_cost + ext_cost
                     self._last_external_ev_kwh  += wall_kwh * ext_frac
@@ -259,6 +263,9 @@ class JourneyHome(mesa.Agent):
         self.cost_history_by_slot:        dict = {s.name: [] for s in slots}
         self.consumption_history_by_slot: dict = {s.name: [] for s in slots}
         self.fuel_history_by_slot:        dict = {s.name: [] for s in slots}
+        # (12,) per year for seasonal end-use charts (HVAC) — Phase 4 §1.
+        self.monthly_consumption_history_by_slot: dict = {s.name: [] for s in slots}
+        self.monthly_cost_history_by_slot:        dict = {s.name: [] for s in slots}
 
     def step(self):
         year_idx     = self.model.steps - 1   # 0-based array index
@@ -308,6 +315,16 @@ class JourneyHome(mesa.Agent):
                 self.consumption_history_by_slot[slot.name].append(
                     active_dev.history["consumption"][-1])
                 self.fuel_history_by_slot[slot.name].append(active_dev.fuel_type)
+                # Seasonal (12,) detail for end-use charts (HVAC); guarded for any device
+                # whose history carries the monthly vectors this year (§1).
+                mc = active_dev.history.get("monthly_consumption")
+                if mc:
+                    self.monthly_consumption_history_by_slot[slot.name].append(mc[-1])
+                    self.monthly_cost_history_by_slot[slot.name].append(
+                        active_dev.history["monthly_cost"][-1])
+                else:
+                    self.monthly_consumption_history_by_slot[slot.name].append(np.zeros(12))
+                    self.monthly_cost_history_by_slot[slot.name].append(np.zeros(12))
                 if active_dev.fuel_type == "electricity":
                     # §3.13 — external EV charging is NOT on the home meter; exclude it
                     # from elec opex so the §8 solar cap can't offset public charging.
@@ -315,6 +332,8 @@ class JourneyHome(mesa.Agent):
             else:
                 self.consumption_history_by_slot[slot.name].append(0.0)
                 self.fuel_history_by_slot[slot.name].append("electricity")
+                self.monthly_consumption_history_by_slot[slot.name].append(np.zeros(12))
+                self.monthly_cost_history_by_slot[slot.name].append(np.zeros(12))
 
             for event_year, event_cost in slot.capex_events:
                 if event_year == current_year:

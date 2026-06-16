@@ -239,6 +239,159 @@ transparent-scenario philosophy used elsewhere in WhyWatt:
 - [x] **Two-file JSON design:** `tmy3_zones.json` (16 zone records) + `zip_to_zone.json` (ZIP index).
 - [ ] **Cal-Adapt aggregation:** county→CEC-zone mapping method (area-weighted vs. reference-city county). Recommendation: reference-city county, for consistency with the TMY3 baseline choice.
 - [ ] **Trend default scenario:** RCP 4.5 (moderate) vs. None. Recommendation: RCP 4.5 default, with a clear in-UI note and a one-click "None" for skeptical audiences.
+*** Two new Decision based on 1.9 below 
+HomeConfig carries zip_code (the input); the model builds ClimateData from it (derived) — parallel to how HomeConfig holds rate inputs and the model builds the rate arrays. §1.4 said "inject ClimateData into HomeConfig," but keeping HomeConfig a pure input bag and ClimateData a derived runtime object is cleaner and matches the rate precedent.
+ClimateData holds the full (n_years,12) trajectory + a current_year pointer, rather than the flat single-year dataclass in §1.4. The §1.4 fields (monthly_hdd_65f, hdd_cagr, …) become the build inputs; the runtime object is the trajectory.
+
+
+1.9 — Simulation architecture: how the climate trajectory reaches devices (Option B)
+Design note resolving how the time-varying climate (§1.5 trend) is delivered to the
+HVAC and water-heater physics each simulation year. Decision: Option B — precomputed
+per-year trajectory indexed per tick, mirroring how rate escalation already works.
+
+1.9.1 The problem in the current code
+Phase 3 devices freeze their climate arrays at construction and never look back. Every
+physics device snapshots a private copy:
+
+# src/devices/physics.py:30 (GasFurnace), :60-61 (HeatPumpHVAC), :90/:114/:134 (WH, AC)
+self._hdd = np.asarray(monthly_hdd, dtype=float)   # copied once, in __init__
+and monthly_consumption() reads that frozen copy with no year input:
+
+# physics.py:33-34
+def monthly_consumption(self):
+    return self._hdd * 24 * self.ua / (self.afue * 100_000)
+It is then pulled by DeviceSlot.step() with no year argument (journey.py:154). So there
+is no path for a changing HDD/CDD to reach a device mid-run — the array a device is born
+with is the array it dies with. Applying the §1.5 warming trend requires closing this gap.
+
+1.9.2 Decision: Option B, consistent with the existing rate machinery
+This model already solves "a quantity that changes every simulation year" — for rates —
+and it does not do it with a mutating agent. It precomputes the full trajectory once and
+indexes it per tick:
+
+# model.py:416-421  — built once at construction, shape (n_years, 12)
+self.elec_rates = elec_loader_a.get_annual_monthly_rates(..., custom_cagr=elec_cagr_a_eff)
+# model.py:571-572  — indexed each step
+year_idx = self.steps - 1
+self.current_elec_rates = self.elec_rates[year_idx]
+Climate adopts the same pattern: build (n_years, 12) HDD/CDD trajectories up front
+(applying the trend CAGR once), then index by year_idx each step. There is no stepping
+"climate agent" under Option B — exactly as there is no stepping "rate agent." Climate
+becomes a precomputed trajectory plus a "current year" pointer, owned by the model and
+advanced in HESModel.step() alongside current_elec_rates.
+
+This is the "two independent simulations" decomposition discussed in design: a trajectory
+pass (evolve climate to end-of-horizon, store the array) feeding a device/cost pass
+(index in per year). The decomposition is valid because climate is exogenous — the
+warming trend does not respond to the simulated household's behaviour.
+
+1.9.3 The one asymmetry vs. rates — and why climate must be injected live, not applied externally
+Rates and climate are time-varying the same way, but they couple to the device differently:
+
+Affects	Where it's applied	Device sees it?
+Rates	cost	outside the device, on its output: monthly_cost(monthly_rates)	No — passed as an argument by JourneyHome
+Climate	consumption	inside monthly_consumption() — it's the physics	Yes — must be readable from within the device
+Because climate drives the physics inside monthly_consumption(), the device must read the
+current value. The clean way that preserves the project's "injected at construction" hard
+rule is: inject a live ClimateData object (not a copied array), and have the device read
+a property off it. The model advances that object's year pointer each step; every device that
+holds the reference automatically sees the correct year on the next tick — with no per-device
+mutation and no change to the monthly_consumption() -> (12,) contract.
+
+1.9.4 ClimateData as the precomputed-trajectory object
+ClimateLoader.get_climate(zip) (§1.4) returns a ClimateData that carries the full
+trajectory and a movable pointer, so "advancing a year" is just moving an index — pure
+Option B, no element mutation:
+
+@dataclass
+class ClimateData:
+    zone_key: str
+    zone_label: str
+    _hdd_traj: np.ndarray      # (n_years, 12) — base × (1 + hdd_cagr) ** year, built once
+    _cdd_traj: np.ndarray      # (n_years, 12)
+    _inlet:    np.ndarray      # (12,) — static; inlet water is NOT trended in Phase 4 (§1.7)
+    current_year: int = 0      # model sets this each step
+
+    @property
+    def monthly_hdd(self): return self._hdd_traj[self.current_year]
+    @property
+    def monthly_cdd(self): return self._cdd_traj[self.current_year]
+    @property
+    def monthly_inlet(self): return self._inlet
+One ClimateData per model, shared by all homes. Both JourneyHome instances (and the
+scenario-B pair) read the same climate — climate does not differ between rate scenarios. The
+trend scenario selector (None / RCP 4.5 / RCP 8.5, §1.5) only changes which CAGR is baked
+into _hdd_traj/_cdd_traj at build time.
+current_year = 0 ⇒ cagr = 0 ⇒ every row equals the base year ⇒ Phase 3 numbers reproduce
+exactly. This is the reproducibility guarantee for the "None" trend default and for all
+existing validation targets.
+1.9.5 Wiring (Option B, minimal touch)
+HESModel.__init__ — replace the hardcoded load (model.py:358-365) with:
+
+self.climate = climate_loader.get_climate(home_config.zip_code, n_years=n_years,
+                                           trend_scenario=trend_scenario)
+self.climate.current_year = 0
+ua_by_insulation, setpoint, bedroom_scaling etc. are not climate-zone data — they
+move to a constants module / stay on HomeConfig (they were only co-located in
+bayarea_tmy3.json for convenience). tmy3_zones.json records hold HDD/CDD/inlet only (§1.3).
+
+HESModel.step (model.py:569-583) — one line, beside the rate index:
+
+self.climate.current_year = year_idx
+_make_device (model.py:96-190) — physics branches pass climate=self.climate instead
+of the monthly_hdd= / monthly_cdd= / monthly_inlet_temp_f= array slices.
+
+Physics devices (physics.py) — five classes switch from snapshot to reference:
+GasFurnace, HeatPumpHVAC, GasWaterHeater, HeatPumpWaterHeater, CentralAC. Each stores
+self._climate = climate and reads self._climate.monthly_hdd / .monthly_cdd /
+.monthly_inlet. Non-physics devices (dryer, cooktop, EV, lights) are untouched.
+
+Water heaters read monthly_inlet (static today). Converting them too — even though their
+input doesn't yet change year-to-year — keeps the injection uniform and makes a future
+inlet-temp trend a one-line change in ClimateData.
+
+1.9.6 Forward-compatibility seam: monthly climate vs. future hourly/TOU rates
+Climate stays monthly (HDD/CDD are inherently monthly-aggregated degree-days). Rates are
+expected to go hourly/TOU later. Option B holds for both, because the A-vs-B axis is
+exogenous vs. endogenous, not time resolution:
+
+An hourly rate trajectory is still exogenous → still precompute-able; the array just grows a
+dimension ((n_years, 12) → (n_years, 8760) or (n_years, 12, 24)). Trivial for numpy.
+The codebase already precomputes sub-daily rate structure into an effective monthly rate
+via the ACC mechanism (scripts/extract_acc_shapes.py:
+effective_rate[m] = retail_rate[m] × Σ_h(device_load_profile[h] × acc_shape[m,h])). That is
+Option B handling TOU-shaped data today.
+The monthly-climate / hourly-rate mismatch is reconciled at the device load-shape bridge
+(device_load_shapes.json), already in the model: monthly consumption is distributed onto a
+TOU/hourly load shape (or the hourly rate is collapsed onto it) before the cost multiply.
+Guidance to keep B safe through TOU: keep the cost contract resolution-agnostic —
+cost = consumption_shape ⊙ rate_shape → sum — and let the rate array carry a resolution
+dimension that can grow (month → TOU period → hour) without callers restructuring. Don't bake
+the literal 12 into cost routing.
+
+1.9.7 What Option B deliberately does not cover
+The only future feature that breaks pure precompute is stateful hourly battery / NEM
+dispatch: once a battery charges/discharges hour-to-hour, an hour's cost depends on the
+state-of-charge carried from the previous hour — that is endogenous and cannot be a flat
+precomputed array. It would require a stepping inner loop (SoC as carried state). Note three
+things: (1) it is a property of the cost/dispatch engine, not of the rate or climate
+source — the TOU rate trajectory itself stays exogenous and precomputed; (2) §8 explicitly
+deferred it ("no hour-by-hour NEM engine needed"); (3) it is an additive sub-engine that does
+not retroactively invalidate choosing Option B for the climate and rate trajectories now.
+
+1.9.8 Test implications
+With trend_scenario = None (CAGR = 0), all Phase 2/3 device validation targets (CLAUDE.md
+table) must reproduce bit-for-bit — every trajectory row equals the base year.
+ClimateData is constructible standalone (fixed arrays, no model) → device physics remains
+unit-testable in isolation.
+New trend test: with a negative hdd_cagr, year-n monthly_hdd < year-0, and HVAC heating
+consumption declines monotonically across the horizon for the do-nothing furnace.
+
+A couple of small refinements I baked in that diverge slightly from the earlier §1.4 sketch — flag them when you paste, since they're decisions:
+
+HomeConfig carries zip_code (the input); the model builds ClimateData from it (derived) — parallel to how HomeConfig holds rate inputs and the model builds the rate arrays. §1.4 said "inject ClimateData into HomeConfig," but keeping HomeConfig a pure input bag and ClimateData a derived runtime object is cleaner and matches the rate precedent.
+ClimateData holds the full (n_years,12) trajectory + a current_year pointer, rather than the flat single-year dataclass in §1.4. The §1.4 fields (monthly_hdd_65f, hdd_cagr, …) become the build inputs; the runtime object is the trajectory.
+
 
 ## §2 — EIA-Based Rate Modeling
 

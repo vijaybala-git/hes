@@ -1,0 +1,50 @@
+{
+  "_meta": {
+    "schema_version": 2,
+    "description": "CEC Building Climate Zone climate records. Per-zone monthly HDD/CDD (base 65F), monthly inlet water temp, and monthly average dry-bulb temp (reserved for Phase 4 §4 COP curve). Trend CAGRs are per-scenario (Phase 4 §1.5: none / rcp45 / rcp85), populated from Cal-Adapt in Step 1d — values here are provisional placeholders.",
+    "status": "PROVISIONAL SEED — 3 zones hand-authored for architecture validation (Phase 4 S1, Step 0). Annual totals for CZ4 are authoritative (San Jose TMY3); CZ13/CZ16 monthly distributions are approximate and aligned to the spec's stated annuals (Fresno 3200/2800, CZ16 6800/100). Trend CAGRs are illustrative. Replace ALL records with authoritative 16-zone + Cal-Adapt data via scripts/build_climate_db.py in Step 1.",
+    "invariants": "monthly_hdd_65f and monthly_cdd_65f each sum to annual_hdd_65f / annual_cdd_65f. All monthly arrays are length 12 (Jan..Dec). hdd_cagr_by_scenario/cdd_cagr_by_scenario carry keys none/rcp45/rcp85. Keys beginning with '_' are metadata and must be skipped by ClimateLoader."
+  },
+  "CA_CZ4": {
+    "state": "CA",
+    "zone_id": "CZ4",
+    "reference_city": "San Jose",
+    "tmy3_station": "724945",
+    "annual_hdd_65f": 1910,
+    "annual_cdd_65f": 340,
+    "monthly_hdd_65f": [420, 340, 260, 140, 50, 10, 0, 0, 10, 80, 220, 380],
+    "monthly_cdd_65f": [0, 0, 0, 5, 20, 60, 90, 85, 55, 20, 5, 0],
+    "monthly_inlet_water_f": [54, 54, 55, 57, 60, 63, 65, 66, 65, 62, 58, 55],
+    "monthly_avg_temp_f": [50, 53, 55, 58, 62, 66, 69, 70, 69, 63, 55, 50],
+    "hdd_cagr_by_scenario": {"none": 0.0, "rcp45": -0.003, "rcp85": -0.006},
+    "cdd_cagr_by_scenario": {"none": 0.0, "rcp45": 0.006, "rcp85": 0.012}
+  },
+  "CA_CZ13": {
+    "state": "CA",
+    "zone_id": "CZ13",
+    "reference_city": "Fresno",
+    "tmy3_station": "723890",
+    "annual_hdd_65f": 3200,
+    "annual_cdd_65f": 2800,
+    "monthly_hdd_65f": [700, 520, 400, 230, 90, 10, 0, 0, 10, 110, 400, 730],
+    "monthly_cdd_65f": [0, 0, 20, 90, 250, 470, 670, 620, 440, 210, 30, 0],
+    "monthly_inlet_water_f": [52, 53, 56, 61, 67, 73, 78, 79, 75, 67, 58, 53],
+    "monthly_avg_temp_f": [46, 51, 56, 62, 70, 79, 85, 84, 78, 67, 54, 46],
+    "hdd_cagr_by_scenario": {"none": 0.0, "rcp45": -0.005, "rcp85": -0.010},
+    "cdd_cagr_by_scenario": {"none": 0.0, "rcp45": 0.008, "rcp85": 0.016}
+  },
+  "CA_CZ16": {
+    "state": "CA",
+    "zone_id": "CZ16",
+    "reference_city": "Blue Canyon",
+    "tmy3_station": "725845",
+    "annual_hdd_65f": 6800,
+    "annual_cdd_65f": 100,
+    "monthly_hdd_65f": [920, 820, 830, 660, 480, 290, 130, 140, 300, 530, 760, 940],
+    "monthly_cdd_65f": [0, 0, 0, 0, 5, 15, 32, 28, 15, 5, 0, 0],
+    "monthly_inlet_water_f": [39, 39, 40, 43, 47, 53, 58, 59, 55, 49, 43, 40],
+    "monthly_avg_temp_f": [33, 34, 35, 40, 47, 55, 63, 62, 57, 48, 40, 34],
+    "hdd_cagr_by_scenario": {"none": 0.0, "rcp45": -0.006, "rcp85": -0.012},
+    "cdd_cagr_by_scenario": {"none": 0.0, "rcp45": 0.010, "rcp85": 0.020}
+  }
+}

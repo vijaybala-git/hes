@@ -15,7 +15,8 @@ from pathlib import Path
 import mesa
 import numpy as np
 
-from home_config import HomeConfig, compute_baseload_kwh, HOT_WATER_GAL_PER_DAY
+from home_config import HomeConfig, compute_baseload_kwh, HOT_WATER_GAL_PER_DAY, UA_BY_INSULATION
+from climate_loader import ClimateLoader
 from social_cost import SocialCostConfig
 from journey import JourneyHome, DeviceSlot, CapExOnlySlot, CATEGORY_ORDER, CATEGORY_LABELS, SolarBatteryConfig
 from rate_loader import RateLoader, ACCRateLoader
@@ -25,6 +26,9 @@ from devices.schedule import EVCharger, PhysicsEVCharger
 from devices.vehicle  import GasolineVehicle, ElectricVehicle
 
 _DATA = Path(__file__).parent.parent / "data"
+
+# One ZIP->zone climate loader for the whole process (reads the two committed JSON files).
+_CLIMATE_LOADER = ClimateLoader()
 
 
 SCENARIO_PRESETS = {
@@ -94,8 +98,7 @@ def _build_elec_rates_by_class(acc_loader: ACCRateLoader,
 
 
 def _make_device(spec: dict, mesa_model: mesa.Model, *,
-                 hdd: np.ndarray, cdd: np.ndarray,
-                 inlet_temp: np.ndarray, ua: float,
+                 climate, ua: float,
                  hw_gallons: float, baseload_kwh: float):
     """Instantiate one EnergyConsumer from a slot JSON device spec."""
     cls   = spec["class"]
@@ -113,7 +116,7 @@ def _make_device(spec: dict, mesa_model: mesa.Model, *,
         return GasFurnace(mesa_model,
                           afue=spec.get("afue", 0.80),
                           ua_btu_hr_f=ua,
-                          monthly_hdd=hdd,
+                          climate=climate,
                           age=age, lifespan=ls, installation_cost=cost, **elec)
 
     if cls == "HeatPumpHVAC":
@@ -121,7 +124,7 @@ def _make_device(spec: dict, mesa_model: mesa.Model, *,
                             cop_heating=spec.get("cop_heating", 3.5),
                             seer_cooling=spec.get("seer_cooling", 22),
                             ua_btu_hr_f=ua,
-                            monthly_hdd=hdd, monthly_cdd=cdd,
+                            climate=climate,
                             age=age, lifespan=ls, installation_cost=cost, **elec)
 
     if cls == "GasWaterHeater":
@@ -129,7 +132,7 @@ def _make_device(spec: dict, mesa_model: mesa.Model, *,
         return GasWaterHeater(mesa_model,
                               uef=spec.get("uef", 0.65),
                               daily_gallons=daily_gal,
-                              monthly_inlet_temp_f=inlet_temp,
+                              climate=climate,
                               age=age, lifespan=ls, installation_cost=cost, **elec)
 
     if cls == "HeatPumpWaterHeater":
@@ -137,7 +140,7 @@ def _make_device(spec: dict, mesa_model: mesa.Model, *,
         return HeatPumpWaterHeater(mesa_model,
                                    uef=spec.get("uef", 3.5),
                                    daily_gallons=daily_gal,
-                                   monthly_inlet_temp_f=inlet_temp,
+                                   climate=climate,
                                    age=age, lifespan=ls, installation_cost=cost, **elec)
 
     if cls == "GasDryer":
@@ -186,7 +189,7 @@ def _make_device(spec: dict, mesa_model: mesa.Model, *,
         return CentralAC(mesa_model,
                          seer_cooling=spec.get("seer_cooling", 14),
                          ua_btu_hr_f=ua,
-                         monthly_cdd=cdd,
+                         climate=climate,
                          age=age, lifespan=ls, installation_cost=cost, **elec)
 
     if cls == "GasolineVehicle":
@@ -208,11 +211,10 @@ def _make_device(spec: dict, mesa_model: mesa.Model, *,
 
 def _build_slots(slot_configs: list, is_baseline: bool,
                  mesa_model: mesa.Model, *,
-                 hdd, cdd, inlet_temp, ua, hw_gallons, baseload_kwh) -> list:
+                 climate, ua, hw_gallons, baseload_kwh) -> list:
     """Create a fresh list of DeviceSlot objects with independent device instances."""
     slots = []
-    kw = dict(hdd=hdd, cdd=cdd, inlet_temp=inlet_temp,
-              ua=ua, hw_gallons=hw_gallons, baseload_kwh=baseload_kwh)
+    kw = dict(climate=climate, ua=ua, hw_gallons=hw_gallons, baseload_kwh=baseload_kwh)
 
     for cfg in slot_configs:
         baseline_devs = [
@@ -286,6 +288,7 @@ class HESModel(mesa.Model):
                  comparison_mode: bool = False,
                  n_years:          int  = 20,
                  sim_start_year:   int  = 2025,
+                 climate_trend:    str  = "none",   # §1.5: "none" | "rcp45" | "rcp85"
                  slot_configs:     list | None = None,
                  capex_only_slots: list | None = None,
                  solar_config: SolarBatteryConfig | None = None,
@@ -355,16 +358,16 @@ class HESModel(mesa.Model):
         ], dtype=float)
         self.external_ev_rates = _external_ev_rates
 
-        # ── Climate constants ─────────────────────────────────────────────────
-        with open(_DATA / "climate/bayarea_tmy3.json") as f:
-            climate = json.load(f)
+        # ── Climate (Phase 4 §1) — ZIP-driven, with Option-B trend trajectory ─
+        # ClimateData carries the full (n_years, 12) HDD/CDD trajectory; step() advances
+        # its current_year pointer and the physics devices read it live (§1.9).
+        self.climate = _CLIMATE_LOADER.get_climate(
+            home_config.zip_code, n_years=n_years, trend_scenario=climate_trend)
+        self.climate.advance_to(0)
+        self.climate_trend = climate_trend
 
-        hdd        = np.array(climate["monthly_hdd_65f"],           dtype=float)
-        cdd        = np.array(climate["monthly_cdd_65f"],           dtype=float)
-        inlet_temp = np.array(climate["monthly_inlet_water_temp_f"], dtype=float)
-        ua_map     = climate["ua_by_insulation"]
-
-        ua = float(ua_map[home_config.insulation_quality])
+        # UA is building physics, not climate-zone data (§1.9.5).
+        ua = float(UA_BY_INSULATION[home_config.insulation_quality])
 
         # ── Baseload formula ──────────────────────────────────────────────────
         baseload_before = compute_baseload_kwh(
@@ -401,7 +404,7 @@ class HESModel(mesa.Model):
                 cfg["install_cost"] = home_config.baseload_install_cost
                 cfg["rebate"]       = home_config.baseload_rebate
 
-        device_kw = dict(hdd=hdd, cdd=cdd, inlet_temp=inlet_temp,
+        device_kw = dict(climate=self.climate,
                          ua=ua, hw_gallons=hw_gallons, baseload_kwh=baseload_before)
 
         # ── Rate arrays — Scenario A ──────────────────────────────────────────
@@ -568,6 +571,8 @@ class HESModel(mesa.Model):
 
     def step(self):
         year_idx = self.steps - 1
+        # Advance the live climate view so HVAC/WH see this year's (trended) HDD/CDD (§1.9).
+        self.climate.advance_to(year_idx)
         self.current_elec_rates = self.elec_rates[year_idx]
         self.current_gas_rates  = self.gas_rates[year_idx]
 

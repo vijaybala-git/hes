@@ -26,7 +26,11 @@ class EnergyConsumer(mesa.Agent):
         self.circuit_amps  = circuit_amps
         self.continuous    = continuous
         self.capex_events: list = []
-        self.history: dict = {"consumption": [], "cost": []}
+        # "monthly_consumption"/"monthly_cost" retain the (12,) vectors (Phase 4 §1) so
+        # seasonal end-use charts (HVAC) can show month-by-month detail; the scalar
+        # "consumption"/"cost" annual sums are unchanged.
+        self.history: dict = {"consumption": [], "cost": [],
+                              "monthly_consumption": [], "monthly_cost": []}
 
     @property
     def rated_va(self) -> float:
@@ -49,4 +53,6 @@ class EnergyConsumer(mesa.Agent):
         cost = self.monthly_cost(monthly_rates)
         self.history["consumption"].append(float(consumption.sum()))
         self.history["cost"].append(float(cost.sum()))
+        self.history["monthly_consumption"].append(np.asarray(consumption, dtype=float))
+        self.history["monthly_cost"].append(np.asarray(cost, dtype=float))
         self.age += 1

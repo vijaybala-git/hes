@@ -1,0 +1,19 @@
+{
+  "_meta": {
+    "status": "PROVISIONAL SEED — 12 ZIPs across 3 zones for architecture validation (Phase 4 S1, Step 0). Replace with the full CEC ZIP->zone table (~1,700 CA ZIPs) in Step 1a.",
+    "fallback_zone": "CA_CZ4",
+    "note": "Keys beginning with '_' are metadata and must be skipped by ClimateLoader. Values are zone keys into tmy3_zones.json."
+  },
+  "95110": "CA_CZ4",
+  "95112": "CA_CZ4",
+  "95113": "CA_CZ4",
+  "95128": "CA_CZ4",
+  "95008": "CA_CZ4",
+  "93720": "CA_CZ13",
+  "93650": "CA_CZ13",
+  "93701": "CA_CZ13",
+  "93722": "CA_CZ13",
+  "95728": "CA_CZ16",
+  "95715": "CA_CZ16",
+  "96161": "CA_CZ16"
+}

@@ -3,6 +3,7 @@ WhyWatt? — Solara UI (Phase 3 / Objective 1 — Help System)
 """
 import os
 import json
+import functools
 from pathlib import Path
 import solara
 import numpy as np
@@ -14,6 +15,7 @@ matplotlib.use("Agg")
 from matplotlib.figure import Figure
 from model import HESModel
 from home_config import HomeConfig, compute_baseload_kwh
+from climate_loader import ClimateLoader, TREND_SCENARIOS
 from journey import CATEGORY_ORDER, CATEGORY_LABELS, CapExOnlySlot, SolarBatteryConfig
 from ui.device_style import DEVICE_STYLE, DEVICE_ORDER, dstyle, device_legend_handles
 from panel_assessor import PanelAssessor
@@ -209,7 +211,8 @@ DEVICE_ALPHAS = [0.70,      0.60,       0.55,      0.55,      0.55,       0.45]
 _DEFAULTS = {
     # Home profile
     "zip_code":               "95112",
-    "climate_zone":           "CZ12",
+    "climate_zone":           "CZ4",
+    "climate_trend":          "none",
     "num_bedrooms":           3,
     "square_footage":         1800,
     "year_built":             1985,
@@ -379,7 +382,8 @@ _DEFAULTS = {
 
 # Home profile
 zip_code           = solara.reactive("95112")
-climate_zone       = solara.reactive("CZ12")
+climate_zone       = solara.reactive("CZ4")    # display only — resolved live from zip_code
+climate_trend      = solara.reactive("none")   # §1.5: "none" | "rcp45" | "rcp85"
 num_bedrooms       = solara.reactive(3)
 square_footage     = solara.reactive(1800)
 year_built         = solara.reactive(1985)
@@ -597,6 +601,7 @@ def reset_to_defaults():
     """Reset every reactive to its _DEFAULTS value in one shot."""
     zip_code.set(_DEFAULTS["zip_code"])
     climate_zone.set(_DEFAULTS["climate_zone"])
+    climate_trend.set(_DEFAULTS["climate_trend"])
     num_bedrooms.set(_DEFAULTS["num_bedrooms"])
     square_footage.set(_DEFAULTS["square_footage"])
     year_built.set(_DEFAULTS["year_built"])
@@ -964,13 +969,32 @@ def _build_slot_configs() -> list:
     ]
 
 
+# ── Climate resolution (ZIP → CEC zone), pinned to zip_code (Phase 4 §1) ────────
+
+_APP_CLIMATE_LOADER = ClimateLoader()
+
+_TREND_LABELS = {
+    "none":  "None (static TMY3)",
+    "rcp45": "Moderate (RCP 4.5)",
+    "rcp85": "High (RCP 8.5)",
+}
+
+
+@functools.lru_cache(maxsize=256)
+def _climate_info(zipcode: str, trend: str):
+    """Resolve a ZIP (+trend) to ClimateData for display. Cached; local JSON only."""
+    return _APP_CLIMATE_LOADER.get_climate(zipcode, n_years=1, trend_scenario=trend)
+
+
 # ── Simulation runner ──────────────────────────────────────────────────────────
 
 def run_simulation():
     """Build and run HESModel from current reactive state; return (model, df)."""
+    _ci = _climate_info(zip_code.value, climate_trend.value)
     hc = HomeConfig(
         zip_code=zip_code.value,
-        climate_zone=climate_zone.value,
+        climate_zone=_ci.zone_id,   # resolved from zip, not a manual field
+
         num_bedrooms=num_bedrooms.value,
         square_footage=square_footage.value,
         year_built=year_built.value,
@@ -1031,6 +1055,7 @@ def run_simulation():
     m = HESModel(
         home_config=hc,
         n_years=years.value,
+        climate_trend=climate_trend.value,
         gas_cagr_a=gas_cagr_pct_a.value / 100.0,
         elec_cagr_a=elec_cagr_pct_a.value / 100.0,
         gas_cagr_b=gas_cagr_pct_b.value / 100.0,
@@ -2165,9 +2190,10 @@ def HomeInfoBar():
     bl_kwh = compute_baseload_kwh(
         square_footage.value, num_bedrooms.value, baseload_constant_before.value
     )
+    _ci = _climate_info(zip_code.value, climate_trend.value)
     solara.Markdown(
-        f"📍 **San Jose, CA** &nbsp;·&nbsp; ZIP {zip_code.value} "
-        f"&nbsp;·&nbsp; Climate Zone {climate_zone.value} "
+        f"📍 **{_ci.reference_city}, CA** &nbsp;·&nbsp; ZIP {zip_code.value} "
+        f"&nbsp;·&nbsp; Climate Zone {_ci.zone_id} "
         f"&nbsp;·&nbsp; {num_bedrooms.value} bed "
         f"&nbsp;·&nbsp; {square_footage.value:,} sq ft "
         f"&nbsp;·&nbsp; Built {year_built.value} "
@@ -3155,10 +3181,17 @@ def HomeSummaryCard():
         with solara.Row(gap="6px", style=_ROW_CTRL):
             with solara.Column(style="min-width:140px"):
                 solara.InputInt("Sq ft", value=square_footage)
-        # Row 3: climate zone
-        with solara.Row(gap="6px", style=_ROW_CTRL):
-            with solara.Column(style="min-width:120px"):
-                solara.Select("Climate zone", value=climate_zone, values=_CZ_OPTIONS)
+        # Row 3: climate zone + source — pinned to ZIP (Phase 4 §1)
+        _ci = _climate_info(zip_code.value, climate_trend.value)
+        _src = ("⚠ ZIP not found — Bay Area default"
+                if _ci.fallback else "CEC Title 24 zone · TMY3")
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            f"<div style='font-size:0.82em; color:#555; margin-top:2px; line-height:1.45;'>"
+            f"📍 <b>{_ci.zone_id} — {_ci.reference_city}</b>"
+            f"<span style='color:#888;'> &nbsp;HDD {_ci.annual_hdd_65f:,.0f} · "
+            f"CDD {_ci.annual_cdd_65f:,.0f}</span>"
+            f"<br><span style='color:#999;'>{_src}</span></div>"
+        ))
 
 
 @solara.component
@@ -3870,20 +3903,49 @@ def BaseloadDetail():
 @solara.component
 def HomeDetail():
     """Home profile detail — single column per §25.4.10."""
-    _DS("Location & Home")
+    _ci = _climate_info(zip_code.value, climate_trend.value)
+
+    _DS("Location & Climate")
     solara.InputText("ZIP code", value=zip_code)
-    solara.Select("Climate zone", value=climate_zone, values=_CZ_OPTIONS)
+    if _ci.fallback:
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            "<div style='font-size:0.82em; color:#b8860b; margin:3px 0;'>"
+            "⚠ ZIP not recognized — using Bay Area defaults (CZ4)</div>"))
+    solara.HTML(tag="div", unsafe_innerHTML=(
+        f"<div style='font-size:0.85em; color:#444; margin:3px 0; line-height:1.5;'>"
+        f"Climate zone <b>{_ci.zone_id} — {_ci.reference_city}</b><br>"
+        f"<span style='color:#666;'>Heating <b>{_ci.annual_hdd_65f:,.0f}</b> HDD · "
+        f"Cooling <b>{_ci.annual_cdd_65f:,.0f}</b> CDD <span style='color:#999;'>(base 65°F)</span></span>"
+        f"<br><span style='color:#999;'>Source: CEC Title 24 zone · NREL TMY3</span></div>"))
     solara.Select("Bedrooms", value=num_bedrooms, values=[1, 2, 3, 4, 5])
     solara.InputInt("Square footage", value=square_footage)
     solara.InputInt("Year built", value=year_built)
     solara.Markdown("---")
+
+    _DS("Climate Trend")
+    solara.Select("Warming scenario",
+                  value=_TREND_LABELS[climate_trend.value],
+                  values=list(_TREND_LABELS.values()),
+                  on_value=lambda lbl: climate_trend.set(
+                      {v: k for k, v in _TREND_LABELS.items()}[lbl]))
+    _trend_note = ("No trend — static TMY3 (reproduces base climate)"
+                   if climate_trend.value == "none"
+                   else "Applied per simulation year to HDD/CDD (Cal-Adapt)")
+    solara.HTML(tag="div", unsafe_innerHTML=(
+        f"<div style='font-size:0.82em; color:#666; margin-top:4px; line-height:1.5;'>"
+        f"Modeled CAGR: HDD <b>{_ci.hdd_cagr * 100:+.2f}%/yr</b> · "
+        f"CDD <b>{_ci.cdd_cagr * 100:+.2f}%/yr</b>"
+        f"<br><span style='color:#999;'>{_trend_note}</span></div>"))
+    solara.Markdown("---")
+
     _DS("Building Performance")
     solara.Select("Insulation quality", value=insulation_quality,
                   values=["poor", "average", "good"])
     ua = UA_MAP[insulation_quality.value]
     solara.HTML(tag="div", unsafe_innerHTML=(
         f"<div style='font-size:0.82em; color:#666; margin-top:4px;'>"
-        f"UA = {ua} BTU/hr/°F  ·  Annual HDD = 1,910 (Bay Area TMY3)</div>"
+        f"UA = {ua} BTU/hr/°F  ·  Annual HDD {_ci.annual_hdd_65f:,.0f} · "
+        f"CDD {_ci.annual_cdd_65f:,.0f} ({_ci.reference_city} TMY3)</div>"
     ))
 
 
@@ -4450,13 +4512,14 @@ def Masthead():
     bl_kwh = compute_baseload_kwh(
         square_footage.value, num_bedrooms.value, baseload_constant_before.value
     )
-    cz = climate_zone.value.replace("CZ", "").strip()
+    _ci = _climate_info(zip_code.value, climate_trend.value)
+    cz = _ci.zone_id.replace("CZ", "").strip()
     context_html = (
         "<div class='context'>"
         "<span class='loc'>"
         "<svg viewBox='0 0 24 24' fill='currentColor'><path d='M12 2C8.1 2 5 5.1 5 9c0 "
         "5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1112 6a2.5 2.5 0 010 "
-        "5.5z'/></svg>San Jose, CA</span>"
+        f"5.5z'/></svg>{_ci.reference_city}, CA</span>"
         f"<span class='spec first'>ZIP <b class='mono'>{zip_code.value}</b></span>"
         f"<span class='spec'>CZ <b>{cz}</b></span>"
         f"<span class='spec'><b>{num_bedrooms.value}</b> bed</span>"
@@ -4808,7 +4871,7 @@ def Page():
     solara.Style(_REDESIGN_CSS + "\n" + _LAYOUT_V2_CSS)   # design system + v2 layout
 
     model, df = solara.use_memo(run_simulation, dependencies=[
-        zip_code.value, climate_zone.value, num_bedrooms.value,
+        zip_code.value, climate_trend.value, num_bedrooms.value,
         square_footage.value, year_built.value, insulation_quality.value,
         furnace_afue.value, gas_wh_uef.value, hvac_has_cooling.value,
         hp_cop_heating.value, hp_seer_cooling.value, hpwh_uef.value,

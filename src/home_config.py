@@ -21,12 +21,17 @@ def compute_baseload_kwh(sq_ft: int, bedrooms: int, constant: float) -> float:
 HOT_WATER_GAL_PER_DAY = {1: 30, 2: 50, 3: 65, 4: 75, 5: 85}
 # Source: DOE/ENERGY STAR; 3BR = TMY3 reference 65 gal/day
 
+# Building envelope UA (BTU/hr/°F) by insulation quality. Climate-INDEPENDENT — a
+# property of the building, not the climate zone. Relocated from the old
+# data/climate/bayarea_tmy3.json per Phase 4 §1.9.5 (zone files hold HDD/CDD/inlet only).
+UA_BY_INSULATION = {"poor": 650, "average": 500, "good": 350}
+
 
 @dataclass
 class HomeConfig:
     # ── Location ──────────────────────────────────────────────────────────────
     zip_code:           str  = "95112"
-    climate_zone:       str  = "CZ12"
+    climate_zone:       str  = "CZ4"     # display only; the live zone is resolved from zip_code
 
     # ── Building ──────────────────────────────────────────────────────────────
     num_bedrooms:       int  = 3          # Phase 2 active — scales hot water
