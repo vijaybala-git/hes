@@ -1,0 +1,169 @@
+{
+  "_meta": {
+    "source_repo": "climate.onebuilding.org",
+    "source_dir": "https://climate.onebuilding.org/WMO_Region_4_North_and_Central_America/USA_United_States_of_America/CA_California/",
+    "series": "TMYx.2011-2025",
+    "note": "TMYx = Typical Meteorological Year from NOAA ISD via the Sandia method. Snapshots are the as-downloaded .zip (incl. .epw + ASHRAE .stat/.ddy companions).",
+    "downloaded": "2026-06-16"
+  },
+  "CA_CZ1": {
+    "zone_id": "CZ1",
+    "reference_city": "Arcata",
+    "wmo": "725945",
+    "vintage": "TMYx.2011-2025",
+    "source_zip": "USA_CA_Arcata-Eureka-California.Redwood.Coast-Humboldt.County.AP.725945_TMYx.2011-2025.zip",
+    "epw_file": "USA_CA_Arcata-Eureka-California.Redwood.Coast-Humboldt.County.AP.725945_TMYx.2011-2025.epw",
+    "zip_sha256": "62e1a65b13f00066f18f9e7b203bbaf762c0831bcbecefac910b2f778dd47379",
+    "note": ""
+  },
+  "CA_CZ2": {
+    "zone_id": "CZ2",
+    "reference_city": "Santa Rosa",
+    "wmo": "724957",
+    "vintage": "TMYx.2011-2025",
+    "source_zip": "USA_CA_Santa.Rosa-Schulz-Sonoma.County.AP.724957_TMYx.2011-2025.zip",
+    "epw_file": "USA_CA_Santa.Rosa-Schulz-Sonoma.County.AP.724957_TMYx.2011-2025.epw",
+    "zip_sha256": "2a4c95cd28f463111f252c677a48d6070aaea3bf68a8fbea7fdf6f32af99432c",
+    "note": ""
+  },
+  "CA_CZ3": {
+    "zone_id": "CZ3",
+    "reference_city": "Oakland",
+    "wmo": "724930",
+    "vintage": "TMYx.2011-2025",
+    "source_zip": "USA_CA_Oakland.Intl.AP.724930_TMYx.2011-2025.zip",
+    "epw_file": "USA_CA_Oakland.Intl.AP.724930_TMYx.2011-2025.epw",
+    "zip_sha256": "723d2a204093e7d6b88e84173efc827c9473880ff26b1f5454ac06360c166999",
+    "note": ""
+  },
+  "CA_CZ4": {
+    "zone_id": "CZ4",
+    "reference_city": "San Jose",
+    "wmo": "724945",
+    "vintage": "TMYx.2011-2025",
+    "source_zip": "USA_CA_San.Jose-Mineta.Intl.AP.724945_TMYx.2011-2025.zip",
+    "epw_file": "USA_CA_San.Jose-Mineta.Intl.AP.724945_TMYx.2011-2025.epw",
+    "zip_sha256": "6a096e9effcd43bd558e6dfb9570893ae80913f604c6ae22cde22042d5801636",
+    "note": ""
+  },
+  "CA_CZ5": {
+    "zone_id": "CZ5",
+    "reference_city": "Santa Maria",
+    "wmo": "723940",
+    "vintage": "TMYx.2011-2025",
+    "source_zip": "USA_CA_Santa.Maria.Public.AP-Hancock.Field.723940_TMYx.2011-2025.zip",
+    "epw_file": "USA_CA_Santa.Maria.Public.AP-Hancock.Field.723940_TMYx.2011-2025.epw",
+    "zip_sha256": "1971fd3272ae712cdca9446b37ceafe820538c09ea8c4068e8d19a55da810b2b",
+    "note": ""
+  },
+  "CA_CZ6": {
+    "zone_id": "CZ6",
+    "reference_city": "Los Angeles",
+    "wmo": "722950",
+    "vintage": "TMYx.2011-2025",
+    "source_zip": "USA_CA_Los.Angeles.Intl.AP.722950_TMYx.2011-2025.zip",
+    "epw_file": "USA_CA_Los.Angeles.Intl.AP.722950_TMYx.2011-2025.epw",
+    "zip_sha256": "c3292a7bc19ab05b8bbb7d9a39bb43f1d5c006790b9dc0ed8c848d8995e3e877",
+    "note": "LAX (coastal) for south-coast zone"
+  },
+  "CA_CZ7": {
+    "zone_id": "CZ7",
+    "reference_city": "San Diego",
+    "wmo": "722900",
+    "vintage": "TMYx.2011-2025",
+    "source_zip": "USA_CA_San.Diego.Intl.AP-Lindbergh.Field.722900_TMYx.2011-2025.zip",
+    "epw_file": "USA_CA_San.Diego.Intl.AP-Lindbergh.Field.722900_TMYx.2011-2025.epw",
+    "zip_sha256": "242dcfb24589e13874de7fa5ad4cb4712a44aa5003f1c75f19ec32be99f175c1",
+    "note": ""
+  },
+  "CA_CZ8": {
+    "zone_id": "CZ8",
+    "reference_city": "El Toro",
+    "wmo": "722976",
+    "vintage": "TMYx.2011-2025",
+    "source_zip": "USA_CA_Fullerton.Muni.AP.722976_TMYx.2011-2025.zip",
+    "epw_file": "USA_CA_Fullerton.Muni.AP.722976_TMYx.2011-2025.epw",
+    "zip_sha256": "ff7b4d4f534c774ba332f204cffd68913eb7abd8a09cb9d56bf2b435c3e6a368",
+    "note": "Fullerton \u2014 El Toro MCAS closed 1999"
+  },
+  "CA_CZ9": {
+    "zone_id": "CZ9",
+    "reference_city": "Pasadena",
+    "wmo": "722880",
+    "vintage": "TMYx.2011-2025",
+    "source_zip": "USA_CA_Hollywood.Burbank.AP.722880_TMYx.2011-2025.zip",
+    "epw_file": "USA_CA_Hollywood.Burbank.AP.722880_TMYx.2011-2025.epw",
+    "zip_sha256": "5630ddad2b820a1686c0b43bb90f4f51c17cae3b2832c05abca45211ff1636d7",
+    "note": "Burbank \u2014 no Pasadena station"
+  },
+  "CA_CZ10": {
+    "zone_id": "CZ10",
+    "reference_city": "Riverside",
+    "wmo": "722869",
+    "vintage": "TMYx.2011-2025",
+    "source_zip": "USA_CA_Riverside.Muni.AP.722869_TMYx.2011-2025.zip",
+    "epw_file": "USA_CA_Riverside.Muni.AP.722869_TMYx.2011-2025.epw",
+    "zip_sha256": "9e9464755c53230e109c0126f62bc685bbfd9718e4a31e6eac8855e566f1db70",
+    "note": "Riverside Muni"
+  },
+  "CA_CZ11": {
+    "zone_id": "CZ11",
+    "reference_city": "Red Bluff",
+    "wmo": "725910",
+    "vintage": "TMYx.2011-2025",
+    "source_zip": "USA_CA_Red.Bluff.Muni.AP.725910_TMYx.2011-2025.zip",
+    "epw_file": "USA_CA_Red.Bluff.Muni.AP.725910_TMYx.2011-2025.epw",
+    "zip_sha256": "800b9093e7e46c4d4a346c6cbc79a858dd445e6074c90e0530cb81b7141fc2fb",
+    "note": ""
+  },
+  "CA_CZ12": {
+    "zone_id": "CZ12",
+    "reference_city": "Sacramento",
+    "wmo": "724830",
+    "vintage": "TMYx.2011-2025",
+    "source_zip": "USA_CA_Sacramento.Exec.AP.724830_TMYx.2011-2025.zip",
+    "epw_file": "USA_CA_Sacramento.Exec.AP.724830_TMYx.2011-2025.epw",
+    "zip_sha256": "5b33818630e99b87a9d8351a9fb3307fbfe96ef7d1c2ac69a1103a36a50e3dbb",
+    "note": "Sacramento Exec"
+  },
+  "CA_CZ13": {
+    "zone_id": "CZ13",
+    "reference_city": "Fresno",
+    "wmo": "723890",
+    "vintage": "TMYx.2011-2025",
+    "source_zip": "USA_CA_Fresno.Yosemite.Intl.AP.723890_TMYx.2011-2025.zip",
+    "epw_file": "USA_CA_Fresno.Yosemite.Intl.AP.723890_TMYx.2011-2025.epw",
+    "zip_sha256": "1c67b96a661b4eef2e8441330c440e881c211ba253f7cd2b62fe98322c7c92ed",
+    "note": ""
+  },
+  "CA_CZ14": {
+    "zone_id": "CZ14",
+    "reference_city": "China Lake",
+    "wmo": "746120",
+    "vintage": "TMYx.2011-2025",
+    "source_zip": "USA_CA_NAWS.China.Lake.746120_TMYx.2011-2025.zip",
+    "epw_file": "USA_CA_NAWS.China.Lake.746120_TMYx.2011-2025.epw",
+    "zip_sha256": "d49521212deacbee5da2f477a4501e73bad538a80bb27bce4d1b06624fc40d1c",
+    "note": ""
+  },
+  "CA_CZ15": {
+    "zone_id": "CZ15",
+    "reference_city": "El Centro",
+    "wmo": "722810",
+    "vintage": "TMYx.2011-2025",
+    "source_zip": "USA_CA_NAF.El.Centro.722810_TMYx.2011-2025.zip",
+    "epw_file": "USA_CA_NAF.El.Centro.722810_TMYx.2011-2025.epw",
+    "zip_sha256": "761e3ca259b4f5fde5cebceb880bcebd15730ec94a6c5eda9e248cf0ff07063c",
+    "note": ""
+  },
+  "CA_CZ16": {
+    "zone_id": "CZ16",
+    "reference_city": "Blue Canyon",
+    "wmo": "725845",
+    "vintage": "TMYx.2011-2025",
+    "source_zip": "USA_CA_Blue.Canyon-Nyack.AP.725845_TMYx.2011-2025.zip",
+    "epw_file": "USA_CA_Blue.Canyon-Nyack.AP.725845_TMYx.2011-2025.epw",
+    "zip_sha256": "3682bf990fe399f87a3a0b16775bb9a777165b435dc6e518eb60e723e0729a94",
+    "note": ""
+  }
+}
