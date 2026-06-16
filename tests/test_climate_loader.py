@@ -38,8 +38,8 @@ def test_unknown_zip_falls_back_to_cz4_with_flag(loader):
 def test_get_climate_sets_label_and_annuals(loader):
     c = loader.get_climate("93720")
     assert c.zone_label == "CZ13 — Fresno"
-    assert c.annual_hdd_65f == 3200
-    assert c.annual_cdd_65f == 2800
+    assert c.annual_hdd_65f == 1903    # TMYx 2011-2025 (Fresno is cooling-dominated)
+    assert c.annual_cdd_65f == 2485
     assert c.fallback is False
 
 

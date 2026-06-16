@@ -26,8 +26,11 @@ import sys
 import time
 import urllib.request
 import zipfile
+from collections import defaultdict
 from datetime import date
 from pathlib import Path
+
+import numpy as np
 
 ROOT = Path(__file__).parent.parent
 SOURCES = ROOT / "data" / "climate" / "sources"
@@ -119,12 +122,98 @@ def download_sources():
     print(f"\nWrote {SOURCES / 'manifest.json'} ({len(manifest) - 1} zones)")
 
 
+ZONES_JSON = ROOT / "data" / "climate" / "tmy3_zones.json"
+_MID_DOY = np.array([15, 46, 74, 105, 135, 166, 196, 227, 258, 288, 319, 349])
+
+# Provisional trend CAGRs — uniform placeholder until Step 1d replaces them with per-zone
+# Cal-Adapt fits. Kept non-zero so the trend UI stays demonstrable; clearly flagged.
+_PROVISIONAL_HDD_CAGR = {"none": 0.0, "rcp45": -0.004, "rcp85": -0.008}
+_PROVISIONAL_CDD_CAGR = {"none": 0.0, "rcp45": 0.008, "rcp85": 0.016}
+
+
+def _parse_epw(epw_text: str):
+    """Return (monthly_hdd, monthly_cdd, monthly_avg_f) — daily-mean, base 65°F."""
+    rows = epw_text.splitlines()[8:]            # 8 EPW header lines
+    by_day = defaultdict(list)
+    for ln in rows:
+        f = ln.split(",")
+        by_day[(int(f[1]), int(f[2]))].append(float(f[6]))   # f[6] = dry-bulb °C
+    hdd = np.zeros(12); cdd = np.zeros(12); tsum = np.zeros(12); tcnt = np.zeros(12)
+    for (mo, _dy), temps in by_day.items():
+        tmean_f = (sum(temps) / len(temps)) * 9 / 5 + 32
+        hdd[mo - 1] += max(0.0, 65 - tmean_f)
+        cdd[mo - 1] += max(0.0, tmean_f - 65)
+        tsum[mo - 1] += tmean_f; tcnt[mo - 1] += 1
+    return hdd, cdd, tsum / tcnt
+
+
+def _mains_water_f(monthly_avg_f: np.ndarray) -> np.ndarray:
+    """Monthly cold-water inlet temp via the Burch & Christensen (2007) correlation,
+    as used by NREL BEopt / ResStock. Driven by annual mean air temp and its range."""
+    t_amb = float(monthly_avg_f.mean())
+    dt_amb = float(monthly_avg_f.max() - monthly_avg_f.min())
+    ratio = 0.4 + 0.01 * (t_amb - 44.0)
+    lag = 35.0 - 1.0 * (t_amb - 44.0)
+    ang = np.deg2rad(0.986 * (_MID_DOY - 15 - lag) - 90.0)
+    return (t_amb + 6.0) + ratio * (dt_amb / 2.0) * np.sin(ang)
+
+
+def build_zones():
+    """Parse each snapshotted EPW into a CEC zone record; write tmy3_zones.json."""
+    man = json.loads((SOURCES / "manifest.json").read_text(encoding="utf-8"))
+    out = {"_meta": {
+        "schema_version": 3,
+        "description": "CEC Building Climate Zone records derived from OneBuilding TMYx EPW "
+                       "(daily-mean HDD/CDD base 65°F; inlet water via Burch-Christensen 2007).",
+        "source_repo": "climate.onebuilding.org",
+        "series": VINTAGE,
+        "method": "daily-mean degree-days, base 65°F; mains water = Burch-Christensen (BEopt)",
+        "built": str(date.today()),
+        "trend_note": "hdd/cdd_cagr_by_scenario are PROVISIONAL uniform placeholders pending "
+                      "Step 1d (Cal-Adapt per-zone fit).",
+        "invariants": "monthly arrays length 12 (Jan..Dec); monthly HDD/CDD sum to annual.",
+    }}
+    summary = []
+    for zone_key, info in STATION_MANIFEST.items():
+        rec_src = man[zone_key]
+        zpath = ZIP_DIR / rec_src["source_zip"]
+        zf = zipfile.ZipFile(zpath)
+        epw_name = [n for n in zf.namelist() if n.lower().endswith(".epw")][0]
+        hdd, cdd, avg = _parse_epw(zf.read(epw_name).decode("latin-1"))
+        inlet = _mains_water_f(avg)
+        out[zone_key] = {
+            "state": "CA", "zone_id": info["zone_id"], "reference_city": info["reference_city"],
+            "tmy3_station": info["wmo"], "vintage": VINTAGE,
+            "source_file": rec_src["epw_file"], "source_zip": rec_src["source_zip"],
+            "sha256": rec_src["zip_sha256"], "extracted": str(date.today()),
+            "annual_hdd_65f": round(float(hdd.sum())),
+            "annual_cdd_65f": round(float(cdd.sum())),
+            "monthly_hdd_65f": [round(float(x)) for x in hdd],
+            "monthly_cdd_65f": [round(float(x)) for x in cdd],
+            "monthly_inlet_water_f": [round(float(x)) for x in inlet],
+            "monthly_avg_temp_f": [round(float(x)) for x in avg],
+            "hdd_cagr_by_scenario": dict(_PROVISIONAL_HDD_CAGR),
+            "cdd_cagr_by_scenario": dict(_PROVISIONAL_CDD_CAGR),
+            "note": info["note"],
+        }
+        summary.append((info["zone_id"], info["reference_city"],
+                        out[zone_key]["annual_hdd_65f"], out[zone_key]["annual_cdd_65f"]))
+    ZONES_JSON.write_text(json.dumps(out, indent=2), encoding="utf-8")
+    print(f"Wrote {ZONES_JSON} ({len(summary)} zones)\n")
+    print(f"{'Zone':5} {'City':14} {'HDD':>6} {'CDD':>6}")
+    for zid, city, h, c in summary:
+        print(f"{zid:5} {city:14} {h:6d} {c:6d}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--download", action="store_true", help="fetch + snapshot the 16 EPW sources")
+    ap.add_argument("--build-zones", action="store_true", help="parse snapshots -> tmy3_zones.json")
     args = ap.parse_args()
     if args.download:
         download_sources()
+    elif args.build_zones:
+        build_zones()
     else:
         ap.print_help()
         sys.exit(1)

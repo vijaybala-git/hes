@@ -62,20 +62,23 @@ Next development phase (Phase 3) has not been scoped. Items deferred from Phase 
 
 ## Key data constants
 
-**Bay Area TMY3 monthly values (San Jose Mineta, Station 724945):**
+**Climate — ZIP-driven CEC zones (Phase 4 §1).** The model resolves `zip_code` → CEC
+Building Climate Zone → monthly HDD/CDD/inlet-water from OneBuilding **TMYx 2011-2025** EPW
+files (16 reference stations). Built offline by `scripts/build_climate_db.py` into
+`data/climate/tmy3_zones.json`; raw sources snapshotted (with sha256) under
+`data/climate/sources/`. CZ4 (San Jose, station 724945) is the default zone:
 ```
-monthly_hdd_65f:        [420, 340, 260, 140, 50, 10, 0, 0, 10, 80, 220, 380]  → sum 1910
-monthly_cdd_65f:        [0, 0, 0, 5, 20, 60, 90, 85, 55, 20, 5, 0]           → sum 340
-monthly_inlet_water_f:  [54, 54, 55, 57, 60, 63, 65, 66, 65, 62, 58, 55]
-setpoint_water_f:       120
-daily_hot_water_gal:    65
-UA_poor:    650 BTU/hr/°F
-UA_average: 500 BTU/hr/°F
-UA_good:    350 BTU/hr/°F
+CZ4 annual_hdd_65f: 2242   annual_cdd_65f: 554   (TMYx 2011-2025, daily-mean base 65°F)
+setpoint_water_f: 120   daily_hot_water_gal: 65 (3BR)
+UA_poor: 650   UA_average: 500   UA_good: 350   BTU/hr/°F   (home_config.UA_BY_INSULATION)
 ```
 
-**IMPORTANT:** Annual HDD for Bay Area is 1,910 — NOT 2,600 (that is the national average).
-All validation targets in the spec use 1,910.
+> **Re-baselined in Phase 4.** Phase 2's hardcoded "Bay Area HDD = 1,910 / CDD = 340" was an
+> undocumented hand estimate — no real San Jose weather file produces it (NREL TMY3 ≈ 2,501;
+> TMYx 2011-2025 = 2,242). The live model now uses authoritative per-zone TMYx data. The
+> legacy `data/climate/bayarea_tmy3.json` (1,910 HDD) is kept ONLY as a fixed reference
+> climate for the device-formula regression tests in `tests/test_devices.py` — it validates
+> the consumption *formulas* at a stable input, and is no longer "Bay Area actual."
 
 **Bedroom scaling (BEDROOM_SCALING dict, 3BR = reference):**
 ```
@@ -101,6 +104,11 @@ stress (CEC):  elec +10%/yr, gas +12%/yr
 ---
 
 ## Validation targets (tests must verify these)
+
+> These validate the consumption **formulas** at a fixed reference climate (HDD=1910 /
+> CDD=340, the legacy `bayarea_tmy3.json`), independent of the live ZIP-driven zone data
+> (Phase 4). `tests/test_devices.py` uses this fixed reference so formula regressions stay
+> stable; the live model uses real per-zone TMYx values (e.g., CZ4 = 2242/554).
 
 | Device | Config | Expected | Tolerance |
 |--------|--------|---------|-----------|
