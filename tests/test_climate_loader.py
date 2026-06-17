@@ -117,6 +117,15 @@ def test_zone_contrast_inland_hotter_mountain_colder(loader):
 
 # ── Validation ────────────────────────────────────────────────────────────────
 
+def test_trend_cagrs_are_real_and_signed(loader):
+    # Cal-Adapt-fitted (§1.7): HDD declines, CDD rises under warming; "none" stays flat.
+    for zipc in ["95112", "93720", "96161", "92101", "95814"]:
+        c = loader.get_climate(zipc, trend_scenario="rcp45")
+        assert c.hdd_cagr < 0 and c.cdd_cagr > 0
+        flat = loader.get_climate(zipc, trend_scenario="none")
+        assert flat.hdd_cagr == 0.0 and flat.cdd_cagr == 0.0
+
+
 def test_invalid_trend_scenario_raises(loader):
     with pytest.raises(ValueError):
         loader.get_climate("95110", trend_scenario="rcp99")

@@ -6,8 +6,10 @@
     "series": "TMYx.2011-2025",
     "method": "daily-mean degree-days, base 65\u00b0F; mains water = Burch-Christensen (BEopt)",
     "built": "2026-06-16",
-    "trend_note": "hdd/cdd_cagr_by_scenario are PROVISIONAL uniform placeholders pending Step 1d (Cal-Adapt per-zone fit).",
-    "invariants": "monthly arrays length 12 (Jan..Dec); monthly HDD/CDD sum to annual."
+    "trend_note": "hdd/cdd_cagr_by_scenario fitted by log-linear regression of Cal-Adapt ens32avg annual degree-days over 2025-2054 at each station's lat/lon.",
+    "invariants": "monthly arrays length 12 (Jan..Dec); monthly HDD/CDD sum to annual.",
+    "trend_source": "Cal-Adapt (cal-adapt.org), LOCA 32-model ensemble avg, RCP 4.5 / 8.5",
+    "trend_built": "2026-06-17"
   },
   "CA_CZ1": {
     "state": "CA",
@@ -79,13 +81,13 @@
     ],
     "hdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": -0.004,
-      "rcp85": -0.008
+      "rcp45": -0.00576,
+      "rcp85": -0.00689
     },
     "cdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": 0.008,
-      "rcp85": 0.016
+      "rcp45": 0.02887,
+      "rcp85": 0.03988
     },
     "note": ""
   },
@@ -159,13 +161,13 @@
     ],
     "hdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": -0.004,
-      "rcp85": -0.008
+      "rcp45": -0.00647,
+      "rcp85": -0.0074
     },
     "cdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": 0.008,
-      "rcp85": 0.016
+      "rcp45": 0.01088,
+      "rcp85": 0.01425
     },
     "note": ""
   },
@@ -239,13 +241,13 @@
     ],
     "hdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": -0.004,
-      "rcp85": -0.008
+      "rcp45": -0.0073,
+      "rcp85": -0.00869
     },
     "cdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": 0.008,
-      "rcp85": 0.016
+      "rcp45": 0.01694,
+      "rcp85": 0.0237
     },
     "note": ""
   },
@@ -319,13 +321,13 @@
     ],
     "hdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": -0.004,
-      "rcp85": -0.008
+      "rcp45": -0.00682,
+      "rcp85": -0.00826
     },
     "cdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": 0.008,
-      "rcp85": 0.016
+      "rcp45": 0.00909,
+      "rcp85": 0.01245
     },
     "note": ""
   },
@@ -399,13 +401,13 @@
     ],
     "hdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": -0.004,
-      "rcp85": -0.008
+      "rcp45": -0.00846,
+      "rcp85": -0.01006
     },
     "cdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": 0.008,
-      "rcp85": 0.016
+      "rcp45": 0.01799,
+      "rcp85": 0.02389
     },
     "note": ""
   },
@@ -479,13 +481,13 @@
     ],
     "hdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": -0.004,
-      "rcp85": -0.008
+      "rcp45": -0.01079,
+      "rcp85": -0.01397
     },
     "cdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": 0.008,
-      "rcp85": 0.016
+      "rcp45": 0.01096,
+      "rcp85": 0.0149
     },
     "note": "LAX (coastal) for south-coast zone"
   },
@@ -559,13 +561,13 @@
     ],
     "hdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": -0.004,
-      "rcp85": -0.008
+      "rcp45": -0.01108,
+      "rcp85": -0.01492
     },
     "cdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": 0.008,
-      "rcp85": 0.016
+      "rcp45": 0.01034,
+      "rcp85": 0.01421
     },
     "note": ""
   },
@@ -639,13 +641,13 @@
     ],
     "hdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": -0.004,
-      "rcp85": -0.008
+      "rcp45": -0.01179,
+      "rcp85": -0.01463
     },
     "cdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": 0.008,
-      "rcp85": 0.016
+      "rcp45": 0.00839,
+      "rcp85": 0.01127
     },
     "note": "Fullerton \u2014 El Toro MCAS closed 1999"
   },
@@ -719,13 +721,13 @@
     ],
     "hdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": -0.004,
-      "rcp85": -0.008
+      "rcp45": -0.00958,
+      "rcp85": -0.01305
     },
     "cdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": 0.008,
-      "rcp85": 0.016
+      "rcp45": 0.00877,
+      "rcp85": 0.01238
     },
     "note": "Burbank \u2014 no Pasadena station"
   },
@@ -799,13 +801,13 @@
     ],
     "hdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": -0.004,
-      "rcp85": -0.008
+      "rcp45": -0.00942,
+      "rcp85": -0.01251
     },
     "cdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": 0.008,
-      "rcp85": 0.016
+      "rcp45": 0.00614,
+      "rcp85": 0.00865
     },
     "note": "Riverside Muni"
   },
@@ -879,13 +881,13 @@
     ],
     "hdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": -0.004,
-      "rcp85": -0.008
+      "rcp45": -0.00525,
+      "rcp85": -0.00584
     },
     "cdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": 0.008,
-      "rcp85": 0.016
+      "rcp45": 0.00463,
+      "rcp85": 0.00673
     },
     "note": ""
   },
@@ -959,13 +961,13 @@
     ],
     "hdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": -0.004,
-      "rcp85": -0.008
+      "rcp45": -0.00485,
+      "rcp85": -0.00555
     },
     "cdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": 0.008,
-      "rcp85": 0.016
+      "rcp45": 0.00605,
+      "rcp85": 0.0086
     },
     "note": "Sacramento Exec"
   },
@@ -1039,13 +1041,13 @@
     ],
     "hdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": -0.004,
-      "rcp85": -0.008
+      "rcp45": -0.00441,
+      "rcp85": -0.00555
     },
     "cdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": 0.008,
-      "rcp85": 0.016
+      "rcp45": 0.00457,
+      "rcp85": 0.00699
     },
     "note": ""
   },
@@ -1119,13 +1121,13 @@
     ],
     "hdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": -0.004,
-      "rcp85": -0.008
+      "rcp45": -0.00454,
+      "rcp85": -0.00628
     },
     "cdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": 0.008,
-      "rcp85": 0.016
+      "rcp45": 0.00405,
+      "rcp85": 0.00654
     },
     "note": ""
   },
@@ -1199,13 +1201,13 @@
     ],
     "hdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": -0.004,
-      "rcp85": -0.008
+      "rcp45": -0.00979,
+      "rcp85": -0.01355
     },
     "cdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": 0.008,
-      "rcp85": 0.016
+      "rcp45": 0.00356,
+      "rcp85": 0.00522
     },
     "note": ""
   },
@@ -1279,13 +1281,13 @@
     ],
     "hdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": -0.004,
-      "rcp85": -0.008
+      "rcp45": -0.00419,
+      "rcp85": -0.00495
     },
     "cdd_cagr_by_scenario": {
       "none": 0.0,
-      "rcp45": 0.008,
-      "rcp85": 0.016
+      "rcp45": 0.00839,
+      "rcp85": 0.01424
     },
     "note": ""
   }

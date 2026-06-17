@@ -1001,7 +1001,15 @@ Jose, so it shows lower HDD and far higher CDD.
 ### Climate trend
 
 WhyWatt can optionally layer a multi-decade warming trend on top of the static climate (the
-Climate Trend control in the Home Profile). The trend gently lowers heating and raises cooling
-each year across the modeled period. The current trend rates are provisional placeholders; a
-future update will replace them with zone-specific projections from Cal-Adapt, California's
-official climate-projection dataset.
+Climate Trend control in the Home Profile). Each modeled year, heating degree-days are scaled
+down and cooling degree-days up by a small compounding rate, so a 20-year run in an inland or
+mountain zone reflects warmer winters and hotter summers rather than a frozen present.
+
+The trend rates are per-zone annual growth rates (CAGR), fitted by log-linear regression to
+Cal-Adapt — the CEC/LBNL official California climate-projection dataset. We use the LOCA
+32-model ensemble average of annual heating and cooling degree-days over 2025-2054. Two
+scenarios are offered: RCP 4.5 (moderate emissions) and RCP 8.5 (high emissions). "None" turns
+the trend off and reproduces the static typical-year climate exactly. As with the weather
+files, the raw Cal-Adapt series are snapshotted in the project for reproducibility.
+
+@include: _generated/climate_trend_table.md

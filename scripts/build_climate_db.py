@@ -10,9 +10,11 @@ One reference station per CEC Building Climate Zone (Title 24), latest pinned TM
 Raw source files are snapshotted under data/climate/sources/ so the build is reproducible
 offline and the numbers can never silently change when OneBuilding re-issues a station.
 
-Modes:
-  python scripts/build_climate_db.py --download   # fetch + snapshot the 16 EPW sources
-  # (parse/build-zones mode added in Step 1.3; zip-table mode in Step 1.6)
+Modes (run in this order — build-zones writes placeholder CAGRs that build-trend fills in):
+  python scripts/build_climate_db.py --download      # 1.2  fetch + snapshot 16 EPW sources
+  python scripts/build_climate_db.py --build-zones   # 1.3  EPW -> tmy3_zones.json
+  python scripts/build_climate_db.py --build-trend   # 1.7  Cal-Adapt -> per-zone trend CAGRs
+  python scripts/build_climate_db.py --build-zips    # 1.6  CEC xlsx -> zip_to_zone.json
 """
 from __future__ import annotations
 
@@ -129,8 +131,18 @@ FALLBACK_ZONE = "CA_CZ4"
 CEC_ZIP_URL = ("https://www.energy.ca.gov/sites/default/files/2020-04/"
                "BuildingClimateZonesByZIPCode_ada.xlsx")
 CEC_DIR = SOURCES / "cec"
-# Generated table fragment for the "Climate Data" help page (included via @include).
+# Cal-Adapt climate-trend projections (§1.7).
+CALADAPT_DIR = SOURCES / "caladapt"
+TREND_FIT_WINDOW = (2025, 2054)   # years over which the CAGR is fitted
+_CALADAPT_SLUGS = {
+    ("hdd", "rcp45"): "hdd_year_ens32avg_rcp45",
+    ("hdd", "rcp85"): "hdd_year_ens32avg_rcp85",
+    ("cdd", "rcp45"): "cdd_year_ens32avg_rcp45",
+    ("cdd", "rcp85"): "cdd_year_ens32avg_rcp85",
+}
+# Generated table fragments for the "Climate Data" help page (included via @include).
 DOC_FRAGMENT = ROOT / "docs" / "help" / "_generated" / "climate_zones_table.md"
+TREND_FRAGMENT = ROOT / "docs" / "help" / "_generated" / "climate_trend_table.md"
 _MID_DOY = np.array([15, 46, 74, 105, 135, 166, 196, 227, 258, 288, 319, 349])
 
 # Provisional trend CAGRs — uniform placeholder until Step 1d replaces them with per-zone
@@ -269,16 +281,92 @@ def build_zip_table():
     print(f"Wrote {ZIP_JSON}: {len(mapping)} ZIPs (skipped {skipped}); sha {sha[:12]}…")
 
 
+def _fit_cagr(index, data, lo, hi):
+    """Annual CAGR via log-linear regression of degree-days over [lo, hi]."""
+    yrs, vals = [], []
+    for s, v in zip(index, data):
+        y = int(str(s)[:4])
+        if lo <= y <= hi and v is not None and v > 0:
+            yrs.append(y); vals.append(v)
+    if len(yrs) < 5:
+        return 0.0
+    yrs = np.array(yrs, float); vals = np.array(vals, float)
+    slope = np.polyfit(yrs - yrs[0], np.log(vals), 1)[0]
+    return float(np.exp(slope) - 1.0)
+
+
+def build_trend():
+    """Fit per-zone HDD/CDD trend CAGRs from Cal-Adapt and write them into tmy3_zones.json."""
+    import urllib.parse
+    man = json.loads((SOURCES / "manifest.json").read_text(encoding="utf-8"))
+    zones = json.loads(ZONES_JSON.read_text(encoding="utf-8"))
+    CALADAPT_DIR.mkdir(parents=True, exist_ok=True)
+    lo, hi = TREND_FIT_WINDOW
+    snapshot = {"_meta": {"source": "Cal-Adapt API (cal-adapt.org)",
+                          "series": "LOCA 32-model ensemble average (ens32avg), annual HDD/CDD",
+                          "fit_window": [lo, hi], "extracted": str(date.today())}}
+    for zone_key, info in STATION_MANIFEST.items():
+        zf = zipfile.ZipFile(ZIP_DIR / man[zone_key]["source_zip"])
+        epw = [n for n in zf.namelist() if n.lower().endswith(".epw")][0]
+        loc = zf.read(epw).decode("latin-1").splitlines()[0].split(",")
+        lat, lon = float(loc[6]), float(loc[7])
+        snap = {"lat": lat, "lon": lon}
+        cagr = {"hdd": {"none": 0.0}, "cdd": {"none": 0.0}}
+        for (var, scn), slug in _CALADAPT_SLUGS.items():
+            pt = urllib.parse.quote(f"Point({lon} {lat})")
+            j = json.loads(_get(f"https://api.cal-adapt.org/api/series/{slug}/events/"
+                                f"?g={pt}&imperial=true&pagesize=200"))
+            snap[f"{var}_{scn}"] = {"index": j["index"], "data": j["data"]}
+            cagr[var][scn] = round(_fit_cagr(j["index"], j["data"], lo, hi), 5)
+        zones[zone_key]["hdd_cagr_by_scenario"] = cagr["hdd"]
+        zones[zone_key]["cdd_cagr_by_scenario"] = cagr["cdd"]
+        snapshot[zone_key] = snap
+        print(f"  {zone_key:7} {info['reference_city']:13} "
+              f"HDD/yr 45={cagr['hdd']['rcp45']:+.4f} 85={cagr['hdd']['rcp85']:+.4f}  |  "
+              f"CDD/yr 45={cagr['cdd']['rcp45']:+.4f} 85={cagr['cdd']['rcp85']:+.4f}")
+
+    zones["_meta"]["trend_note"] = (
+        f"hdd/cdd_cagr_by_scenario fitted by log-linear regression of Cal-Adapt ens32avg "
+        f"annual degree-days over {lo}-{hi} at each station's lat/lon.")
+    zones["_meta"]["trend_source"] = "Cal-Adapt (cal-adapt.org), LOCA 32-model ensemble avg, RCP 4.5 / 8.5"
+    zones["_meta"]["trend_built"] = str(date.today())
+    ZONES_JSON.write_text(json.dumps(zones, indent=2), encoding="utf-8")
+    (CALADAPT_DIR / "trend_series.json").write_text(json.dumps(snapshot, indent=1), encoding="utf-8")
+    _write_trend_fragment(zones, lo, hi)
+    print(f"\nUpdated trend CAGRs in {ZONES_JSON.name}; snapshot -> {CALADAPT_DIR / 'trend_series.json'}")
+
+
+def _write_trend_fragment(zones: dict, lo: int, hi: int):
+    """Emit the per-zone trend-CAGR table as a pre-formatted help fragment."""
+    L = [f"    Per-zone warming trend (annual CAGR), fitted from Cal-Adapt LOCA ens32avg, {lo}-{hi}.",
+         "    Generated by build_climate_db.py --build-trend — do not edit by hand.",
+         "    " + "-" * 60,
+         f"    {'Zone':5} {'City':14} {'HDD 4.5':>8} {'HDD 8.5':>8} {'CDD 4.5':>8} {'CDD 8.5':>8}"]
+    for k, r in zones.items():
+        if k.startswith("_"):
+            continue
+        h, c = r["hdd_cagr_by_scenario"], r["cdd_cagr_by_scenario"]
+        L.append(f"    {r['zone_id']:5} {r['reference_city']:14} "
+                 f"{h['rcp45']*100:+7.2f}% {h['rcp85']*100:+7.2f}% "
+                 f"{c['rcp45']*100:+7.2f}% {c['rcp85']*100:+7.2f}%")
+    TREND_FRAGMENT.parent.mkdir(parents=True, exist_ok=True)
+    TREND_FRAGMENT.write_text("\n".join(L) + "\n", encoding="utf-8")
+    print(f"Wrote {TREND_FRAGMENT}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--download", action="store_true", help="fetch + snapshot the 16 EPW sources")
     ap.add_argument("--build-zones", action="store_true", help="parse snapshots -> tmy3_zones.json")
+    ap.add_argument("--build-trend", action="store_true", help="Cal-Adapt -> per-zone trend CAGRs")
     ap.add_argument("--build-zips", action="store_true", help="CEC xlsx -> zip_to_zone.json")
     args = ap.parse_args()
     if args.download:
         download_sources()
     elif args.build_zones:
         build_zones()
+    elif args.build_trend:
+        build_trend()
     elif args.build_zips:
         build_zip_table()
     else:
