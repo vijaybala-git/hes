@@ -397,118 +397,218 @@ ClimateData holds the full (n_years,12) trajectory + a current_year pointer, rat
 
 ### 2.1 Motivation and Decision
 
-Phase 2/3 rate data is PG&E-specific (CPUC filings, PG&E Advice Letters). Users outside
-PG&E territory see incorrect rates. Phase 4 adds EIA state-level rates as a selectable
-option alongside the existing PG&E data.
+Phase 2/3 priced every home off a single hardcoded PG&E base rate ($0.386/kWh,
+$2.08/therm) projected forward by a user CAGR — the **flat-CAGR rate plan**. Any user
+outside PG&E territory, and even PG&E users on non-default tariffs, saw the wrong base.
+
+Phase 4 **replaces the flat-CAGR plan** with EIA-sourced rates resolved from the user's
+ZIP. The model now leads with the user's *actual utility* and falls back to a California
+statewide average only when the ZIP cannot be resolved.
 
 **Decisions (resolved):**
-- PG&E CPUC data stays as-is and remains a selectable rate source (not replaced).
-- EIA state data is a second selectable rate source — starting with California only.
-- The rate source is a user choice in the UI, not auto-detected from ZIP.
-- The infrastructure (build script + data schema) supports adding any US state by
-  running the script for that state. No code changes needed to add a new state.
+- **Per-utility is the default.** `zip_code` → electric utility (`eiaid`) and → gas LDC,
+  each pricing off that provider's own EIA data.
+- **California statewide average is the fallback** when ZIP→utility resolution fails, and
+  is **also explicitly selectable** as a deliberate "statewide view."
+- **These two options replace the flat-CAGR rate plan.** The old hardcoded PG&E base rate
+  is retired as the default source.
+- **Baseline year is 2024 for both fuels** — the most recent year complete for electricity
+  *and* gas (see §2.3).
+- **No live lookups.** All resolution is against preprocessed local tables built offline;
+  the user-facing app never calls a network API (see §2.5).
+- The build infrastructure supports adding any US state by re-running the scripts. No app
+  code changes needed to add a state.
+- **ACC rate models (`acc_shaped`, `acc_seasonal`) are unchanged by this section** and
+  continue to use their existing retail base. Re-sourcing the ACC retail base from EIA is
+  out of scope for §2.
 
 ### 2.2 Rate Source Options
 
-| Source | Label in UI | Coverage | Accuracy |
-|--------|------------|----------|----------|
-| PG&E CPUC | "PG&E (CPUC tariff)" | PG&E territory only | Highest — actual tariff filings |
-| EIA California | "California average (EIA)" | All CA ZIPs | Medium — statewide average across all utilities |
+| Source | UI label | Coverage | Accuracy |
+|--------|----------|----------|----------|
+| EIA per-utility | "My utility (from ZIP): _e.g._ PG&E" ← **default** | Any CA ZIP that resolves to a known utility | High — that utility's own residential effective rate + monthly shape |
+| EIA California average | "California average (EIA)" | All CA ZIPs | Medium — sales-weighted statewide blend; also the auto-fallback |
 
-The user selects the rate source via a dropdown in the Rate/Projection panel. Default:
-PG&E CPUC (unchanged). When EIA California is selected, the simulation uses EIA's
-residential average rate and historical CAGR. The ACC shape is only available for the
-PG&E source; with EIA source, ACC is disabled and a flat seasonal shape is used instead.
+The flat-CAGR / hardcoded-PG&E option is removed from the selector. The escalation engine
+(CAGR projection + conservative/moderate/stress scenarios + manual override) is **retained**
+— it is now seeded from each source's EIA historical 10-yr CAGR but remains user-overridable.
 
-### 2.3 Data Source
+### 2.3 Data Sources and Baseline Year
 
-**EIA Open Data API (free, no key required for bulk downloads):**
-- Electricity: EIA-861 / EIA Form 861M — monthly state-level residential retail rate (¢/kWh)
-- Natural gas: EIA Natural Gas Monthly — monthly state-level residential rate ($/Mcf, converted to $/therm)
+| | Electricity | Gas |
+|---|---|---|
+| Per-utility source | **EIA-861M** (monthly) + EIA-861 (annual census) | **EIA-176** (annual, company-level) |
+| Effective rate | residential revenue ÷ sales | residential revenue ÷ volume |
+| Monthly shape | **per-utility** (EIA-861M monthly) | **state-level** (EIA Natural Gas Monthly), shared across CA LDCs |
+| 2024 complete? | ✅ | ✅ (released Nov 2025) |
+| 2025 complete? | ✅ (~2-mo lag) | ❌ (EIA-176 ~11-mo lag; not until ~Oct 2026) |
 
-Both series go back to 2001. The build script downloads once and snapshots the data.
+**Baseline year = 2024 for both fuels** for parity. Electricity *could* run 2025, but gas
+cannot until late 2026, so 2024 is the common complete year.
 
-### 2.4 Offline Data Pipeline
+**Gas monthly-shape approximation (documented):** EIA-176 is annual-only, so per-LDC gas has
+no monthly series. The 12-month seasonal shape is borrowed from the **California state-level**
+NG Monthly series and applied to each LDC's annual base rate:
+`gas_rate[m] = ldc_annual_base × cagr_projection × ca_state_monthly_shape[m]`.
+This is sound — CA gas seasonality is heating-driven and near-identical across the three LDCs
+— but is explicitly an approximation (per-LDC *level*, state *shape*).
 
-A build script (`scripts/build_eia_rates.py`) will:
+### 2.4 ZIP → Utility Resolution (two independent mappings)
 
-1. Accept a `--states` argument (default: `CA`; accepts multiple: `--states CA TX NY`)
-2. Download EIA bulk electricity and natural gas rate series for residential sector
-3. Filter to the requested state(s)
-4. Compute the 10-year historical CAGR for each state (used as the default escalation scenario)
-5. Compute a monthly seasonal shape (12-month ratio array) from multi-year averages
-6. Merge results into `data/rates/eia_rates_by_state.json` (append-safe)
+Electric and gas service territories do **not** coincide (e.g., SCE electric + SoCalGas gas),
+so resolution uses two separate crosswalks:
 
-Schema (per state — JSON field keys are unchanged data identifiers; `"gas"` here is the
-natural-gas series):
+| Mapping | Source | Notes |
+|---|---|---|
+| `zip → electric eiaid` | OpenEI **"U.S. Electric Utility Companies and Rates: Look-up by Zip Code (2024)"** CSV | Some ZIPs list multiple utilities → disambiguation rule below |
+| `zip → gas LDC id` | CA-specific table (PG&E north / SoCalGas south / SDG&E) | No clean national crosswalk; CA has ~3 LDCs, so a small ZIP/county table |
+
+**Disambiguation / fallback to CA average is triggered when:**
+- the ZIP is not in the crosswalk, **or**
+- the ZIP maps to multiple utilities with no single IOU to choose, **or**
+- the resolved utility is not present in the rate snapshot (e.g., a small muni we didn't build).
+
+The fallback is per-fuel and independent: electricity may resolve to a utility while gas
+falls back, or vice-versa.
+
+### 2.5 Offline Data Pipeline (preprocess only — no runtime API)
+
+All four inputs are static annual/monthly files. Build scripts download once, snapshot each
+raw source with a sha256 under `data/rates/sources/`, and bake flat lookup tables. The app
+reads **only** the committed JSON; `zip → eiaid → rate` is a dict hit at init, identical to
+the existing `zip → CEC zone` resolution.
+
+Scripts:
+- `scripts/build_eia_rates.py --states CA` → `data/rates/eia_rates_by_utility.json`
+- `scripts/build_zip_utility_map.py --states CA` →
+  `data/rates/zip_to_electric_utility.json` and `data/rates/zip_to_gas_ldc.json`
+
+`eia_rates_by_utility.json` schema (values illustrative — computed by the build script):
 ```json
 {
-  "CA": {
-    "label": "California",
-    "electricity": {
+  "electric_utilities": {
+    "14328": {
+      "name": "Pacific Gas & Electric Co",
+      "state": "CA",
       "unit": "$/kWh",
-      "current_rate": 0.312,
-      "historical_cagr_10yr": 0.071,
-      "monthly_seasonal_shape": [0.95, 0.93, 0.97, 1.00, 1.03, 1.08, 1.12, 1.10, 1.05, 1.00, 0.97, 0.95]
-    },
-    "gas": {
+      "base_year": 2024,
+      "current_rate": 0.41,
+      "historical_cagr_10yr": 0.078,
+      "monthly_seasonal_shape": [0.95,0.93,0.97,1.00,1.03,1.08,1.12,1.10,1.05,1.00,0.97,0.95],
+      "source": "EIA-861M / EIA-861, 2024",
+      "shape_source": "EIA-861M 2024 monthly, eiaid 14328"
+    }
+  },
+  "gas_ldcs": {
+    "G_PGE": {
+      "name": "Pacific Gas & Electric Co",
+      "state": "CA",
       "unit": "$/therm",
+      "base_year": 2024,
       "current_rate": 1.74,
       "historical_cagr_10yr": 0.063,
-      "monthly_seasonal_shape": [1.10, 1.08, 1.02, 0.97, 0.93, 0.90, 0.90, 0.92, 0.96, 1.00, 1.06, 1.10]
-    },
-    "source": "EIA-861 and EIA Natural Gas Monthly, 2024 annual average",
-    "extracted": "2026-06-02"
-  }
+      "monthly_seasonal_shape": [1.10,1.08,1.02,0.97,0.93,0.90,0.90,0.92,0.96,1.00,1.06,1.10],
+      "source": "EIA-176, 2024 (annual)",
+      "shape_source": "EIA Natural Gas Monthly, CA state (LDC-shared)"
+    }
+  },
+  "state_average": {
+    "CA": {
+      "label": "California (statewide average)",
+      "electricity": {
+        "unit": "$/kWh", "base_year": 2024, "current_rate": 0.32,
+        "historical_cagr_10yr": 0.071,
+        "monthly_seasonal_shape": [0.96,0.94,0.97,1.00,1.03,1.07,1.10,1.09,1.05,1.00,0.97,0.96],
+        "source": "EIA-861M state aggregate, 2024"
+      },
+      "gas": {
+        "unit": "$/therm", "base_year": 2024, "current_rate": 1.69,
+        "historical_cagr_10yr": 0.060,
+        "monthly_seasonal_shape": [1.10,1.08,1.02,0.97,0.93,0.90,0.90,0.92,0.96,1.00,1.06,1.10],
+        "source": "EIA Natural Gas Monthly, CA state, 2024"
+      }
+    }
+  },
+  "extracted": "2026-06-17"
 }
 ```
 
-**Adding a new state in the future:**
+`zip_to_electric_utility.json` and `zip_to_gas_ldc.json` are `{ "<zip>": ["<id>", ...] }`
+maps (lists allow the multi-utility ZIP case to be detected and routed to fallback).
+
+**Adding a new state later:**
 ```
-python scripts/build_eia_rates.py --states TX
-# → appends TX to data/rates/eia_rates_by_state.json, commit the file
-# → TX becomes available in the UI rate source dropdown automatically
+python scripts/build_eia_rates.py     --states TX
+python scripts/build_zip_utility_map.py --states TX
+# → appends TX utilities + ZIP crosswalks; TX ZIPs resolve automatically in the app
 ```
 
-### 2.5 Integration with Existing Rate Framework
+### 2.6 Integration with Existing Rate Framework
 
-The existing `RateLoader` class interface is unchanged. A new factory method is added:
+`RateLoader`'s interface is unchanged. Two factory methods replace the flat-CAGR constructor:
 
 ```python
-RateLoader.from_eia(state: str, fuel: str) -> RateLoader
-# Reads from data/rates/eia_rates_by_state.json
-# fuel: "electricity" | "gas"   ("gas" = natural-gas series key, unchanged)
-# Uses EIA current_rate as base_rate, historical_cagr_10yr as default escalation
+RateLoader.from_eia_utility(util_id: str, fuel: str) -> RateLoader
+RateLoader.from_eia_state(state: str,    fuel: str) -> RateLoader
+# both read data/rates/eia_rates_by_utility.json
+# fuel: "electricity" | "gas"
+# base_rate         ← current_rate (2024)
+# default escalation← historical_cagr_10yr  (user CAGR slider still overrides)
+# seasonal shape    ← monthly_seasonal_shape  (no longer flat)
 ```
 
-The `RateLoader.from_pge(fuel)` factory is made explicit to match the pattern. Both
-factories return the same `RateLoader` type — the simulation code is unaware of which
-source was used.
+A thin resolver (used by `HESModel.__init__`) turns a ZIP + source choice into the right
+pair of loaders plus provenance for the UI:
 
-### 2.6 UI Changes
+```python
+resolve_rate_sources(zip_code, source_choice) -> (elec_loader, gas_loader, provenance)
+# source_choice="auto"        → per-utility, per-fuel, with CA fallback (default)
+# source_choice="ca_average"  → from_eia_state("CA", ...) for both fuels
+# provenance records, per fuel: resolved name + whether fallback fired
+```
 
-- **Rate panel:** Add a **"Rate source"** dropdown:
-  - "PG&E (CPUC tariff)" ← default
+Both factories return the same `RateLoader` type — the simulation is unaware of source.
+The `get_annual_monthly_rates(...)` flow, scenario presets, and ACC wrapper are untouched.
+
+### 2.7 UI Changes
+
+- **Rate source dropdown** (replaces the flat-CAGR/PG&E entry):
+  - "My utility (from ZIP): _‹resolved name›_" ← default
   - "California average (EIA)"
-  - _(future states appear here as their data files are added)_
-- **Source label:** Below the dropdown, show data vintage:
-  e.g., "EIA data: 2024 annual average, extracted 2026-06-02"
-- **ACC note:** When EIA source is selected, the ACC section shows:
-  "ACC shape available for PG&E only — using flat seasonal shape"
-- **Manual override:** allow user to enter a custom base rate ($/kWh, $/therm) for cases
-  where neither source matches their bill
+  - _(future states/utilities appear as their data files are added)_
+- **Resolution note:** show the resolved providers, e.g.
+  "Electric: PG&E · Gas: PG&E — EIA 2024." When a fallback fired, say so plainly:
+  "Couldn't match your utility from ZIP — using California average. Pick your utility
+  manually if you know it."
+- **Data vintage label:** "EIA data: 2024, extracted 2026-06-17."
+- **CAGR control:** retained; seeded from the source's `historical_cagr_10yr`, overridable;
+  conservative/moderate/stress scenarios still apply.
+- **Manual override:** allow a custom base rate ($/kWh, $/therm) when neither source matches
+  the user's bill.
+- **ACC note:** ACC shape remains a separate model option, unaffected by source selection.
 
-### 2.7 Resolved / Open Questions
+### 2.8 Future Extension (out of scope for §2): TOU & Tiered Tariffs
 
-- [x] **PG&E CPUC data retained and selectable** — not replaced.
-- [x] **EIA is a selectable option, not auto-detected** — user picks rate source explicitly.
-- [x] **CA-only initially; add-state workflow defined** — run script, commit JSON, done.
-- [x] **Residential sector rates** — not blended with commercial.
-- [x] **Rate basis: most recent 12-month average** — more stable than single-month.
-- [ ] Should the EIA dropdown dynamically populate from available states in the JSON,
-      or be a hardcoded list? (Recommendation: dynamic — reads `data/rates/eia_rates_by_state.json` keys)
+EIA gives an *effective* $/kWh, not the tariff *structure*. Time-of-use (peak/off-peak)
+and tiered/baseline ("slab") pricing require per-tariff structure data (e.g., OpenEI URDB,
+electric-only) and are a separate future effort. The model is well-positioned for it:
+the existing 24-hour device load profiles + ACC machinery already do load-shape-weighted
+pricing, so TOU can be added as parallel peak/off-peak `(12,)` accumulators (additive,
+preserving `monthly_consumption() → (12,)`), while tiered pricing adds a home-level
+non-linear step. Not required for the per-utility base-rate accuracy delivered here.
 
----
+### 2.9 Resolved / Open Questions
+
+- [x] **Per-utility is default; CA average is fallback *and* selectable.**
+- [x] **Flat-CAGR / hardcoded-PG&E base rate replaced** by EIA-sourced rates.
+- [x] **2024 baseline for both fuels** (common complete year).
+- [x] **Two independent ZIP→utility mappings** (electric via OpenEI; gas via CA LDC table).
+- [x] **Gas monthly shape = CA state shape** applied to per-LDC annual base (documented approximation).
+- [x] **Residential sector**, effective rate = revenue ÷ sales (elec) / revenue ÷ volume (gas).
+- [x] **Preprocess-only** — no runtime API; app reads committed JSON.
+- [x] ~~PG&E CPUC retained as default selectable source~~ — **superseded**: EIA per-utility is now the default; ACC modes keep their own retail base.
+- [ ] Disambiguation when a ZIP maps to multiple IOUs (not just IOU-vs-muni) — pick highest-load, or prompt? (Recommendation: highest residential sales, then allow manual override.)
+- [ ] Refresh cadence for the snapshot — annually after EIA-176 release (~Nov)? (Recommendation: yes, re-run both build scripts each Nov and commit.)
 
 ## §3 — Transportation: ICE & Electric Vehicles
 
