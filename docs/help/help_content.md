@@ -864,6 +864,14 @@ Annual kWh by Device and Annual Gas by Device
 Electricity (kilowatt-hours) and gas (therms) used by each appliance per year.
 For an electric vehicle, the kWh chart counts home charging only.
 
+HVAC Monthly Energy
+The HVAC system's energy across the twelve months of the year HVAC is swapped,
+split into heating (lower bars) and cooling (stacked on top). Do-nothing gas
+heating is shown in kilowatt-hour-equivalent (29.3 kWh per therm) so it sits on
+the same axis as the electric heat pump; cooling is omitted for homes that have
+none. Switch the scenario toggle to contrast a gas furnace against a heat pump
+month by month.
+
 Energy Mix Timeline
 A stacked view of where your home's energy comes from each year, in
 kilowatt-hour-equivalent terms: natural gas, grid electricity, your own solar,

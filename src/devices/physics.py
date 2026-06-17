@@ -53,8 +53,11 @@ class GasFurnace(PhysicsDevice):
     def _hdd(self) -> np.ndarray:
         return self._climate.monthly_hdd if self._climate is not None else self._hdd_static
 
-    def monthly_consumption(self) -> np.ndarray:
+    def monthly_heating(self) -> np.ndarray:
         return self._hdd * 24 * self.ua / (self.afue * 100_000)
+
+    def monthly_consumption(self) -> np.ndarray:
+        return self.monthly_heating()
 
 
 class HeatPumpHVAC(PhysicsDevice):
@@ -95,10 +98,14 @@ class HeatPumpHVAC(PhysicsDevice):
     def _cdd(self) -> np.ndarray:
         return self._climate.monthly_cdd if self._climate is not None else self._cdd_static
 
+    def monthly_heating(self) -> np.ndarray:
+        return self._hdd * 24 * self.ua / (self.cop * 3412)
+
+    def monthly_cooling(self) -> np.ndarray:
+        return self._cdd * 24 * self.ua / (self.seer * 1000)
+
     def monthly_consumption(self) -> np.ndarray:
-        heating = self._hdd * 24 * self.ua / (self.cop * 3412)
-        cooling = self._cdd * 24 * self.ua / (self.seer * 1000)
-        return heating + cooling
+        return self.monthly_heating() + self.monthly_cooling()
 
 
 # ── Water heating ─────────────────────────────────────────────────────────────
@@ -188,5 +195,8 @@ class CentralAC(PhysicsDevice):
     def _cdd(self) -> np.ndarray:
         return self._climate.monthly_cdd if self._climate is not None else self._cdd_static
 
-    def monthly_consumption(self) -> np.ndarray:
+    def monthly_cooling(self) -> np.ndarray:
         return self._cdd * 24 * self.ua / (self.seer * 1000)
+
+    def monthly_consumption(self) -> np.ndarray:
+        return self.monthly_cooling()

@@ -119,6 +119,7 @@ CHART_OPTIONS = [
     "Home Energy Use by Device",
     "Annual kWh by Device",
     "Annual Gas by Device",
+    "HVAC Monthly Energy",
     "Energy Mix Timeline",
 ]
 
@@ -134,6 +135,7 @@ CHART_CODES = {
     "Home Energy Use by Device":      "EU.2",
     "Annual kWh by Device":           "EU.3",
     "Annual Gas by Device":           "EU.4",
+    "HVAC Monthly Energy":            "EU.7",
     "Energy Mix Timeline":            "EU.6",
     "Electric CAGR Projection":       "R.1",
     "Gas CAGR Projection":            "R.2",
@@ -2076,6 +2078,65 @@ def make_panel_load_timeline(df, model, n):
     return fig
 
 
+def make_hvac_monthly(df, model, n, home="journey"):
+    """EU.7 · Monthly HVAC energy for the planned HVAC-swap year — heating (bottom)
+    + cooling (top) stacked by month. Do-nothing gas heating is shown in kWh-equivalent
+    (29.3 kWh/therm); electric heating/cooling is kWh as-is. Cooling omitted when absent."""
+    _M = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    hobj = model.journey_home if home == "journey" else model.baseline_home
+
+    # Compare both homes at the same calendar year: the journey HVAC swap year.
+    jslot = next((s for s in model.journey_home.slots if s.name == "HVAC"), None)
+    swap_year = getattr(jslot, "swap_year", None)
+    year_idx = max(0, min((swap_year - 1) if swap_year else (n - 1), n - 1))
+    cal_year = model.sim_start_year + year_idx
+
+    fig = _new_fig(wide=False)
+    ax = fig.add_subplot(111)
+    slot = next((s for s in hobj.slots if s.name == "HVAC"), None)
+    if slot is None:
+        ax.text(0.5, 0.5, "No HVAC slot", ha="center", va="center",
+                transform=ax.transAxes, color=_CC_TICK)
+        return fig
+
+    # Active HVAC device(s) for this home at that year (mirrors DeviceSlot.step logic).
+    if home == "baseline" or slot.swap_year is None or (year_idx + 1) < slot.swap_year:
+        active = list(slot.baseline_devices)
+    else:
+        active = [slot.electric_device] if slot.electric_device else []
+
+    prev = model.climate.current_year          # read the chosen year, then restore
+    model.climate.advance_to(year_idx)
+    heating = np.zeros(12); cooling = np.zeros(12)
+    for dev in active:
+        if dev is None:
+            continue
+        f = KWH_PER_THERM if dev.fuel_type == "gas" else 1.0   # gas → kWh-equivalent
+        if hasattr(dev, "monthly_heating"):
+            heating += np.asarray(dev.monthly_heating(), dtype=float) * f
+        if hasattr(dev, "monthly_cooling"):
+            cooling += np.asarray(dev.monthly_cooling(), dtype=float) * f
+    model.climate.advance_to(prev)
+
+    x = np.arange(12)
+    ax.bar(x, heating, color="#E2603A", label="Heating")
+    if cooling.sum() > 0:
+        ax.bar(x, cooling, bottom=heating, color="#4A90D9", label="Cooling")
+    ax.set_xticks(x); ax.set_xticklabels(_M, fontsize=7)
+    ax.set_ylabel("kWh-equivalent")
+    label = "Your journey" if home == "journey" else "Do nothing"
+    ax.set_title(f"HVAC monthly energy — {label}, {cal_year}",
+                 fontsize=11, fontweight="bold")
+    if heating.sum() + cooling.sum() > 0:
+        ax.legend(fontsize=8, framealpha=0.85)
+    else:
+        ax.text(0.5, 0.5, "No HVAC energy\nthis year", ha="center", va="center",
+                transform=ax.transAxes, fontsize=11, color=_CC_TICK, style="italic")
+    _style(ax); fig.tight_layout()
+    return fig
+
+
 CHART_FNS = {
     "Cumulative Energy Costs":        make_cumulative_opex,
     "Estimated Electrical Load":      make_panel_load_timeline,
@@ -2090,6 +2151,7 @@ CHART_FNS = {
     "Annual kWh by Device":           make_annual_kwh,
     "Annual Gas by Device":           make_annual_gas,
     "Annual Gasoline by Vehicle":     make_annual_gasoline,
+    "HVAC Monthly Energy":            make_hvac_monthly,
     "Energy Mix Timeline":            make_energy_mix_timeline,
 }
 
@@ -2102,6 +2164,7 @@ _TOGGLE_CHART_NAMES = _DEVICE_CHART_NAMES | {
     "Annual kWh by Device",
     "Annual Gas by Device",
     "Annual Gasoline by Vehicle",
+    "HVAC Monthly Energy",
     "Energy Mix Timeline",
 }
 
@@ -2159,6 +2222,12 @@ def ChartPane(chart_name, model, df, n):
         with solara.Column(gap="4px"):
             _toggle_buttons(device_chart_home)
             fig = make_annual_gasoline(df, model, n, home=home)
+            solara.FigureMatplotlib(fig)
+    elif chart_name == "HVAC Monthly Energy":
+        home = device_chart_home.value
+        with solara.Column(gap="4px"):
+            _toggle_buttons(device_chart_home)
+            fig = make_hvac_monthly(df, model, n, home=home)
             solara.FigureMatplotlib(fig)
     elif chart_name == "Energy Mix Timeline":
         home = device_chart_home.value
