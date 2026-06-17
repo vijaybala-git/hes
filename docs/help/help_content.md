@@ -966,6 +966,11 @@ We use one reference weather station per CEC zone, at the latest available vinta
 (TMYx 2011-2025). The raw weather files are downloaded once and stored in the project with
 SHA-256 checksums, so the published numbers can never change unexpectedly.
 
+The ZIP-code-to-zone mapping itself is the California Energy Commission's official
+"Building Climate Zones by ZIP Code" table — roughly 2,700 California ZIP codes — snapshotted
+with a checksum alongside the weather files. A ZIP not found in the table falls back to CZ4
+(San Jose) with an on-screen notice.
+
 ### How we compute it
 
 Degree-days use the standard NOAA daily-mean definition at a 65°F base:

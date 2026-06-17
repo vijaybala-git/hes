@@ -123,6 +123,12 @@ def download_sources():
 
 
 ZONES_JSON = ROOT / "data" / "climate" / "tmy3_zones.json"
+ZIP_JSON = ROOT / "data" / "climate" / "zip_to_zone.json"
+FALLBACK_ZONE = "CA_CZ4"
+# Official CEC ZIP -> Building Climate Zone table (xlsx).
+CEC_ZIP_URL = ("https://www.energy.ca.gov/sites/default/files/2020-04/"
+               "BuildingClimateZonesByZIPCode_ada.xlsx")
+CEC_DIR = SOURCES / "cec"
 # Generated table fragment for the "Climate Data" help page (included via @include).
 DOC_FRAGMENT = ROOT / "docs" / "help" / "_generated" / "climate_zones_table.md"
 _MID_DOY = np.array([15, 46, 74, 105, 135, 166, 196, 227, 258, 288, 319, 349])
@@ -227,15 +233,54 @@ def _write_doc_fragment(zones: dict):
     print(f"Wrote {DOC_FRAGMENT}")
 
 
+def build_zip_table():
+    """Snapshot the official CEC ZIP->Building-Climate-Zone xlsx -> zip_to_zone.json."""
+    import openpyxl
+    CEC_DIR.mkdir(parents=True, exist_ok=True)
+    data = _get(CEC_ZIP_URL)
+    snap = CEC_DIR / "BuildingClimateZonesByZIPCode_ada.xlsx"
+    snap.write_bytes(data)
+    sha = hashlib.sha256(data).hexdigest()
+
+    ws = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True).active
+    rows = list(ws.iter_rows(values_only=True))[1:]   # drop header ("Zip Code","Building CZ")
+
+    mapping, skipped = {}, 0
+    for zc, cz in rows:
+        try:
+            zip5, czi = str(int(zc)).zfill(5), int(cz)
+        except (TypeError, ValueError):
+            skipped += 1; continue
+        if not 1 <= czi <= 16:
+            skipped += 1; continue
+        mapping[zip5] = f"CA_CZ{czi}"
+
+    out = {"_meta": {
+        "status": f"Official CEC Building Climate Zones by ZIP Code ({len(mapping)} ZIPs).",
+        "source_url": CEC_ZIP_URL,
+        "source_file": snap.name,
+        "sha256": sha,
+        "extracted": str(date.today()),
+        "fallback_zone": FALLBACK_ZONE,
+        "note": "Keys beginning with '_' are metadata; values are zone keys into tmy3_zones.json.",
+    }}
+    out.update({z: mapping[z] for z in sorted(mapping)})
+    ZIP_JSON.write_text(json.dumps(out, indent=0), encoding="utf-8")
+    print(f"Wrote {ZIP_JSON}: {len(mapping)} ZIPs (skipped {skipped}); sha {sha[:12]}…")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--download", action="store_true", help="fetch + snapshot the 16 EPW sources")
     ap.add_argument("--build-zones", action="store_true", help="parse snapshots -> tmy3_zones.json")
+    ap.add_argument("--build-zips", action="store_true", help="CEC xlsx -> zip_to_zone.json")
     args = ap.parse_args()
     if args.download:
         download_sources()
     elif args.build_zones:
         build_zones()
+    elif args.build_zips:
+        build_zip_table()
     else:
         ap.print_help()
         sys.exit(1)

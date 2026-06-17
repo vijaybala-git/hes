@@ -55,6 +55,7 @@
     <h2 id="where-it-comes-from">Where it comes from</h2>
     <p>The weather data is the TMYx series from climate.onebuilding.org, the standard public repository for building-energy weather files, maintained by the authors of the EnergyPlus weather format. A TMYx file is a Typical Meteorological Year synthesized from NOAA's Integrated Surface Database (ISD) of hourly observations, using the industry-standard Sandia method. It represents a typical year — a long-run average — not any single anomalous year.</p>
 <p>We use one reference weather station per CEC zone, at the latest available vintage (TMYx 2011-2025). The raw weather files are downloaded once and stored in the project with SHA-256 checksums, so the published numbers can never change unexpectedly.</p>
+<p>The ZIP-code-to-zone mapping itself is the California Energy Commission's official "Building Climate Zones by ZIP Code" table — roughly 2,700 California ZIP codes — snapshotted with a checksum alongside the weather files. A ZIP not found in the table falls back to CZ4 (San Jose) with an on-screen notice.</p>
 
     <h2 id="how-we-compute-it">How we compute it</h2>
     <p>Degree-days use the standard NOAA daily-mean definition at a 65°F base:</p>
