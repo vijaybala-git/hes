@@ -106,6 +106,13 @@ HELP_POPUPS: dict[str, tuple[str, str]] = {
         " but are real and quantified by official sources.",
         "social_cost.html",
     ),
+    "climate_data": (
+        "WhyWatt's heating and cooling estimates are driven by real local climate"
+        " data — monthly heating and cooling degree-days for your CEC Building"
+        " Climate Zone, derived from NOAA weather records. This Technical"
+        " Reference documents exactly what we use and how.",
+        "climate_data.html",
+    ),
 
     # ── Chart title bars (stable — not from help_content.md) ─────────────────
     "chart_jc1": (
@@ -163,10 +170,10 @@ HELP_POPUPS: dict[str, tuple[str, str]] = {
         "Cumulative Energy Costs": "chart_jc2",
         "Annual Cost by Year": "chart_jc1",
         "Cost Breakdown by Category": "chart_jc4",
-        "Home Energy Cost by Device": "chart_jc4",
+        "Cost by Device": "chart_jc4",
         "Summary": "chart_jc3",
         "ACC Rate Projection": "chart_r2",
-        "Home Energy Use by Device": "chart_eu2",
+        "Energy Use by Device": "chart_eu2",
     },
 
 }

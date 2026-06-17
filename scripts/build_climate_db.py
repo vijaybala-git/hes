@@ -123,6 +123,8 @@ def download_sources():
 
 
 ZONES_JSON = ROOT / "data" / "climate" / "tmy3_zones.json"
+# Generated table fragment for the "Climate Data" help page (included via @include).
+DOC_FRAGMENT = ROOT / "docs" / "help" / "_generated" / "climate_zones_table.md"
 _MID_DOY = np.array([15, 46, 74, 105, 135, 166, 196, 227, 258, 288, 319, 349])
 
 # Provisional trend CAGRs — uniform placeholder until Step 1d replaces them with per-zone
@@ -199,10 +201,30 @@ def build_zones():
         summary.append((info["zone_id"], info["reference_city"],
                         out[zone_key]["annual_hdd_65f"], out[zone_key]["annual_cdd_65f"]))
     ZONES_JSON.write_text(json.dumps(out, indent=2), encoding="utf-8")
+    _write_doc_fragment(out)
     print(f"Wrote {ZONES_JSON} ({len(summary)} zones)\n")
     print(f"{'Zone':5} {'City':14} {'HDD':>6} {'CDD':>6}")
     for zid, city, h, c in summary:
         print(f"{zid:5} {city:14} {h:6d} {c:6d}")
+
+
+def _write_doc_fragment(zones: dict):
+    """Emit the 16-zone summary as a 4-space-indented (pre-formatted) help fragment.
+
+    Included by docs/help/help_content.md via `@include:`; regenerated on every build so
+    the Climate Data help page can never drift from data/climate/tmy3_zones.json.
+    """
+    rows = [(r["zone_id"], r["reference_city"], r["tmy3_station"],
+             r["annual_hdd_65f"], r["annual_cdd_65f"])
+            for k, r in zones.items() if not k.startswith("_")]
+    L = ["    Generated from data/climate/tmy3_zones.json by scripts/build_climate_db.py — do not edit by hand.",
+         f"    Source: OneBuilding {VINTAGE} · daily-mean degree-days, base 65°F · built {date.today()}",
+         "    " + "-" * 56,
+         f"    {'Zone':5} {'Reference city':16} {'Stn':7} {'HDD':>5} {'CDD':>5}"]
+    L += [f"    {z:5} {c:16} {w:7} {h:5d} {d:5d}" for z, c, w, h, d in rows]
+    DOC_FRAGMENT.parent.mkdir(parents=True, exist_ok=True)
+    DOC_FRAGMENT.write_text("\n".join(L) + "\n", encoding="utf-8")
+    print(f"Wrote {DOC_FRAGMENT}")
 
 
 def main():

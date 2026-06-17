@@ -934,3 +934,69 @@ not predictions.
 
 Developed with support from the Electrification Collaboration (ECHo) —
 helping California communities make the switch.
+
+## §16 · Climate Data
+@file: climate_data.html
+@keys: climate_data
+@popup: WhyWatt's heating and cooling estimates are driven by real local climate data —
+  monthly heating and cooling degree-days for your CEC Building Climate Zone, derived from
+  NOAA weather records. This Technical Reference documents exactly what we use and how.
+
+### What data we use
+
+Your home's heating and cooling energy depends heavily on local climate. WhyWatt looks up
+your ZIP code, finds your California Energy Commission (CEC) Building Climate Zone, and uses
+that zone's monthly climate profile to drive the HVAC and water-heater calculations.
+
+For each of the 16 CEC zones we store three monthly profiles — one value per calendar month:
+
+- Heating Degree-Days (HDD, base 65°F) — how cold the winters are
+- Cooling Degree-Days (CDD, base 65°F) — how hot the summers are
+- Cold-water inlet temperature — how much the water heater must warm incoming water
+
+### Where it comes from
+
+The weather data is the TMYx series from climate.onebuilding.org, the standard public
+repository for building-energy weather files, maintained by the authors of the EnergyPlus
+weather format. A TMYx file is a Typical Meteorological Year synthesized from NOAA's
+Integrated Surface Database (ISD) of hourly observations, using the industry-standard Sandia
+method. It represents a typical year — a long-run average — not any single anomalous year.
+
+We use one reference weather station per CEC zone, at the latest available vintage
+(TMYx 2011-2025). The raw weather files are downloaded once and stored in the project with
+SHA-256 checksums, so the published numbers can never change unexpectedly.
+
+### How we compute it
+
+Degree-days use the standard NOAA daily-mean definition at a 65°F base:
+
+    For each day:  HDD = max(0, 65 - daily_mean_°F)
+                   CDD = max(0, daily_mean_°F - 65)
+    Monthly value = sum over that month's days
+
+Cold-water inlet temperature uses the Burch & Christensen (2007) correlation — the same model
+used by NREL's BEopt and ResStock — driven by each site's annual mean air temperature and its
+seasonal range.
+
+### The 16 climate zones
+
+@include: _generated/climate_zones_table.md
+
+### A note on accuracy
+
+These are typical-year averages, not a forecast for any specific year. Real weather varies — a
+cold snap or heat wave pushes a single year above or below these figures. For a long-run cost
+comparison, which is what WhyWatt models, typical-year climate is the right basis, and it is
+the same class of data used by Title 24 energy-code compliance tools.
+
+One consequence worth noting: a hot inland zone can have fewer heating degree-days than a mild
+coastal one. Fresno, for example, has hotter summers but a shorter heating season than San
+Jose, so it shows lower HDD and far higher CDD.
+
+### Climate trend
+
+WhyWatt can optionally layer a multi-decade warming trend on top of the static climate (the
+Climate Trend control in the Home Profile). The trend gently lowers heating and raises cooling
+each year across the modeled period. The current trend rates are provisional placeholders; a
+future update will replace them with zone-specific projections from Cal-Adapt, California's
+official climate-projection dataset.

@@ -136,8 +136,20 @@ def parse_md(path: Path) -> list[HelpSection]:
 
         popup = " ".join(popup_lines).strip()
 
-        # Parse ### subsections from body_start onward
-        body_lines = lines[body_start:]
+        # Parse ### subsections from body_start onward.
+        # Expand `@include: <path>` directives (path relative to docs/help/) so generated
+        # fragments — e.g. the climate zone table from build_climate_db.py — splice in.
+        body_lines = []
+        for bl in lines[body_start:]:
+            s = bl.strip()
+            if s.startswith("@include:"):
+                inc = path.parent / s[len("@include:"):].strip()
+                if inc.exists():
+                    body_lines.extend(inc.read_text(encoding="utf-8").splitlines())
+                else:
+                    print(f"  WARN: @include not found: {inc}", file=sys.stderr)
+            else:
+                body_lines.append(bl)
         subsections: list[tuple[str, str]] = []
         current_heading = ""
         current_body: list[str] = []
