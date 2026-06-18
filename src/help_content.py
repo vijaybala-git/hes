@@ -113,6 +113,13 @@ HELP_POPUPS: dict[str, tuple[str, str]] = {
         " Reference documents exactly what we use and how.",
         "climate_data.html",
     ),
+    "rates_reference": (
+        "WhyWatt prices your bills off your actual utility's residential rate —"
+        " not a statewide average — using federal EIA data. This Technical"
+        " Reference documents the sources, the effective-rate method, and the per-"
+        " utility numbers we use.",
+        "rates_reference.html",
+    ),
 
     # ── Chart title bars (stable — not from help_content.md) ─────────────────
     "chart_jc1": (

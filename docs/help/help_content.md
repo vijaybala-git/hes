@@ -1021,3 +1021,86 @@ the trend off and reproduces the static typical-year climate exactly. As with th
 files, the raw Cal-Adapt series are snapshotted in the project for reproducibility.
 
 @include: _generated/climate_trend_table.md
+
+## §17 · Technical Reference — Electricity & Gas Rates
+@file: rates_reference.html
+@keys: rates_reference
+@popup: WhyWatt prices your bills off your actual utility's residential rate — not a
+  statewide average — using federal EIA data. This Technical Reference documents the
+  sources, the effective-rate method, and the per-utility numbers we use.
+
+### What rates we use
+
+Your long-term cost depends on the price you pay per unit of energy. WhyWatt looks up your
+utility from your ZIP code and prices electricity and natural gas off that utility's own
+residential rate. A Pacific Gas & Electric home is priced at PG&E's rate, a Southern
+California Edison home at SCE's — not a blended California average that mixes in cheaper
+municipal utilities.
+
+We store one residential rate per utility, per fuel:
+
+- Electricity — dollars per kilowatt-hour ($/kWh)
+- Natural gas — dollars per therm ($/therm)
+
+### Where it comes from
+
+The rates are from the U.S. Energy Information Administration (EIA), the federal statistical
+agency for energy. Two authoritative datasets are used, each snapshotted in the project with
+SHA-256 checksums so the published numbers can never change unexpectedly:
+
+- Electricity — Form EIA-861M, the monthly utility report. We use each utility's residential
+  revenue and sales for the base year.
+- Natural gas — Form EIA-176, the annual report of every gas distribution company, queried
+  through EIA's public NGQS system. We use each company's residential revenue and volume.
+
+Both are residential-sector only, and the rate basis is the full base year (2024).
+
+### How we compute the rate — the effective rate
+
+Rather than copying a single line from a tariff sheet, we compute the effective rate that
+households actually pay: total residential revenue divided by total residential energy.
+
+    Electricity:  $/kWh   = residential revenue ($) ÷ residential sales (kWh)
+    Natural gas:  $/therm  = residential revenue ($) ÷ residential volume (therms)
+                  (gas volume is reported in Mcf; 1 Mcf = 10.37 therms)
+
+This matters: the effective rate folds in fixed monthly service charges, tier structures, and
+riders that a quoted commodity rate leaves out. For PG&E gas, the effective rate is about
+$2.32/therm — higher than the commodity tariff alone — because it includes the fixed charge
+every customer pays. The effective rate is the honest "what shows up on the bill."
+
+### Per-utility rates vs. the statewide average
+
+@include: _generated/rate_tables.md
+
+The spread is large and one-directional for our primary audience: a PG&E customer pays about
+24% more for electricity and 25% more for gas than the California blend. Using the statewide
+average would understate a Bay Area bill substantially. That is why per-utility is the default
+and the statewide average is only a fallback.
+
+### Default, fallback, and manual override
+
+WhyWatt resolves your utility from your ZIP code automatically. If the ZIP cannot be matched
+to a known utility — an unlisted municipal utility, or a ZIP that maps to several utilities
+with no clear choice — it falls back to the California statewide average and says so on screen.
+You can always pick a utility manually or enter your own rate from a recent bill.
+
+### How rates grow over time
+
+The base-year rate is escalated into the future using a compound annual growth rate (CAGR)
+fitted to the last decade of EIA history for that state — roughly 7%/year for both fuels in
+California. You can override this with the conservative / moderate / stress escalation
+scenarios or your own percentage; the base year and source data stay the same.
+
+### A note on seasonality and accuracy
+
+WhyWatt applies a single rate across all twelve months. Seasonal swings in your bill come from
+seasonal energy use — more heating in winter, more cooling in summer — which the simulation
+already models month by month. We deliberately do not also vary the price by month: the raw
+monthly effective rate is distorted by tiered pricing and billing true-ups, and layering it on
+top of seasonal consumption would double-count the same effect. A future version may add a
+clean seasonal price shape for natural gas.
+
+These are real, recent, utility-specific rates from federal data — a substantial improvement
+over a single hand-entered number — but they are an annual average, not your exact tariff. For
+a precise bill, use the manual override with figures from your own statement.

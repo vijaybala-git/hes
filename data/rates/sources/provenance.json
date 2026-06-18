@@ -1,0 +1,20 @@
+{
+  "eia861m_sales_ult_cust_2024.xlsx": {
+    "url": "https://www.eia.gov/electricity/data/eia861m/archive/xls/sales_ult_cust_2024.xlsx",
+    "sha256": "bdcd1164b00dd70a09b83b753d45766ea2a92c5385feb30268217312c210379f",
+    "bytes": 1493780,
+    "downloaded": "2026-06-17"
+  },
+  "eia861m_sales_revenue.xlsx": {
+    "url": "https://www.eia.gov/electricity/data/eia861m/xls/sales_revenue.xlsx",
+    "sha256": "c6e9cfe9fbf18a49f24892375ee694624b5483002f2cb32dfcc3aaf8f554a3f8",
+    "bytes": 2225537,
+    "downloaded": "2026-06-17"
+  },
+  "eia176_ngqs_rpc_2014_2024.json": {
+    "url": "https://www.eia.gov/naturalgas/ngqs/data/report/RPC/data/2014/2024/ACI/all/1010VL/1010CS",
+    "sha256": "d8d4114a4ad90f5649c826d88925ee22a2a7fa4fd443cc3520bb473b18ded32e",
+    "bytes": 796335,
+    "downloaded": "2026-06-17"
+  }
+}

@@ -1,0 +1,228 @@
+{
+  "electric_utilities": {
+    "14328": {
+      "name": "Pacific Gas & Electric",
+      "state": "CA",
+      "unit": "$/kWh",
+      "base_year": 2024,
+      "current_rate": 0.3962,
+      "historical_cagr_10yr": 0.0686,
+      "monthly_seasonal_shape": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "shape_method": "flat",
+      "source": "EIA-861M 2024 (revenue \u00f7 sales)"
+    },
+    "17609": {
+      "name": "Southern California Edison",
+      "state": "CA",
+      "unit": "$/kWh",
+      "base_year": 2024,
+      "current_rate": 0.3243,
+      "historical_cagr_10yr": 0.0686,
+      "monthly_seasonal_shape": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "shape_method": "flat",
+      "source": "EIA-861M 2024 (revenue \u00f7 sales)"
+    },
+    "16609": {
+      "name": "San Diego Gas & Electric",
+      "state": "CA",
+      "unit": "$/kWh",
+      "base_year": 2024,
+      "current_rate": 0.4363,
+      "historical_cagr_10yr": 0.0686,
+      "monthly_seasonal_shape": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "shape_method": "flat",
+      "source": "EIA-861M 2024 (revenue \u00f7 sales)"
+    }
+  },
+  "gas_ldcs": {
+    "17610617": {
+      "name": "Pacific Gas & Electric",
+      "state": "CA",
+      "unit": "$/therm",
+      "base_year": 2024,
+      "current_rate": 2.3147,
+      "historical_cagr_10yr": 0.0741,
+      "monthly_seasonal_shape": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "shape_method": "flat",
+      "source": "EIA-176/NGQS 2024 (revenue \u00f7 volume)"
+    },
+    "17621931": {
+      "name": "Southern California Gas",
+      "state": "CA",
+      "unit": "$/therm",
+      "base_year": 2024,
+      "current_rate": 1.5174,
+      "historical_cagr_10yr": 0.0674,
+      "monthly_seasonal_shape": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "shape_method": "flat",
+      "source": "EIA-176/NGQS 2024 (revenue \u00f7 volume)"
+    },
+    "17611927": {
+      "name": "San Diego Gas & Electric",
+      "state": "CA",
+      "unit": "$/therm",
+      "base_year": 2024,
+      "current_rate": 1.9253,
+      "historical_cagr_10yr": 0.0723,
+      "monthly_seasonal_shape": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "shape_method": "flat",
+      "source": "EIA-176/NGQS 2024 (revenue \u00f7 volume)"
+    }
+  },
+  "state_average": {
+    "CA": {
+      "label": "California",
+      "electricity": {
+        "unit": "$/kWh",
+        "base_year": 2024,
+        "current_rate": 0.3197,
+        "historical_cagr_10yr": 0.0686,
+        "monthly_seasonal_shape": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "shape_method": "flat",
+        "source": "EIA-861M 2024 state aggregate"
+      },
+      "gas": {
+        "unit": "$/therm",
+        "base_year": 2024,
+        "current_rate": 1.8459,
+        "historical_cagr_10yr": 0.0698,
+        "monthly_seasonal_shape": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "shape_method": "flat",
+        "source": "EIA-176/NGQS 2024 state total"
+      }
+    }
+  },
+  "_meta": {
+    "schema_version": 1,
+    "base_year": 2024,
+    "built": "2026-06-17",
+    "shape_method": "flat \u2014 seasonal variation comes from consumption; per-LDC gas shaping from EIA NG-Monthly is a deferred enhancement (S2.0 spike)",
+    "effective_rate_method": "residential revenue \u00f7 residential sales (elec) / volume (gas)",
+    "mcf_to_therm": 10.37,
+    "sources": {
+      "eia861m_sales_ult_cust_2024.xlsx": {
+        "url": "https://www.eia.gov/electricity/data/eia861m/archive/xls/sales_ult_cust_2024.xlsx",
+        "sha256": "bdcd1164b00dd70a09b83b753d45766ea2a92c5385feb30268217312c210379f",
+        "bytes": 1493780,
+        "downloaded": "2026-06-17"
+      },
+      "eia861m_sales_revenue.xlsx": {
+        "url": "https://www.eia.gov/electricity/data/eia861m/xls/sales_revenue.xlsx",
+        "sha256": "c6e9cfe9fbf18a49f24892375ee694624b5483002f2cb32dfcc3aaf8f554a3f8",
+        "bytes": 2225537,
+        "downloaded": "2026-06-17"
+      },
+      "eia176_ngqs_rpc_2014_2024.json": {
+        "url": "https://www.eia.gov/naturalgas/ngqs/data/report/RPC/data/2014/2024/ACI/all/1010VL/1010CS",
+        "sha256": "d8d4114a4ad90f5649c826d88925ee22a2a7fa4fd443cc3520bb473b18ded32e",
+        "bytes": 796335,
+        "downloaded": "2026-06-17"
+      }
+    },
+    "note": "Keys '_meta' aside: electric_utilities keyed by EIA-861 utility number; gas_ldcs by EIA-176 company id; state_average is the ZIP-unresolved fallback."
+  }
+}

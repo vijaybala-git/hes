@@ -20,6 +20,7 @@ from climate_loader import ClimateLoader
 from social_cost import SocialCostConfig
 from journey import JourneyHome, DeviceSlot, CapExOnlySlot, CATEGORY_ORDER, CATEGORY_LABELS, SolarBatteryConfig
 from rate_loader import RateLoader, ACCRateLoader
+from rate_resolver import RateResolver
 from devices.physics  import GasFurnace, HeatPumpHVAC, GasWaterHeater, HeatPumpWaterHeater, CentralAC
 from devices.seasonal import GasDryer, HeatPumpDryer, GasCooktop, InductionCooktop, LightsAndPlugs
 from devices.schedule import EVCharger, PhysicsEVCharger
@@ -29,6 +30,10 @@ _DATA = Path(__file__).parent.parent / "data"
 
 # One ZIP->zone climate loader for the whole process (reads the two committed JSON files).
 _CLIMATE_LOADER = ClimateLoader()
+
+# One ZIP->utility rate resolver for the whole process (Phase 4 §2).
+_RATE_RESOLVER = RateResolver()
+_DEFAULT_RATE_STATE = "CA"
 
 
 SCENARIO_PRESETS = {
@@ -60,11 +65,15 @@ DEVICE_ACC_CATEGORY: dict[str, str] = {
 _ELEC_ACC_CATEGORIES = ["hpwh", "hvac_heat", "hvac_cool", "ev", "baseload", "flat"]
 
 
-def _make_loader(base_rl: RateLoader, rate_model: str) -> object:
-    """Return ACCRateLoader for ACC models; base RateLoader for CAGR flat."""
+def _make_loader(base_rl: RateLoader, rate_model: str, fuel: str, fuel_res) -> object:
+    """Return ACCRateLoader for ACC models (PG&E/CPUC base, unchanged); otherwise the
+    EIA per-utility loader resolved from the ZIP, falling back to the state average when
+    the ZIP didn't resolve to a utility we price (Phase 4 §2)."""
     if rate_model in ("acc_shaped", "acc_seasonal"):
         return ACCRateLoader(base_rl)
-    return base_rl
+    if fuel_res.utility_id is not None:
+        return RateLoader.from_eia_utility(fuel_res.utility_id, fuel)
+    return RateLoader.from_eia_state(_DEFAULT_RATE_STATE, fuel)
 
 
 def _cagr_for(rate_model: str, cagr: float) -> float | None:
@@ -303,6 +312,8 @@ class HESModel(mesa.Model):
                  # §3.13 Wave 3 — external (public/workplace) EV charging price model
                  external_ev_price_per_kwh:         float = 0.25,
                  external_ev_escalation_pct:        float = 0.03,  # annual fractional change
+                 # §2 rate source: "auto" (per-utility from ZIP) | "ca_average"
+                 rate_source: str = "auto",
                  # §23 rate model selections — stored, wired when ACCRateLoader is added
                  elec_rate_model_a: str = "cagr_flat",
                  gas_rate_model_a:  str = "cagr_flat",
@@ -407,10 +418,18 @@ class HESModel(mesa.Model):
         device_kw = dict(climate=self.climate,
                          ua=ua, hw_gallons=hw_gallons, baseload_kwh=baseload_before)
 
+        # ── Rate resolution (Phase 4 §2): ZIP → utility, drives per-utility pricing ──
+        # rl (PG&E/CPUC base) is retained for ACC modes; the non-ACC path prices off the
+        # resolved EIA utility (or the CA average when the ZIP didn't resolve).
+        self.rate_source = rate_source
+        self.rate_resolution = _RATE_RESOLVER.resolve(home_config.zip_code, source=rate_source)
+
         # ── Rate arrays — Scenario A ──────────────────────────────────────────
         rl = RateLoader()
-        elec_loader_a = _make_loader(rl, elec_rate_model_a)
-        gas_loader_a  = _make_loader(rl, gas_rate_model_a)
+        elec_loader_a = _make_loader(rl, elec_rate_model_a, "electricity",
+                                     self.rate_resolution.electricity)
+        gas_loader_a  = _make_loader(rl, gas_rate_model_a, "gas",
+                                     self.rate_resolution.gas)
 
         # CAGR mode uses user slider; ACC mode uses acc_cagr slider (ignores CAGR slider)
         elec_cagr_a_eff = acc_elec_cagr_a if elec_rate_model_a == "acc_shaped"  else _cagr_for(elec_rate_model_a, elec_cagr_a)
@@ -468,8 +487,10 @@ class HESModel(mesa.Model):
 
         # ── Scenario B (lazy — only when comparison_mode=True) ────────────────
         if comparison_mode:
-            elec_loader_b = _make_loader(rl, elec_rate_model_b)
-            gas_loader_b  = _make_loader(rl, gas_rate_model_b)
+            elec_loader_b = _make_loader(rl, elec_rate_model_b, "electricity",
+                                         self.rate_resolution.electricity)
+            gas_loader_b  = _make_loader(rl, gas_rate_model_b, "gas",
+                                         self.rate_resolution.gas)
 
             elec_cagr_b_eff = acc_elec_cagr_b if elec_rate_model_b == "acc_shaped"  else _cagr_for(elec_rate_model_b, elec_cagr_b)
             gas_cagr_b_eff  = acc_gas_cagr_b  if gas_rate_model_b  == "acc_seasonal" else _cagr_for(gas_rate_model_b,  gas_cagr_b)

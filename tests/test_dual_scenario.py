@@ -115,10 +115,15 @@ def test_stress_baseline_exceeds_moderate_baseline():
     baseline_home_b (stress) must accumulate more opex than baseline_home (moderate).
     """
     from model import HESModel
+    # Pin BOTH scenarios to the same rate model so the comparison isolates the scenario
+    # CAGR (moderate vs stress). With mixed default models (A=cagr_flat/EIA, B=acc_shaped/
+    # PG&E) the bases differ and the scenario effect is confounded (Phase 4 §2).
     m = HESModel(n_years=20,
                  scenario_a="moderate",
                  scenario_b="stress",
-                 comparison_mode=True)
+                 comparison_mode=True,
+                 elec_rate_model_a="cagr_flat", elec_rate_model_b="cagr_flat",
+                 gas_rate_model_a="cagr_flat", gas_rate_model_b="cagr_flat")
     m.run_all()
     assert m.baseline_home_b.cumulative_opex > m.baseline_home.cumulative_opex, (
         f"Stress baseline {m.baseline_home_b.cumulative_opex:.0f} should exceed "
@@ -129,10 +134,12 @@ def test_stress_baseline_exceeds_moderate_baseline():
 def test_stress_elec_rate_exceeds_moderate_elec_rate():
     """Scenario B (stress) electricity rates must exceed Scenario A (moderate) at year 20."""
     from model import HESModel
+    # Same rate model on both scenarios so the scenario CAGR (not the rate source) drives it.
     m = HESModel(n_years=20,
                  scenario_a="moderate",
                  scenario_b="stress",
-                 comparison_mode=True)
+                 comparison_mode=True,
+                 elec_rate_model_a="cagr_flat", elec_rate_model_b="cagr_flat")
     m.run_all()
     df = m.datacollector.get_model_vars_dataframe()
     assert df["Elec Rate B"].iloc[-1] > df["Elec Rate"].iloc[-1]

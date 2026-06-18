@@ -16,6 +16,7 @@ from matplotlib.figure import Figure
 from model import HESModel
 from home_config import HomeConfig, compute_baseload_kwh
 from climate_loader import ClimateLoader, TREND_SCENARIOS
+from rate_resolver import RateResolver
 from journey import CATEGORY_ORDER, CATEGORY_LABELS, CapExOnlySlot, SolarBatteryConfig
 from ui.device_style import DEVICE_STYLE, DEVICE_ORDER, dstyle, device_legend_handles
 from panel_assessor import PanelAssessor
@@ -352,6 +353,7 @@ _DEFAULTS = {
     "solar_system_cost":     30000,
     "solar_rebate":          0,
     # Pricing
+    "rate_source":            "auto",
     "elec_rate_model_a":      "cagr_flat",
     "elec_cagr_pct_a":        7,
     "acc_elec_cagr_a":        7,
@@ -556,6 +558,7 @@ device_chart_home = solara.reactive("journey")   # "journey" | "baseline"
 acc_shape_year = solara.reactive(1)
 
 # Pricing & timeline
+rate_source       = solara.reactive("auto")        # §2: "auto" (ZIP utility) | "ca_average"
 elec_rate_model_a = solara.reactive("cagr_flat")   # "cagr_flat" | "acc_shaped"
 elec_cagr_pct_a   = solara.reactive(7)
 acc_elec_cagr_a   = solara.reactive(7)            # base escalation used when acc_shaped
@@ -722,6 +725,7 @@ def reset_to_defaults():
     solar_nbc.set(_DEFAULTS["solar_nbc"])
     solar_system_cost.set(_DEFAULTS["solar_system_cost"])
     solar_rebate.set(_DEFAULTS["solar_rebate"])
+    rate_source.set(_DEFAULTS["rate_source"])
     elec_rate_model_a.set(_DEFAULTS["elec_rate_model_a"])
     elec_cagr_pct_a.set(_DEFAULTS["elec_cagr_pct_a"])
     acc_elec_cagr_a.set(_DEFAULTS["acc_elec_cagr_a"])
@@ -988,6 +992,38 @@ def _climate_info(zipcode: str, trend: str):
     return _APP_CLIMATE_LOADER.get_climate(zipcode, n_years=1, trend_scenario=trend)
 
 
+# ── Rate resolution (ZIP → electric utility + gas LDC), Phase 4 §2 ──────────────
+
+_APP_RATE_RESOLVER = RateResolver()
+
+
+@functools.lru_cache(maxsize=256)
+def _rate_info(zipcode: str, source: str):
+    """Resolve a ZIP to its electric utility + gas LDC for display. Cached; local JSON."""
+    return _APP_RATE_RESOLVER.resolve(zipcode, source=source)
+
+
+def _utility_line(fr) -> str:
+    """One-row HTML for a resolved fuel: icon + utility name + provenance badge."""
+    icon = "⚡" if fr.fuel == "electricity" else "🔥"
+    color = C_RATE_ELEC if fr.fuel == "electricity" else C_RATE_GAS
+    if fr.provenance == "inferred":
+        badge = ("<span style='font-size:0.72em; color:#B26A00; background:#FFF3E0;"
+                 " border-radius:3px; padding:1px 5px; margin-left:6px'>≈ estimated from area</span>")
+    elif fr.provenance == "fallback":
+        badge = ("<span style='font-size:0.72em; color:#9A4D00; background:#FFE0B2;"
+                 " border-radius:3px; padding:1px 5px; margin-left:6px'>⚠ utility not found — CA avg</span>")
+    elif fr.provenance == "selected":
+        badge = ("<span style='font-size:0.72em; color:#546E7A; background:#ECEFF1;"
+                 " border-radius:3px; padding:1px 5px; margin-left:6px'>statewide</span>")
+    else:
+        badge = ""
+    return (f"<div style='display:flex; align-items:baseline; font-size:0.84em;"
+            f" padding:2px 0 2px 4px;'>"
+            f"<span style='color:{color}; margin-right:6px'>{icon}</span>"
+            f"<strong style='color:#263238'>{fr.name}</strong>{badge}</div>")
+
+
 # ── Simulation runner ──────────────────────────────────────────────────────────
 
 def run_simulation():
@@ -1064,6 +1100,7 @@ def run_simulation():
         elec_cagr_b=elec_cagr_pct_b.value / 100.0,
         comparison_mode=comparison_mode.value,
         sim_start_year=sim_start_year.value,
+        rate_source=rate_source.value,
         slot_configs=_build_slot_configs(),
         capex_only_slots=capex_slots or None,
         solar_config=solar_cfg,
@@ -3364,9 +3401,22 @@ def RatesSummaryCard():
     # ── Card 2: Home Energy Prices (electricity + gas) ────────────────────────
     with solara.Column(classes=["device"]):
         _hd("Home Energy Prices")
+        # ── Rate source (§2): per-utility (from ZIP) vs CA statewide average ──
+        _model_toggle("Source", rate_source,
+                      [("auto", "My utility"), ("ca_average", "CA average")], "#3F51B5")
+        # Resolved utility — picked from ZIP (or statewide), w/ fallback/inferred badge.
+        _ri = _rate_info(zip_code.value, rate_source.value)
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            f"<div style='font-size:0.74em; font-weight:600; color:#607D8B;"
+            f" margin:6px 0 1px 0'>Your utility (ZIP {zip_code.value})</div>"
+            + _utility_line(_ri.electricity) + _utility_line(_ri.gas)
+            + f"<div style='font-size:0.70em; color:#90A4AE; margin:3px 0 0 4px'>"
+            f"{_APP_RATE_RESOLVER.data_vintage}<br>EIA historical escalation: "
+            f"⚡{_ri.electricity.cagr*100:.1f}% · 🔥{_ri.gas.cagr*100:.1f}%/yr</div>"
+        ))
         solara.HTML(tag="div", unsafe_innerHTML=(
             f"<div style='font-size:0.78em; font-weight:600; color:{C_RATE_ELEC};"
-            " margin-bottom:2px; margin-top:4px'>⚡ Electricity Rate Model</div>"
+            " margin-bottom:2px; margin-top:8px'>⚡ Electricity Rate Model</div>"
         ))
         with solara.Row(gap="6px", style="align-items:center; flex-wrap:wrap"):
             _model_toggle("⚡", elec_rate_model_a,

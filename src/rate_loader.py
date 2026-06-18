@@ -11,6 +11,7 @@ ACCRateLoader wraps a RateLoader and applies ACC shape factors:
 Revenue-neutral: a flat (uniform) device profile returns the same annual cost as
 the base RateLoader — devices that run off-peak cost less, peak devices cost more.
 """
+import functools
 import json
 from pathlib import Path
 
@@ -23,15 +24,60 @@ _FUEL_FILES = {
     "gas":         "pge_gas_g1.json",
 }
 
+_EIA_RATES_FILE = _RATES_DIR / "eia_rates_by_utility.json"
+
 _VALID_SCENARIOS = {"conservative", "moderate", "stress"}
+
+
+@functools.lru_cache(maxsize=1)
+def _eia_db() -> dict:
+    """The committed EIA per-utility rate database (Phase 4 §2). Cached."""
+    with open(_EIA_RATES_FILE, encoding="utf-8") as f:
+        return json.load(f)
 
 
 class RateLoader:
     def __init__(self):
         self._data: dict[str, dict] = {}
+        # Per-fuel monthly seasonal shape. PG&E/CPUC loaders are flat (×1); the EIA
+        # factories may carry a real shape. Applied in get_annual_monthly_rates.
+        self._seasonal_shape: dict[str, np.ndarray] = {}
         for fuel, filename in _FUEL_FILES.items():
             with open(_RATES_DIR / filename, encoding="utf-8") as f:
                 self._data[fuel] = json.load(f)
+            self._seasonal_shape[fuel] = np.ones(12)
+
+    # ── EIA per-utility factories (Phase 4 §2.6) ────────────────────────────────
+    @classmethod
+    def from_eia_utility(cls, util_id: str, fuel: str) -> "RateLoader":
+        """Build a loader from a resolved EIA utility/LDC id (revenue-÷-sales rate)."""
+        key = "electric_utilities" if fuel == "electricity" else "gas_ldcs"
+        return cls._from_eia_record(fuel, _eia_db()[key][str(util_id)])
+
+    @classmethod
+    def from_eia_state(cls, state: str, fuel: str) -> "RateLoader":
+        """Build a loader from the statewide-average EIA series (ZIP-unresolved fallback)."""
+        return cls._from_eia_record(fuel, _eia_db()["state_average"][state][fuel])
+
+    @classmethod
+    def _from_eia_record(cls, fuel: str, rec: dict) -> "RateLoader":
+        self = cls.__new__(cls)
+        self._data = {}
+        self._seasonal_shape = {}
+        cagr = float(rec["historical_cagr_10yr"])
+        # No historical periods — the 2024 base is projected forward for every sim year.
+        # The named scenarios all map to the EIA historical CAGR; the user CAGR slider
+        # still overrides via custom_cagr (§2.2).
+        self._data[fuel] = {
+            "periods": [],
+            "projection": {
+                "base_rate": float(rec["current_rate"]),
+                "base_year": int(rec["base_year"]),
+                "cagr_conservative": cagr, "cagr_moderate": cagr, "cagr_stress": cagr,
+            },
+        }
+        self._seasonal_shape[fuel] = np.asarray(rec["monthly_seasonal_shape"], dtype=float)
+        return self
 
     def _fuel_data(self, fuel: str) -> dict:
         if fuel not in self._data:
@@ -83,11 +129,13 @@ class RateLoader:
             raise ValueError(
                 f"Unknown scenario: {scenario!r}. Expected one of {sorted(_VALID_SCENARIOS)!r}."
             )
+        shape = self._seasonal_shape.get(fuel, np.ones(12))
         rates = np.empty((n_years, 12), dtype=float)
         for yr_idx in range(n_years):
             year = sim_start_year + yr_idx
             for mo in range(1, 13):
-                rates[yr_idx, mo - 1] = self.get_rate(fuel, year, mo, scenario, custom_cagr)
+                rates[yr_idx, mo - 1] = (
+                    self.get_rate(fuel, year, mo, scenario, custom_cagr) * shape[mo - 1])
         return rates
 
 

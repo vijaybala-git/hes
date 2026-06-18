@@ -610,6 +610,104 @@ non-linear step. Not required for the per-utility base-rate accuracy delivered h
 - [ ] Disambiguation when a ZIP maps to multiple IOUs (not just IOU-vs-muni) — pick highest-load, or prompt? (Recommendation: highest residential sales, then allow manual override.)
 - [ ] Refresh cadence for the snapshot — annually after EIA-176 release (~Nov)? (Recommendation: yes, re-run both build scripts each Nov and commit.)
 
+§2 execution plan — EIA-Based Rate Modeling
+S2.0 — Data spike + acquisition (do first; gates everything)
+The one unverified assumption from our research: that EIA-861M actually carries per-utility monthly residential rows for PG&E/SCE/SDG&E. Verify before building on it.
+
+Spike: download EIA-861M 2024, confirm PG&E (eiaid 14328), SCE (17609), SDG&E (16609) each have monthly residential revenue + sales. If monthly per-utility is thinner than hoped, fall back to EIA-861 annual base + state monthly shape for electric too (degrade gracefully, documented).
+Acquire & snapshot (raw + sha256 under data/rates/sources/, mirroring climate sources):
+OpenEI "ZIP Code Look-up (2024)" CSV → electric zip→eiaid
+EIA-861M / 861 (2024) → electric per-utility effective rate + monthly shape
+EIA-176 (2024) → gas per-LDC annual effective rate
+EIA Natural Gas Monthly (CA state) → gas monthly seasonal shape
+Acceptance: raw files snapshotted with checksums; spike note recorded.
+S2.1 — Build scripts (offline, mirror build_climate_db.py)
+scripts/build_eia_rates.py --states CA → data/rates/eia_rates_by_utility.json (the §2.5 schema: electric_utilities / gas_ldcs / state_average). Computes current_rate, historical_cagr_10yr, monthly_seasonal_shape per the spec.
+scripts/build_zip_utility_map.py --states CA → data/rates/zip_to_electric_utility.json + data/rates/zip_to_gas_ldc.json.
+Known hard bit: there's no clean national zip→gas-LDC source. For CA it's ~3 LDCs (PG&E / SoCalGas / SDG&E) — assemble from county/ZIP-prefix territory, committed as a small reviewed table.
+Acceptance: running both scripts reproduces the committed JSON; 94103→PG&E (both fuels), a SoCalGas ZIP (e.g. 90001)→SCE electric + SoCalGas gas.
+S2.2 — Rate loader (the one design decision)
+Add EIA sourcing to rate_loader.py. Recommendation: extend RateLoader with from_eia_utility(util_id, fuel) / from_eia_state(state, fuel) classmethods (per §2.6) rather than a new sibling class — they populate the existing projection block (base_rate=2024 current_rate, cagr=historical_cagr_10yr) plus a new _seasonal_shape[fuel] vector, so get_annual_monthly_rates becomes base × (1+cagr)^yr × shape[m]. Keeps one class, the existing scenario/custom_cagr machinery, and the ACC wrapper all intact.
+
+Acceptance: a flat shape reproduces today's behavior; PG&E loader returns 2024-anchored seasonal rates.
+S2.3 — ZIP→source resolver (mirror ClimateLoader.resolve_zone)
+New RateSourceResolver: resolve(zip, source_choice) → (elec_id|None, gas_id|None, provenance) with per-fuel CA-average fallback and a fallback flag for the UI. Reads only committed JSON.
+Acceptance: unknown ZIP → CA average + fallback flag; multi-utility ZIP → fallback (or highest-load pick — open question in §2.9).
+S2.4 — Model wiring (replace the cagr_flat path)
+In HESModel.__init__, resolve rate sources from home_config.zip_code + a new rate_source selection, building elec/gas loaders via the factories. Retire the hardcoded-PG&E cagr_flat default; keep acc_shaped/acc_seasonal untouched.
+Store provenance on the model for the UI.
+Acceptance: existing dual-scenario + ACC tests still pass; default run now prices off PG&E EIA 2024.
+S2.5 — App UI (the elec_rate_model_a selector + labels)
+Replace the cagr_flat entry with "My utility (from ZIP)" (default) and "California average (EIA)"; update _elec_rate_label/_gas_rate_label.
+Add the resolved-provider line, the transparent fallback message, and the "EIA data: 2024" vintage label (§2.7). Keep CAGR slider (seeded from EIA) + manual override.
+Acceptance: verify in the running app (preview workflow) that switching ZIP updates the resolved utility and fallback note.
+S2.6 — Tests + help docs
+Extend tests/test_rate_loader.py: EIA factories, seasonal shape, state fallback; new tests/test_rate_resolver.py for ZIP→source + fallback.
+Update scripts/build_help.py content for the new rate-source model.
+Acceptance: full pytest green; grep -r MMBtu still clean (hard rule #1).
+
+### S2.0 Results — Data spike (completed 2026-06-17)
+
+**Verdict: ✅ green for both fuels.** Per-utility monthly/annual residential data exists,
+is materially more accurate than the statewide blend, and points the same direction for
+our PG&E audience. Plan proceeds unchanged; one shape-handling refinement logged below.
+
+**Electricity — 2024 annual residential effective rate (revenue ÷ sales), $/kWh**
+
+| Source | $/kWh | vs CA blend |
+|--------|------:|------------:|
+| **PG&E** (eiaid 14328) | **0.396** | **+24%** |
+| SCE (17609) | 0.324 | +1% |
+| SDG&E (16609) | 0.436 | +36% |
+| CA blend (fallback) | 0.320 | — |
+
+**Gas — 2024 residential effective rate (revenue ÷ volume), $/therm** (1 Mcf = 10.37 therms)
+
+| LDC | EIA-176 id | $/therm | vs CA blend |
+|-----|-----------|--------:|------------:|
+| **PG&E** (PACIFIC GAS) | 17610617 | **2.32** | **+25%** |
+| SoCalGas (S. CALIFORNIA GAS) | 17621931 | 1.52 | −18% |
+| SDG&E (SAN DIEGO G&E) | 17611927 | 1.93 | +4% |
+| CA blend (fallback) | — | 1.85 | — |
+
+**Key findings**
+- **Per-utility matters on both fuels.** The blend understates a PG&E customer by ~24%
+  (electric) and ~25% (gas). Our Bay Area / PG&E primary audience pays the high end of
+  *both* — per-utility resolution is substantive, not cosmetic.
+- **Effective rate captures fixed charges.** PG&E gas effective $2.32/therm > the Phase 2
+  hardcoded G-1 tariff ($2.08) because revenue÷volume folds in the fixed monthly service
+  charge a commodity rate alone misses. This is the more honest "what households pay."
+- **Cross-checks passed.** EIA-176 CA gas blend ($1.846/therm) ≈ independent dnav CA
+  monthly series mean ($1.833/therm), within ~1%.
+- **Separate keyspaces confirmed.** Gas LDC ids (PG&E 17610617) ≠ electric eiaids
+  (PG&E 14328) → `gas_ldcs` stays separate from `electric_utilities`, and gas needs its
+  own `zip→LDC` map (as planned in §2.4).
+
+**Shape decision (revises §2.3 "electric monthly shape comes cleanly from 861M")**
+- **Electric monthly effective shape is noisy** (PG&E 0.77–1.45, SDG&E Oct spike 1.53×) —
+  it embeds tiered-pricing + billing true-ups, not pure price seasonality. Because the model
+  **already applies seasonal consumption**, multiplying by this shape would **double-count**
+  tier seasonality. → **Decision:** use the per-utility **annual** effective rate as the base;
+  make the electric monthly shape **flat or multi-year-smoothed** (finalize in S2.1), not the
+  raw single-year revenue÷sales ratio.
+- **Gas monthly shape is well-behaved** (CA state series 0.91–1.10) → borrow the CA state
+  monthly shape over each LDC's annual base as planned; the double-count concern is mild.
+
+**Acquisition specifics handed to S2.1 (`build_eia_rates.py`)**
+- *Electric per-utility:* `sales_ult_cust_<year>.xlsx`, sheet `Sales Ultimate Cust. -States`,
+  `header=2`; residential cols at index 7/8/9 = Revenue (k$) / Sales (MWh) / Customers.
+  State fallback: `sales_revenue.xlsx`, sheet `Monthly-States`.
+- *Gas per-LDC (cleaner than the NG Annual xls):* NGQS JSON API, no token —
+  `https://www.eia.gov/naturalgas/ngqs/data/report/RPC/data/2024/2024/ACI/all/1010VL/1010CS`
+  (volume `1010VL` Mcf, revenue `1010CS` $); company names via report `RP6`.
+- Both raw sources to be snapshotted with sha256 under `data/rates/sources/`.
+
+**New Help deliverable (added to S2.6):** a **"Technical Reference: Electricity & Gas Rates"**
+HTML page, surfaced as its own link under Help (mirroring the Climate Data reference page).
+Documents the EIA sources, the revenue÷sales / revenue÷volume effective-rate method, the
+per-utility-vs-blend numbers above, the Mcf→therm conversion, and the shape-handling decision.
+
+
 ## §3 — Transportation: ICE & Electric Vehicles
 
 ### 3.1 Motivation
