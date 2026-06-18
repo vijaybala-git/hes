@@ -353,7 +353,6 @@ _DEFAULTS = {
     "solar_system_cost":     30000,
     "solar_rebate":          0,
     # Pricing
-    "rate_source":            "auto",
     "elec_rate_model_a":      "cagr_flat",
     "elec_cagr_pct_a":        7,
     "acc_elec_cagr_a":        7,
@@ -558,11 +557,13 @@ device_chart_home = solara.reactive("journey")   # "journey" | "baseline"
 acc_shape_year = solara.reactive(1)
 
 # Pricing & timeline
-rate_source       = solara.reactive("auto")        # §2: "auto" (ZIP utility) | "ca_average"
-elec_rate_model_a = solara.reactive("cagr_flat")   # "cagr_flat" | "acc_shaped"
+# §2 per-fuel rate model — "cagr_flat" (= My Utility, EIA per-utility from ZIP) |
+# "ca_average" (EIA statewide) | "acc_shaped"/"acc_seasonal" (ACC). The CAGR slider applies
+# to both EIA modes and is seeded from each utility's EIA historical CAGR (see EnergyPrices).
+elec_rate_model_a = solara.reactive("cagr_flat")
 elec_cagr_pct_a   = solara.reactive(7)
 acc_elec_cagr_a   = solara.reactive(7)            # base escalation used when acc_shaped
-gas_rate_model_a  = solara.reactive("cagr_flat")   # "cagr_flat" | "acc_seasonal"
+gas_rate_model_a  = solara.reactive("cagr_flat")
 gas_cagr_pct_a    = solara.reactive(8)
 acc_gas_cagr_a    = solara.reactive(8)             # base escalation used when acc_seasonal
 comparison_mode   = solara.reactive(False)
@@ -725,7 +726,6 @@ def reset_to_defaults():
     solar_nbc.set(_DEFAULTS["solar_nbc"])
     solar_system_cost.set(_DEFAULTS["solar_system_cost"])
     solar_rebate.set(_DEFAULTS["solar_rebate"])
-    rate_source.set(_DEFAULTS["rate_source"])
     elec_rate_model_a.set(_DEFAULTS["elec_rate_model_a"])
     elec_cagr_pct_a.set(_DEFAULTS["elec_cagr_pct_a"])
     acc_elec_cagr_a.set(_DEFAULTS["acc_elec_cagr_a"])
@@ -1024,6 +1024,57 @@ def _utility_line(fr) -> str:
             f"<strong style='color:#263238'>{fr.name}</strong>{badge}</div>")
 
 
+_PROV_BADGE = {  # provenance -> (text, fg, bg)
+    "inferred": ("≈ estimated from area", "#B26A00", "#FFF3E0"),
+    "fallback": ("⚠ utility not found — CA avg", "#9A4D00", "#FFE0B2"),
+    "selected": ("statewide", "#546E7A", "#ECEFF1"),
+    "acc":      ("ACC shape", "#546E7A", "#ECEFF1"),
+}
+
+
+def _rate_line_html(fuel: str, name: str, provenance: str, cagr_pct=None) -> str:
+    """Resolved-rate line: icon + name + provenance badge + right-aligned CAGR."""
+    icon = "⚡" if fuel == "electricity" else "🔥"
+    color = C_RATE_ELEC if fuel == "electricity" else C_RATE_GAS
+    badge = ""
+    if provenance in _PROV_BADGE:
+        t, fg, bg = _PROV_BADGE[provenance]
+        badge = (f"<span style='font-size:0.72em; color:{fg}; background:{bg};"
+                 f" border-radius:3px; padding:1px 5px; margin-left:6px'>{t}</span>")
+    cagr = ("" if cagr_pct is None else
+            f"<span style='margin-left:auto; color:#546E7A; font-size:0.82em'>+{cagr_pct}%/yr</span>")
+    return (f"<div style='display:flex; align-items:baseline; font-size:0.84em;"
+            f" padding:2px 0 2px 4px;'>"
+            f"<span style='color:{color}; margin-right:6px'>{icon}</span>"
+            f"<strong style='color:#263238'>{name}</strong>{badge}{cagr}</div>")
+
+
+def _fuel_resolved_display(fuel: str, mode: str, cagr_pct: int, acc_cagr_pct: int,
+                           ri_auto, ri_ca) -> tuple[str, str, int]:
+    """(name, provenance, cagr) for a fuel given its selected rate mode."""
+    fr_auto = ri_auto.electricity if fuel == "electricity" else ri_auto.gas
+    if mode in ("acc_shaped", "acc_seasonal"):
+        return "PG&E CPUC base", "acc", acc_cagr_pct
+    if mode == "ca_average":
+        return "California average", "selected", cagr_pct
+    return fr_auto.name, fr_auto.provenance, cagr_pct          # cagr_flat = My Utility
+
+
+def _seed_eia_cagr():
+    """Seed the per-fuel CAGR sliders from each utility's EIA historical CAGR (the JSON
+    default), for the two EIA modes (both scenarios). Re-seeds on ZIP/mode change; manual
+    edits persist until the context changes. ACC modes keep their own base-escalation slider."""
+    pairs = [(elec_rate_model_a, elec_cagr_pct_a, "electricity"),
+             (gas_rate_model_a,  gas_cagr_pct_a,  "gas"),
+             (elec_rate_model_b, elec_cagr_pct_b, "electricity"),
+             (gas_rate_model_b,  gas_cagr_pct_b,  "gas")]
+    for mode_rv, cagr_rv, fuel in pairs:
+        if mode_rv.value in ("cagr_flat", "ca_average"):
+            src = "ca_average" if mode_rv.value == "ca_average" else "auto"
+            fr = getattr(_rate_info(zip_code.value, src), fuel)
+            cagr_rv.set(round(fr.cagr * 100))
+
+
 # ── Simulation runner ──────────────────────────────────────────────────────────
 
 def run_simulation():
@@ -1100,7 +1151,6 @@ def run_simulation():
         elec_cagr_b=elec_cagr_pct_b.value / 100.0,
         comparison_mode=comparison_mode.value,
         sim_start_year=sim_start_year.value,
-        rate_source=rate_source.value,
         slot_configs=_build_slot_configs(),
         capex_only_slots=capex_slots or None,
         solar_config=solar_cfg,
@@ -1342,12 +1392,16 @@ def make_capex(df, model, n):
 # Chart 5 — Electric CAGR Projection
 def _elec_rate_label(model_str: str, cagr_pct: int, suffix: str = "") -> str:
     if model_str == "cagr_flat":
-        return f"Elec +{cagr_pct}%/yr{suffix}"
+        return f"Elec (my utility) +{cagr_pct}%/yr{suffix}"
+    if model_str == "ca_average":
+        return f"Elec (CA avg) +{cagr_pct}%/yr{suffix}"
     return f"Electricity ACC-shaped{suffix}"
 
 def _gas_rate_label(model_str: str, cagr_pct: int, suffix: str = "") -> str:
     if model_str == "cagr_flat":
-        return f"Gas +{cagr_pct}%/yr{suffix}"
+        return f"Gas (my utility) +{cagr_pct}%/yr{suffix}"
+    if model_str == "ca_average":
+        return f"Gas (CA avg) +{cagr_pct}%/yr{suffix}"
     return f"Gas ACC seasonal{suffix}"
 
 
@@ -3370,8 +3424,10 @@ def _model_toggle(label: str, rv, options: list, color: str):
 def RatesSummaryCard():
     """Energy & Prices summary (§3.8) — three balance-matched sub-cards:
     Model Timeline · Home Energy Prices · External Energy Price."""
-    elec_model = elec_rate_model_a.value
-    gas_model  = gas_rate_model_a.value
+    # Seed the CAGR sliders from each utility's EIA historical CAGR (re-runs on ZIP/mode change).
+    solara.use_effect(_seed_eia_cagr,
+                      [zip_code.value, elec_rate_model_a.value, gas_rate_model_a.value,
+                       elec_rate_model_b.value, gas_rate_model_b.value])
 
     def _hd(title, show_help=False):
         """Sub-card header: rates icon + title + (optional help) + ⋮ detail opener."""
@@ -3398,46 +3454,30 @@ def RatesSummaryCard():
         _hd("Model Timeline", show_help=True)
         solara.SliderInt(f"⏱ Model: {years.value} yrs", value=years, min=5, max=30)
 
-    # ── Card 2: Home Energy Prices (electricity + gas) ────────────────────────
+    # ── Card 2: Home Energy Prices — per-fuel rate model (My Utility / CA Average / ACC) ──
     with solara.Column(classes=["device"]):
         _hd("Home Energy Prices")
-        # ── Rate source (§2): per-utility (from ZIP) vs CA statewide average ──
-        _model_toggle("Source", rate_source,
-                      [("auto", "My utility"), ("ca_average", "CA average")], "#3F51B5")
-        # Resolved utility — picked from ZIP (or statewide), w/ fallback/inferred badge.
-        _ri = _rate_info(zip_code.value, rate_source.value)
+        _ri_auto = _rate_info(zip_code.value, "auto")
+        _ri_ca   = _rate_info(zip_code.value, "ca_average")
+
+        def _picker(fuel, heading, color, mode_rv, options, cagr_pct, acc_cagr_pct):
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                f"<div style='font-size:0.78em; font-weight:600; color:{color};"
+                f" margin-bottom:2px; margin-top:8px'>{heading}</div>"))
+            _model_toggle("", mode_rv, options, color)
+            name, prov, cagr = _fuel_resolved_display(
+                fuel, mode_rv.value, cagr_pct, acc_cagr_pct, _ri_auto, _ri_ca)
+            solara.HTML(tag="div", unsafe_innerHTML=_rate_line_html(fuel, name, prov, cagr))
+
+        _picker("electricity", "⚡ Electricity Rate Model", C_RATE_ELEC, elec_rate_model_a,
+                [("cagr_flat", "My Utility"), ("ca_average", "CA Average"), ("acc_shaped", "ACC")],
+                elec_cagr_pct_a.value, acc_elec_cagr_a.value)
+        _picker("gas", "🔥 Gas Rate Model", C_RATE_GAS, gas_rate_model_a,
+                [("cagr_flat", "My Utility"), ("ca_average", "CA Average"), ("acc_seasonal", "ACC")],
+                gas_cagr_pct_a.value, acc_gas_cagr_a.value)
         solara.HTML(tag="div", unsafe_innerHTML=(
-            f"<div style='font-size:0.74em; font-weight:600; color:#607D8B;"
-            f" margin:6px 0 1px 0'>Your utility (ZIP {zip_code.value})</div>"
-            + _utility_line(_ri.electricity) + _utility_line(_ri.gas)
-            + f"<div style='font-size:0.70em; color:#90A4AE; margin:3px 0 0 4px'>"
-            f"{_APP_RATE_RESOLVER.data_vintage}<br>EIA historical escalation: "
-            f"⚡{_ri.electricity.cagr*100:.1f}% · 🔥{_ri.gas.cagr*100:.1f}%/yr</div>"
-        ))
-        solara.HTML(tag="div", unsafe_innerHTML=(
-            f"<div style='font-size:0.78em; font-weight:600; color:{C_RATE_ELEC};"
-            " margin-bottom:2px; margin-top:8px'>⚡ Electricity Rate Model</div>"
-        ))
-        with solara.Row(gap="6px", style="align-items:center; flex-wrap:wrap"):
-            _model_toggle("⚡", elec_rate_model_a,
-                          [("cagr_flat", "CAGR"), ("acc_shaped", "ACC")], C_RATE_ELEC)
-            if elec_model == "cagr_flat":
-                solara.HTML(tag="span", unsafe_innerHTML=(
-                    f"<span style='font-size:0.80em; color:#546E7A;'>"
-                    f"+{elec_cagr_pct_a.value}%/yr</span>"
-                ))
-        solara.HTML(tag="div", unsafe_innerHTML=(
-            f"<div style='font-size:0.78em; font-weight:600; color:{C_RATE_GAS};"
-            " margin-bottom:2px; margin-top:8px'>🔥 Gas Rate Model</div>"
-        ))
-        with solara.Row(gap="6px", style="align-items:center; flex-wrap:wrap"):
-            _model_toggle("🔥", gas_rate_model_a,
-                          [("cagr_flat", "CAGR"), ("acc_seasonal", "ACC")], C_RATE_GAS)
-            if gas_model == "cagr_flat":
-                solara.HTML(tag="span", unsafe_innerHTML=(
-                    f"<span style='font-size:0.80em; color:#546E7A;'>"
-                    f"+{gas_cagr_pct_a.value}%/yr</span>"
-                ))
+            f"<div style='font-size:0.68em; color:#90A4AE; margin:5px 0 0 4px'>"
+            f"{_APP_RATE_RESOLVER.data_vintage} · ZIP {zip_code.value}</div>"))
 
     # ── Card 3: External Energy Price (gasoline + external EV) ─────────────────
     gpr = gasoline_price.value
@@ -4305,10 +4345,11 @@ def SolarDetail(model):
             ))
 
 
-def _fuel_model_block(heading: str, color: str,
+def _fuel_model_block(fuel: str, heading: str, color: str,
                        model_rv, cagr_rv, acc_cagr_rv,
-                       model_options: list, cagr_max: int):
-    """Fuel rate model section: toggle buttons + conditional CAGR or ACC-base slider."""
+                       model_options: list, cagr_max: int, ri_auto, ri_ca):
+    """Fuel rate model section: 3-way mode toggle + resolved name line + the editable CAGR
+    slider (EIA modes, seeded from JSON) or the ACC base-escalation slider."""
     solara.HTML(tag="div", unsafe_innerHTML=(
         f"<div style='font-weight:600; font-size:0.84em; color:{color};"
         " margin:8px 0 4px'>" + heading + "</div>"
@@ -4327,9 +4368,13 @@ def _fuel_model_block(heading: str, color: str,
                     " border-radius:4px; padding:3px 10px; font-size:0.80em; cursor:pointer;"
                 ),
             )
-    if model_rv.value == "cagr_flat":
+    # Resolved utility for this fuel + mode (name + provenance badge).
+    _name, _prov, _ = _fuel_resolved_display(
+        fuel, model_rv.value, cagr_rv.value, acc_cagr_rv.value, ri_auto, ri_ca)
+    solara.HTML(tag="div", unsafe_innerHTML=_rate_line_html(fuel, _name, _prov, None))
+    if model_rv.value in ("cagr_flat", "ca_average"):
         solara.SliderInt(
-            f"+{cagr_rv.value}%/yr",
+            f"+{cagr_rv.value}%/yr  (EIA default — editable)",
             value=cagr_rv, min=0, max=cagr_max,
         )
     else:
@@ -4358,13 +4403,17 @@ def RatesDetail():
     ))
 
     # ── Scenario A — electricity + gas (scenario-split) ───────────────────────
+    _ri_auto = _rate_info(zip_code.value, "auto")
+    _ri_ca   = _rate_info(zip_code.value, "ca_average")
     _DS("Scenario A")
-    _fuel_model_block("⚡ Electricity Rate Model", C_RATE_ELEC,
+    _fuel_model_block("electricity", "⚡ Electricity Rate Model", C_RATE_ELEC,
                        elec_rate_model_a, elec_cagr_pct_a, acc_elec_cagr_a,
-                       [("cagr_flat", "CAGR Flat"), ("acc_shaped", "ACC-Shaped")], 15)
-    _fuel_model_block("🔥 Gas Rate Model", C_RATE_GAS,
+                       [("cagr_flat", "My Utility"), ("ca_average", "CA Average"),
+                        ("acc_shaped", "ACC")], 15, _ri_auto, _ri_ca)
+    _fuel_model_block("gas", "🔥 Gas Rate Model", C_RATE_GAS,
                        gas_rate_model_a, gas_cagr_pct_a, acc_gas_cagr_a,
-                       [("cagr_flat", "CAGR Flat"), ("acc_seasonal", "ACC Seasonal")], 20)
+                       [("cagr_flat", "My Utility"), ("ca_average", "CA Average"),
+                        ("acc_seasonal", "ACC")], 20, _ri_auto, _ri_ca)
 
     # ── Shared transport fuels (NOT scenario-split) ───────────────────────────
     solara.HTML(tag="div", unsafe_innerHTML=(
@@ -4402,12 +4451,14 @@ def RatesDetail():
             "Transport fuels are shared (not split).</div>"
         ))
         _DS("Scenario B  (dashed lines)")
-        _fuel_model_block("⚡ Electricity Rate Model", C_RATE_ELEC,
+        _fuel_model_block("electricity", "⚡ Electricity Rate Model", C_RATE_ELEC,
                            elec_rate_model_b, elec_cagr_pct_b, acc_elec_cagr_b,
-                           [("cagr_flat", "CAGR Flat"), ("acc_shaped", "ACC-Shaped")], 15)
-        _fuel_model_block("🔥 Gas Rate Model", C_RATE_GAS,
+                           [("cagr_flat", "My Utility"), ("ca_average", "CA Average"),
+                            ("acc_shaped", "ACC")], 15, _ri_auto, _ri_ca)
+        _fuel_model_block("gas", "🔥 Gas Rate Model", C_RATE_GAS,
                            gas_rate_model_b, gas_cagr_pct_b, acc_gas_cagr_b,
-                           [("cagr_flat", "CAGR Flat"), ("acc_seasonal", "ACC Seasonal")], 20)
+                           [("cagr_flat", "My Utility"), ("ca_average", "CA Average"),
+                            ("acc_seasonal", "ACC")], 20, _ri_auto, _ri_ca)
 
 
 # ── §25 Summary panel components ─────────────────────────────────────────────

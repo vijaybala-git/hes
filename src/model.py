@@ -66,11 +66,16 @@ _ELEC_ACC_CATEGORIES = ["hpwh", "hvac_heat", "hvac_cool", "ev", "baseload", "fla
 
 
 def _make_loader(base_rl: RateLoader, rate_model: str, fuel: str, fuel_res) -> object:
-    """Return ACCRateLoader for ACC models (PG&E/CPUC base, unchanged); otherwise the
-    EIA per-utility loader resolved from the ZIP, falling back to the state average when
-    the ZIP didn't resolve to a utility we price (Phase 4 §2)."""
+    """Phase 4 §2 — three rate modes (per fuel):
+      - "acc_shaped"/"acc_seasonal"  → ACCRateLoader (PG&E/CPUC base, unchanged)
+      - "ca_average"                 → EIA statewide-average series
+      - "cagr_flat" (= "My Utility") → EIA per-utility from ZIP, falling back to the state
+                                       average when the ZIP didn't resolve to a priced utility
+    """
     if rate_model in ("acc_shaped", "acc_seasonal"):
         return ACCRateLoader(base_rl)
+    if rate_model == "ca_average":
+        return RateLoader.from_eia_state(_DEFAULT_RATE_STATE, fuel)
     if fuel_res.utility_id is not None:
         return RateLoader.from_eia_utility(fuel_res.utility_id, fuel)
     return RateLoader.from_eia_state(_DEFAULT_RATE_STATE, fuel)
@@ -78,7 +83,7 @@ def _make_loader(base_rl: RateLoader, rate_model: str, fuel: str, fuel_res) -> o
 
 def _cagr_for(rate_model: str, cagr: float) -> float | None:
     """Return cagr when CAGR model selected; None for ACC (ignores user CAGR)."""
-    return cagr if rate_model == "cagr_flat" else None
+    return cagr if rate_model in ("cagr_flat", "ca_average") else None
 
 
 def _build_elec_rates_by_class(acc_loader: ACCRateLoader,
@@ -312,9 +317,8 @@ class HESModel(mesa.Model):
                  # §3.13 Wave 3 — external (public/workplace) EV charging price model
                  external_ev_price_per_kwh:         float = 0.25,
                  external_ev_escalation_pct:        float = 0.03,  # annual fractional change
-                 # §2 rate source: "auto" (per-utility from ZIP) | "ca_average"
-                 rate_source: str = "auto",
-                 # §23 rate model selections — stored, wired when ACCRateLoader is added
+                 # §2 per-fuel rate model: "cagr_flat" (= My Utility, EIA per-utility from
+                 # ZIP) | "ca_average" (EIA statewide) | "acc_shaped"/"acc_seasonal" (ACC).
                  elec_rate_model_a: str = "cagr_flat",
                  gas_rate_model_a:  str = "cagr_flat",
                  elec_rate_model_b: str = "acc_shaped",
@@ -421,8 +425,9 @@ class HESModel(mesa.Model):
         # ── Rate resolution (Phase 4 §2): ZIP → utility, drives per-utility pricing ──
         # rl (PG&E/CPUC base) is retained for ACC modes; the non-ACC path prices off the
         # resolved EIA utility (or the CA average when the ZIP didn't resolve).
-        self.rate_source = rate_source
-        self.rate_resolution = _RATE_RESOLVER.resolve(home_config.zip_code, source=rate_source)
+        # Per-utility resolution (used by "My Utility" mode + UI display). "ca_average"
+        # mode prices off the statewide series directly in _make_loader.
+        self.rate_resolution = _RATE_RESOLVER.resolve(home_config.zip_code, source="auto")
 
         # ── Rate arrays — Scenario A ──────────────────────────────────────────
         rl = RateLoader()

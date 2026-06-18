@@ -19,6 +19,10 @@ import numpy as np
 
 _RATES_DIR = Path(__file__).parent.parent / "data" / "rates"
 
+# TODO(Phase 4 cleanup): the hardcoded PG&E/CPUC rate files below are no longer used as a
+# primary rate source — the EIA per-utility / CA-average modes replaced the old "CAGR" option
+# in the UI (Phase 4 §2). They are now consumed ONLY as the base for ACCRateLoader. Once the
+# ACC base is re-sourced (or ACC retired), remove these files and the default __init__ path.
 _FUEL_FILES = {
     "electricity": "pge_elec_e1.json",
     "gas":         "pge_gas_g1.json",
