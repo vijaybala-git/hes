@@ -111,3 +111,106 @@ After **every** move:
 - Land all pending Phase 4 work on `main` first (after a few more tests).
 - Do Phase 4.5 on a dedicated branch (e.g. `phase4.5-app-split`), one commit per phase so any
   step is trivially reversible.
+
+---
+
+# Phase 4.5b — Configuration & Startup (externalized defaults)
+
+**Status:** 🔵 PLANNED — follows the app.py refactor; builds on the now-isolated `ui/state.py`.
+**Added:** 2026-06-18.
+
+## Motivation
+
+After the refactor, all reactive state lives in `ui/state.py`, but the defaults are still
+**hardcoded in two parallel places**: the `_DEFAULTS` dict (144 keys) *and* the reactive
+initial literals (`zip_code = solara.reactive("95112")`). They currently agree but are kept in
+sync by hand — any one-sided edit silently drifts. Beyond the cleanup, we want **configs that
+can be loaded at startup, swapped, shared, and re-loaded.**
+
+## Use cases (driving the design)
+
+1. **Startup** loads a base config (`whywatt_default`) so the app starts in a known state.
+2. **Developers ship alternate configs** — for a state, a city, a demo, or even a single
+   parameter changed — and a user loads one of them.
+3. A config can be **exported, shared, and re-loaded**, reproducing the same state.
+
+## Design principles
+
+- **Single source of truth** — reactives initialize *from* the loaded config; `_DEFAULTS` is
+  the loaded base, not a second hand-written copy.
+- **Self-describing, versioned** — every config (base and shared) carries `schema_version`
+  so it survives sharing across app builds.
+- **Load = REPLACE** (decided) — `effective = factory ⊕ config.values`; any key absent from
+  the config resets to factory. Deterministic and reproducible regardless of prior on-screen
+  state. (An "overlay/patch" mode may be added later, but is not the default.)
+- **Export** captures the current persistent reactives into a shareable config.
+- **Transient UI reactives are excluded** from configs/export: `setup_collapsed`,
+  `_panel_state`, `_baseload_state`, `hw_gallons_user_override`.
+
+## Config file format (JSON, versioned envelope)
+
+```json
+{
+  "schema_version": 1,
+  "name": "whywatt_default",
+  "description": "Factory defaults — San Jose / PG&E baseline",
+  "based_on": null,
+  "values": { "zip_code": "95112", "num_bedrooms": 3, "...": "...144 keys..." }
+}
+```
+
+- **Base** (`whywatt_default.json`): full `values`, `based_on: null`.
+- **Profile / shared config**: same envelope; `values` may be a **delta** (a few keys, e.g. a
+  city or single-parameter config) or a **full snapshot**. The loader treats both identically
+  because it always merges onto the factory base.
+
+## Loader API — `src/ui/config.py`
+
+```python
+FACTORY = "whywatt_default"
+CONFIG_DIR = <repo>/data/config
+
+def load_config(source) -> dict        # source = bundled name | file path | dict  (point 2 & 3)
+def factory_defaults() -> dict          # the base `values` (point 1)
+def merge(values) -> dict               # factory ⊕ values  (REPLACE semantics)
+def validate(cfg) -> list[str]          # unknown keys / type / range -> warnings (safe loads)
+def apply_config(cfg) -> None           # set reactives = merge(cfg["values"])    (point 2 & 3)
+def export_config(name, desc) -> dict   # snapshot current persistent reactives    (point 3)
+```
+
+`load_config` accepts **any source** (not just bundled names), so user-shared files load too.
+
+## `ui/state.py` becomes single-source
+
+```python
+from ui.config import factory_defaults
+_DEFAULTS = factory_defaults()                       # loaded once at import
+zip_code  = solara.reactive(_DEFAULTS["zip_code"])   # init FROM config, never a literal
+...
+def reset_to_defaults():  apply_config(factory)      # unchanged behavior
+```
+
+Add a **drift-proof test**: `assert set(_DEFAULTS) == {names of the resettable reactives}` —
+this *enforces* the single source of truth so the two can never silently diverge again.
+
+## Versioning (decided)
+
+- `schema_version` lives on the base file **and** every exported config.
+- Loader is tolerant: same version → load; older → fill missing keys from factory + warn;
+  unknown keys → ignore + warn. Shared configs therefore survive app upgrades.
+
+## Migration path (two layers)
+
+- **Layer 1 — cleanup (behavior-preserving, do first):** generate `whywatt_default.json` *from*
+  the current `_DEFAULTS` (identical values → zero behavior change), add `ui/config.py`
+  (`factory_defaults`, `merge`, `apply_config`), rewire `state.py` to init from it, add the
+  drift test. Verified with the same scan + preview discipline as Phase 4.5.
+- **Layer 2 — the feature (when ready):** add `load_config(any source)`, `export_config`,
+  `validate`, and the versioned envelope. The UI to pick/upload/share configs is deferred —
+  the architecture above already supports it.
+
+## Out of scope / deferred
+
+- UI for choosing/uploading/sharing configs (the data model supports it; the widget is later).
+- Moving option enumerations (`_CZ_OPTIONS`, `_BR_OPTIONS`, `CHART_OPTIONS`) into config —
+  optional follow-up; these are static valid-value lists, not user defaults.
