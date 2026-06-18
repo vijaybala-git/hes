@@ -23,6 +23,17 @@ from panel_assessor import PanelAssessor
 from social_cost import SocialCostConfig
 from help_utils import (HelpButton, ChartHelpButton, HelpPopupOverlay,
                         HelpLink)
+# Phase 4.5 — leaf modules (pure constants/functions; names unchanged for the body).
+from ui.theme import (  # noqa: F401
+    C_NAVY, C_SKY, C_RED, C_BASE, C_ELEC, C_RATE_ELEC, C_RATE_GAS,
+    _CC_J, _CC_B, _CC_GRID, _CC_TICK, _CC_SOLAR, CATEGORY_COLORS, CHART_OPTIONS, CHART_CODES,
+    _SLOT_COLORS, KWH_PER_THERM, KWH_PER_GALLON_GASOLINE, UA_MAP, _SLOT_DISPLAY_ORDER,
+    DEVICE_LABELS, DEVICE_COLORS, DEVICE_ALPHAS, _REDESIGN_CSS, _LAYOUT_V2_CSS)
+from ui.icons import (  # noqa: F401
+    _WHYWATT_ICON_SVG, _DEVICE_ICONS, _CARD_IC, _PANEL_IC, _DEVICE_HELP_KEY, _SOCIAL_IC)
+from ui.estimators import (  # noqa: F401
+    _est_gas_furnace, _est_hp_hvac_heating, _est_hp_hvac_cooling, _est_gas_wh, _est_hpwh,
+    _est_gas_dryer, _est_hp_dryer, _est_gas_cooktop, _est_induction, _est_ev_kwh, _kwh_eq)
 
 # ── Asset paths ───────────────────────────────────────────────────────────────
 _HERE         = os.path.dirname(os.path.abspath(__file__))
@@ -30,38 +41,6 @@ _ASSETS       = os.path.normpath(os.path.join(_HERE, "..", "docs", "assets"))
 _WHYWATT_LOGO = os.path.join(_ASSETS, "whywatt_logo.svg")
 _ECHO_LOGO    = os.path.join(_ASSETS, "echo_logo.svg")
 _ECHO_ICON    = os.path.join(_ASSETS, "echo_icon.svg")
-
-# Icon-only SVG extracted from whywatt_logo.svg paths (house + bar elements).
-# ViewBox crops to the icon area (x 0-88, y 0-92); fills turned white so the
-# icon renders cleanly on the .brand-mark gradient background.
-_WHYWATT_ICON_SVG = (
-    '<svg viewBox="0 0 88 92" xmlns="http://www.w3.org/2000/svg">'
-    '<path d="M8 84 L8 44 L44 8 L80 44 L80 84 Z"'
-    ' fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.85)"'
-    ' stroke-width="3.5" stroke-linejoin="round"/>'
-    '<rect x="30.973" y="44.513" width="8" height="18" rx="4" fill="#fff"/>'
-    '<rect x="49.895" y="47.27" width="8" height="13" rx="4" fill="#fff"/>'
-    '<path d="M40.487 67 L40.487 72 C43.154 75.333 45.82 75.333 48.487 72'
-    ' L48.487 67 Z" fill="#fff"/>'
-    '</svg>'
-)
-
-# ── Phase 3 redesign design system (injected once via solara.Style in Page) ─────
-_REDESIGN_CSS_PATH = os.path.join(_HERE, "styles_redesign.css")
-try:
-    with open(_REDESIGN_CSS_PATH, "r", encoding="utf-8") as _f:
-        _REDESIGN_CSS = _f.read()
-except OSError:
-    _REDESIGN_CSS = ""
-
-# ── v2 layout layer (cockpit, setup group + collapse, 2-row journey, split card) ─
-_LAYOUT_V2_CSS_PATH = os.path.join(_HERE, "layout_v2.css")
-try:
-    with open(_LAYOUT_V2_CSS_PATH, "r", encoding="utf-8") as _f:
-        _LAYOUT_V2_CSS = _f.read()
-except OSError:
-    _LAYOUT_V2_CSS = ""
-
 
 def _read_svg(path: str, height_px: int | None = None) -> str | None:
     """Return SVG content as a string, or None if file is missing.
@@ -80,135 +59,10 @@ def _read_svg(path: str, height_px: int | None = None) -> str | None:
     return content
 
 
-# ── Color palette ─────────────────────────────────────────────────────────────
-C_NAVY  = "#0D47A1"
-C_SKY   = "#50BDF8"
-C_RED   = "#D0302D"
-C_BASE  = C_RED
-C_ELEC  = C_NAVY
-# Rate model UI colors — distinct from journey Red/Blue
-C_RATE_ELEC = "#0288D1"   # light blue — electricity rate
-C_RATE_GAS  = "#E65100"   # deep orange — gas rate
-
-# ── Chart design tokens (D6 — design system series colors + transparent bg) ───
-_CC_J    = "#3B6FD4"   # journey series (design token)
-_CC_B    = "#D2785F"   # baseline series (design token)
-_CC_GRID = "#EBEDF1"
-_CC_TICK = "#5A6273"
-_CC_SOLAR = "#00897B"
-
-CATEGORY_COLORS = {
-    "Baseload":       ("#BDBDBD", "#BBDEFB"),
-    "WaterHeating":   ("#9E9E9E", C_SKY),
-    "HVAC_Cooling":   ("#757575", "#1E88E5"),
-    "HVAC_Heating":   ("#424242", C_NAVY),
-    "Transportation": ("#6D4C41", "#7B1FA2"),
-}
-
-CHART_OPTIONS = [
-    "Cumulative Energy Costs",
-    "Annual Cost by Year",
-    "Cost Breakdown by Category",
-    "Equipment Replacements (CapEx)",
-    "Estimated Electrical Load",
-    "Electric CAGR Projection",
-    "Gas CAGR Projection",
-    "ACC Rate Projection",
-    "Electricity Rate Shape",
-    "Journey Timeline",
-    "Home Energy Cost by Device",
-    "Home Energy Use by Device",
-    "Annual kWh by Device",
-    "Annual Gas by Device",
-    "HVAC Monthly Energy",
-    "Energy Mix Timeline",
-]
-
-# Reference codes shown in chart titles and headers — used in help files
-CHART_CODES = {
-    "Cumulative Energy Costs":        "JC.1",
-    "Annual Cost by Year":            "JC.2",
-    "Cost Breakdown by Category":     "JC.3",
-    "Equipment Replacements (CapEx)": "JC.4",
-    "Journey Timeline":               "JC.5",
-    "Estimated Electrical Load":      "JC.6",
-    "Home Energy Cost by Device":     "EU.1",
-    "Home Energy Use by Device":      "EU.2",
-    "Annual kWh by Device":           "EU.3",
-    "Annual Gas by Device":           "EU.4",
-    "HVAC Monthly Energy":            "EU.7",
-    "Energy Mix Timeline":            "EU.6",
-    "Electric CAGR Projection":       "R.1",
-    "Gas CAGR Projection":            "R.2",
-    "ACC Rate Projection":            "R.3",
-    "Electricity Rate Shape":         "R.4",
-}
-
-# Per-slot color palette (consistent across EU.3 / EU.4 / cost charts)
-_SLOT_COLORS = {
-    "HVAC":                  "#1565C0",
-    "Water Heater":          "#0288D1",
-    "Dryer":                 "#D32F2F",
-    "Cooktop":               "#F57C00",
-    "EV Charger":            "#388E3C",
-    "Transportation":        "#C0392B",
-    "EV Driving":            "#388E3C",
-    "Lights and Appliances": "#78909C",
-}
-
-KWH_PER_THERM = 29.3
-KWH_PER_GALLON_GASOLINE = 33.7   # EPA energy content of gasoline (MPGe basis), display only
-
-UA_MAP = {"poor": 650, "average": 500, "good": 350}
-
-
-# ── Display-only consumption estimators (not used in simulation) ──────────────
-
-def _est_gas_furnace(afue: float, ua: int, annual_hdd: int = 1910) -> float:
-    return annual_hdd * 24 * ua / (afue * 100_000)
-
-def _est_hp_hvac_heating(cop: float, ua: int, annual_hdd: int = 1910) -> float:
-    return annual_hdd * 24 * ua / (cop * 3412)
-
-def _est_hp_hvac_cooling(seer: float, ua: int, annual_cdd: int = 340) -> float:
-    return annual_cdd * 24 * ua / (seer * 1000)
-
-def _est_gas_wh(uef: float, daily_gal: int,
-                avg_inlet_f: float = 60.0, setpoint_f: float = 120.0) -> float:
-    return daily_gal * 365 * 8.33 * (setpoint_f - avg_inlet_f) * 0.00001 / uef
-
-def _est_hpwh(uef: float, daily_gal: int,
-              avg_inlet_f: float = 60.0, setpoint_f: float = 120.0) -> float:
-    return daily_gal * 365 * 8.33 * (setpoint_f - avg_inlet_f) * 0.000293 / uef
-
-def _est_gas_dryer(therms_per_cycle: float, loads_per_week: int) -> float:
-    return therms_per_cycle * loads_per_week * 52
-
-def _est_hp_dryer(kwh_per_cycle: float, loads_per_week: int) -> float:
-    return kwh_per_cycle * loads_per_week * 52
-
-def _est_gas_cooktop(therms_per_meal: float, meals_per_week: int) -> float:
-    return therms_per_meal * meals_per_week * 52
-
-def _est_induction(kwh_per_meal: float, meals_per_week: int) -> float:
-    return kwh_per_meal * meals_per_week * 52
-
-def _est_ev_kwh(miles: int, kwh_per_mile: float,
-                charging_eff: float = 0.90) -> float:
-    return miles * kwh_per_mile / charging_eff
-
+# ── Display-only: EV efficiency preset (writes a reactive, so it stays here) ──
 def _apply_ev_efficiency_preset(label: str):
     presets = {"Efficient": 0.23, "Average": 0.30, "Large": 0.45}
     ev_kwh_per_mile.set(presets[label])
-
-def _kwh_eq(therms: float) -> float:
-    return therms * KWH_PER_THERM
-
-
-_SLOT_DISPLAY_ORDER = ["HVAC", "Water Heater", "Dryer", "Cooktop", "EV Driving", "Lights and Appliances"]
-DEVICE_LABELS = ["HVAC", "Water Heater", "Dryer", "Cooktop", "EV Charging", "Baseload"]
-DEVICE_COLORS = ["#0D47A1", "#1565C0", "#D0302D", "#EC9B1E", "#388E3C", "#78909C"]
-DEVICE_ALPHAS = [0.70,      0.60,       0.55,      0.55,      0.55,       0.45]
 
 # ── Defaults (single source of truth for reset) ──────────────────────────────
 _DEFAULTS = {
@@ -2770,102 +2624,7 @@ def _DetailCosts(inst_rv, reb_rv):
 
 # ── §25.2 Summary card helpers ────────────────────────────────────────────────
 
-_DEVICE_ICONS = {
-    "hvac":         ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
-                     " stroke-linecap='round' stroke-linejoin='round'>"
-                     "<path d='M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4'/>"
-                     "<circle cx='12' cy='12' r='2.4' fill='currentColor' stroke='none'/></svg>"),
-    "water_heater": ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
-                     " stroke-linecap='round' stroke-linejoin='round'>"
-                     "<rect x='6' y='3' width='12' height='18' rx='3'/>"
-                     "<path d='M9 8h6M12 13v4'/></svg>"),
-    "ice":          ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
-                     " stroke-linecap='round' stroke-linejoin='round'>"
-                     "<path d='M2 17V9a2 2 0 012-2h9l4 4v6'/>"
-                     "<path d='M1 17h18'/><circle cx='5' cy='17.5' r='1.5'/>"
-                     "<circle cx='14' cy='17.5' r='1.5'/>"
-                     "<path d='M9 7V3M9 3h4'/></svg>"),
-    "ev":           ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
-                     " stroke-linecap='round' stroke-linejoin='round'>"
-                     "<path d='M3 17V8a2 2 0 012-2h7a2 2 0 012 2v9'/>"
-                     "<path d='M2 17h13'/><circle cx='5.5' cy='17.5' r='1.6'/>"
-                     "<circle cx='11.5' cy='17.5' r='1.6'/><path d='M14 9h2.5L19 12v5h-5'/></svg>"),
-    "cooktop":      ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
-                     " stroke-linecap='round' stroke-linejoin='round'>"
-                     "<path d='M12 2c0 6-6 6-6 12a6 6 0 1012 0c0-6-6-6-6-12z'/></svg>"),
-    "dryer":        ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
-                     " stroke-linecap='round' stroke-linejoin='round'>"
-                     "<path d='M20.38 3.46 16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.57"
-                     "a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84"
-                     "l.58-3.57a2 2 0 00-1.34-2.23z'/></svg>"),
-    "panel":        ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
-                     " stroke-linecap='round' stroke-linejoin='round'>"
-                     "<path d='M13 2 4 14h6l-1 8 9-12h-6l1-8z'/></svg>"),
-    "baseload":     ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
-                     " stroke-linecap='round' stroke-linejoin='round'>"
-                     "<path d='M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 006 8"
-                     "c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5'/>"
-                     "<path d='M9 18h6M10 22h4'/></svg>"),
-    "home":         ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
-                     " stroke-linecap='round' stroke-linejoin='round'>"
-                     "<path d='M3 11.5 12 4l9 7.5'/><path d='M5 10.5V20h14v-9.5'/></svg>"),
-    "solar":        ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
-                     " stroke-linecap='round' stroke-linejoin='round'>"
-                     "<circle cx='12' cy='12' r='4'/>"
-                     "<path d='M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2'/>"
-                     "</svg>"),
-    "rates":        ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
-                     " stroke-linecap='round' stroke-linejoin='round'>"
-                     "<path d='M3 3v18h18'/><path d='M7 14l3-4 3 2 4-6'/></svg>"),
-}
-
-# ── Card-level header icons (accent-soft .ic chip in .card-hd) ────────────────
-_CARD_IC = {
-    "journey": ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
-                " stroke-linecap='round' stroke-linejoin='round'>"
-                "<path d='M4 19V5a2 2 0 012-2h9l5 5v11a2 2 0 01-2 2H6a2 2 0 01-2-2z'/>"
-                "<path d='M8 8h5M8 12h8M8 16h8'/></svg>"),
-    "home":    ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
-                " stroke-linecap='round' stroke-linejoin='round'>"
-                "<path d='M3 11.5 12 4l9 7.5'/><path d='M5 10.5V20h14v-9.5'/></svg>"),
-    "energy":  ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
-                " stroke-linecap='round' stroke-linejoin='round'>"
-                "<path d='M3 3v18h18'/><path d='M7 14l3-4 3 2 4-6'/></svg>"),
-}
-
-# ── Panel sub-header icons (smaller .ic chip in .panel-hd) ────────────────────
-_PANEL_IC = {
-    "home_profile": ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
-                     " stroke-linecap='round' stroke-linejoin='round'>"
-                     "<path d='M3 11.5 12 4l9 7.5'/><path d='M5 10.5V20h14v-9.5'/></svg>"),
-    "solar":        ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
-                     " stroke-linecap='round' stroke-linejoin='round'>"
-                     "<circle cx='12' cy='12' r='4'/>"
-                     "<path d='M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2'/>"
-                     "</svg>"),
-    "rates":        ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
-                     " stroke-linecap='round' stroke-linejoin='round'>"
-                     "<path d='M3 17l5-5 4 3 7-8'/><path d='M21 7v5h-5'/></svg>"),
-    "social":       ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
-                     " stroke-linecap='round' stroke-linejoin='round'>"
-                     "<path d='M12 22C6.5 22 2 17.5 2 12S6.5 2 12 2s10 4.5 10 10-4.5 10-10 10z'/>"
-                     "<path d='M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01'/></svg>"),
-}
-
-
-_DEVICE_HELP_KEY = {
-    "hvac":         "hvac",
-    "water_heater": "water_heater",
-    "ice":          "transportation",
-    "ev":           "ev_charger",
-    "cooktop":      "cooktop",
-    "dryer":        "dryer",
-    "panel":        "panel_upgrade",
-    "baseload":     "baseload",
-    "home":         "home_profile",
-    "solar":        "solar",
-    "rates":        "rates",
-}
+# Icon dicts (_DEVICE_ICONS, _CARD_IC, _PANEL_IC, _DEVICE_HELP_KEY) -> ui/icons.py (Phase 4.5).
 
 
 def _card_header(key: str, title: str):
@@ -4503,10 +4262,7 @@ def EnergyPricesPanel():
 
 
 # Social & Health icon — module-level so SetupGroup header can reuse it
-_SOCIAL_IC = ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
-              " stroke-linecap='round' stroke-linejoin='round'>"
-              "<path d='M12 22C6.5 22 2 17.5 2 12S6.5 2 12 2s10 4.5 10 10-4.5 10-10 10z'/>"
-              "<path d='M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01'/></svg>")
+# _SOCIAL_IC -> ui/icons.py (Phase 4.5)
 
 
 @solara.component
