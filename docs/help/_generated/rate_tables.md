@@ -1,5 +1,5 @@
     Generated from data/rates/eia_rates_by_utility.json by scripts/build_eia_rates.py — do not edit by hand.
-    Source: EIA-861M (electricity) · EIA-176/NGQS (gas) · base year 2024 · built 2026-06-17
+    Source: EIA-861M (electricity) · EIA-176/NGQS (gas) · base year 2024 · built 2026-06-18
     ------------------------------------------------------------
     ELECTRICITY — residential effective rate ($/kWh)
     Utility                          $/kWh  vs blend

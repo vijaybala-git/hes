@@ -115,6 +115,36 @@ def _fit_cagr(years: list[int], values: list[float]) -> float:
 
 
 # ── Electricity (EIA-861M) ──────────────────────────────────────────────────────
+def _monthly_observed(sub: pd.DataFrame, rev_c, sales_c) -> list:
+    """12 observed monthly effective rates (rev_m ÷ sales_m), Jan..Dec; None where missing.
+
+    Retained for transparency/inspection only — NOT applied in the simulation (the model
+    uses a flat monthly_seasonal_shape; this raw shape embeds tier/true-up artifacts that
+    would double-count the model's already-seasonal consumption — see S2.0 spike)."""
+    s = sub.copy()
+    s["_rev"] = pd.to_numeric(s[rev_c], errors="coerce")
+    s["_sales"] = pd.to_numeric(s[sales_c], errors="coerce")
+    bm = s.groupby("Month")[["_rev", "_sales"]].sum()
+    out = []
+    for mo in range(1, 13):
+        if mo in bm.index and bm.loc[mo, "_sales"]:
+            out.append(round(float(bm.loc[mo, "_rev"] / bm.loc[mo, "_sales"]), 4))
+        else:
+            out.append(None)
+    return out
+
+
+def _normalized_shape(monthly: list | None) -> list | None:
+    """Normalize observed monthly rates to mean 1.0 (the seasonal shape), or None."""
+    if not monthly:
+        return None
+    vals = [m for m in monthly if m]
+    if not vals:
+        return None
+    mean = sum(vals) / len(vals)
+    return [round(m / mean, 4) if m else None for m in monthly]
+
+
 def _build_electric(state: str, sel: dict, provenance: dict, check: bool) -> tuple[dict, dict]:
     """Return (per_utility_dict, state_average_dict) for electricity, $/kWh."""
     # Per-utility file (one base year)
@@ -135,7 +165,8 @@ def _build_electric(state: str, sel: dict, provenance: dict, check: bool) -> tup
         sales = pd.to_numeric(sub[sales_c], errors="coerce").sum()   # MWh
         # $/kWh = (rev*1000 $) / (sales*1000 kWh) = rev / sales
         rate = float(rev / sales) if sales else 0.0
-        per_util[str(num)] = {"name": name, "rate": round(rate, 4)}
+        per_util[str(num)] = {"name": name, "rate": round(rate, 4),
+                              "monthly": _monthly_observed(sub, rev_c, sales_c)}
 
     # State-average blend + 10-yr CAGR from the aggregate Monthly-States sheet
     sdf = pd.read_excel(SOURCES / state_name, sheet_name="Monthly-States", header=2)
@@ -155,7 +186,9 @@ def _build_electric(state: str, sel: dict, provenance: dict, check: bool) -> tup
     for u in per_util.values():
         u["cagr"] = round(cagr, 4)
 
-    state_avg = {"rate": round(base_price, 4), "cagr": round(cagr, 4)}
+    ca_base = ca[ca["Year"] == BASE_YEAR]
+    state_avg = {"rate": round(base_price, 4), "cagr": round(cagr, 4),
+                 "monthly": _monthly_observed(ca_base, res_rev, res_sales)}
     print(f"  electric {state}: blend {base_price:.4f} $/kWh, 10yr CAGR {cagr*100:.1f}%")
     return per_util, state_avg
 
@@ -257,9 +290,14 @@ FLAT_SHAPE = [1.0] * 12
 
 
 def _elec_record(name: str, state: str, u: dict) -> dict:
+    monthly = u.get("monthly")
     return {"name": name, "state": state, "unit": "$/kWh", "base_year": BASE_YEAR,
             "current_rate": u["rate"], "historical_cagr_10yr": u["cagr"],
+            # APPLIED in the simulation:
             "monthly_seasonal_shape": FLAT_SHAPE, "shape_method": "flat",
+            # RETAINED for reference, NOT applied (EIA-861M actual monthly rates):
+            "monthly_rate_observed": monthly,
+            "monthly_shape_observed": _normalized_shape(monthly),
             "source": f"EIA-861M {BASE_YEAR} (revenue ÷ sales)"}
 
 
@@ -267,6 +305,8 @@ def _gas_record(name: str, state: str, u: dict) -> dict:
     return {"name": name, "state": state, "unit": "$/therm", "base_year": BASE_YEAR,
             "current_rate": u["rate"], "historical_cagr_10yr": u["cagr"],
             "monthly_seasonal_shape": FLAT_SHAPE, "shape_method": "flat",
+            # EIA-176 is annual only — no per-LDC monthly rates to retain.
+            "monthly_rate_observed": None, "monthly_shape_observed": None,
             "source": f"EIA-176/NGQS {BASE_YEAR} (revenue ÷ volume)"}
 
 
@@ -291,10 +331,13 @@ def build(states: list[str], check: bool):
                             "current_rate": e_avg["rate"],
                             "historical_cagr_10yr": e_avg["cagr"],
                             "monthly_seasonal_shape": FLAT_SHAPE, "shape_method": "flat",
+                            "monthly_rate_observed": e_avg.get("monthly"),
+                            "monthly_shape_observed": _normalized_shape(e_avg.get("monthly")),
                             "source": f"EIA-861M {BASE_YEAR} state aggregate"},
             "gas": {"unit": "$/therm", "base_year": BASE_YEAR,
                     "current_rate": g_avg["rate"], "historical_cagr_10yr": g_avg["cagr"],
                     "monthly_seasonal_shape": FLAT_SHAPE, "shape_method": "flat",
+                    "monthly_rate_observed": None, "monthly_shape_observed": None,
                     "source": f"EIA-176/NGQS {BASE_YEAR} state total"},
         }
 
@@ -304,6 +347,11 @@ def build(states: list[str], check: bool):
         "built": str(date.today()),
         "shape_method": "flat — seasonal variation comes from consumption; per-LDC gas "
                         "shaping from EIA NG-Monthly is a deferred enhancement (S2.0 spike)",
+        "monthly_rate_observed_note": "Electric records also carry the actual EIA-861M "
+                        "monthly rates (monthly_rate_observed) and their normalized shape "
+                        "(monthly_shape_observed), RETAINED for reference but NOT applied — "
+                        "applying them onto already-seasonal consumption would double-count "
+                        "tier/true-up effects. Gas (EIA-176) is annual-only: null.",
         "effective_rate_method": "residential revenue ÷ residential sales (elec) / volume (gas)",
         "mcf_to_therm": MCF_TO_THERM,
         "sources": provenance,
