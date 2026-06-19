@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "name": "Los Angeles (SCE / SoCalGas)",
+  "description": "LA basin — electric SCE, gas SoCalGas. ZIP-only delta on the factory base.",
+  "based_on": "whywatt_default",
+  "values": { "zip_code": "90001" }
+}

@@ -8,11 +8,20 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+import pytest
+
 import ui.state as S
 from ui import config
 
 # Module-level reactives that are intentionally NOT config-driven (ephemeral UI state).
 _TRANSIENT = {"setup_collapsed", "_panel_state", "_baseload_state", "hw_gallons_user_override"}
+
+
+@pytest.fixture(autouse=True)
+def _restore_state():
+    """Leave the shared reactives at factory after every test (they're process-global)."""
+    yield
+    S.reset_to_defaults()
 
 
 def test_config_file_has_versioned_envelope():
@@ -49,3 +58,44 @@ def test_merge_replace_semantics():
     assert m["zip_code"] == "90001"                              # override applied
     assert m["num_bedrooms"] == S._DEFAULTS["num_bedrooms"]      # absent key keeps factory
     assert set(m) == set(S._DEFAULTS)                            # all keys present (replace)
+
+
+# ── Layer 2: list / load / apply / export ──────────────────────────────────────
+
+def test_list_configs_includes_factory_and_profiles():
+    names = [c["name"] for c in config.list_configs()]
+    assert "whywatt_default" in names
+    assert any("Diego" in n or "Angeles" in n for n in names)  # bundled profiles present
+
+
+def test_load_config_from_key_and_dict():
+    by_key = config.load_config("profiles/los_angeles")
+    assert by_key["zip_code"] == "90001"
+    by_dict = config.load_config({"values": {"zip_code": "77777"}})
+    assert by_dict == {"zip_code": "77777"}
+
+
+def test_apply_config_is_replace():
+    S.zip_code.set("11111")
+    S.num_bedrooms.set(5)
+    S.apply_config(config.load_config("profiles/los_angeles"))   # delta = {zip_code: 90001}
+    assert S.zip_code.value == "90001"                            # override applied
+    assert S.num_bedrooms.value == S._DEFAULTS["num_bedrooms"]    # absent key -> factory (REPLACE)
+
+
+def test_apply_config_ignores_unknown_keys():
+    S.apply_config({"zip_code": "92101", "bogus_key": 123})
+    assert S.zip_code.value == "92101"
+    assert not hasattr(S, "bogus_key")
+
+
+def test_export_round_trips():
+    S.zip_code.set("90001")
+    S.num_bedrooms.set(4)
+    snap = S.export_config(name="snap", description="d")
+    assert snap["schema_version"] == config.SCHEMA_VERSION
+    assert len(snap["values"]) == len(S._DEFAULTS)
+    S.reset_to_defaults()
+    assert S.zip_code.value != "90001"
+    S.apply_config(snap["values"])                 # re-load the snapshot
+    assert S.zip_code.value == "90001" and S.num_bedrooms.value == 4

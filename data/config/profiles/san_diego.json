@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "name": "San Diego (SDG&E)",
+  "description": "San Diego — SDG&E electric + gas. ZIP-only delta on the factory base.",
+  "based_on": "whywatt_default",
+  "values": { "zip_code": "92101" }
+}

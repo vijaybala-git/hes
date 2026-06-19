@@ -7,7 +7,7 @@ instance per cell (Phase 4.5 invariant #1).
 """
 import solara
 
-from ui.config import factory_defaults
+from ui.config import factory_defaults, merge, make_envelope
 
 # ── Defaults — externalized to data/config/whywatt_default.json (Phase 4.5b) ──
 # Single source of truth: the reactives below initialize from this dict; reset uses it.
@@ -383,6 +383,20 @@ def reset_to_defaults():
     acc_shape_year.set(_DEFAULTS["acc_shape_year"])
     detail_open.set(_DEFAULTS["detail_open"])
     _set_all_setup(False)
+
+
+def apply_config(values: dict) -> None:
+    """Load a config (Phase 4.5b, REPLACE semantics): set EVERY persistent reactive from
+    factory ⊕ values. Keys absent from `values` revert to factory; unknown keys are ignored.
+    Transient UI reactives are untouched."""
+    for k, v in merge({k: v for k, v in values.items() if k in _DEFAULTS}).items():
+        globals()[k].set(v)
+
+
+def export_config(name: str = "my_whywatt_config", description: str = "") -> dict:
+    """Snapshot the current persistent reactive values into a versioned, shareable envelope."""
+    values = {k: globals()[k].value for k in _DEFAULTS}
+    return make_envelope(values, name=name, description=description)
 
 
 # Export everything defined above (reactives, _DEFAULTS, helpers, reset) so a
