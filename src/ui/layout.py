@@ -842,8 +842,14 @@ def _SettingsLoadDialog(open_rv, err_rv):
             err_rv.set(f"Could not load settings: {e}")
 
     def _on_upload(f):
+        # Solara's FileInfo is a TypedDict (a dict at runtime), so use item access.
         try:
-            _apply(json.loads(f.data.decode("utf-8")))
+            raw = f["data"] if isinstance(f, dict) else getattr(f, "data", None)
+            if raw is None:                          # lazy read fallback
+                fobj = f["file_obj"] if isinstance(f, dict) else f.file_obj
+                raw = fobj.read()
+            text = raw.decode("utf-8") if isinstance(raw, (bytes, bytearray)) else raw
+            _apply(json.loads(text))
         except Exception as e:                      # noqa: BLE001
             err_rv.set(f"Invalid settings file: {e}")
 
