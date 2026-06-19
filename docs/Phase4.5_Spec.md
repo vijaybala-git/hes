@@ -214,3 +214,23 @@ this *enforces* the single source of truth so the two can never silently diverge
 - UI for choosing/uploading/sharing configs (the data model supports it; the widget is later).
 - Moving option enumerations (`_CZ_OPTIONS`, `_BR_OPTIONS`, `CHART_OPTIONS`) into config —
   optional follow-up; these are static valid-value lists, not user defaults.
+
+---
+
+# Phase 4.5 — scope umbrella
+
+Phase 4.5 now covers three related workstreams on the refactored `ui/` package:
+
+1. **App split (done)** — `app.py` monolith → `ui/` modules; see the top of this doc.
+2. **Config & startup** — externalized, versioned defaults.
+   - **Layer 1 (done):** `data/config/whywatt_default.json` + `ui/config.py`, single source of
+     truth (see "Phase 4.5b — Configuration & Startup").
+   - **Layer 2 (planned, part of Phase 4.5):** `load_config` / `apply_config` / `export_config`
+     + the versioned envelope + validation, and the config-picker/share UI. The regression
+     suite below is its first consumer.
+3. **Regression tests (planned, part of Phase 4.5)** — golden-master scenario suite (~12
+   cases) for pre-deploy confidence and release-over-release diff reports.
+   **See `docs/Regression_Test_Spec.md`** for the full design (metrics, case matrix, workflow).
+
+These are living specs — `Regression_Test_Spec.md` in particular will be reviewed and updated
+as the suite is built.
