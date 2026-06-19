@@ -45,6 +45,14 @@ to eliminate float/platform noise.
 - Panel: `current_load_amps` (yr-1), `peak_amps`, `peak_status` (green/yellow/orange/red),
   `peak_year` — exactly what `PanelAssessor.journey_load_timeline()` feeds the cockpit
 
+**Transportation gasoline externalities (when a vehicle is in play — Case 11):**
+- `gasoline_gallons` (journey **and** baseline — non-zero in both legs)
+- `gasoline_climate_cost`, `gasoline_health_cost` (journey **and** baseline)
+
+These come from the model's transport reporters (`Journey/Baseline Gasoline Gallons`,
+`Journey/Baseline Gasoline Climate`, `… Health`) and are a **separate** stream from the
+natural-gas social cost above. Capturing both legs locks the gasoline delta of the EV switch.
+
 **Per device / slot** (from `cost_history_by_slot` / `consumption_history_by_slot` /
 `fuel_history_by_slot` on both `journey_home` and `baseline_home`):
 - cumulative cost (journey **and** baseline)
@@ -98,7 +106,7 @@ Tricky additions (each exercises a distinct code path the base set misses):
 | 8 | **ACC rate model** (elec `acc_shaped` + gas `acc_seasonal`) | the ACC pricing engine (load shapes, avoided cost, NEM 3 export) — base cases are all CAGR |
 | 9 | **Do-nothing baseline only** (all gas, no swaps) | isolates the baseline numbers from the journey |
 | 10 | **Out-of-state ZIP → CA-average *fallback*** (e.g. TX 73301) | the fallback *trigger* (distinct from *selecting* CA average) |
-| 11 | **ICE → EV transport** (the §3 full switch) | gasoline gallons + climate/health externalities (a separate cost stream) |
+| 11 | **ICE → EV transport** — full §3 switch, **gasoline in both legs** (do-nothing drives ICE throughout; the journey retains a bit of gasoline after the EV switch) | gasoline gallons + climate/health externalities regressed for **both** journey and baseline — a separate cost stream, non-zero in both legs |
 | 12 | **Hot inland zone** (Fresno 93720) | cooling-dominated climate (base ZIPs are milder) |
 
 > Highest priority if trimming: **7 (panel), 8 (ACC), 9 (baseline)** — cheap, and they cover
@@ -154,9 +162,11 @@ pytest tests/test_regression.py             # green gate before deploy
 
 ## Open items (review as we build)
 
-- **Case 11 semantics** — confirm "EV charger journey" means the full **ICE→EV switch** (with
-  gasoline externalities), vs. only the charging-load model. The suite should cover the full
-  switch in at least one case.
+- ~~**Case 11 semantics**~~ — **resolved:** Case 11 is the full **ICE→EV switch** with gasoline
+  externalities, and gasoline is present (non-zero) in **both** the do-nothing and journey
+  legs (do-nothing drives ICE throughout; the journey keeps a bit of residual gasoline after
+  the EV switch). Implementation detail to fix when building the case: the residual gasoline
+  fraction / swap year that produces the "bit of gasoline" in the journey leg.
 - Final precision for rounding per metric (whole `$`; kWh/therms to 0.1?).
 - Whether to capture intermediate years (e.g., yr-1, yr-5, yr-10, final) or only cumulative +
   final — start minimal, expand if a regression hides between snapshots.
