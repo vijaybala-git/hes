@@ -873,6 +873,30 @@ def _SettingsLoadDialog(open_rv, err_rv):
 
 
 @solara.component
+def _SettingsExportDialog(open_rv):
+    """Modal (Phase 4.5b): name the export, then download the current settings as JSON."""
+    fname = solara.use_reactive("whywatt_settings")
+    desc = solara.use_reactive("")
+    stem = (fname.value or "").strip() or "whywatt_settings"
+    out_name = stem if stem.lower().endswith(".json") else stem + ".json"
+    with solara.v.Dialog(v_model=open_rv.value, on_v_model=open_rv.set, max_width="480"):
+        with solara.Card("Export settings"):
+            solara.Markdown("Download the current settings as a shareable `.json`.")
+            solara.InputText("File name", value=fname, continuous_update=True)
+            solara.InputText("Description (optional)", value=desc, continuous_update=True)
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                f"<div style='font-size:0.8em;color:#607D8B'>Saves as "
+                f"<b>{out_name}</b></div>"))
+            with solara.CardActions():
+                solara.v.Spacer()
+                solara.Button("Close", text=True, on_click=lambda: open_rv.set(False))
+                solara.FileDownload(
+                    lambda: json.dumps(export_config(name=stem, description=desc.value),
+                                       indent=2),
+                    filename=out_name, label="Download")
+
+
+@solara.component
 def Masthead():
     """Redesign masthead: preserved logo + one-line context pill + Reset/Help."""
     bl_kwh = compute_baseload_kwh(
@@ -882,6 +906,7 @@ def Masthead():
     cz = _ci.zone_id.replace("CZ", "").strip()
     _settings_load_open = solara.use_reactive(False)
     _settings_load_err = solara.use_reactive("")
+    _settings_export_open = solara.use_reactive(False)
     context_html = (
         "<div class='context'>"
         "<span class='loc'>"
@@ -911,17 +936,18 @@ def Masthead():
         with solara.Row(classes=["actions"], style="gap:8px; flex-shrink:0; align-items:center"):
             solara.Button("↺ Reset", on_click=reset_to_defaults, classes=["btn"])
 
-            # Settings dropdown — Load… (opens dialog) / Export (downloads JSON).
+            # Settings dropdown — Load… / Export… (each opens a dialog).
             with solara.lab.Menu(activator=solara.Button("⚙ Settings ▾", classes=["btn"])):
                 with solara.Column(gap="0px", style="padding:4px; min-width:150px"):
                     solara.Button("Load…", text=True, on_click=lambda: (
                         _settings_load_err.set(""), _settings_load_open.set(True)))
-                    solara.FileDownload(lambda: json.dumps(export_config(), indent=2),
-                                        filename="whywatt_settings.json", label="Export")
+                    solara.Button("Export…", text=True,
+                                  on_click=lambda: _settings_export_open.set(True))
 
             HelpLink("? Help", "index.html", classes=["btn", "primary"],
                      style="text-decoration:none")
         _SettingsLoadDialog(_settings_load_open, _settings_load_err)
+        _SettingsExportDialog(_settings_export_open)
 
 
 def _verdict_numbers(df, model):
