@@ -8,16 +8,25 @@
 # docs/assets/ and public/ into the image. Only those paths affect the
 # running Space.
 #
-# Some repo folders (e.g. docs/presentations/ — slide decks + images) are
-# NOT part of the Space and we do not want their blobs uploaded to HF. The
-# script strips the paths in $ExcludePaths from history *in a throwaway
+# Some repo paths are NOT part of the running Space and we do not want their
+# blobs uploaded to HF:
+#   - docs/presentations/  — slide decks + images (not served)
+#   - data/climate/sources/ and data/rates/sources/ — raw TMYx weather .zip and
+#     EIA .xlsx snapshots. They are build-time inputs to scripts/build_*.py only;
+#     the app reads the processed JSON (tmy3_zones.json, eia_rates_by_utility.json),
+#     never these. HF's hub rejects large non-LFS blobs, so they must be stripped.
+# The script strips the paths in $ExcludePaths from history *in a throwaway
 # clone*, then force-pushes that cleaned history to the Space's main branch.
 # Your local repo (and GitHub) are never rewritten.
 
 param(
     [string]   $Branch       = "main",
     [string]   $Remote       = "hf",
-    [string[]] $ExcludePaths = @("docs/presentations")
+    [string[]] $ExcludePaths = @(
+        "docs/presentations",
+        "data/climate/sources",
+        "data/rates/sources"
+    )
 )
 
 $ErrorActionPreference = "Stop"
