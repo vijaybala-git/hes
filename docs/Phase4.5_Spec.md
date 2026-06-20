@@ -217,6 +217,86 @@ this *enforces* the single source of truth so the two can never silently diverge
 
 ---
 
+
+## WhyWatt — Regression Testing Framework Plan
+We are building a robust Regression Testing Framework to lock down the simulation output numbers before each release. This framework will run the full simulation pipeline for a set of test cases, compare the results against a committed "golden" snapshot, and flag any unexpected drift.
+
+User Review Required
+IMPORTANT
+
+The framework requires a headless run_simulation helper. We will refactor src/ui/layout.py to move the core simulation setup and runner into src/ui/sim.py (which is already a leaf module containing ZIP rate/climate resolvers). This separates layout components from domain configuration logic.
+
+Open Questions
+NOTE
+
+Case 11 (ICE -> EV transport with gasoline in both legs): We will configure Case 11 with ev_swap_planned = true, ev_swap_year = 5, and transport_ice_miles_after = 2000. This means that even after the EV switch, the home keeps an ICE vehicle driving 2000 miles/year, resulting in non-zero gasoline usage (and gasoline externalities) in both the baseline (12k miles) and journey (2k miles) legs.
+
+NOTE
+
+Stable Rounding Precision: We will round values in the snapshots to ensure that floating-point platform noise (e.g. 1.000000000002 vs 1.0) does not break tests:
+
+Currency metrics (opex, cost history): nearest integer (whole $).
+Energy consumption (kWh, therms, gallons): 0.1 precision.
+Electrical currents (amps): nearest integer.
+Proposed Changes
+We will introduce a test suite layout where harness execution and case configurations are strictly separated.
+
+UI Simulation Core
+[MODIFY] 
+sim.py
+Move _build_slot_configs() and run_simulation() verbatim from src/ui/layout.py.
+Import necessary domain classes from src/model.py, src/home_config.py, src/journey.py, src/social_cost.py, and src/panel_assessor.py.
+Ensure all necessary symbols are exported.
+[MODIFY] 
+layout.py
+Remove _build_slot_configs() and run_simulation().
+Import run_simulation and _build_slot_configs from ui.sim (or let from ui.sim import * pick them up).
+Regression Case Configurations
+We will define 12 test cases as delta JSON profiles. They will live in 
+tests/regression/cases/
+:
+
+01_pge_full_journey_no_solar.json (PG&E 95112, full electrification journey, no solar)
+02_pge_full_journey_solar.json (PG&E 95112, full electrification journey, with solar)
+03_sce_full_journey_no_solar.json (SCE/SoCalGas 90001, full journey, no solar)
+04_sce_full_journey_solar.json (SCE/SoCalGas 90001, full journey, with solar)
+05_ca_average_full_journey_no_solar.json (CA average rate model, full journey, no solar)
+06_ca_average_full_journey_solar.json (CA average rate model, full journey, with solar)
+07_panel_upgrade_trigger.json (100A service panel, full electrification, forcing orange/red peak status)
+08_acc_rate_model.json (ACC shaped electricity + seasonal gas pricing engine)
+09_do_nothing_baseline_only.json (All-gas base home, no electrification swaps planned)
+10_out_of_state_zip_fallback.json (Texas ZIP 73301 forcing utility fallback to CA average)
+11_ice_ev_transport_gasoline.json (EV switch with residual gasoline driving in both legs)
+12_hot_inland_zone.json (Fresno 93720 with active cooling-dominated HVAC baseline)
+Harness and Report Engine
+[NEW] 
+run_regression.py
+A CLI execution script to run all discovered test cases, check current statistics against the golden master, and render comparison outputs.
+
+Dynamic Case Discovery: Searches tests/regression/cases/*.json for cases.
+State Isolation: For each case, imports ui.state, calls reset_to_defaults(), applies the case delta config via apply_config(), runs run_simulation(), and harvests the metrics.
+Standard Comparison Look and Feel:
+Compares cockpit and device stats against the reference golden.json.
+Displays a clean colored console grid of results (PASSED / FAILED with golden | current | diff highlight).
+Outputs a detailed markdown report (tests/regression/report.md) detailing the comparison metrics, which is updated on every run.
+Audit Update Mode: Supports --update to overwrite/save the current runs into tests/regression/golden.json for git-versioned changes.
+[NEW] 
+test_regression.py
+A standard pytest gate that runs the regression comparison and fails the build if any drift is detected. This links the framework to CI.
+
+Verification Plan
+Automated Tests
+Run .venv\Scripts\python -m pytest tests/test_regression.py to ensure tests run and succeed.
+Verify deterministic seed execution: run twice and ensure no diffs are found.
+Run python scripts/run_regression.py and inspect console outputs.
+Manual Verification
+Review the generated 
+tests/regression/report.md
+ for clean markdown presentation.
+Intentionally modify a code file (e.g. tweak a pricing CAGR default) and ensure run_regression captures the regression and test_regression fails.
+
+
+
 # Phase 4.5 — scope umbrella
 
 Phase 4.5 now covers three related workstreams on the refactored `ui/` package:
@@ -228,7 +308,9 @@ Phase 4.5 now covers three related workstreams on the refactored `ui/` package:
    - **Layer 2 (planned, part of Phase 4.5):** `load_config` / `apply_config` / `export_config`
      + the versioned envelope + validation, and the config-picker/share UI. The regression
      suite below is its first consumer.
-3. **Regression tests (planned, part of Phase 4.5)** — golden-master scenario suite (~12
+	 
+3. **Regression Test Framework**
+4. **Regression tests (planned, part of Phase 4.5)** — golden-master scenario suite (~12
    cases) for pre-deploy confidence and release-over-release diff reports.
    **See `docs/Regression_Test_Spec.md`** for the full design (metrics, case matrix, workflow).
 

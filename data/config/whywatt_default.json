@@ -11,7 +11,7 @@
     "square_footage": 1800,
     "year_built": 1985,
     "insulation_quality": "average",
-    "panel_amps": 200,
+    "panel_amps": 100,
     "panel_calc_method": "optional",
     "hvac_tonnage": 3.0,
     "ev_charger_amps": 32,

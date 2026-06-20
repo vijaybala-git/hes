@@ -604,7 +604,7 @@ def _PanelControls():
     planned = panel_upgrade_planned.value
     # Row 1: plan checkbox
     with solara.Row(gap="8px", style=_ROW_CTRL):
-        _PlanCheck(panel_upgrade_planned, "Plan 200A upgrade")
+        _PlanCheck(panel_upgrade_planned, "Plan panel upgrade", right=False)
     # Row 2: full-width year slider + subscript
     if planned:
         yr = panel_upgrade_year.value
@@ -628,7 +628,7 @@ def _PanelControls():
 def PanelSummaryCard():
     """§25.3.6 — amperage + plan year | install cost | rebate."""
     with solara.Column(classes=["device"]):
-        _card_header("panel", "Panel Upgrade")
+        _card_header("panel", "Electrical Panel")
         _PanelControls()
 
 

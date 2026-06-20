@@ -38,7 +38,7 @@ class HomeConfig:
     square_footage:     int  = 1800       # drives baseload formula + NEC general load
     year_built:         int  = 1985       # carried; future use
     insulation_quality: str  = "average"  # Phase 2 active — poor / average / good → UA
-    panel_amps:         int  = 200        # Phase 3 §5 — electrical service size (100/150/200)
+    panel_amps:         int  = 100        # Phase 3 §5 — electrical service size (100/150/200)
 
     # ── Baseload formula inputs ───────────────────────────────────────────────
     baseload_constant_before: float      = 500.0   # always-on kWh/yr (current)

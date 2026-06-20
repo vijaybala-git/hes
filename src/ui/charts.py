@@ -45,59 +45,132 @@ def _new_fig(wide=False):
     return fig
 
 
+def _legend_below(fig, ax, handles=None, labels=None, *, fontsize=8,
+                  ncol=None, max_cols=4, title=None, **kw):
+    """House style — legend in a reserved band centered beneath the axes.
+
+    Grows the figure height by the legend band so the plot area is preserved, and
+    pins a generous left margin so the y-axis label never clips the figure edge.
+    With no labelled artists it just sets margins (leaving whitespace where a
+    legend would be — intentional, for a consistent plot size across charts).
+    Pass `handles`/`labels` explicitly for proxy artists (Patches/Line2D) that are
+    not attached to the axes.
+    """
+    if handles is None:
+        handles, labels = ax.get_legend_handles_labels()
+    w, h0 = fig.get_size_inches()
+    if not handles:
+        fig.subplots_adjust(left=0.16, right=0.96, top=0.92, bottom=0.18)
+        return None
+    if ncol is None:
+        ncol = min(max_cols, len(handles))
+    nrow = (len(handles) + ncol - 1) // ncol
+    band_in = 0.50 + 0.26 * nrow
+    new_h = h0 + band_in
+    fig.set_size_inches(w, new_h)
+    leg_args = dict(loc="lower center", bbox_to_anchor=(0.5, 0.01),
+                    bbox_transform=fig.transFigure, ncol=ncol, fontsize=fontsize,
+                    title=title, framealpha=0, borderaxespad=0, **kw)
+    if labels is None:   # proxy handles carry their own label=
+        leg = ax.legend(handles=handles, **leg_args)
+    else:
+        leg = ax.legend(handles, labels, **leg_args)
+    if title:
+        leg._legend_box.align = "left"
+    fig.subplots_adjust(left=0.16, right=0.96, top=0.92,
+                        bottom=(band_in / new_h) + 0.03)
+    return leg
+
+
 # Chart 1 — Cumulative Energy Costs
 def make_cumulative_opex(df, model, n):
     fig = _new_fig()
+    fig.set_size_inches(6, 4.3)   # taller: makes room for the below-axes legend
     ax  = fig.add_subplot(111)
     x = np.arange(1, n + 1)
     b = df["Baseline Cum Cost"].values
     lbl_a = " (A)" if model.comparison_mode else ""
 
+    # "Your journey" is a SINGLE line. When solar is selected, Journey Cum Cost is
+    # already net of solar+battery savings, so we only relabel it — never split into
+    # a second line. Keeps the graph to 4 lines max (×2 with social).
     has_solar = solar_planned.value and "Solar Saving" in df.columns
+    e = df["Journey Cum Cost"].values
+    j_color = _CC_SOLAR if has_solar else _CC_J
+    j_label = f"Your journey + Solar{lbl_a}" if has_solar else f"Your journey{lbl_a}"
 
-    if has_solar:
-        solar_savings_cum = np.cumsum(df["Solar Saving"].values)
-        e_no_solar = df["Journey Cum Cost"].values + solar_savings_cum
-        e_solar    = df["Journey Cum Cost"].values
-        ax.plot(x, b,          color=_CC_B,     lw=2.5, label=f"Do nothing{lbl_a}")
-        ax.plot(x, e_no_solar, color=_CC_J,     lw=2.0, linestyle="--",
-                label=f"Your journey{lbl_a}")
-        ax.plot(x, e_solar,    color=_CC_SOLAR, lw=2.5,
-                label=f"Your journey + Solar{lbl_a}")
-        ax.fill_between(x, b, e_solar,    where=(b >= e_solar),
-                        color=_CC_SOLAR, alpha=0.10, label="Journey + Solar saves")
-        ax.fill_between(x, e_solar, e_no_solar, where=(e_no_solar > e_solar),
-                        color=_CC_J,    alpha=0.07, label="Solar adds")
-    else:
-        e = df["Journey Cum Cost"].values
-        ax.plot(x, b, color=_CC_B, lw=2.5, label=f"Do nothing{lbl_a}")
-        ax.plot(x, e, color=_CC_J, lw=2.5, label=f"Your journey{lbl_a}")
-        ax.fill_between(x, b, e, where=(b >= e), color=_CC_J, alpha=0.12, label="Journey saves")
-        ax.fill_between(x, b, e, where=(b <  e), color=_CC_B, alpha=0.12, label="Gas saves")
+    ax.plot(x, b, color=_CC_B,   lw=2.5)
+    ax.plot(x, e, color=j_color, lw=2.5)
+    # Shaded savings region — self-explanatory, deliberately kept out of the legend.
+    ax.fill_between(x, b, e, where=(b >= e), color=j_color, alpha=0.12)
+
+    # Payback marker — drawn at the SAME year the cockpit reports, so the two
+    # never disagree: the first year cumulative savings ("Opex Delta") turn
+    # positive. Skipped when there is no payback within the horizon.
+    if "Opex Delta" in df.columns:
+        delta_vals = df["Opex Delta"].values
+        payback_yr = next((i + 1 for i, d in enumerate(delta_vals) if d > 0), None)
+        if payback_yr is not None:
+            cal = model.sim_start_year + payback_yr - 1
+            ax.axvline(payback_yr, color="#555", lw=1.2, linestyle=(0, (4, 3)),
+                       alpha=0.85, zorder=2)
+            ax.annotate(f"Payback · Yr {payback_yr} ({cal})", xy=(payback_yr, 0.98),
+                        xycoords=ax.get_xaxis_transform(),
+                        xytext=(4, 0), textcoords="offset points",
+                        ha="left", va="top", fontsize=8, color="#555",
+                        bbox=dict(boxstyle="round,pad=0.25", facecolor="white",
+                                  edgecolor="#CCC", alpha=0.85))
 
     if model.comparison_mode:
         bB = df["Baseline Cum Cost B"].values
         eB = df["Journey Cum Cost B"].values
         ax.plot(x, bB, color=_CC_B, lw=2.0, linestyle="--", label="Do nothing (B)")
         ax.plot(x, eB, color=_CC_J, lw=2.0, linestyle="--", label="Your journey (B)")
-    cfg = getattr(model, "social_cost_config", None)
-    if (cfg is not None and cfg.total_rate > 0
-            and "Journey Social Climate" in df.columns):
-        j_social = np.cumsum(df["Journey Social Climate"].values
-                             + df["Journey Social Health"].values)
-        b_social = np.cumsum(df["Baseline Social Climate"].values
-                             + df["Baseline Social Health"].values)
-        ax.plot(x, b + b_social, color=_CC_B, lw=1.5, linestyle=":",
-                alpha=0.9, label="Do nothing + social")
-        ax.plot(x, df["Journey Cum Cost"].values + j_social, color=_CC_J, lw=1.5,
-                linestyle=":", alpha=0.9, label="Your journey + social")
+    # "+ social" lines use the combined social total (gas combustion + gasoline
+    # externalities), so they move with both the gas and gasoline adders.
+    social_on = False
+    if "Journey Social Total" in df.columns and (
+            np.any(df["Journey Social Total"].values)
+            or np.any(df["Baseline Social Total"].values)):
+        j_social = np.cumsum(df["Journey Social Total"].values)
+        b_social = np.cumsum(df["Baseline Social Total"].values)
+        ax.plot(x, b + b_social, color=_CC_B,   lw=1.5, linestyle=":", alpha=0.9)
+        ax.plot(x, e + j_social, color=j_color, lw=1.5, linestyle=":", alpha=0.9)
+        social_on = True
 
     ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(_money))
     ax.set_xlabel("Year")
     ax.set_ylabel("Cumulative Energy Cost")
-    ax.legend(fontsize=8, framealpha=0.6)
     _style(ax)
-    fig.tight_layout(pad=1.0)
+
+    # ── Grouped legend below the axes ─────────────────────────────────────────
+    # Left group = Energy Cost (solid lines); right group = + Social Cost (dotted).
+    # The shaded "saves" region is omitted (self-explanatory). The figure is taller
+    # (set above) so reserving this bottom band does not shrink the plot.
+    energy   = [Line2D([0], [0], color=_CC_B,   lw=2.5),
+                Line2D([0], [0], color=j_color, lw=2.5)]
+    e_labels = [f"Do nothing{lbl_a}", j_label]
+    if model.comparison_mode:
+        energy   += [Line2D([0], [0], color=_CC_B, lw=2.0, ls="--"),
+                     Line2D([0], [0], color=_CC_J, lw=2.0, ls="--")]
+        e_labels += ["Do nothing (B)", "Your journey (B)"]
+    leg1 = ax.legend(energy, e_labels, title="Energy Cost",
+                     loc="upper left", bbox_to_anchor=(0.0, -0.24),
+                     ncol=1, fontsize=8, title_fontsize=9,
+                     framealpha=0, borderaxespad=0, handlelength=2.4)
+    leg1._legend_box.align = "left"
+    ax.add_artist(leg1)
+    if social_on:
+        social = [Line2D([0], [0], color=_CC_B,   lw=1.5, ls=":"),
+                  Line2D([0], [0], color=j_color, lw=1.5, ls=":")]
+        leg2 = ax.legend(social, [f"Do nothing{lbl_a}", j_label],
+                         title="+ Social Cost",
+                         loc="upper right", bbox_to_anchor=(1.0, -0.24),
+                         ncol=1, fontsize=8, title_fontsize=9,
+                         framealpha=0, borderaxespad=0, handlelength=2.4)
+        leg2._legend_box.align = "left"
+
+    fig.subplots_adjust(left=0.16, right=0.97, top=0.96, bottom=0.33)
     return fig
 
 
@@ -121,13 +194,11 @@ def make_annual_cost(df, model, n):
         ax.bar(x - w / 2, b_ann, w, color=_CC_B, label="Do nothing",   zorder=3)
         ax.bar(x + w / 2, j_ann, w, color=_CC_J, label="Your journey", zorder=3)
         # Social cost — stacked on top when enabled
-        cfg = getattr(model, "social_cost_config", None)
-        if (cfg is not None and cfg.total_rate > 0
-                and "Baseline Social Climate" in df.columns):
-            b_soc = (df["Baseline Social Climate"].values
-                     + df["Baseline Social Health"].values)
-            j_soc = (df["Journey Social Climate"].values
-                     + df["Journey Social Health"].values)
+        if "Baseline Social Total" in df.columns and (
+                np.any(df["Baseline Social Total"].values)
+                or np.any(df["Journey Social Total"].values)):
+            b_soc = df["Baseline Social Total"].values
+            j_soc = df["Journey Social Total"].values
             ax.bar(x - w / 2, b_soc, w, bottom=b_ann,
                    color="#FB8C00", alpha=0.85, label="Do nothing — social", zorder=3)
             ax.bar(x + w / 2, j_soc, w, bottom=j_ann,
@@ -135,9 +206,8 @@ def make_annual_cost(df, model, n):
     ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(_money))
     ax.set_xlabel("Year")
     ax.set_ylabel("Annual Energy Cost")
-    ax.legend(fontsize=8)
     _style(ax)
-    fig.tight_layout(pad=1.0)
+    _legend_below(fig, ax)
     return fig
 
 
@@ -203,9 +273,8 @@ def make_cost_breakdown(df, model, n, home="journey"):
     ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(_money))
     ax.set_xlabel("Year")
     ax.set_ylabel("Cumulative Cost")
-    ax.legend(fontsize=7, framealpha=0.8, loc="upper left")
     _style(ax)
-    fig.tight_layout(pad=1.0)
+    _legend_below(fig, ax, fontsize=7)
     return fig
 
 
@@ -253,11 +322,10 @@ def make_elec_price(df, model, n):
     if model.comparison_mode:
         lbl_b = _elec_rate_label(model.elec_rate_model_b, elec_cagr_pct_b.value, " (B)")
         ax.plot(x, df["Elec Rate B"].values, color=_CC_J, lw=2.0, linestyle="--", label=lbl_b)
-        ax.legend(fontsize=8)
     ax.set_xlabel("Year")
     ax.set_ylabel("Avg Electricity Price  ($/kWh)")
     _style(ax)
-    fig.tight_layout(pad=1.0)
+    _legend_below(fig, ax, max_cols=2)
     return fig
 
 
@@ -271,11 +339,10 @@ def make_gas_price(df, model, n):
     if model.comparison_mode:
         lbl_b = _gas_rate_label(model.gas_rate_model_b, gas_cagr_pct_b.value, " (B)")
         ax.plot(x, df["Gas Rate B"].values, color="#EF6C00", lw=2.0, linestyle="--", label=lbl_b)
-        ax.legend(fontsize=8)
     ax.set_xlabel("Year")
     ax.set_ylabel("Avg Gas Price  ($/therm)")
     _style(ax)
-    fig.tight_layout(pad=1.0)
+    _legend_below(fig, ax, max_cols=2)
     return fig
 
 
@@ -299,7 +366,7 @@ def _plot_rate_band(ax, cal_x, base, lo_factor, hi_factor, lo_lbl, hi_lbl, color
 
 
 def make_rate_trajectory(df, model, n):
-    fig = Figure(figsize=(7, 5), dpi=100)
+    fig = Figure(figsize=(7, 6), dpi=100)   # taller: below-axis legends per subplot
     fig.patch.set_facecolor("#F9F9F9")
     ax_elec = fig.add_subplot(211)
     ax_gas  = fig.add_subplot(212)
@@ -332,7 +399,8 @@ def make_rate_trajectory(df, model, n):
         ax_elec.plot(cal_x, df["Elec Rate B"].values,
                      color=C_RATE_ELEC, lw=2.0, linestyle="--", label=lbl_eb)
 
-    ax_elec.legend(fontsize=7)
+    ax_elec.legend(loc="upper center", bbox_to_anchor=(0.5, -0.20), ncol=2,
+                   fontsize=7, framealpha=0, borderaxespad=0)
     ax_elec.yaxis.set_major_formatter(
         matplotlib.ticker.FuncFormatter(lambda v, _: f"${v:.3f}"))
     ax_elec.set_ylabel("$/kWh")
@@ -359,14 +427,16 @@ def make_rate_trajectory(df, model, n):
         ax_gas.plot(cal_x, df["Gas Rate B"].values,
                     color=C_RATE_GAS, lw=2.0, linestyle="--", label=lbl_gb)
 
-    ax_gas.legend(fontsize=7)
+    ax_gas.legend(loc="lower center", bbox_to_anchor=(0.5, 0.01),
+                  bbox_transform=fig.transFigure, ncol=2,
+                  fontsize=7, framealpha=0, borderaxespad=0)
     ax_gas.yaxis.set_major_formatter(
         matplotlib.ticker.FuncFormatter(lambda v, _: f"${v:.2f}"))
     ax_gas.set_ylabel("$/therm")
     ax_gas.set_xlabel("Year")
     _style(ax_gas)
 
-    fig.tight_layout(pad=1.2)
+    fig.subplots_adjust(left=0.12, right=0.96, top=0.96, bottom=0.13, hspace=0.50)
     return fig
 
 
@@ -704,6 +774,7 @@ def make_capex_v2(df, model, n):
     keys_present = [k for k in DEVICE_ORDER
                     if any(model.journey_home.capex_by_device.get(k, {}).values())
                     or any(model.baseline_home.capex_by_device.get(k, {}).values())]
+    handles = None
     if keys_present:
         handles = device_legend_handles(keys_present)
         from matplotlib.patches import Patch
@@ -711,10 +782,9 @@ def make_capex_v2(df, model, n):
             Patch(facecolor="none", edgecolor="#666", hatch="//", label="Do nothing (hatched)"),
             Patch(facecolor="#aaa", edgecolor="#666", label="Your journey (solid)"),
         ]
-        ax.legend(handles=handles, fontsize=10, ncol=2, framealpha=0.85, loc="upper left")
 
     _style(ax)
-    fig.tight_layout(pad=1.0)
+    _legend_below(fig, ax, handles=handles, fontsize=9)
     return fig
 
 
@@ -792,9 +862,7 @@ def render_device_chart(model, home: str = "journey",
     ax.grid(axis="y", color="#78909C", alpha=0.12, linewidth=0.5)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.legend(handles=patches, loc="upper left", fontsize=8, framealpha=0.9, ncol=6)
-
-    fig.tight_layout(pad=1.0)
+    _legend_below(fig, ax, handles=patches, fontsize=8)
     return fig
 
 
@@ -824,9 +892,8 @@ def make_annual_kwh(df, model, n, home="journey"):
         matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
     ax.set_xlabel("Year")
     ax.set_ylabel("kWh / year")
-    ax.legend(fontsize=7, framealpha=0.8, loc="upper left")
     _style(ax)
-    fig.tight_layout(pad=1.0)
+    _legend_below(fig, ax, fontsize=7)
     return fig
 
 
@@ -863,10 +930,8 @@ def make_annual_gas(df, model, n, home="journey"):
         matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
     ax.set_xlabel("Year")
     ax.set_ylabel("Therms / year")
-    if has_any:
-        ax.legend(fontsize=7, framealpha=0.8, loc="upper right")
     _style(ax)
-    fig.tight_layout(pad=1.0)
+    _legend_below(fig, ax, fontsize=7)
     return fig
 
 
@@ -890,10 +955,8 @@ def make_annual_gasoline(df, model, n, home="journey"):
     ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
     ax.set_xlabel("Year")
     ax.set_ylabel("Gallons / year")
-    if gallons.sum() > 0:
-        ax.legend(fontsize=7, framealpha=0.8, loc="upper right")
     _style(ax)
-    fig.tight_layout(pad=1.0)
+    _legend_below(fig, ax, fontsize=7)
     return fig
 
 
@@ -938,7 +1001,6 @@ def make_energy_mix_timeline(df, model, n, home="journey"):
     if sum(d.sum() for d in data) > 0:
         ax.stackplot(x, *data, labels=labels, colors=colors, alpha=0.85)
         ax.plot(x, np.sum(data, axis=0), color="#37474F", lw=0.6, alpha=0.4)
-        ax.legend(fontsize=7, framealpha=0.8, loc="upper left")
     else:
         ax.text(0.5, 0.5, "No energy use\nin this scenario",
                 ha="center", va="center", transform=ax.transAxes,
@@ -950,7 +1012,7 @@ def make_energy_mix_timeline(df, model, n, home="journey"):
     ax.set_xlim(1, n)
     ax.margins(x=0)
     _style(ax)
-    fig.tight_layout(pad=1.0)
+    _legend_below(fig, ax, fontsize=7, max_cols=5)
     return fig
 
 
@@ -1002,9 +1064,8 @@ def make_panel_load_timeline(df, model, n):
         matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:.0f} A"))
     ax.set_xlabel("Year")
     ax.set_ylabel("Service load (A)")
-    ax.legend(fontsize=8, framealpha=0.6, loc="lower right")
     _style(ax)
-    fig.tight_layout(pad=1.0)
+    _legend_below(fig, ax, max_cols=2)
     return fig
 
 
@@ -1058,12 +1119,11 @@ def make_hvac_monthly(df, model, n, home="journey"):
     label = "Your journey" if home == "journey" else "Do nothing"
     ax.set_title(f"HVAC monthly energy — {label}, {cal_year}",
                  fontsize=11, fontweight="bold")
-    if heating.sum() + cooling.sum() > 0:
-        ax.legend(fontsize=8, framealpha=0.85)
-    else:
+    if heating.sum() + cooling.sum() == 0:
         ax.text(0.5, 0.5, "No HVAC energy\nthis year", ha="center", va="center",
                 transform=ax.transAxes, fontsize=11, color=_CC_TICK, style="italic")
-    _style(ax); fig.tight_layout()
+    _style(ax)
+    _legend_below(fig, ax, max_cols=2)
     return fig
 
 

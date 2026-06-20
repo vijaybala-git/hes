@@ -570,6 +570,19 @@ class HESModel(mesa.Model):
             "Baseline Gasoline Health":   lambda m: (m.baseline_home.gasoline_gallons_history[-1]
                                                      * m.gasoline_health_cost_per_gallon
                                                      if m.baseline_home.gasoline_gallons_history else 0.0),
+            # Overall social cost = gas-combustion social (§6) + gasoline externalities
+            # (§3). Single source of truth for the "+ social" lines on JC.1, the annual
+            # chart, and the cockpit — so gasoline adders move with their sliders too.
+            "Journey Social Total":   lambda m: (
+                m.journey_home.gas_therms_history[-1] * m.social_cost_config.total_rate
+                + (m.journey_home.gasoline_gallons_history[-1]
+                   * (m.gasoline_climate_cost_per_gallon + m.gasoline_health_cost_per_gallon)
+                   if m.journey_home.gasoline_gallons_history else 0.0)),
+            "Baseline Social Total":  lambda m: (
+                m.baseline_home.gas_therms_history[-1] * m.social_cost_config.total_rate
+                + (m.baseline_home.gasoline_gallons_history[-1]
+                   * (m.gasoline_climate_cost_per_gallon + m.gasoline_health_cost_per_gallon)
+                   if m.baseline_home.gasoline_gallons_history else 0.0)),
         }
         if comparison_mode:
             reporters.update({

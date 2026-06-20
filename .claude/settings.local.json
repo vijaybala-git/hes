@@ -113,7 +113,17 @@
       "Bash(cat .claude/launch.json)",
       "Bash(.venv/Scripts/python.exe -c \"import solara, sys; print\\('solara', solara.__version__\\)\")",
       "Bash(.venv/Scripts/python.exe -m pytest tests/test_rate_resolver.py -q)",
-      "Bash(.venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('src/app.py',encoding='utf-8'\\).read\\(\\)\\); print\\('app.py parses OK'\\)\")"
+      "Bash(.venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('src/app.py',encoding='utf-8'\\).read\\(\\)\\); print\\('app.py parses OK'\\)\")",
+      "Bash(.venv/Scripts/python.exe scripts/build_eia_rates.py --states CA)",
+      "Bash(awk -F: '$1>1136 && $1<2196')",
+      "Bash(../.venv/Scripts/python.exe -c \"import sys; sys.path.insert\\(0,'.'\\); from rate_resolver import RateResolver; r=RateResolver\\(\\); x=r.resolve\\('73301'\\); print\\('TX zip 73301 ->', x.electricity.name, x.electricity.provenance, '/', x.gas.name, x.gas.provenance\\)\")",
+      "Bash(set -e)",
+      "Bash(git branch *)",
+      "Bash(git merge *)",
+      "Bash(.venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('src/app.py',encoding='utf-8'\\).read\\(\\)\\); print\\('app.py OK,', sum\\(1 for _ in open\\('src/app.py',encoding='utf-8'\\)\\), 'lines'\\)\")",
+      "Bash(.venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('src/app.py',encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('src/ui/charts.py',encoding='utf-8'\\).read\\(\\)\\); print\\('both parse'\\)\")",
+      "Bash(cd /d/vijay/MyDocuments/hes && grep -nE \"^import json|^import os|^from ui import|^from ui.state import\" src/ui/layout.py | head)",
+      "Bash(cd \"D:/vijay/MyDocuments/hes\" && rm -f docs/_t_*.png docs/_jc1_*.png && git status --short src/ui/charts.py)"
     ]
   }
 }

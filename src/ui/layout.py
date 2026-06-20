@@ -960,8 +960,8 @@ def _verdict_numbers(df, model):
     # Net social cost avoided by electrifying (baseline social − journey social)
     net_social = 0.0
     try:
-        b_soc = (df.get("Baseline Social Climate", 0) + df.get("Baseline Social Health", 0))
-        j_soc = (df.get("Journey Social Climate",  0) + df.get("Journey Social Health",  0))
+        b_soc = df.get("Baseline Social Total", 0)
+        j_soc = df.get("Journey Social Total", 0)
         net_social = float((b_soc - j_soc).sum())
     except Exception:
         net_social = 0.0
@@ -1146,6 +1146,7 @@ def _SetupCard(collapse_key: str, icon_svg: str, title: str, help_key: str, body
 def _HomeBody():
     with solara.Column(classes=["card-bd"], gap="8px"):
         HomeSummaryCard()
+        PanelSummaryCard()
         SolarSummaryCard()
 
 
@@ -1177,7 +1178,7 @@ def SetupGroup():
                 f"<div style='display:flex;align-items:center;gap:10px;min-width:0'>"
                 f"<span class='ic'>{_CARD_IC['home']}</span>"
                 f"<h3 style='margin:0'>Setup your home</h3>"
-                f"<span class='scope'>— Home &amp; Solar, Energy &amp; Prices, "
+                f"<span class='scope'>— Home, Panel &amp; Solar, Energy &amp; Prices, "
                 f"Social &amp; Health collapse together</span></div>"
             ))
             solara.Button(
@@ -1188,7 +1189,7 @@ def SetupGroup():
             )
         # 3-card grid (flex; collapsed-all CSS turns this into a chip row)
         with solara.Row(classes=["setup-grid"]):
-            _SetupCard("home",   _CARD_IC["home"],   "Home &amp; Solar",
+            _SetupCard("home",   _CARD_IC["home"],   "Home, Panel &amp; Solar",
                        "home_profile",  _HomeBody)
             _SetupCard("energy", _CARD_IC["energy"], "Energy &amp; Prices",
                        "energy_prices", _EnergyBody)
@@ -1197,43 +1198,6 @@ def SetupGroup():
 
 
 # ── v2 §E — Electrification Journey 2-row appliance grid ─────────────────────────
-
-def _subpanel_head(icon_svg: str, name: str, detail_key: str, help_key: str = ""):
-    """Split-card subpanel header: icon+name (flex) + ? help + ⋮ details."""
-    with solara.Row(style="align-items:center; gap:8px"):
-        solara.HTML(tag="div", unsafe_innerHTML=(
-            f"<div class='snm'><span class='di'>{icon_svg}</span>{name}</div>"
-        ), style="flex:1; min-width:0")
-        if help_key:
-            HelpButton(help_key)
-        solara.Button(
-            "",
-            on_click=lambda k=detail_key: detail_open.set(
-                None if detail_open.value == k else k),
-            classes=["iconbtn"],
-            children=[solara.HTML(tag="span", unsafe_innerHTML=(
-                "<svg viewBox='0 0 24 24' fill='currentColor'>"
-                "<circle cx='5' cy='12' r='1.8'/>"
-                "<circle cx='12' cy='12' r='1.8'/>"
-                "<circle cx='19' cy='12' r='1.8'/></svg>"
-            ))],
-        )
-
-
-@solara.component
-def PanelBaseloadSplit():
-    """v2 §E Change 5 — one .device card split into Electrical Panel | Baseload.
-    Per project decision, inline controls are retained (not pushed to modal)."""
-    panel_ic    = _DEVICE_ICONS.get("panel", "")
-    baseload_ic = _DEVICE_ICONS.get("baseload", "")
-    with solara.Column(classes=["device"], style="flex:1.3 1 360px"):
-        with solara.Row(classes=["split2"]):
-            with solara.Column(classes=["subpanel"]):
-                _subpanel_head(panel_ic, "Electrical Panel", "panel", "panel_assessment")
-                _PanelControls()
-            with solara.Column(classes=["subpanel"]):
-                _subpanel_head(baseload_ic, "Baseload", "baseload", "baseload")
-                _BaseloadControls()
 
 
 @solara.component
@@ -1263,7 +1227,7 @@ def JourneyGrid():
             with solara.Row(classes=["jgrid"]):
                 CooktopSummaryCard()
                 DryerSummaryCard()
-                PanelBaseloadSplit()
+                BaseloadSummaryCard()
 
 
 # ── Main Page ──────────────────────────────────────────────────────────────────
