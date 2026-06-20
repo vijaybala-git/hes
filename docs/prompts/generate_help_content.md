@@ -15,7 +15,7 @@ short review report.
 You are the technical writer for WhyWatt. Regenerate the master help file
 `docs/help/help_content.md` — a homeowner/advocate-facing user guide — so that every panel,
 control, chart, and scenario in the app has accurate, plain-English help. A build script
-turns this file into the `docs/help/*.html` pages, so your output must follow its format
+turns this file into the served `public/help/*.html` pages, so your output must follow its format
 exactly.
 
 ---
@@ -31,10 +31,17 @@ exactly.
 3. **`docs/Phase{N}_Spec.md`** (newest) plus earlier `Phase*_Spec.md` for context — the
    source of truth for WHAT each feature is: its parameters, defaults, ranges, and the
    data sources / citations behind every number.
-4. **The code under `src/`** — especially `src/devices/`, `src/*config*.py`,
-   `src/*_loader.py`, `src/panel_assessor.py`, and `app.py` — the source of truth for HOW it
-   actually works: real defaults, real formulas, real ranges, and what is actually
-   implemented versus only specced.
+4. **The code under `src/`** — the source of truth for HOW it actually works: real defaults,
+   real formulas, real ranges, and what is actually implemented versus only specced. The
+   places that matter most:
+   - `src/devices/`, `src/*_loader.py`, `src/panel_assessor.py`, `src/home_config.py`,
+     `src/model.py` — the physics/engine: formulas, ranges, climate and rate resolution.
+   - `src/ui/` — the Solara UI was refactored out of `app.py` into this package
+     (Phase 4.5). The pieces a writer needs: `src/ui/state.py` (every reactive control +
+     `_DEFAULTS` + reset), `src/ui/theme.py` (`CHART_OPTIONS` / `CHART_CODES` — the
+     authoritative chart catalog), `src/ui/charts.py` (`CHART_FNS` — what each chart actually
+     plots), `src/ui/config.py` + `src/ui/layout.py` (the Settings Load/Export/Reset feature),
+     and `src/ui/panels.py`. Treat `app.py` as a thin entrypoint, not the source of truth.
 
 ---
 
@@ -58,10 +65,15 @@ documents, so a reader knows exactly what the app starts with before they touch 
 Pull each default from the code's authoritative source, using the FIRST source below that
 applies. Never invent or infer a value the code does not set.
 
-1. **`_DEFAULTS` dict in `src/app.py`** — the canonical default for every user-facing
-   reactive control: sliders, checkboxes, dropdowns, number inputs. This is the primary
-   registry; most page defaults live here (e.g., `transport_mpg`, `solar_panels`,
-   `external_ev_price_per_kwh`, `social_climate_rate`). Match the dict key to the control.
+1. **The factory defaults file `data/config/whywatt_default.json`** (its `values` block) —
+   the canonical default for every user-facing reactive control: sliders, checkboxes,
+   dropdowns, number inputs. As of Phase 4.5b this JSON is the single source of truth;
+   `src/ui/state.py` loads it into the `_DEFAULTS` dict and every reactive initializes from
+   it (so reading `_DEFAULTS` in `state.py` and reading the JSON give the same value). Most
+   page defaults live here (e.g., `transport_mpg`, `solar_panels`, `external_ev_price_per_kwh`,
+   `social_climate_rate`). Match the dict key to the control. The bundled sample profiles in
+   `data/config/profiles/*.json` are NOT the defaults — they are alternate presets a user can
+   load; never read a default from them.
 2. **JSON data files under `data/`** — defaults the UI loads rather than hard-codes:
    published rates (`data/rates/*.json`), climate constants (`data/climate/*.json`), and the
    default home/appliance/slot configs (`data/homes/*.json`, `data/appliances/*.json`).
@@ -178,6 +190,98 @@ Phase {N}'s spec introduced or changed. But verify the whole file stays internal
 consistent: when one model changes, sections that reference it often need a touch too. For
 example, when solar moved from a "% coverage" slider to a "panels × kW" model, the EV, ACC,
 and chart sections that mention solar also needed updating.
+
+---
+
+## This run — Phase 4 & 4.5 focus (PHASE = 4.5)
+
+Phases 4 and 4.5 turned three things that the help still describes as "future release" or
+"PG&E/Bay-Area only" into live features, and reworked the chart catalog. Treat the items
+below as the priority edits for this run. The Technical-Reference pages §16 (Climate Data)
+and §17 (Electricity & Gas Rates) already document the new climate and rate engines correctly
+— use them as the accurate exemplars, and bring the homeowner-facing pages into line with
+them. Verify everything against the code as always.
+
+### A. Climate is now ZIP-driven (no longer Bay-Area-only)
+
+The model resolves the home's ZIP code to a CEC Building Climate Zone and pulls that zone's
+monthly HDD/CDD and cold-water inlet temperatures (TMYx 2011-2025 data; see §16 and
+`data/climate/`). HVAC (§4) and Water Heater (§5) energy are driven by the *resolved zone*,
+not a single hardcoded Bay Area profile. There is also an optional multi-decade Climate Trend
+(none / RCP 4.5 / RCP 8.5) that scales degree-days over the run.
+
+- Rewrite §2 (Home & Climate): remove the "WhyWatt currently uses Bay Area data for every
+  home / ZIP-based selection is coming in a future release" language. Describe ZIP → CEC zone
+  resolution as live, name the default ZIP/zone from the defaults file, mention the CZ4 (San
+  Jose) fallback for unmatched ZIPs, and point readers to §16 for the full reference. Note the
+  Climate Trend control.
+- Update §4 (HVAC) and §5 (Water Heater): degree-days and inlet temperatures come from the
+  resolved climate zone. Do NOT keep "Bay Area default: 1,910 HDD / 340 CDD" as the live model
+  value — that figure is now only the fixed reference climate used by the formula regression
+  tests, not what a user gets. State the formula and the default *efficiency* values from code;
+  describe the climate inputs as zone-resolved.
+- Refresh the `@popup:` text for `home_profile` and `zip_code` accordingly.
+
+### B. Energy rates are now utility-specific via EIA (no longer a single PG&E number)
+
+Rates are resolved from the home's utility (looked up from ZIP) using federal EIA data, as an
+effective rate (residential revenue ÷ residential energy). The electricity/gas rate-model
+selector offers "My Utility" (EIA per-utility, the `cagr_flat` default), "CA average" (EIA
+statewide), and the ACC-shaped/seasonal options. See §17 for the authoritative method, the
+per-utility numbers, the effective-rate definition, and the ZIP→utility resolution with
+statewide-average fallback and manual override.
+
+- Update §3 (Energy & Prices): describe rates as per-utility EIA effective rates resolved from
+  ZIP, with the three rate-model options above; cross-reference §17. Drop or soften the "all
+  homes use PG&E rates; SCE/SDG&E in a future release" claim — verify against code which
+  utilities actually resolve, and describe what the code does. Keep the escalation-scenario
+  and the gasoline / external-EV-charging content.
+- Refresh the `@popup:` text for `energy_prices` and `rates` so they no longer say prices
+  "start from current PG&E tariff rates."
+- Keep numbers consistent between §3, §17, and the About page (§15).
+
+### C. Settings — Load / Export / Reset (document in §1 Journey Planner)
+
+The masthead has a ⚙ Settings menu (Load… / Export…) plus a ↺ Reset button (see
+`src/ui/layout.py`, backed by `src/ui/config.py`). Load lets a user apply a bundled sample
+profile (`data/config/profiles/*.json`) or drop a settings `.json` they previously exported;
+Export downloads the current settings as a shareable, named `.json`; Reset restores the
+factory defaults. Loading uses REPLACE semantics — any setting absent from a file reverts to
+its factory value.
+
+- Add a new `###` subsection to §1 (Journey Planner) — e.g. "Saving, loading & resetting your
+  plan" — explaining these three actions in plain English (no filenames-as-jargon, no code
+  identifiers). This is prose under the existing §1 page; it does not need its own `@keys`
+  (there is no `[?]` target for the Settings menu — confirm against `src/help_content.py`
+  before adding one).
+
+### D. Charts — rebuild the §14 catalog (the major update)
+
+The chart catalog drifted. The authoritative, user-facing list is `CHART_OPTIONS` in
+`src/ui/theme.py`; the reference code for each chart (JC.x / EU.x / R.x, shown in the chart
+header) is `CHART_CODES` in the same file; what each chart actually plots is the matching
+`make_*` function reached through `CHART_FNS` in `src/ui/charts.py`. Rebuild §14 from these:
+
+- List every chart in `CHART_OPTIONS`, grouped Journey Costs (JC) / Energy Use (EU) /
+  Rates (R), each with its `CHART_CODES` code and exact menu name. Do not invent charts and do
+  not list any that aren't user-selectable (e.g. an internal `make_*` with no `CHART_OPTIONS`
+  entry, such as the gasoline-by-vehicle chart, must be omitted unless it is actually in the
+  menu — verify).
+- Give each chart a genuinely useful 1-3 sentence description: what it shows, what the axes /
+  bars / lines mean, and what decision it helps with — read the `make_*` body so the
+  description matches what's actually drawn (e.g. payback marker on JC.1, the kWh-equivalent
+  conversion and gas-vs-heat-pump comparison on HVAC Monthly Energy, the off-peak/peak band on
+  the rate projection). Aim for the quality of the existing HVAC and Energy-Mix descriptions.
+- Reconcile the chart `@keys`. The per-chart `[?]` popups live in `src/help_content.py`
+  (`chart_*` keys, e.g. `chart_jc1`). The keys there currently cover only a subset
+  (jc1-4, eu1-2, r1-2) of the real catalog (JC.1-6, EU.1-7, R.1-4). In your review report,
+  flag the mismatch between `CHART_CODES`, the `chart_*` keys, and the `_chart_name_to_key`
+  map so a developer can decide whether to add the missing popup keys; only assign a chart to
+  §14's `@keys` if a real key for it exists in the code.
+
+After these edits, re-run the full self-check, paying special attention to: every climate /
+rate / chart number traces to code or §16/§17; nothing still calls ZIP climate or per-utility
+rates a "future release"; and the §14 catalog matches `CHART_OPTIONS` exactly.
 
 ---
 

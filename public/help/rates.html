@@ -44,8 +44,23 @@
   <main>
 
     <h2 id="what-this-means-for-you">What this means for you</h2>
-    <p>WhyWatt uses real PG&E tariff rates as the starting point and projects them forward each year. The escalation you choose has a large effect on the long-term totals — higher escalation makes electrification look better because gas prices rise faster. This is also where you set how many years the simulation covers.</p>
+    <p>WhyWatt prices electricity and gas off your own utility's current rate, looked up from your ZIP code using federal U.S. Energy Information Administration (EIA) data, and projects them forward each year. The escalation you choose has a large effect on the long-term totals — higher escalation makes electrification look better because gas prices rise faster. This is also where you set how many years the simulation covers.</p>
 <p>The panel groups four price streams: home electricity, natural gas, gasoline, and external (public or workplace) EV charging. Electricity and gas can each be compared across two scenarios; gasoline and external EV charging are single shared prices that apply to both scenarios.</p>
+
+    <h2 id="which-rate-you-pay">Which rate you pay</h2>
+    <p>Each fuel offers three rate models:</p>
+<ul>
+<li>My Utility (default): your utility's own effective rate — total residential revenue divided</li>
+</ul>
+<p>by total residential energy — from federal EIA data. At the default San Jose ZIP this is Pacific Gas & Electric.</p>
+<ul>
+<li>California average: the statewide blended rate, used automatically when a ZIP can't be</li>
+</ul>
+<p>matched to a utility.</p>
+<ul>
+<li>ACC-shaped (electricity) or ACC-seasonal (gas): the CPUC Avoided Cost Calculator rate shape.</li>
+</ul>
+<p>WhyWatt currently prices the three large California investor-owned utilities — PG&E, Southern California Edison (SCE), and San Diego Gas & Electric (SDG&E). The Electricity & Gas Rates technical reference documents the method, the per-utility numbers, and the fallback in full.</p>
 
     <h2 id="escalation-scenarios">Escalation scenarios</h2>
     <ul>
@@ -54,10 +69,10 @@
 <li>Stress (CEC): electricity +10%/yr, gas +12%/yr</li>
 </ul>
 
-    <h2 id="base-rates-2025">Base rates (2025)</h2>
+    <h2 id="base-rates-pg-e-2024-eia">Base rates (PG&amp;E, 2024 EIA)</h2>
     <ul>
-<li>Electricity (PG&E E-1): $0.386/kWh (Cal Advocates Q2 2025 report)</li>
-<li>Gas (PG&E G-1): $2.08/therm (PG&E Advice Letter 5014-G1, Jan 2025)</li>
+<li>Electricity: $0.396/kWh (PG&E residential effective rate, EIA 2024)</li>
+<li>Gas: $2.31/therm (PG&E residential effective rate, EIA 2024)</li>
 <li>Gasoline: $4.50/gallon (California retail average)</li>
 <li>External EV charging: $0.25/kWh (median US public Level 2 rate)</li>
 </ul>
@@ -72,15 +87,15 @@
 </ul>
 <p>scenarios; only electricity and gas are scenario-split.</p>
 <ul>
-<li>All homes in the simulation use PG&E rates. Other California utilities</li>
+<li>All three large California utilities are priced (PG&E, SCE, SDG&E); a ZIP outside their</li>
 </ul>
-<p>(SCE, SDG&E) will be supported in a future release.</p>
+<p>territory falls back to the California statewide average.</p>
 
     <h2 id="default-values">Default values</h2>
     <ul>
 <li>Model timeline — 20 years</li>
-<li>Electricity rate model — CAGR Flat, +7%/yr</li>
-<li>Gas rate model — CAGR Flat, +8%/yr</li>
+<li>Electricity rate model — My Utility (EIA per-utility), +7%/yr</li>
+<li>Gas rate model — My Utility (EIA per-utility), +8%/yr</li>
 <li>Gasoline price — $4.50/gal, +0%/yr</li>
 <li>External EV charging price — $0.25/kWh, +3%/yr</li>
 <li>Compare two scenarios (A vs B) — off</li>
@@ -88,9 +103,8 @@
 
     <h2 id="data-sources">Data sources</h2>
     <ul>
-<li>PG&E E-1 tariff: Cal Advocates Q2 2025 report</li>
-<li>PG&E G-1 tariff: PG&E Advice Letter 5014-G1, January 2025</li>
-<li>Historical CAGR: EIA retail electricity and gas price series, 2014-2024</li>
+<li>Electricity & gas rates: U.S. EIA — Form EIA-861M (electric) and Form EIA-176 (gas), 2024</li>
+<li>ACC rate shape: CPUC/E3 Avoided Cost Calculator 2024</li>
 <li>External EV charging: published public Level 2 charging rates (2024)</li>
 </ul>
 <p>---</p>

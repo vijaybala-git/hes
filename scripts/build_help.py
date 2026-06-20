@@ -9,11 +9,18 @@ USAGE:
 
 RUN FROM the project root (D:/vijay/MyDocuments/hes).
 
-OUTPUT:
-    docs/help/*.html        — one HTML file per section (source of truth)
-    public/help/*.html      — served copy (Solara serves public/ at /static/public/)
+SOURCE (the only hand-edited files, under docs/help/):
+    help_content.md         — section content (the single source of truth)
+    _generated/*.md         — @include fragments (climate/rate tables)
+    _template.html          — dev reference for the page layout (not served)
+
+OUTPUT (all generated; Solara serves project-root public/ at /static/public/):
+    public/help/*.html      — one HTML file per section + a generated index.html
     public/assets/          — logo copied so served pages render it
     src/help_content.py     — regenerated HELP_POPUPS dict
+
+The app reads public/help/*.html (help_utils._HELP_URL_BASE = /static/public/help/).
+Nothing is written under docs/help/ — that directory holds only source.
 
 This script is run by developers after an editor updates help_content.md.
 Editors do not run this script themselves.
@@ -28,10 +35,10 @@ from pathlib import Path
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 ROOT        = Path(__file__).parent.parent
-CONTENT_MD  = ROOT / "docs" / "help" / "help_content.md"
-HELP_DIR    = ROOT / "docs" / "help"
+SOURCE_DIR  = ROOT / "docs" / "help"          # hand-edited source (md + includes)
+CONTENT_MD  = SOURCE_DIR / "help_content.md"
 HELP_PY     = ROOT / "src" / "help_content.py"
-# Served copy — Solara serves project-root public/ at /static/public/
+# Generated, served output — Solara serves project-root public/ at /static/public/
 PUBLIC_HELP   = ROOT / "public" / "help"
 PUBLIC_ASSETS = ROOT / "public" / "assets"
 
@@ -304,48 +311,209 @@ def render_html(section: HelpSection) -> str:
 """
 
 
+# ── Index page generator ────────────────────────────────────────────────────────
+
+# Curated grouping for the help index, keyed by html_file so the index never drifts
+# from the sections. Any section whose file is not listed here still appears, under a
+# "More help" group — so a new section can never silently fall off the index.
+_INDEX_GROUPS: list[tuple[str, list[str]]] = [
+    ("Getting started",        ["journey.html"]),
+    ("Your home",              ["climate.html", "baseload.html", "panel.html"]),
+    ("Appliances & vehicles",  ["hvac.html", "water_heating.html", "dryer.html",
+                                "cooktop.html", "ev.html", "solar.html"]),
+    ("Energy prices",          ["rates.html", "acc.html"]),
+    ("Charts",                 ["charts.html"]),
+    ("Costs beyond the bill",  ["social_cost.html"]),
+    ("Technical reference",    ["climate_data.html", "rates_reference.html"]),
+    ("About",                  ["about.html"]),
+]
+
+_INDEX_CSS = """
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+           max-width: 760px; margin: 2rem auto; padding: 0 1.5rem;
+           color: #222; line-height: 1.65; }
+    header { display: flex; align-items: center; gap: 1rem;
+             border-bottom: 2px solid #E8EAF6; padding-bottom: 1rem; margin-bottom: 1.5rem; }
+    header img { height: 48px; }
+    header h1 { margin: 0; font-size: 1.6rem; color: #1A237E; }
+    .intro { background: #E8EAF6; border-radius: 6px; padding: 0.8rem 1.2rem;
+             margin-bottom: 2rem; font-size: 0.95rem; color: #283593; }
+    h2 { margin-top: 2rem; padding-bottom: 0.3rem;
+         border-bottom: 1px solid #E8EAF6; color: #283593; font-size: 1.05rem; }
+    ul { margin: 0.4rem 0 1rem 0; padding-left: 1.4rem; }
+    li { margin: 0.35rem 0; }
+    a { color: #3F51B5; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #E8EAF6;
+             font-size: 0.78rem; color: #9E9E9E; }
+    footer a { color: #9E9E9E; }
+""".strip()
+
+
+def render_index(sections: list[HelpSection]) -> str:
+    """Generate index.html from the parsed sections — links to each page (never a
+    per-chart anchor, which would drift), grouped by _INDEX_GROUPS with a fallback."""
+    by_file = {s.html_file: s for s in sections}
+    placed: set[str] = set()
+    blocks: list[str] = []
+
+    def _li(s: HelpSection) -> str:
+        return f'    <li><a href="{s.html_file}">{s.title.replace("&", "&amp;")}</a></li>'
+
+    for group_name, files in _INDEX_GROUPS:
+        items = [_li(by_file[f]) for f in files if f in by_file]
+        for f in files:
+            if f in by_file:
+                placed.add(f)
+        if items:
+            blocks.append(f"  <h2>{group_name}</h2>\n  <ul>\n" + "\n".join(items) + "\n  </ul>")
+
+    leftovers = [s for s in sections if s.html_file not in placed]
+    if leftovers:
+        items = "\n".join(_li(s) for s in leftovers)
+        blocks.append("  <h2>More help</h2>\n  <ul>\n" + items + "\n  </ul>")
+
+    body = "\n\n".join(blocks)
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WhyWatt Help</title>
+  <style>
+{textwrap.indent(_INDEX_CSS, "    ")}
+  </style>
+</head>
+<body>
+  <header>
+    <img src="../assets/whywatt_logo.svg" alt="WhyWatt"
+         onerror="this.style.display='none'">
+    <h1>WhyWatt Help</h1>
+  </header>
+
+  <div class="intro">
+    This help system explains how WhyWatt models your home's electrification journey —
+    where the numbers come from, what assumptions are made, and what the charts mean.
+    Click any topic below or use the <strong>[?]</strong> buttons inside the app for
+    quick summaries.
+  </div>
+
+{body}
+
+  <footer>
+    WhyWatt v3.0 &middot; <a href="about.html">About this tool</a>
+  </footer>
+</body>
+</html>
+"""
+
+
 # ── help_content.py generator ──────────────────────────────────────────────────
 
-# Keys that map chart names to popup keys — not in .md, kept stable here
+# Keys that map chart names to popup keys — not in .md, kept stable here.
+# Names MUST match CHART_OPTIONS in src/ui/theme.py; keys are aligned to the chart's
+# reference code in CHART_CODES (chart_jc1 ↔ JC.1, chart_eu7 ↔ EU.7, chart_r3 ↔ R.3).
 _CHART_NAME_TO_KEY = {
-    "Cumulative Energy Costs":    "chart_jc2",
-    "Annual Cost by Year":        "chart_jc1",
-    "Cost Breakdown by Category": "chart_jc4",
-    "Cost by Device":             "chart_jc4",
-    "Summary":                    "chart_jc3",
-    "ACC Rate Projection":        "chart_r2",
-    "Energy Use by Device":       "chart_eu2",
+    # Journey Costs (JC)
+    "Cumulative Energy Costs":        "chart_jc1",
+    "Annual Cost by Year":            "chart_jc2",
+    "Cost Breakdown by Category":     "chart_jc3",
+    "Equipment Replacements (CapEx)": "chart_jc4",
+    "Journey Timeline":               "chart_jc5",
+    "Estimated Electrical Load":      "chart_jc6",
+    # Energy Use (EU)
+    "Home Energy Cost by Device":     "chart_eu1",
+    "Home Energy Use by Device":      "chart_eu2",
+    "Annual kWh by Device":           "chart_eu3",
+    "Annual Gas by Device":           "chart_eu4",
+    "Energy Mix Timeline":            "chart_eu6",
+    "HVAC Monthly Energy":            "chart_eu7",
+    # Rates (R)
+    "Electric CAGR Projection":       "chart_r1",
+    "Gas CAGR Projection":            "chart_r2",
+    "ACC Rate Projection":            "chart_r3",
+    "Electricity Rate Shape":         "chart_r4",
 }
 
-# Extra popup entries not tied to a page section (chart entries use chart keys)
+# Extra popup entries not tied to a page section (chart entries use chart keys).
+# One per user-selectable chart in CHART_OPTIONS; text describes what the matching
+# make_* builder in src/ui/charts.py actually plots. Keep each to 2–3 sentences.
 _EXTRA_POPUP_KEYS = {
-    "chart_jc1": ("Annual cost is the total energy bill for that simulation year — "
-                  "electricity plus gas — for your journey home vs. the do-nothing baseline. "
-                  "The gap between the lines is your annual saving (or cost) in that year.",
-                  "charts.html#jc1"),
-    "chart_jc2": ("Cumulative cost adds up every year's bill from year 1 onward. "
-                  "The crossover point — where the journey line dips below do-nothing — "
-                  "is your payback year.",
-                  "charts.html#jc2"),
-    "chart_jc3": ("The summary bar shows total 20-year spend for each scenario side by side. "
-                  "The difference is your estimated lifetime savings from electrification.",
-                  "charts.html#jc3"),
-    "chart_jc4": ("Each segment shows one appliance's share of the annual energy bill. "
-                  "Watching this chart across years shows which swaps have the biggest cost impact.",
-                  "charts.html#jc4"),
-    "chart_r1":  ("Rates are projected forward from today's PG&E tariff using a compound annual "
-                  "growth rate (CAGR). You can choose conservative, moderate, or stress scenarios.",
-                  "rates.html#projection"),
-    "chart_r2":  ("The ACC (Avoided Cost of Carbon) seasonal shape shows how the effective "
-                  "electricity rate varies by month under the CPUC's avoided-cost framework. "
-                  "Summer peak hours carry the highest effective rate.",
+    # ── Journey Costs (JC) ──────────────────────────────────────────────────────
+    "chart_jc1": ("Cumulative energy cost adds up every year's bill from year 1 onward, for "
+                  "your journey vs. the do-nothing baseline. The crossover — where the journey "
+                  "line dips below do-nothing — is your payback year, marked on the chart. "
+                  "Dotted lines add the social & health cost of gas and gasoline when enabled.",
+                  "charts.html"),
+    "chart_jc2": ("Annual cost is the total energy bill for a single simulation year — "
+                  "electricity, gas, gasoline, and external EV charging — for your journey vs. "
+                  "do-nothing. The gap in any year is your saving (or extra cost) that year; "
+                  "social & health costs stack on top when enabled.",
+                  "charts.html"),
+    "chart_jc3": ("A stacked view of cumulative cost split by category — heating, cooling, "
+                  "water heating, baseload, cooking, and transportation — with gas and gasoline "
+                  "social costs layered on top when enabled. Use the scenario toggle to switch "
+                  "between your journey and do-nothing.",
+                  "charts.html"),
+    "chart_jc4": ("The one-time install costs of each appliance, colored by device and plotted "
+                  "in the year they occur — your journey (solid bars) beside the do-nothing "
+                  "wear-out replacements (hatched). The box totals net capital over the period "
+                  "in today's dollars.",
+                  "charts.html"),
+    "chart_jc5": ("A year-by-year map of your electrification journey: each appliance swap and "
+                  "add-on (solar, panel, EV charger) is a marker on the year it happens, with "
+                  "its net cost. Do-nothing wear-out replacements appear below the rail so you "
+                  "can compare the two timelines.",
+                  "charts.html"),
+    "chart_jc6": ("Your home's estimated electrical service load, in amps, as each electric "
+                  "appliance comes online — against your panel's capacity line. It uses the NEC "
+                  "Article 220 method to flag whether a panel upgrade is needed and in which "
+                  "year.",
+                  "charts.html"),
+    # ── Energy Use (EU) ─────────────────────────────────────────────────────────
+    "chart_eu1": ("A stacked area of annual home-energy cost by appliance, year over year. It "
+                  "counts only energy on your home meter — gasoline and external public EV "
+                  "charging are excluded. Switch scenarios with the toggle to see which swaps "
+                  "cut cost most.",
+                  "charts.html"),
+    "chart_eu2": ("A stacked area of annual home-energy use by appliance in kilowatt-hour-"
+                  "equivalent terms (gas converted at 29.3 kWh per therm). Like the cost view, "
+                  "it excludes gasoline and external EV charging — only what lands on your home "
+                  "meter.",
+                  "charts.html"),
+    "chart_eu3": ("Actual electricity used by each appliance per year, in kilowatt-hours, as "
+                  "stacked bars. For an electric vehicle this counts home charging only.",
+                  "charts.html"),
+    "chart_eu4": ("Natural gas used by each appliance per year, in therms, as stacked bars. As "
+                  "gas appliances are swapped for electric ones, these bars shrink toward zero.",
+                  "charts.html"),
+    "chart_eu6": ("A stacked view of where your home's energy comes from each year, in "
+                  "kilowatt-hour-equivalent terms: natural gas, gasoline, grid electricity, your "
+                  "own solar, and external EV charging. It tells the decarbonization story at a "
+                  "glance as gas shrinks and solar grows.",
+                  "charts.html"),
+    "chart_eu7": ("The heat pump's energy across the twelve months of the HVAC-swap year, split "
+                  "into heating (bottom) and cooling (top). Do-nothing gas heating is shown in "
+                  "kilowatt-hour-equivalent (29.3 kWh per therm) so a gas furnace and a heat "
+                  "pump sit on the same axis; cooling is omitted for homes that have none.",
+                  "charts.html"),
+    # ── Rates (R) ───────────────────────────────────────────────────────────────
+    "chart_r1":  ("Your electricity price projected forward each year from your utility's "
+                  "current EIA effective rate, using the escalation you choose. A second dashed "
+                  "line appears when you compare two scenarios.",
+                  "rates.html"),
+    "chart_r2":  ("Your natural-gas price projected forward each year from your utility's "
+                  "current EIA effective rate, using the escalation you choose. A second dashed "
+                  "line appears when you compare two scenarios.",
+                  "rates.html"),
+    "chart_r3":  ("Electricity and gas prices projected forward together, with a shaded band "
+                  "showing the seasonal or hourly range under the CPUC Avoided Cost Calculator "
+                  "when an ACC rate model is selected. The center line is the annual average.",
                   "acc.html"),
-    "chart_eu1": ("Annual energy consumption in physical units — kilowatt-hours for electricity "
-                  "and therms for gas. This shows how much energy is used before applying rates.",
-                  "charts.html#eu1"),
-    "chart_eu2": ("Each segment shows one appliance's share of total energy consumption. "
-                  "Compare journey vs. do-nothing to see which swaps reduce energy use most.",
-                  "charts.html#eu2"),
+    "chart_r4":  ("A heatmap of how the effective electricity rate varies by hour of day and "
+                  "month under the CPUC Avoided Cost Calculator. Summer afternoon and winter "
+                  "evening peaks carry the highest avoided cost. Shown only when an ACC-shaped "
+                  "electricity model is selected.",
+                  "acc.html"),
 }
 
 
@@ -445,36 +613,36 @@ def main():
         print("  Parse OK — no files written (--check mode)")
         return
 
-    # Write HTML files
+    # Write section HTML directly to the served dir (public/help/).
+    PUBLIC_HELP.mkdir(parents=True, exist_ok=True)
     written_html = []
     for section in sections:
-        out_path = HELP_DIR / section.html_file
-        html = render_html(section)
-        out_path.write_text(html, encoding="utf-8")
+        out_path = PUBLIC_HELP / section.html_file
+        out_path.write_text(render_html(section), encoding="utf-8")
         written_html.append(section.html_file)
         print(f"  wrote {out_path.relative_to(ROOT)}")
+
+    # Generate the help index (from the sections, so it never drifts).
+    (PUBLIC_HELP / "index.html").write_text(render_index(sections), encoding="utf-8")
+    print(f"  wrote {(PUBLIC_HELP / 'index.html').relative_to(ROOT)}")
 
     # Write help_content.py
     py_content = render_help_content_py(sections)
     HELP_PY.write_text(py_content, encoding="utf-8")
     print(f"  wrote {HELP_PY.relative_to(ROOT)}")
 
-    # Sync served copy: all docs/help/*.html (generated + hand-written index/about)
-    # → public/help/, plus the logo the pages reference at ../assets/.
+    # Copy the logo the served pages reference at ../assets/.
     import shutil
-    PUBLIC_HELP.mkdir(parents=True, exist_ok=True)
-    for html in HELP_DIR.glob("*.html"):
-        shutil.copy2(html, PUBLIC_HELP / html.name)
-    print(f"  synced {len(list(HELP_DIR.glob('*.html')))} html -> {PUBLIC_HELP.relative_to(ROOT)}")
     logo = ROOT / "docs" / "assets" / "whywatt_logo.svg"
     if logo.exists():
         PUBLIC_ASSETS.mkdir(parents=True, exist_ok=True)
         shutil.copy2(logo, PUBLIC_ASSETS / logo.name)
-        print(f"  synced logo -> {(PUBLIC_ASSETS / logo.name).relative_to(ROOT)}")
+        print(f"  copied logo -> {(PUBLIC_ASSETS / logo.name).relative_to(ROOT)}")
 
-    print(f"\nDone. {len(written_html)} HTML files + help_content.py regenerated.")
+    print(f"\nDone. {len(written_html)} section pages + index.html + help_content.py "
+          f"-> public/help/.")
     print("\nNext steps:")
-    print("  1. git add docs/help/*.html src/help_content.py")
+    print("  1. git add public/help/ src/help_content.py docs/help/help_content.md")
     print('  2. git commit -m "Rebuild help from help_content.md"')
 
 

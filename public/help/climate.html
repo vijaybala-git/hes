@@ -47,8 +47,11 @@
     <p>Your home profile tells WhyWatt how much energy your appliances use. A larger home needs more heating and cooling. Better insulation (lower UA value) means the HVAC works less hard. Heating and cooling are driven by your local climate, expressed as monthly heating and cooling degree-days (HDD/CDD).</p>
 
     <h2 id="climate-data">Climate data</h2>
-    <p>WhyWatt currently uses a single Bay Area climate profile (San Jose) for every home — about 1,910 heating degree-days and 340 cooling degree-days per year, from NOAA TMY3 data. This fits most of the Bay Area well, but understates heating in colder inland and mountain areas and cooling in the hot Central Valley.</p>
-<p>ZIP-based climate selection — mapping your ZIP code to one of California's 16 official CEC Building Climate Zones — is coming in a future release. Until then, homes outside the Bay Area should treat the heating and cooling numbers as approximate.</p>
+    <p>WhyWatt looks up your ZIP code, finds your California Energy Commission (CEC) Building Climate Zone, and drives heating and cooling from that zone's real monthly degree-day data. The default ZIP, 95112 (San Jose), maps to Climate Zone 4 — about 2,240 heating degree-days and 550 cooling degree-days a year. Change the ZIP and the whole climate profile changes with it.</p>
+<p>California has 16 official climate zones, from the foggy coast to the hot Central Valley and cold mountains. A ZIP that isn't in the lookup table falls back to Zone 4 (San Jose) with a note on screen. The full per-zone data and its sources are documented in the Climate Data technical reference.</p>
+
+    <h2 id="climate-trend-optional">Climate trend (optional)</h2>
+    <p>You can optionally layer a multi-decade warming trend on top of today's climate. Set the Climate Trend control to a moderate (RCP 4.5) or high (RCP 8.5) emissions path and each future year gets slightly fewer heating degree-days and more cooling degree-days, so a 20-year run reflects warmer winters and hotter summers. "None" keeps today's typical-year climate flat. The per-zone trend rates are documented in the Climate Data reference.</p>
 
     <h2 id="insulation-quality">Insulation quality</h2>
     <p>The UA value (heat loss rate, in BTU per hour per degree Fahrenheit) measures how fast your home loses heat:</p>
@@ -60,9 +63,9 @@
 
     <h2 id="key-assumptions">Key assumptions</h2>
     <ul>
-<li>Climate data comes from NOAA TMY3 (1991-2005 composite) — a multi-year</li>
+<li>Climate data is a typical meteorological year (TMYx 2011-2025) — a multi-year</li>
 </ul>
-<p>statistical average, not any single year.</p>
+<p>statistical average for your zone, not any single year.</p>
 <ul>
 <li>Floor area and bedroom count scale the baseload (lights and plugs) consumption.</li>
 </ul>
@@ -70,18 +73,20 @@
     <h2 id="default-values">Default values</h2>
     <ul>
 <li>ZIP code — 95112 (San Jose)</li>
-<li>Climate zone — CZ12</li>
+<li>Climate zone — Zone 4 (resolved from the ZIP; display only)</li>
+<li>Climate trend — None</li>
 <li>Bedrooms — 3</li>
 <li>Floor area — 1,800 sq ft</li>
 <li>Year built — 1985</li>
 <li>Insulation quality — Average (UA = 500)</li>
-<li>Main panel size — 200 amps</li>
+<li>Main panel size — 100 amps</li>
 </ul>
 
     <h2 id="data-sources">Data sources</h2>
     <ul>
-<li>CEC Title 24 ZIP-to-climate-zone table</li>
-<li>NOAA TMY3 station data (NREL)</li>
+<li>CEC Title 24 Building Climate Zones by ZIP Code table</li>
+<li>TMYx 2011-2025 weather data (climate.onebuilding.org, from NOAA's Integrated Surface Database)</li>
+<li>Cal-Adapt LOCA climate projections (climate trend)</li>
 </ul>
 <p>---</p>
   </main>

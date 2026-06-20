@@ -2,7 +2,7 @@
 help_utils.py — Help system utilities for WhyWatt.
 
 Provides:
-  help_url(page, anchor)   — build the served URL for a docs/help/*.html page
+  help_url(page, anchor)   — build the served URL for a public/help/*.html page
   HelpLink(label, topic)   — anchor that opens a help page in a new browser tab
   HelpButton(topic_key)    — small circular [?] button
   HelpPopupOverlay()       — single overlay instance; place once in Page()
@@ -23,11 +23,9 @@ _HELP_URL_BASE = "/static/public/help/"
 help_open = solara.reactive("")
 
 # Friendlier popup titles for chart keys (otherwise "chart_jc2" → "Jc2").
-# Reverse the chart-name→key map, then fill in keys with no chart name.
+# Reverse the chart-name→key map — it covers every user-selectable chart, so each
+# chart_* key resolves to its exact menu name (chart_jc1 → "Cumulative Energy Costs").
 _TOPIC_TITLES: dict[str, str] = {key: name for name, key in CHART_NAME_TO_HELP_KEY.items()}
-_TOPIC_TITLES.setdefault("chart_jc1", "Annual Cost by Year")
-_TOPIC_TITLES.setdefault("chart_r1",  "Rate Projection")
-_TOPIC_TITLES.setdefault("chart_eu1", "Annual Energy Use")
 
 
 def _topic_title(key: str) -> str:

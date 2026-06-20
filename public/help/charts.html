@@ -44,26 +44,31 @@
   <main>
 
     <h2 id="journey-costs-jc">Journey Costs (JC)</h2>
-    <p>Annual Cost — Your Journey vs. Do Nothing Shows the total energy bill (electricity, gas, gasoline, and external EV charging) for each year of the simulation, for both scenarios side by side. The gap in a given year is your annual saving or cost.</p>
-<p>Cumulative Cost & Payback Crossover Adds up every year's total bill from year 1 onward. The crossover point — where the Journey line dips below Do Nothing — is your payback year. This is often the most compelling chart to show homeowners.</p>
-<p>Cost Breakdown by Category A stacked area where each band is one category's share of the cumulative bill — heating, cooling, water heating, baseload, and transportation.</p>
-<p>Equipment Replacements (CapEx) The one-time install costs of your planned swaps, plotted in the year they occur, so you can see the upfront investment alongside the running savings.</p>
-<p>Journey Timeline A visual timeline of your electrification journey: which appliance is swapped in which year, and when the EV charger and solar come online.</p>
-
-    <h2 id="rates-r">Rates (R)</h2>
-    <p>Electricity and Gas Rate Projection Rates projected forward from today's PG&E tariff using your chosen escalation.</p>
-<p>ACC Seasonal Rate Shape Monthly variation in the effective electricity rate under the CPUC Avoided Cost Calculator framework. Summer afternoon peak hours carry the highest effective rate.</p>
+    <p>JC.1 · Cumulative Energy Costs Adds up every year's energy bill from year 1 onward, for Your Journey vs. Do Nothing. The crossover — where the journey line drops below do-nothing — is your payback year, marked on the chart. When social and health costs are switched on, dotted lines add those hidden costs. Often the most compelling chart to show a homeowner.</p>
+<p>JC.2 · Annual Cost by Year The total energy bill for each single year — electricity, gas, gasoline, and external EV charging — as side-by-side bars for the two scenarios. The gap in any year is your saving or extra cost that year; social and health costs stack on top when enabled.</p>
+<p>JC.3 · Cost Breakdown by Category A stacked view of cumulative cost split by category — heating, cooling, water heating, baseload, cooking, and transportation — with gas and gasoline social costs layered on top when enabled. Use the scenario toggle to switch between Your Journey and Do Nothing.</p>
+<p>JC.4 · Equipment Replacements (CapEx) The one-time install costs of each appliance, colored by device and plotted in the year they happen — Your Journey (solid bars) beside the Do Nothing wear-out replacements (hatched). A box totals the net capital difference over the period, in today's dollars.</p>
+<p>JC.5 · Journey Timeline A year-by-year map of your journey: each appliance swap and add-on (solar, panel, EV charger) is a marker in the year it happens, with its net cost. Do Nothing wear-out replacements appear below the rail so you can compare the two paths.</p>
+<p>JC.6 · Estimated Electrical Load Your home's estimated electrical service load, in amps, rising as each electric appliance comes online — against your panel's capacity line. It uses the NEC (National Electrical Code) Article 220 method to flag whether, and when, a panel upgrade is needed.</p>
 
     <h2 id="energy-use-eu">Energy Use (EU)</h2>
-    <p>Cost by Device and Energy Use by Device Per-appliance breakdowns of annual cost and energy. Compare journey vs. do-nothing to see which swaps matter most.</p>
-<p>Annual kWh by Device and Annual Gas by Device Electricity (kilowatt-hours) and gas (therms) used by each appliance per year. For an electric vehicle, the kWh chart counts home charging only.</p>
-<p>HVAC Monthly Energy The HVAC system's energy across the twelve months of the year HVAC is swapped, split into heating (lower bars) and cooling (stacked on top). Do-nothing gas heating is shown in kilowatt-hour-equivalent (29.3 kWh per therm) so it sits on the same axis as the electric heat pump; cooling is omitted for homes that have none. Switch the scenario toggle to contrast a gas furnace against a heat pump month by month.</p>
-<p>Energy Mix Timeline A stacked view of where your home's energy comes from each year, in kilowatt-hour-equivalent terms: natural gas, grid electricity, your own solar, and external EV charging. It tells the decarbonization story at a glance — gas shrinking, solar growing, and grid use falling as your journey unfolds.</p>
+    <p>EU.1 · Home Energy Cost by Device A stacked area of annual home-energy cost by appliance, year over year. It counts only energy on your home meter — gasoline and public EV charging are excluded. Toggle scenarios to see which swaps cut cost most.</p>
+<p>EU.2 · Home Energy Use by Device The same stacked view in energy terms — kilowatt-hour-equivalent, with gas converted at 29.3 kWh per therm. Like the cost view, it counts only what lands on your home meter.</p>
+<p>EU.3 · Annual kWh by Device Actual electricity used by each appliance per year, in kilowatt-hours, as stacked bars. For an electric vehicle this counts home charging only.</p>
+<p>EU.4 · Annual Gas by Device Natural gas used by each appliance per year, in therms, as stacked bars. As gas appliances are swapped for electric ones, these bars shrink toward zero.</p>
+<p>EU.6 · Energy Mix Timeline A stacked view of where your home's energy comes from each year, in kilowatt-hour-equivalent terms: natural gas, gasoline, grid electricity, your own solar, and external EV charging. It tells the decarbonization story at a glance — gas shrinking, solar growing.</p>
+<p>EU.7 · HVAC Monthly Energy The heat pump's energy across the twelve months of the HVAC-swap year, split into heating (lower bars) and cooling (stacked on top). Do Nothing gas heating is shown in kilowatt-hour-equivalent (29.3 kWh per therm) so a gas furnace and a heat pump sit on the same axis; cooling is omitted for homes that have none. Switch the scenario toggle to contrast a gas furnace against a heat pump month by month.</p>
+
+    <h2 id="rates-r">Rates (R)</h2>
+    <p>R.1 · Electric CAGR Projection Your electricity price projected forward each year from your utility's current rate, using the escalation you chose. A second dashed line appears when you compare two scenarios.</p>
+<p>R.2 · Gas CAGR Projection Your natural-gas price projected forward each year from your utility's current rate, using the escalation you chose. A second dashed line appears when you compare two scenarios.</p>
+<p>R.3 · ACC Rate Projection Electricity and gas prices projected forward together, with a shaded band showing the seasonal or hourly range under the CPUC Avoided Cost Calculator when an ACC rate model is selected. The center line is the annual average.</p>
+<p>R.4 · Electricity Rate Shape A heatmap of how the effective electricity rate varies by hour of day and by month under the CPUC Avoided Cost Calculator. Summer afternoons and winter evenings carry the highest avoided cost. Shown only when an ACC-shaped electricity model is selected.</p>
 
     <h2 id="default-values">Default values</h2>
     <ul>
-<li>Left chart — Cumulative Energy Costs</li>
-<li>Right chart — Journey Timeline</li>
+<li>Left chart — Cumulative Energy Costs (JC.1)</li>
+<li>Right chart — Journey Timeline (JC.5)</li>
 <li>Device chart scenario toggle — Your Journey</li>
 </ul>
 <p>---</p>

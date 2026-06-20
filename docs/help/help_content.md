@@ -65,6 +65,21 @@ Years 1-2 still use the gas furnace.
 The calendar year label next to the slider (e.g., "Yr 3 (2028)") is derived
 from the simulation start year.
 
+### Saving, loading & resetting your plan
+
+Everything you set up — your home profile, the appliances and swap years, prices, and the
+options on every panel — is a single "settings" snapshot you can save and reuse. Three
+controls live in the top bar:
+
+- Settings → Export downloads your current setup as a small file you can keep or hand to a
+  colleague or homeowner.
+- Settings → Load brings a setup back. Pick one of the built-in samples (for example San Diego
+  or Los Angeles), or drop in a file you exported earlier. Loading replaces every setting at
+  once — anything the file doesn't mention returns to the factory default.
+- Reset returns everything to the factory defaults in one click, so you can start fresh.
+
+Loading or resetting changes the whole comparison, so the two cost curves redraw immediately.
+
 ### Key assumptions
 
 - The simulation is deterministic — no randomness, no uncertainty bands.
@@ -92,8 +107,8 @@ from the simulation start year.
 @file: climate.html
 @keys: home_profile, zip_code
 @popup: Home details — size and insulation quality — affect how much energy each
-  appliance uses. WhyWatt currently uses Bay Area (San Jose) climate data for every
-  home; ZIP-based climate zone selection is coming in a future release.
+  appliance uses. WhyWatt looks up your ZIP code to find your local climate zone and drives
+  all heating and cooling from that zone's real degree-day data.
 
 ### What this means for you
 
@@ -104,14 +119,23 @@ expressed as monthly heating and cooling degree-days (HDD/CDD).
 
 ### Climate data
 
-WhyWatt currently uses a single Bay Area climate profile (San Jose) for every home —
-about 1,910 heating degree-days and 340 cooling degree-days per year, from NOAA TMY3
-data. This fits most of the Bay Area well, but understates heating in colder inland and
-mountain areas and cooling in the hot Central Valley.
+WhyWatt looks up your ZIP code, finds your California Energy Commission (CEC) Building Climate
+Zone, and drives heating and cooling from that zone's real monthly degree-day data. The
+default ZIP, 95112 (San Jose), maps to Climate Zone 4 — about 2,240 heating degree-days and
+550 cooling degree-days a year. Change the ZIP and the whole climate profile changes with it.
 
-ZIP-based climate selection — mapping your ZIP code to one of California's 16 official
-CEC Building Climate Zones — is coming in a future release. Until then, homes outside the
-Bay Area should treat the heating and cooling numbers as approximate.
+California has 16 official climate zones, from the foggy coast to the hot Central Valley and
+cold mountains. A ZIP that isn't in the lookup table falls back to Zone 4 (San Jose) with a
+note on screen. The full per-zone data and its sources are documented in the Climate Data
+technical reference.
+
+### Climate trend (optional)
+
+You can optionally layer a multi-decade warming trend on top of today's climate. Set the
+Climate Trend control to a moderate (RCP 4.5) or high (RCP 8.5) emissions path and each future
+year gets slightly fewer heating degree-days and more cooling degree-days, so a 20-year run
+reflects warmer winters and hotter summers. "None" keeps today's typical-year climate flat.
+The per-zone trend rates are documented in the Climate Data reference.
 
 ### Insulation quality
 
@@ -124,45 +148,63 @@ fast your home loses heat:
 
 ### Key assumptions
 
-- Climate data comes from NOAA TMY3 (1991-2005 composite) — a multi-year
-  statistical average, not any single year.
+- Climate data is a typical meteorological year (TMYx 2011-2025) — a multi-year
+  statistical average for your zone, not any single year.
 - Floor area and bedroom count scale the baseload (lights and plugs) consumption.
 
 ### Default values
 
 - ZIP code — 95112 (San Jose)
-- Climate zone — CZ12
+- Climate zone — Zone 4 (resolved from the ZIP; display only)
+- Climate trend — None
 - Bedrooms — 3
 - Floor area — 1,800 sq ft
 - Year built — 1985
 - Insulation quality — Average (UA = 500)
-- Main panel size — 200 amps
+- Main panel size — 100 amps
 
 ### Data sources
 
-- CEC Title 24 ZIP-to-climate-zone table
-- NOAA TMY3 station data (NREL)
+- CEC Title 24 Building Climate Zones by ZIP Code table
+- TMYx 2011-2025 weather data (climate.onebuilding.org, from NOAA's Integrated Surface Database)
+- Cal-Adapt LOCA climate projections (climate trend)
 
 ---
 
 ## §3 · Energy & Prices
 @file: rates.html
-@keys: energy_prices, rates, chart_r1
-@popup: Energy prices start from current PG&E tariff rates and are projected
-  forward each year. This panel sets electricity, gas, gasoline, and external
-  EV-charging prices, plus how many years to model.
+@keys: energy_prices, rates, chart_r1, chart_r2
+@popup: Energy prices start from your utility's current rates — looked up from your ZIP using
+  federal EIA data — and are projected forward each year. This panel sets electricity, gas,
+  gasoline, and external EV-charging prices, plus how many years to model.
 
 ### What this means for you
 
-WhyWatt uses real PG&E tariff rates as the starting point and projects them
-forward each year. The escalation you choose has a large effect on the long-term
-totals — higher escalation makes electrification look better because gas prices
-rise faster. This is also where you set how many years the simulation covers.
+WhyWatt prices electricity and gas off your own utility's current rate, looked up from your
+ZIP code using federal U.S. Energy Information Administration (EIA) data, and projects them
+forward each year. The escalation you choose has a large effect on the long-term totals —
+higher escalation makes electrification look better because gas prices rise faster. This is
+also where you set how many years the simulation covers.
 
 The panel groups four price streams: home electricity, natural gas, gasoline, and
 external (public or workplace) EV charging. Electricity and gas can each be compared
 across two scenarios; gasoline and external EV charging are single shared prices that
 apply to both scenarios.
+
+### Which rate you pay
+
+Each fuel offers three rate models:
+
+- My Utility (default): your utility's own effective rate — total residential revenue divided
+  by total residential energy — from federal EIA data. At the default San Jose ZIP this is
+  Pacific Gas & Electric.
+- California average: the statewide blended rate, used automatically when a ZIP can't be
+  matched to a utility.
+- ACC-shaped (electricity) or ACC-seasonal (gas): the CPUC Avoided Cost Calculator rate shape.
+
+WhyWatt currently prices the three large California investor-owned utilities — PG&E, Southern
+California Edison (SCE), and San Diego Gas & Electric (SDG&E). The Electricity & Gas Rates
+technical reference documents the method, the per-utility numbers, and the fallback in full.
 
 ### Escalation scenarios
 
@@ -170,10 +212,10 @@ apply to both scenarios.
 - Moderate (default): electricity +7%/yr, gas +8%/yr — matches the 10-year historical average
 - Stress (CEC): electricity +10%/yr, gas +12%/yr
 
-### Base rates (2025)
+### Base rates (PG&E, 2024 EIA)
 
-- Electricity (PG&E E-1): $0.386/kWh (Cal Advocates Q2 2025 report)
-- Gas (PG&E G-1): $2.08/therm (PG&E Advice Letter 5014-G1, Jan 2025)
+- Electricity: $0.396/kWh (PG&E residential effective rate, EIA 2024)
+- Gas: $2.31/therm (PG&E residential effective rate, EIA 2024)
 - Gasoline: $4.50/gallon (California retail average)
 - External EV charging: $0.25/kWh (median US public Level 2 rate)
 
@@ -183,23 +225,22 @@ apply to both scenarios.
   may differ year to year.
 - Gasoline and external EV-charging prices are shared across both comparison
   scenarios; only electricity and gas are scenario-split.
-- All homes in the simulation use PG&E rates. Other California utilities
-  (SCE, SDG&E) will be supported in a future release.
+- All three large California utilities are priced (PG&E, SCE, SDG&E); a ZIP outside their
+  territory falls back to the California statewide average.
 
 ### Default values
 
 - Model timeline — 20 years
-- Electricity rate model — CAGR Flat, +7%/yr
-- Gas rate model — CAGR Flat, +8%/yr
+- Electricity rate model — My Utility (EIA per-utility), +7%/yr
+- Gas rate model — My Utility (EIA per-utility), +8%/yr
 - Gasoline price — $4.50/gal, +0%/yr
 - External EV charging price — $0.25/kWh, +3%/yr
 - Compare two scenarios (A vs B) — off
 
 ### Data sources
 
-- PG&E E-1 tariff: Cal Advocates Q2 2025 report
-- PG&E G-1 tariff: PG&E Advice Letter 5014-G1, January 2025
-- Historical CAGR: EIA retail electricity and gas price series, 2014-2024
+- Electricity & gas rates: U.S. EIA — Form EIA-861M (electric) and Form EIA-176 (gas), 2024
+- ACC rate shape: CPUC/E3 Avoided Cost Calculator 2024
 - External EV charging: published public Level 2 charging rates (2024)
 
 ---
@@ -243,7 +284,8 @@ Where:
 
 ### Key assumptions
 
-- Bay Area default: 1,910 HDD and 340 CDD (NOAA TMY3, San Jose Mineta)
+- Climate: heating and cooling degree-days come from your home's resolved climate zone — the
+  default San Jose zone is about 2,240 HDD and 550 CDD. Change your ZIP to change the climate.
 - UA classes: Poor = 650, Average = 500, Good = 350 BTU/hr/°F
 - Most Bay Area homes have no central air conditioning today; adding a heat pump
   brings cooling as a clean addition, modeled as one combined install.
@@ -264,7 +306,7 @@ Where:
 
 ### Data sources
 
-- Climate data: NOAA TMY3 (NREL), 1991-2005 composite
+- Climate data: TMYx 2011-2025 per CEC climate zone (climate.onebuilding.org / NOAA ISD)
 - Efficiency specs: ENERGY STAR and AHRI reference data (2024)
 
 ---
@@ -316,7 +358,7 @@ uniform energy factor — the appliance's overall water-heating efficiency.
 ### Data sources
 
 - DOE/ENERGY STAR occupancy and hot water use data
-- Monthly inlet water temperatures: NOAA TMY3
+- Monthly cold-water inlet temperatures: per CEC climate zone (TMYx 2011-2025)
 
 ---
 
@@ -682,7 +724,8 @@ must verify before any work is performed.
 
 ### Default values
 
-- Main panel size — 200 amps
+- Main panel size — 100 amps
+- Panel load method — Optional (NEC 220.82)
 - EV charger nameplate — 32 A; induction — 40 A; heat-pump water heater — 15 A; dryer — 30 A
 - Plan 200A upgrade — not planned, Year 1 if enabled
 - Upgrade cost — $3,000
@@ -697,7 +740,7 @@ must verify before any work is performed.
 
 ## §12 · ACC — Avoided Cost of Carbon
 @file: acc.html
-@keys: chart_r2
+@keys: chart_r3, chart_r4
 @popup: The ACC (Avoided Cost Calculator) seasonal shape shows how the
   effective electricity rate varies by month under the CPUC's
   avoided-cost framework. Summer peak hours carry the highest rate.
@@ -755,8 +798,8 @@ They do not show the cost that combustion imposes on public health (air quality
 damage, respiratory illness) and on the global climate (CO2 and methane emissions).
 
 For natural gas, at the default settings these hidden costs total about $2.30 per
-therm — nearly equal to the $2.08/therm market price. For gasoline, the default
-hidden cost is about $2.44 per gallon on top of the pump price. This panel is
+therm — nearly equal to the $2.31/therm market price you actually pay. For gasoline, the
+default hidden cost is about $2.44 per gallon on top of the pump price. This panel is
 informational: advocates can use it to show homeowners the full picture.
 
 ### Natural gas — climate cost ($1.07/therm default)
@@ -815,73 +858,99 @@ Both are added to the modeled gasoline cost only when their checkboxes are on.
 
 ## §14 · Charts Reference
 @file: charts.html
-@keys: chart_jc1, chart_jc2, chart_jc3, chart_jc4, chart_eu1, chart_eu2
+@keys: chart_jc1, chart_jc2, chart_jc3, chart_jc4, chart_jc5, chart_jc6, chart_eu1, chart_eu2, chart_eu3, chart_eu4, chart_eu6, chart_eu7
 @popup: Charts are organized into three groups — Journey Costs (JC),
-  Rates (R), and Energy Use (EU). Select any chart from the dropdown
-  in each chart panel.
+  Energy Use (EU), and Rates (R). Pick any chart from the dropdown above
+  each chart panel; the code (JC.1, EU.7, R.3 …) appears in the chart's header.
 
 ### Journey Costs (JC)
 
-Annual Cost — Your Journey vs. Do Nothing
-Shows the total energy bill (electricity, gas, gasoline, and external EV charging)
-for each year of the simulation, for both scenarios side by side. The gap in a given
-year is your annual saving or cost.
+JC.1 · Cumulative Energy Costs
+Adds up every year's energy bill from year 1 onward, for Your Journey vs. Do Nothing. The
+crossover — where the journey line drops below do-nothing — is your payback year, marked on
+the chart. When social and health costs are switched on, dotted lines add those hidden costs.
+Often the most compelling chart to show a homeowner.
 
-Cumulative Cost & Payback Crossover
-Adds up every year's total bill from year 1 onward. The crossover point
-— where the Journey line dips below Do Nothing — is your payback year.
-This is often the most compelling chart to show homeowners.
+JC.2 · Annual Cost by Year
+The total energy bill for each single year — electricity, gas, gasoline, and external EV
+charging — as side-by-side bars for the two scenarios. The gap in any year is your saving or
+extra cost that year; social and health costs stack on top when enabled.
 
-Cost Breakdown by Category
-A stacked area where each band is one category's share of the cumulative
-bill — heating, cooling, water heating, baseload, and transportation.
+JC.3 · Cost Breakdown by Category
+A stacked view of cumulative cost split by category — heating, cooling, water heating,
+baseload, cooking, and transportation — with gas and gasoline social costs layered on top when
+enabled. Use the scenario toggle to switch between Your Journey and Do Nothing.
 
-Equipment Replacements (CapEx)
-The one-time install costs of your planned swaps, plotted in the year they occur,
-so you can see the upfront investment alongside the running savings.
+JC.4 · Equipment Replacements (CapEx)
+The one-time install costs of each appliance, colored by device and plotted in the year they
+happen — Your Journey (solid bars) beside the Do Nothing wear-out replacements (hatched). A box
+totals the net capital difference over the period, in today's dollars.
 
-Journey Timeline
-A visual timeline of your electrification journey: which appliance is swapped in
-which year, and when the EV charger and solar come online.
+JC.5 · Journey Timeline
+A year-by-year map of your journey: each appliance swap and add-on (solar, panel, EV charger)
+is a marker in the year it happens, with its net cost. Do Nothing wear-out replacements appear
+below the rail so you can compare the two paths.
 
-### Rates (R)
-
-Electricity and Gas Rate Projection
-Rates projected forward from today's PG&E tariff using your chosen escalation.
-
-ACC Seasonal Rate Shape
-Monthly variation in the effective electricity rate under the CPUC
-Avoided Cost Calculator framework. Summer afternoon peak hours carry
-the highest effective rate.
+JC.6 · Estimated Electrical Load
+Your home's estimated electrical service load, in amps, rising as each electric appliance comes
+online — against your panel's capacity line. It uses the NEC (National Electrical Code) Article
+220 method to flag whether, and when, a panel upgrade is needed.
 
 ### Energy Use (EU)
 
-Cost by Device and Energy Use by Device
-Per-appliance breakdowns of annual cost and energy. Compare journey vs.
-do-nothing to see which swaps matter most.
+EU.1 · Home Energy Cost by Device
+A stacked area of annual home-energy cost by appliance, year over year. It counts only energy
+on your home meter — gasoline and public EV charging are excluded. Toggle scenarios to see
+which swaps cut cost most.
 
-Annual kWh by Device and Annual Gas by Device
-Electricity (kilowatt-hours) and gas (therms) used by each appliance per year.
-For an electric vehicle, the kWh chart counts home charging only.
+EU.2 · Home Energy Use by Device
+The same stacked view in energy terms — kilowatt-hour-equivalent, with gas converted at 29.3
+kWh per therm. Like the cost view, it counts only what lands on your home meter.
 
-HVAC Monthly Energy
-The HVAC system's energy across the twelve months of the year HVAC is swapped,
-split into heating (lower bars) and cooling (stacked on top). Do-nothing gas
-heating is shown in kilowatt-hour-equivalent (29.3 kWh per therm) so it sits on
-the same axis as the electric heat pump; cooling is omitted for homes that have
-none. Switch the scenario toggle to contrast a gas furnace against a heat pump
-month by month.
+EU.3 · Annual kWh by Device
+Actual electricity used by each appliance per year, in kilowatt-hours, as stacked bars. For an
+electric vehicle this counts home charging only.
 
-Energy Mix Timeline
-A stacked view of where your home's energy comes from each year, in
-kilowatt-hour-equivalent terms: natural gas, grid electricity, your own solar,
-and external EV charging. It tells the decarbonization story at a glance — gas
-shrinking, solar growing, and grid use falling as your journey unfolds.
+EU.4 · Annual Gas by Device
+Natural gas used by each appliance per year, in therms, as stacked bars. As gas appliances are
+swapped for electric ones, these bars shrink toward zero.
+
+EU.6 · Energy Mix Timeline
+A stacked view of where your home's energy comes from each year, in kilowatt-hour-equivalent
+terms: natural gas, gasoline, grid electricity, your own solar, and external EV charging. It
+tells the decarbonization story at a glance — gas shrinking, solar growing.
+
+EU.7 · HVAC Monthly Energy
+The heat pump's energy across the twelve months of the HVAC-swap year, split into heating
+(lower bars) and cooling (stacked on top). Do Nothing gas heating is shown in
+kilowatt-hour-equivalent (29.3 kWh per therm) so a gas furnace and a heat pump sit on the same
+axis; cooling is omitted for homes that have none. Switch the scenario toggle to contrast a gas
+furnace against a heat pump month by month.
+
+### Rates (R)
+
+R.1 · Electric CAGR Projection
+Your electricity price projected forward each year from your utility's current rate, using the
+escalation you chose. A second dashed line appears when you compare two scenarios.
+
+R.2 · Gas CAGR Projection
+Your natural-gas price projected forward each year from your utility's current rate, using the
+escalation you chose. A second dashed line appears when you compare two scenarios.
+
+R.3 · ACC Rate Projection
+Electricity and gas prices projected forward together, with a shaded band showing the seasonal
+or hourly range under the CPUC Avoided Cost Calculator when an ACC rate model is selected. The
+center line is the annual average.
+
+R.4 · Electricity Rate Shape
+A heatmap of how the effective electricity rate varies by hour of day and by month under the
+CPUC Avoided Cost Calculator. Summer afternoons and winter evenings carry the highest avoided
+cost. Shown only when an ACC-shaped electricity model is selected.
 
 ### Default values
 
-- Left chart — Cumulative Energy Costs
-- Right chart — Journey Timeline
+- Left chart — Cumulative Energy Costs (JC.1)
+- Right chart — Journey Timeline (JC.5)
 - Device chart scenario toggle — Your Journey
 
 ---
@@ -915,10 +984,10 @@ escalation, capital expenditure for appliance swaps, and solar savings.
 
 ### Data sources
 
-- PG&E electricity rate (E-1): Cal Advocates Q2 2025, $0.386/kWh
-- PG&E gas rate (G-1): PG&E Advice Letter 5014-G1 Jan 2025, $2.08/therm
+- Electricity & gas rates: U.S. EIA per-utility effective rates (2024) — PG&E, SCE, SDG&E
+- PG&E example: $0.396/kWh electricity, $2.31/therm gas (EIA 2024)
 - ACC rate shape: CPUC/E3 Avoided Cost Calculator 2024
-- Climate data: NOAA TMY3, San Jose Mineta (Station 724945), 1991-2005 composite
+- Climate data: TMYx 2011-2025 per CEC Building Climate Zone (climate.onebuilding.org / NOAA)
 - Appliance efficiency: ENERGY STAR and AGA reference data (2024)
 - Bedroom scaling: DOE/ENERGY STAR occupancy proxy
 
@@ -928,7 +997,8 @@ escalation, capital expenditure for appliance swaps, and solar savings.
   otherwise the timeline follows your scheduled swaps
 - Income-qualified rebate programs are coming in a future release
 - Monte Carlo uncertainty bands are coming in a future release
-- Only PG&E rates are currently supported (SCE, SDG&E in a future release)
+- Three California investor-owned utilities are priced (PG&E, SCE, SDG&E); a ZIP outside
+  their territory falls back to the California statewide average
 
 ### Disclaimer
 
