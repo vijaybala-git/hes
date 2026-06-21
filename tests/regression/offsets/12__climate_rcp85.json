@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "name": "Climate trend RCP 8.5 (warmer winters)",
+  "base": "12_hot_inland_zone",
+  "description": "Trend offset on 12_hot_inland_zone: Climate trend RCP 8.5 (warmer winters)",
+  "values": {
+    "climate_trend": "rcp85"
+  },
+  "expect": {
+    "devices.HVAC.baseline_final_consumption": "-"
+  }
+}

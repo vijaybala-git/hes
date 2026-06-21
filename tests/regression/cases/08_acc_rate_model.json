@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "name": "08_acc_rate_model",
+  "description": "ACC shaped electricity + seasonal gas pricing engine \u2014 full journey",
+  "based_on": "whywatt_default",
+  "values": {
+    "dryer_swap_planned": true,
+    "cooktop_swap_planned": true,
+    "ev_swap_planned": true,
+    "panel_amps": 200,
+    "elec_rate_model_a": "acc_shaped",
+    "gas_rate_model_a": "acc_seasonal"
+  }
+}

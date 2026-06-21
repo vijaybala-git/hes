@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "name": "Upgrade service 100 -> 200 A",
+  "base": "07_panel_upgrade_trigger",
+  "description": "Trend offset on 07_panel_upgrade_trigger: Upgrade service 100 -> 200 A",
+  "values": {
+    "panel_amps": 200
+  },
+  "expect": {
+    "cockpit.peak_status": "green"
+  }
+}

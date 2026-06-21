@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "name": "Horizon 20 -> 25 years",
+  "base": "06_ca_average_solar",
+  "description": "Trend offset on 06_ca_average_solar: Horizon 20 -> 25 years",
+  "values": {
+    "years": 25
+  },
+  "expect": {
+    "cockpit.journey_cumulative_opex": "+",
+    "cockpit.baseline_cumulative_opex": "+"
+  }
+}

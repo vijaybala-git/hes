@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "name": "NEM 2.0 export (vs NBT/NEM 3)",
+  "base": "02_pge_solar",
+  "description": "Trend offset on 02_pge_solar: NEM 2.0 export (vs NBT/NEM 3)",
+  "values": {
+    "solar_nem_mode": "nem2"
+  },
+  "expect": {
+    "cockpit.journey_cumulative_opex": "-"
+  }
+}

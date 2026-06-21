@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "name": "06_ca_average_solar",
+  "description": "CA statewide-average EIA rates \u2014 full journey + solar",
+  "based_on": "whywatt_default",
+  "values": {
+    "dryer_swap_planned": true,
+    "cooktop_swap_planned": true,
+    "ev_swap_planned": true,
+    "panel_amps": 200,
+    "solar_planned": true,
+    "elec_rate_model_a": "ca_average",
+    "gas_rate_model_a": "ca_average"
+  }
+}

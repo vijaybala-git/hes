@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "name": "Sunnier site (+200 kWh/kW/yr yield)",
+  "base": "04_sce_solar",
+  "description": "Trend offset on 04_sce_solar: Sunnier site (+200 kWh/kW/yr yield)",
+  "values": {
+    "solar_specific_yield": 1700
+  },
+  "expect": {
+    "cockpit.journey_cumulative_opex": "-"
+  }
+}

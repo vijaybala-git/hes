@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "name": "Gas CAGR +4%/yr",
+  "base": "01_pge_no_solar",
+  "description": "Trend offset on 01_pge_no_solar: Gas CAGR +4%/yr",
+  "values": {
+    "gas_cagr_pct_a": 12
+  },
+  "expect": {
+    "cockpit.baseline_cumulative_opex": "+",
+    "cockpit.opex_delta": "+"
+  }
+}

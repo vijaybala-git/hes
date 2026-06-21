@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "name": "ACC gas CAGR +4%/yr",
+  "base": "08_acc_rate_model",
+  "description": "Trend offset on 08_acc_rate_model: ACC gas CAGR +4%/yr",
+  "values": {
+    "acc_gas_cagr_a": 12
+  },
+  "expect": {
+    "cockpit.baseline_cumulative_opex": "+",
+    "cockpit.opex_delta": "+"
+  }
+}

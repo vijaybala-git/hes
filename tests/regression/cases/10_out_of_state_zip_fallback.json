@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "name": "10_out_of_state_zip_fallback",
+  "description": "Texas ZIP 73301 \u2014 utility resolution falls back to CA average",
+  "based_on": "whywatt_default",
+  "values": {
+    "dryer_swap_planned": true,
+    "cooktop_swap_planned": true,
+    "ev_swap_planned": true,
+    "panel_amps": 200,
+    "zip_code": "73301"
+  }
+}

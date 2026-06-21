@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "name": "01_pge_no_solar",
+  "description": "PG&E 95112 \u2014 full electrification journey, no solar",
+  "based_on": "whywatt_default",
+  "values": {
+    "dryer_swap_planned": true,
+    "cooktop_swap_planned": true,
+    "ev_swap_planned": true,
+    "panel_amps": 200
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "name": "12_hot_inland_zone",
+  "description": "Fresno 93720 \u2014 cooling-dominated HVAC baseline (active AC)",
+  "based_on": "whywatt_default",
+  "values": {
+    "dryer_swap_planned": true,
+    "cooktop_swap_planned": true,
+    "ev_swap_planned": true,
+    "panel_amps": 200,
+    "zip_code": "93720",
+    "hvac_has_cooling": true
+  }
+}

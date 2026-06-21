@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "name": "Solar self-consumption 80% -> 50%",
+  "base": "04_sce_solar",
+  "description": "Trend offset on 04_sce_solar: Solar self-consumption 80% -> 50%",
+  "values": {
+    "solar_scf": 50
+  },
+  "expect": {
+    "cockpit.journey_cumulative_opex": "+"
+  }
+}

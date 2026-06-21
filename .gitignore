@@ -25,3 +25,6 @@ Thumbs.db
 # ACC source Excel files (large, not committed)
 scripts/downloads/
 downloads/
+
+# Regression report — regenerated on every run
+tests/regression/report.md

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "name": "Gasoline health cost +$0.25/gal",
+  "base": "11_ice_ev_transport_gasoline",
+  "description": "Trend offset on 11_ice_ev_transport_gasoline: Gasoline health cost +$0.25/gal",
+  "values": {
+    "gasoline_health_cost_per_gallon": 1.0
+  },
+  "expect": {
+    "gasoline.baseline_health_cost": "+",
+    "gasoline.journey_health_cost": "+",
+    "cockpit.net_social_cost_avoided": "+"
+  }
+}

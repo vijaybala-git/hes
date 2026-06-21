@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "name": "Social cost of carbon +$0.50/therm",
+  "base": "06_ca_average_solar",
+  "description": "Trend offset on 06_ca_average_solar: Social cost of carbon +$0.50/therm",
+  "values": {
+    "social_climate_rate": 1.57
+  },
+  "expect": {
+    "cockpit.net_social_cost_avoided": "+"
+  }
+}

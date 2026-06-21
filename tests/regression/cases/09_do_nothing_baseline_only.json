@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "name": "09_do_nothing_baseline_only",
+  "description": "All-gas home, no electrification swaps planned \u2014 isolates the baseline",
+  "based_on": "whywatt_default",
+  "values": {
+    "panel_amps": 200,
+    "hvac_swap_planned": false,
+    "wh_swap_planned": false,
+    "dryer_swap_planned": false,
+    "cooktop_swap_planned": false,
+    "ev_swap_planned": false
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "name": "Heat-pump cooling SEER +4",
+  "base": "12_hot_inland_zone",
+  "description": "Trend offset on 12_hot_inland_zone: Heat-pump cooling SEER +4",
+  "values": {
+    "hp_seer_cooling": 26
+  },
+  "expect": {
+    "devices.HVAC.journey_final_consumption": "-"
+  }
+}

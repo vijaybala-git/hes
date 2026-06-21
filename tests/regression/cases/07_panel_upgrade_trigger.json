@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "name": "07_panel_upgrade_trigger",
+  "description": "100 A service + full electrification \u2014 forces a red panel verdict",
+  "based_on": "whywatt_default",
+  "values": {
+    "dryer_swap_planned": true,
+    "cooktop_swap_planned": true,
+    "ev_swap_planned": true,
+    "panel_amps": 100
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "name": "02_pge_solar",
+  "description": "PG&E 95112 \u2014 full journey + rooftop solar",
+  "based_on": "whywatt_default",
+  "values": {
+    "dryer_swap_planned": true,
+    "cooktop_swap_planned": true,
+    "ev_swap_planned": true,
+    "panel_amps": 200,
+    "solar_planned": true
+  }
+}

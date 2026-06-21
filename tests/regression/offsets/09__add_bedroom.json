@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "name": "+1 bedroom (baseload + hot water)",
+  "base": "09_do_nothing_baseline_only",
+  "description": "Trend offset on 09_do_nothing_baseline_only: +1 bedroom (baseload + hot water)",
+  "values": {
+    "num_bedrooms": 4
+  },
+  "expect": {
+    "cockpit.baseline_cumulative_opex": "+"
+  }
+}

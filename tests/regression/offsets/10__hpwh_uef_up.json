@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "name": "Heat-pump water heater UEF +0.5",
+  "base": "10_out_of_state_zip_fallback",
+  "description": "Trend offset on 10_out_of_state_zip_fallback: Heat-pump water heater UEF +0.5",
+  "values": {
+    "hpwh_uef": 4.0
+  },
+  "expect": {
+    "devices.Water Heater.journey_final_consumption": "-",
+    "cockpit.journey_cumulative_opex": "-"
+  }
+}

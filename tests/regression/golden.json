@@ -1,0 +1,955 @@
+{
+  "schema_version": 1,
+  "generated": "2026-06-20",
+  "app_commit": "63a95fc",
+  "cases": {
+    "01_pge_no_solar": {
+      "cockpit": {
+        "journey_cumulative_opex": 171472,
+        "baseline_cumulative_opex": 139632,
+        "opex_delta": -31841,
+        "payback_year": 2,
+        "net_social_cost_avoided": 42433,
+        "current_load_amps": 41,
+        "peak_amps": 119,
+        "peak_status": "green",
+        "peak_year": 10
+      },
+      "gasoline": {
+        "journey_gallons": 0.0,
+        "baseline_gallons": 428.6,
+        "journey_climate_cost": 0,
+        "baseline_climate_cost": 724,
+        "journey_health_cost": 0,
+        "baseline_health_cost": 321
+      },
+      "devices": {
+        "HVAC": {
+          "journey_cost": 43912,
+          "baseline_cost": 38472,
+          "journey_final_consumption": 2555.1,
+          "baseline_final_consumption": 336.3,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Water Heater": {
+          "journey_cost": 15617,
+          "baseline_cost": 18685,
+          "journey_final_consumption": 889.0,
+          "baseline_final_consumption": 163.3,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Dryer": {
+          "journey_cost": 7692,
+          "baseline_cost": 6544,
+          "journey_final_consumption": 468.0,
+          "baseline_final_consumption": 57.2,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Cooktop": {
+          "journey_cost": 9196,
+          "baseline_cost": 4164,
+          "journey_final_consumption": 655.2,
+          "baseline_final_consumption": 36.4,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Transportation": {
+          "journey_cost": 1929,
+          "baseline_cost": 38571,
+          "journey_final_consumption": 0.0,
+          "baseline_final_consumption": 428.6,
+          "journey_fuel": "gasoline",
+          "baseline_fuel": "gasoline"
+        },
+        "EV Driving": {
+          "journey_cost": 59931,
+          "baseline_cost": 0,
+          "journey_final_consumption": 3311.7,
+          "baseline_final_consumption": 0.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        },
+        "Lights and Appliances": {
+          "journey_cost": 33195,
+          "baseline_cost": 33195,
+          "journey_final_consumption": 1910.0,
+          "baseline_final_consumption": 1910.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        }
+      }
+    },
+    "02_pge_solar": {
+      "cockpit": {
+        "journey_cumulative_opex": 39027,
+        "baseline_cumulative_opex": 139632,
+        "opex_delta": 100605,
+        "payback_year": 1,
+        "net_social_cost_avoided": 42433,
+        "current_load_amps": 41,
+        "peak_amps": 119,
+        "peak_status": "green",
+        "peak_year": 10
+      },
+      "gasoline": {
+        "journey_gallons": 0.0,
+        "baseline_gallons": 428.6,
+        "journey_climate_cost": 0,
+        "baseline_climate_cost": 724,
+        "journey_health_cost": 0,
+        "baseline_health_cost": 321
+      },
+      "devices": {
+        "HVAC": {
+          "journey_cost": 43912,
+          "baseline_cost": 38472,
+          "journey_final_consumption": 2555.1,
+          "baseline_final_consumption": 336.3,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Water Heater": {
+          "journey_cost": 15617,
+          "baseline_cost": 18685,
+          "journey_final_consumption": 889.0,
+          "baseline_final_consumption": 163.3,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Dryer": {
+          "journey_cost": 7692,
+          "baseline_cost": 6544,
+          "journey_final_consumption": 468.0,
+          "baseline_final_consumption": 57.2,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Cooktop": {
+          "journey_cost": 9196,
+          "baseline_cost": 4164,
+          "journey_final_consumption": 655.2,
+          "baseline_final_consumption": 36.4,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Transportation": {
+          "journey_cost": 1929,
+          "baseline_cost": 38571,
+          "journey_final_consumption": 0.0,
+          "baseline_final_consumption": 428.6,
+          "journey_fuel": "gasoline",
+          "baseline_fuel": "gasoline"
+        },
+        "EV Driving": {
+          "journey_cost": 59931,
+          "baseline_cost": 0,
+          "journey_final_consumption": 3311.7,
+          "baseline_final_consumption": 0.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        },
+        "Lights and Appliances": {
+          "journey_cost": 33195,
+          "baseline_cost": 33195,
+          "journey_final_consumption": 1910.0,
+          "baseline_final_consumption": 1910.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        }
+      }
+    },
+    "03_sce_no_solar": {
+      "cockpit": {
+        "journey_cumulative_opex": 129107,
+        "baseline_cumulative_opex": 95679,
+        "opex_delta": -33428,
+        "payback_year": 2,
+        "net_social_cost_avoided": 34480,
+        "current_load_amps": 41,
+        "peak_amps": 119,
+        "peak_status": "green",
+        "peak_year": 10
+      },
+      "gasoline": {
+        "journey_gallons": 0.0,
+        "baseline_gallons": 428.6,
+        "journey_climate_cost": 0,
+        "baseline_climate_cost": 724,
+        "journey_health_cost": 0,
+        "baseline_health_cost": 321
+      },
+      "devices": {
+        "HVAC": {
+          "journey_cost": 25690,
+          "baseline_cost": 11980,
+          "journey_final_consumption": 1861.6,
+          "baseline_final_consumption": 159.8,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Water Heater": {
+          "journey_cost": 11146,
+          "baseline_cost": 10937,
+          "journey_final_consumption": 793.8,
+          "baseline_final_consumption": 145.8,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Dryer": {
+          "journey_cost": 6089,
+          "baseline_cost": 4290,
+          "journey_final_consumption": 468.0,
+          "baseline_final_consumption": 57.2,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Cooktop": {
+          "journey_cost": 7342,
+          "baseline_cost": 2730,
+          "journey_final_consumption": 655.2,
+          "baseline_final_consumption": 36.4,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Transportation": {
+          "journey_cost": 1929,
+          "baseline_cost": 38571,
+          "journey_final_consumption": 0.0,
+          "baseline_final_consumption": 428.6,
+          "journey_fuel": "gasoline",
+          "baseline_fuel": "gasoline"
+        },
+        "EV Driving": {
+          "journey_cost": 49741,
+          "baseline_cost": 0,
+          "journey_final_consumption": 3311.7,
+          "baseline_final_consumption": 0.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        },
+        "Lights and Appliances": {
+          "journey_cost": 27171,
+          "baseline_cost": 27171,
+          "journey_final_consumption": 1910.0,
+          "baseline_final_consumption": 1910.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        }
+      }
+    },
+    "04_sce_solar": {
+      "cockpit": {
+        "journey_cumulative_opex": 20519,
+        "baseline_cumulative_opex": 95679,
+        "opex_delta": 75160,
+        "payback_year": 1,
+        "net_social_cost_avoided": 34480,
+        "current_load_amps": 41,
+        "peak_amps": 119,
+        "peak_status": "green",
+        "peak_year": 10
+      },
+      "gasoline": {
+        "journey_gallons": 0.0,
+        "baseline_gallons": 428.6,
+        "journey_climate_cost": 0,
+        "baseline_climate_cost": 724,
+        "journey_health_cost": 0,
+        "baseline_health_cost": 321
+      },
+      "devices": {
+        "HVAC": {
+          "journey_cost": 25690,
+          "baseline_cost": 11980,
+          "journey_final_consumption": 1861.6,
+          "baseline_final_consumption": 159.8,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Water Heater": {
+          "journey_cost": 11146,
+          "baseline_cost": 10937,
+          "journey_final_consumption": 793.8,
+          "baseline_final_consumption": 145.8,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Dryer": {
+          "journey_cost": 6089,
+          "baseline_cost": 4290,
+          "journey_final_consumption": 468.0,
+          "baseline_final_consumption": 57.2,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Cooktop": {
+          "journey_cost": 7342,
+          "baseline_cost": 2730,
+          "journey_final_consumption": 655.2,
+          "baseline_final_consumption": 36.4,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Transportation": {
+          "journey_cost": 1929,
+          "baseline_cost": 38571,
+          "journey_final_consumption": 0.0,
+          "baseline_final_consumption": 428.6,
+          "journey_fuel": "gasoline",
+          "baseline_fuel": "gasoline"
+        },
+        "EV Driving": {
+          "journey_cost": 49741,
+          "baseline_cost": 0,
+          "journey_final_consumption": 3311.7,
+          "baseline_final_consumption": 0.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        },
+        "Lights and Appliances": {
+          "journey_cost": 27171,
+          "baseline_cost": 27171,
+          "journey_final_consumption": 1910.0,
+          "baseline_final_consumption": 1910.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        }
+      }
+    },
+    "05_ca_average_no_solar": {
+      "cockpit": {
+        "journey_cumulative_opex": 139409,
+        "baseline_cumulative_opex": 119477,
+        "opex_delta": -19932,
+        "payback_year": 2,
+        "net_social_cost_avoided": 42433,
+        "current_load_amps": 41,
+        "peak_amps": 119,
+        "peak_status": "green",
+        "peak_year": 10
+      },
+      "gasoline": {
+        "journey_gallons": 0.0,
+        "baseline_gallons": 428.6,
+        "journey_climate_cost": 0,
+        "baseline_climate_cost": 724,
+        "journey_health_cost": 0,
+        "baseline_health_cost": 321
+      },
+      "devices": {
+        "HVAC": {
+          "journey_cost": 35417,
+          "baseline_cost": 30681,
+          "journey_final_consumption": 2555.1,
+          "baseline_final_consumption": 336.3,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Water Heater": {
+          "journey_cost": 12584,
+          "baseline_cost": 14901,
+          "journey_final_consumption": 889.0,
+          "baseline_final_consumption": 163.3,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Dryer": {
+          "journey_cost": 6195,
+          "baseline_cost": 5218,
+          "journey_final_consumption": 468.0,
+          "baseline_final_consumption": 57.2,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Cooktop": {
+          "journey_cost": 7410,
+          "baseline_cost": 3321,
+          "journey_final_consumption": 655.2,
+          "baseline_final_consumption": 36.4,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Transportation": {
+          "journey_cost": 1929,
+          "baseline_cost": 38571,
+          "journey_final_consumption": 0.0,
+          "baseline_final_consumption": 428.6,
+          "journey_fuel": "gasoline",
+          "baseline_fuel": "gasoline"
+        },
+        "EV Driving": {
+          "journey_cost": 49089,
+          "baseline_cost": 0,
+          "journey_final_consumption": 3311.7,
+          "baseline_final_consumption": 0.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        },
+        "Lights and Appliances": {
+          "journey_cost": 26785,
+          "baseline_cost": 26785,
+          "journey_final_consumption": 1910.0,
+          "baseline_final_consumption": 1910.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        }
+      }
+    },
+    "06_ca_average_solar": {
+      "cockpit": {
+        "journey_cumulative_opex": 31708,
+        "baseline_cumulative_opex": 119477,
+        "opex_delta": 87770,
+        "payback_year": 1,
+        "net_social_cost_avoided": 42433,
+        "current_load_amps": 41,
+        "peak_amps": 119,
+        "peak_status": "green",
+        "peak_year": 10
+      },
+      "gasoline": {
+        "journey_gallons": 0.0,
+        "baseline_gallons": 428.6,
+        "journey_climate_cost": 0,
+        "baseline_climate_cost": 724,
+        "journey_health_cost": 0,
+        "baseline_health_cost": 321
+      },
+      "devices": {
+        "HVAC": {
+          "journey_cost": 35417,
+          "baseline_cost": 30681,
+          "journey_final_consumption": 2555.1,
+          "baseline_final_consumption": 336.3,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Water Heater": {
+          "journey_cost": 12584,
+          "baseline_cost": 14901,
+          "journey_final_consumption": 889.0,
+          "baseline_final_consumption": 163.3,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Dryer": {
+          "journey_cost": 6195,
+          "baseline_cost": 5218,
+          "journey_final_consumption": 468.0,
+          "baseline_final_consumption": 57.2,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Cooktop": {
+          "journey_cost": 7410,
+          "baseline_cost": 3321,
+          "journey_final_consumption": 655.2,
+          "baseline_final_consumption": 36.4,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Transportation": {
+          "journey_cost": 1929,
+          "baseline_cost": 38571,
+          "journey_final_consumption": 0.0,
+          "baseline_final_consumption": 428.6,
+          "journey_fuel": "gasoline",
+          "baseline_fuel": "gasoline"
+        },
+        "EV Driving": {
+          "journey_cost": 49089,
+          "baseline_cost": 0,
+          "journey_final_consumption": 3311.7,
+          "baseline_final_consumption": 0.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        },
+        "Lights and Appliances": {
+          "journey_cost": 26785,
+          "baseline_cost": 26785,
+          "journey_final_consumption": 1910.0,
+          "baseline_final_consumption": 1910.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        }
+      }
+    },
+    "07_panel_upgrade_trigger": {
+      "cockpit": {
+        "journey_cumulative_opex": 171472,
+        "baseline_cumulative_opex": 139632,
+        "opex_delta": -31841,
+        "payback_year": 2,
+        "net_social_cost_avoided": 42433,
+        "current_load_amps": 41,
+        "peak_amps": 119,
+        "peak_status": "red",
+        "peak_year": 10
+      },
+      "gasoline": {
+        "journey_gallons": 0.0,
+        "baseline_gallons": 428.6,
+        "journey_climate_cost": 0,
+        "baseline_climate_cost": 724,
+        "journey_health_cost": 0,
+        "baseline_health_cost": 321
+      },
+      "devices": {
+        "HVAC": {
+          "journey_cost": 43912,
+          "baseline_cost": 38472,
+          "journey_final_consumption": 2555.1,
+          "baseline_final_consumption": 336.3,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Water Heater": {
+          "journey_cost": 15617,
+          "baseline_cost": 18685,
+          "journey_final_consumption": 889.0,
+          "baseline_final_consumption": 163.3,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Dryer": {
+          "journey_cost": 7692,
+          "baseline_cost": 6544,
+          "journey_final_consumption": 468.0,
+          "baseline_final_consumption": 57.2,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Cooktop": {
+          "journey_cost": 9196,
+          "baseline_cost": 4164,
+          "journey_final_consumption": 655.2,
+          "baseline_final_consumption": 36.4,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Transportation": {
+          "journey_cost": 1929,
+          "baseline_cost": 38571,
+          "journey_final_consumption": 0.0,
+          "baseline_final_consumption": 428.6,
+          "journey_fuel": "gasoline",
+          "baseline_fuel": "gasoline"
+        },
+        "EV Driving": {
+          "journey_cost": 59931,
+          "baseline_cost": 0,
+          "journey_final_consumption": 3311.7,
+          "baseline_final_consumption": 0.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        },
+        "Lights and Appliances": {
+          "journey_cost": 33195,
+          "baseline_cost": 33195,
+          "journey_final_consumption": 1910.0,
+          "baseline_final_consumption": 1910.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        }
+      }
+    },
+    "08_acc_rate_model": {
+      "cockpit": {
+        "journey_cumulative_opex": 167634,
+        "baseline_cumulative_opex": 129420,
+        "opex_delta": -38214,
+        "payback_year": 2,
+        "net_social_cost_avoided": 42433,
+        "current_load_amps": 41,
+        "peak_amps": 119,
+        "peak_status": "green",
+        "peak_year": 10
+      },
+      "gasoline": {
+        "journey_gallons": 0.0,
+        "baseline_gallons": 428.6,
+        "journey_climate_cost": 0,
+        "baseline_climate_cost": 724,
+        "journey_health_cost": 0,
+        "baseline_health_cost": 321
+      },
+      "devices": {
+        "HVAC": {
+          "journey_cost": 49868,
+          "baseline_cost": 36011,
+          "journey_final_consumption": 2555.1,
+          "baseline_final_consumption": 336.3,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Water Heater": {
+          "journey_cost": 15443,
+          "baseline_cost": 15680,
+          "journey_final_consumption": 889.0,
+          "baseline_final_consumption": 163.3,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Dryer": {
+          "journey_cost": 6909,
+          "baseline_cost": 5445,
+          "journey_final_consumption": 468.0,
+          "baseline_final_consumption": 57.2,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Cooktop": {
+          "journey_cost": 8290,
+          "baseline_cost": 3465,
+          "journey_final_consumption": 655.2,
+          "baseline_final_consumption": 36.4,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Transportation": {
+          "journey_cost": 1929,
+          "baseline_cost": 38571,
+          "journey_final_consumption": 0.0,
+          "baseline_final_consumption": 428.6,
+          "journey_fuel": "gasoline",
+          "baseline_fuel": "gasoline"
+        },
+        "EV Driving": {
+          "journey_cost": 54947,
+          "baseline_cost": 0,
+          "journey_final_consumption": 3311.7,
+          "baseline_final_consumption": 0.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        },
+        "Lights and Appliances": {
+          "journey_cost": 30248,
+          "baseline_cost": 30248,
+          "journey_final_consumption": 1910.0,
+          "baseline_final_consumption": 1910.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        }
+      }
+    },
+    "09_do_nothing_baseline_only": {
+      "cockpit": {
+        "journey_cumulative_opex": 139632,
+        "baseline_cumulative_opex": 139632,
+        "opex_delta": 0,
+        "payback_year": null,
+        "net_social_cost_avoided": 0,
+        "current_load_amps": 41,
+        "peak_amps": 41,
+        "peak_status": "green",
+        "peak_year": 1
+      },
+      "gasoline": {
+        "journey_gallons": 428.6,
+        "baseline_gallons": 428.6,
+        "journey_climate_cost": 724,
+        "baseline_climate_cost": 724,
+        "journey_health_cost": 321,
+        "baseline_health_cost": 321
+      },
+      "devices": {
+        "HVAC": {
+          "journey_cost": 38472,
+          "baseline_cost": 38472,
+          "journey_final_consumption": 336.3,
+          "baseline_final_consumption": 336.3,
+          "journey_fuel": "gas",
+          "baseline_fuel": "gas"
+        },
+        "Water Heater": {
+          "journey_cost": 18685,
+          "baseline_cost": 18685,
+          "journey_final_consumption": 163.3,
+          "baseline_final_consumption": 163.3,
+          "journey_fuel": "gas",
+          "baseline_fuel": "gas"
+        },
+        "Dryer": {
+          "journey_cost": 6544,
+          "baseline_cost": 6544,
+          "journey_final_consumption": 57.2,
+          "baseline_final_consumption": 57.2,
+          "journey_fuel": "gas",
+          "baseline_fuel": "gas"
+        },
+        "Cooktop": {
+          "journey_cost": 4164,
+          "baseline_cost": 4164,
+          "journey_final_consumption": 36.4,
+          "baseline_final_consumption": 36.4,
+          "journey_fuel": "gas",
+          "baseline_fuel": "gas"
+        },
+        "Transportation": {
+          "journey_cost": 38571,
+          "baseline_cost": 38571,
+          "journey_final_consumption": 428.6,
+          "baseline_final_consumption": 428.6,
+          "journey_fuel": "gasoline",
+          "baseline_fuel": "gasoline"
+        },
+        "EV Driving": {
+          "journey_cost": 0,
+          "baseline_cost": 0,
+          "journey_final_consumption": 0.0,
+          "baseline_final_consumption": 0.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        },
+        "Lights and Appliances": {
+          "journey_cost": 33195,
+          "baseline_cost": 33195,
+          "journey_final_consumption": 1910.0,
+          "baseline_final_consumption": 1910.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        }
+      }
+    },
+    "10_out_of_state_zip_fallback": {
+      "cockpit": {
+        "journey_cumulative_opex": 139409,
+        "baseline_cumulative_opex": 119477,
+        "opex_delta": -19932,
+        "payback_year": 2,
+        "net_social_cost_avoided": 42433,
+        "current_load_amps": 41,
+        "peak_amps": 119,
+        "peak_status": "green",
+        "peak_year": 10
+      },
+      "gasoline": {
+        "journey_gallons": 0.0,
+        "baseline_gallons": 428.6,
+        "journey_climate_cost": 0,
+        "baseline_climate_cost": 724,
+        "journey_health_cost": 0,
+        "baseline_health_cost": 321
+      },
+      "devices": {
+        "HVAC": {
+          "journey_cost": 35417,
+          "baseline_cost": 30681,
+          "journey_final_consumption": 2555.1,
+          "baseline_final_consumption": 336.3,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Water Heater": {
+          "journey_cost": 12584,
+          "baseline_cost": 14901,
+          "journey_final_consumption": 889.0,
+          "baseline_final_consumption": 163.3,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Dryer": {
+          "journey_cost": 6195,
+          "baseline_cost": 5218,
+          "journey_final_consumption": 468.0,
+          "baseline_final_consumption": 57.2,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Cooktop": {
+          "journey_cost": 7410,
+          "baseline_cost": 3321,
+          "journey_final_consumption": 655.2,
+          "baseline_final_consumption": 36.4,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Transportation": {
+          "journey_cost": 1929,
+          "baseline_cost": 38571,
+          "journey_final_consumption": 0.0,
+          "baseline_final_consumption": 428.6,
+          "journey_fuel": "gasoline",
+          "baseline_fuel": "gasoline"
+        },
+        "EV Driving": {
+          "journey_cost": 49089,
+          "baseline_cost": 0,
+          "journey_final_consumption": 3311.7,
+          "baseline_final_consumption": 0.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        },
+        "Lights and Appliances": {
+          "journey_cost": 26785,
+          "baseline_cost": 26785,
+          "journey_final_consumption": 1910.0,
+          "baseline_final_consumption": 1910.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        }
+      }
+    },
+    "11_ice_ev_transport_gasoline": {
+      "cockpit": {
+        "journey_cumulative_opex": 177106,
+        "baseline_cumulative_opex": 139632,
+        "opex_delta": -37475,
+        "payback_year": null,
+        "net_social_cost_avoided": 36508,
+        "current_load_amps": 41,
+        "peak_amps": 119,
+        "peak_status": "green",
+        "peak_year": 10
+      },
+      "gasoline": {
+        "journey_gallons": 71.4,
+        "baseline_gallons": 428.6,
+        "journey_climate_cost": 121,
+        "baseline_climate_cost": 724,
+        "journey_health_cost": 54,
+        "baseline_health_cost": 321
+      },
+      "devices": {
+        "HVAC": {
+          "journey_cost": 43912,
+          "baseline_cost": 38472,
+          "journey_final_consumption": 2555.1,
+          "baseline_final_consumption": 336.3,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Water Heater": {
+          "journey_cost": 15617,
+          "baseline_cost": 18685,
+          "journey_final_consumption": 889.0,
+          "baseline_final_consumption": 163.3,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Dryer": {
+          "journey_cost": 7692,
+          "baseline_cost": 6544,
+          "journey_final_consumption": 468.0,
+          "baseline_final_consumption": 57.2,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Cooktop": {
+          "journey_cost": 9196,
+          "baseline_cost": 4164,
+          "journey_final_consumption": 655.2,
+          "baseline_final_consumption": 36.4,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Transportation": {
+          "journey_cost": 12857,
+          "baseline_cost": 38571,
+          "journey_final_consumption": 71.4,
+          "baseline_final_consumption": 428.6,
+          "journey_fuel": "gasoline",
+          "baseline_fuel": "gasoline"
+        },
+        "EV Driving": {
+          "journey_cost": 54636,
+          "baseline_cost": 0,
+          "journey_final_consumption": 3311.7,
+          "baseline_final_consumption": 0.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        },
+        "Lights and Appliances": {
+          "journey_cost": 33195,
+          "baseline_cost": 33195,
+          "journey_final_consumption": 1910.0,
+          "baseline_final_consumption": 1910.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        }
+      }
+    },
+    "12_hot_inland_zone": {
+      "cockpit": {
+        "journey_cumulative_opex": 182992,
+        "baseline_cumulative_opex": 168629,
+        "opex_delta": -14363,
+        "payback_year": 2,
+        "net_social_cost_avoided": 39619,
+        "current_load_amps": 61,
+        "peak_amps": 119,
+        "peak_status": "green",
+        "peak_year": 10
+      },
+      "gasoline": {
+        "journey_gallons": 0.0,
+        "baseline_gallons": 428.6,
+        "journey_climate_cost": 0,
+        "baseline_climate_cost": 724,
+        "journey_health_cost": 0,
+        "baseline_health_cost": 321
+      },
+      "devices": {
+        "HVAC": {
+          "journey_cost": 57259,
+          "baseline_cost": 69656,
+          "journey_final_consumption": 3266.7,
+          "baseline_final_consumption": 285.3,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Water Heater": {
+          "journey_cost": 13790,
+          "baseline_cost": 16499,
+          "journey_final_consumption": 785.0,
+          "baseline_final_consumption": 144.2,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Dryer": {
+          "journey_cost": 7692,
+          "baseline_cost": 6544,
+          "journey_final_consumption": 468.0,
+          "baseline_final_consumption": 57.2,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Cooktop": {
+          "journey_cost": 9196,
+          "baseline_cost": 4164,
+          "journey_final_consumption": 655.2,
+          "baseline_final_consumption": 36.4,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "gas"
+        },
+        "Transportation": {
+          "journey_cost": 1929,
+          "baseline_cost": 38571,
+          "journey_final_consumption": 0.0,
+          "baseline_final_consumption": 428.6,
+          "journey_fuel": "gasoline",
+          "baseline_fuel": "gasoline"
+        },
+        "EV Driving": {
+          "journey_cost": 59931,
+          "baseline_cost": 0,
+          "journey_final_consumption": 3311.7,
+          "baseline_final_consumption": 0.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        },
+        "Lights and Appliances": {
+          "journey_cost": 33195,
+          "baseline_cost": 33195,
+          "journey_final_consumption": 1910.0,
+          "baseline_final_consumption": 1910.0,
+          "journey_fuel": "electricity",
+          "baseline_fuel": "electricity"
+        }
+      }
+    }
+  }
+}

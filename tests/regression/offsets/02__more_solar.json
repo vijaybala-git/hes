@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "name": "+5 solar panels (~2 kW)",
+  "base": "02_pge_solar",
+  "description": "Trend offset on 02_pge_solar: +5 solar panels (~2 kW)",
+  "values": {
+    "solar_panels": 20
+  },
+  "expect": {
+    "cockpit.journey_cumulative_opex": "-",
+    "cockpit.opex_delta": "+"
+  }
+}

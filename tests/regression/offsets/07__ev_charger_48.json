@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "name": "EV charger 32 -> 48 A",
+  "base": "07_panel_upgrade_trigger",
+  "description": "Trend offset on 07_panel_upgrade_trigger: EV charger 32 -> 48 A",
+  "values": {
+    "ev_charger_amps": 48
+  },
+  "expect": {
+    "cockpit.peak_amps": "+"
+  }
+}

@@ -1,8 +1,49 @@
 # WhyWatt — Regression Test Spec
 
-**Status:** 🔵 PLANNED — living document; reviewed/updated as the suite is built.
+**Status:** 🟢 DELIVERED — golden-master suite + trend layer built and green (2026-06-21).
 **Part of:** Phase 4.5 (see `Phase4.5_Spec.md`). Builds on the externalized config (Phase 4.5b).
 **Added:** 2026-06-18.
+
+---
+
+## Delivered (2026-06-21)
+
+**Step 0 done** — `run_simulation`, `_build_slot_configs`, `_verdict_numbers`, and a new
+`extract_metrics(model, df)` now live in `src/ui/sim.py` (re-exported from `layout.py` via
+`from ui.sim import *`). The harness imports `ui.sim` only — no Solara/matplotlib needed.
+`extract_metrics` reuses the cockpit's own `_verdict_numbers` so the snapshot is exactly the
+user-visible numbers.
+
+**Two layers, per reviewed decisions:**
+- **Snapshot (12 base cases) — HARD gate.** `golden.json` holds base cases only. Exact compare
+  at rounded precision. `tests/test_regression.py::test_base_cases_match_golden` fails the build
+  on any drift; re-bless intended changes with `python scripts/run_regression.py --update`.
+- **Trend (24 offsets) — WARN-ONLY.** Each base case gets two "offset" deltas with a
+  human-readable name (e.g. *Electricity CAGR +3%/yr*, *+5 solar panels (~2 kW)*,
+  *Upgrade service 100→200 A*) and a predicted direction per metric. The harness runs
+  base⊕offset and checks the move went the predicted way. A wrong direction warns loudly in the
+  report + a pytest warning, but does **not** fail the gate (a directional rule survives golden
+  re-blessing, so it keeps guarding against sign/wiring bugs). 37 predicted moves, all green.
+
+**Files:** `tests/regression/cases/*.json` (12), `tests/regression/offsets/*.json` (24),
+`tests/regression/golden.json` (committed), `scripts/run_regression.py` (harness + markdown
+report), `tests/test_regression.py` (gate + determinism). `tests/regression/report.md` is a
+regenerated artifact.
+
+**Offset catalog** covers ~22 distinct sliders across the 12 cases (rate CAGRs ×4, solar
+panels/yield/self-consumption/NEM mode, HP COP/SEER, furnace AFUE, HPWH UEF, external-EV price,
+gasoline price/escalation/health, MPG, bedrooms, horizon, SCC, panel amps, EV charger amps,
+climate trend).
+
+**Findings while building (provenance, not bugs):**
+- Climate trend *is* wired (RCP 8.5 lifts CZ13 yr-19 CDD +14%, drops HDD). The journey heat
+  pump's final-year kWh looked frozen under the trend only because heating-drop and cooling-rise
+  cancel almost exactly at CZ13/COP 3.5/SEER 22 (≈ ±192 kWh). The offset therefore asserts the
+  **baseline furnace** (heating-only) consumption fall, which is the clean unambiguous signal.
+- `solar_battery_enabled` alone doesn't move economics headlessly (the UI couples it to
+  `solar_scf`); the offset asserts a direct `solar_scf` 80→50 self-consumption drop instead.
+
+---
 
 > Context: the model is at a strong baseline — authoritative per-utility EIA rates, ZIP-driven
 > CEC climate, solid device physics — so this is the right point to lock behavior with a

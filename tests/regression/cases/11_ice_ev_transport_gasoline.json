@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "name": "11_ice_ev_transport_gasoline",
+  "description": "EV switch in yr 5 with residual ICE driving \u2014 gasoline in both legs",
+  "based_on": "whywatt_default",
+  "values": {
+    "dryer_swap_planned": true,
+    "cooktop_swap_planned": true,
+    "ev_swap_planned": true,
+    "panel_amps": 200,
+    "ev_swap_year": 5,
+    "transport_gasoline_miles": 12000,
+    "transport_ice_miles_after": 2000
+  }
+}

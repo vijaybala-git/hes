@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "name": "Electricity CAGR +3%/yr",
+  "base": "01_pge_no_solar",
+  "description": "Trend offset on 01_pge_no_solar: Electricity CAGR +3%/yr",
+  "values": {
+    "elec_cagr_pct_a": 10
+  },
+  "expect": {
+    "cockpit.journey_cumulative_opex": "+",
+    "cockpit.opex_delta": "-"
+  }
+}

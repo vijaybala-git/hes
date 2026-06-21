@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "name": "External EV charging +$0.15/kWh",
+  "base": "03_sce_no_solar",
+  "description": "Trend offset on 03_sce_no_solar: External EV charging +$0.15/kWh",
+  "values": {
+    "external_ev_price_per_kwh": 0.4
+  },
+  "expect": {
+    "cockpit.journey_cumulative_opex": "+",
+    "cockpit.opex_delta": "-"
+  }
+}

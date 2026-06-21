@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "name": "Vehicle MPG +5",
+  "base": "10_out_of_state_zip_fallback",
+  "description": "Trend offset on 10_out_of_state_zip_fallback: Vehicle MPG +5",
+  "values": {
+    "transport_mpg": 33.0
+  },
+  "expect": {
+    "gasoline.baseline_gallons": "-"
+  }
+}

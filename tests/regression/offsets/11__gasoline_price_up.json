@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "name": "Gasoline +$1.00/gal (both legs)",
+  "base": "11_ice_ev_transport_gasoline",
+  "description": "Trend offset on 11_ice_ev_transport_gasoline: Gasoline +$1.00/gal (both legs)",
+  "values": {
+    "gasoline_price": 5.5
+  },
+  "expect": {
+    "cockpit.baseline_cumulative_opex": "+",
+    "cockpit.journey_cumulative_opex": "+"
+  }
+}

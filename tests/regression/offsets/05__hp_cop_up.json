@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "name": "Heat-pump heating COP +0.5",
+  "base": "05_ca_average_no_solar",
+  "description": "Trend offset on 05_ca_average_no_solar: Heat-pump heating COP +0.5",
+  "values": {
+    "hp_cop_heating": 4.0
+  },
+  "expect": {
+    "devices.HVAC.journey_final_consumption": "-",
+    "cockpit.journey_cumulative_opex": "-"
+  }
+}

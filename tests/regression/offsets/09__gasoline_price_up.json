@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "name": "Gasoline +$1.00/gal",
+  "base": "09_do_nothing_baseline_only",
+  "description": "Trend offset on 09_do_nothing_baseline_only: Gasoline +$1.00/gal",
+  "values": {
+    "gasoline_price": 5.5
+  },
+  "expect": {
+    "cockpit.baseline_cumulative_opex": "+"
+  }
+}

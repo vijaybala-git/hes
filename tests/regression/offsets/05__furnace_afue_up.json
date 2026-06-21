@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "name": "Gas furnace AFUE -> 0.95",
+  "base": "05_ca_average_no_solar",
+  "description": "Trend offset on 05_ca_average_no_solar: Gas furnace AFUE -> 0.95",
+  "values": {
+    "furnace_afue": 0.95
+  },
+  "expect": {
+    "devices.HVAC.baseline_final_consumption": "-",
+    "cockpit.opex_delta": "-"
+  }
+}

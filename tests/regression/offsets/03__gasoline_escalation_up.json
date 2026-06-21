@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "name": "Gasoline escalation +3%/yr",
+  "base": "03_sce_no_solar",
+  "description": "Trend offset on 03_sce_no_solar: Gasoline escalation +3%/yr",
+  "values": {
+    "gasoline_escalation_pct": 3
+  },
+  "expect": {
+    "cockpit.baseline_cumulative_opex": "+",
+    "cockpit.opex_delta": "+"
+  }
+}

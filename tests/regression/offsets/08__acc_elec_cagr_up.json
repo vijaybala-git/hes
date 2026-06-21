@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "name": "ACC electricity CAGR +3%/yr",
+  "base": "08_acc_rate_model",
+  "description": "Trend offset on 08_acc_rate_model: ACC electricity CAGR +3%/yr",
+  "values": {
+    "acc_elec_cagr_a": 10
+  },
+  "expect": {
+    "cockpit.journey_cumulative_opex": "+"
+  }
+}

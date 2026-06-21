@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "name": "03_sce_no_solar",
+  "description": "SCE 90001 (SoCalGas) \u2014 full journey, no solar",
+  "based_on": "whywatt_default",
+  "values": {
+    "dryer_swap_planned": true,
+    "cooktop_swap_planned": true,
+    "ev_swap_planned": true,
+    "panel_amps": 200,
+    "zip_code": "90001"
+  }
+}
