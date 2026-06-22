@@ -61,7 +61,7 @@
 /* ---- "Setup your home" group ---- */
 .setup-group {
   background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-xl);
-  padding: 16px; display: flex; flex-direction: column; gap: 14px; margin-bottom: var(--gap);
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; margin-bottom: var(--gap);
 }
 .sg-hd { display: flex; align-items: center; gap: 10px; }
 .sg-hd .ic { width: 28px; height: 28px; border-radius: 8px; background: var(--journey-soft); color: var(--journey-ink); display: grid; place-items: center; flex-shrink: 0; }
@@ -97,15 +97,18 @@
 .card.is-collapsed > *:not(.card-hd) { display: none !important; }
 .card.is-collapsed .card-hd { border-bottom: none; }
 
-/* collapse-all → single line of title chips */
-.setup-group.collapsed-all .setup-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+/* collapse-all → header + 3 chips on ONE inline row */
+.setup-group.collapsed-all { flex-direction: row !important; align-items: center; flex-wrap: nowrap; }
+.setup-group.collapsed-all .sg-hd { flex: 0 0 auto; }
+.setup-group.collapsed-all .sg-hd .scope { display: none; }
+.setup-group.collapsed-all .setup-grid { display: flex; flex: 1 1 auto; flex-wrap: nowrap; gap: 10px; }
 .setup-group.collapsed-all .setup-grid > .card { flex: 1 1 0; min-width: 0; }
 
 /* ---- Appliance journey: 2-row grid ---- */
-.jbody { padding: var(--pad); display: flex; flex-direction: column; gap: 14px; }
+.jbody { padding: 9px 14px 11px; display: flex; flex-direction: column; gap: 7px; }
 .jrow-label {
   font-size: 10.5px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase;
-  color: var(--ink-4); margin-bottom: 1px;
+  color: var(--ink-4); margin: 0;
 }
 .jgrid { display: flex; flex-wrap: wrap; gap: 14px; align-items: stretch; }
 .jgrid > * { flex: 1 1 280px; min-width: 0; }

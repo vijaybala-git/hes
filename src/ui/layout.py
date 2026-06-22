@@ -146,6 +146,33 @@ class _PlotFitter(anywidget.AnyWidget):
     """
 
 
+class _DockScroller(anywidget.AnyWidget):
+    """Mounts inside the DetailDock; on open it scrolls the dock into view just
+    below the sticky topline band (§2). Keyed to the open device so render() fires
+    once per open — NOT on every slider re-render (which would yank the scroll)."""
+    _esm = """
+    export default { render({ el }) {
+      const run = () => {
+        const dock = el.closest('.detail-dock');
+        if (!dock) return;
+        const band = document.querySelector('.sticky-top');
+        const bandH = band ? band.getBoundingClientRect().height : 0;
+        // nearest real scroll container above the dock
+        let sc = dock.parentElement;
+        while (sc && !((sc.scrollHeight > sc.clientHeight) &&
+               /(auto|scroll)/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
+        if (!sc) sc = document.scrollingElement;
+        const dockTop = dock.getBoundingClientRect().top;
+        const scTop = sc.getBoundingClientRect ? sc.getBoundingClientRect().top : 0;
+        sc.scrollTo({ top: sc.scrollTop + (dockTop - scTop) - bandH - 12,
+                      behavior: 'smooth' });
+      };
+      // let the dock + band settle before measuring
+      setTimeout(run, 80);
+    } };
+    """
+
+
 @solara.component
 def _FigurePlotlyResponsive(fig):
     """solara.FigurePlotly + a CSS width reset + the one-time `_PlotFitter` observer so
@@ -536,6 +563,9 @@ def DetailDock(model):
     help_key = _DETAIL_HELP.get(dopen, "")
 
     with solara.Column(classes=["card", "dock", "detail-dock"]):
+        # On open, pull the dock into view below the sticky band (§2). Keyed to
+        # `dopen` so it fires once per open, not on every slider re-render.
+        _DockScroller.element().key(f"dock-scroll-{dopen}")
         # Dock header — icon + title (flex:1) push [?] + Done to the right
         with solara.Row(classes=["modal-hd"]):
             if icon_svg:
@@ -874,7 +904,7 @@ def SetupGroup():
     """v2 §D — tinted group wrapping the three assumption cards with collapse."""
     sc = setup_collapsed.value
     all_collapsed = all(sc.get(k, False) for k in ("home", "energy", "social"))
-    group_cls = ["setup-group"] + (["collapsed-all"] if all_collapsed else [])
+    group_cls = ["setup-group", "lstripe"] + (["collapsed-all"] if all_collapsed else [])
 
     label = "Expand all" if all_collapsed else "Collapse all"
     rot   = "transform:rotate(180deg);" if all_collapsed else ""
@@ -891,8 +921,9 @@ def SetupGroup():
                 f"<div style='display:flex;align-items:center;gap:10px;min-width:0'>"
                 f"<span class='ic'>{_CARD_IC['home']}</span>"
                 f"<h3 style='margin:0'>Setup your home</h3>"
-                f"<span class='scope'>— Home, Panel &amp; Solar, Energy &amp; Prices, "
-                f"Social &amp; Health collapse together</span></div>"
+                f"<span class='scope' title='Home, Panel &amp; Solar, Energy &amp; Prices "
+                f"and Social &amp; Health collapse together'>— your starting assumptions"
+                f"</span></div>"
             ))
             solara.Button(
                 "",
@@ -916,27 +947,25 @@ def SetupGroup():
 @solara.component
 def JourneyGrid():
     """v2 §E — full-width journey card with two labeled appliance rows."""
-    with solara.Column(classes=["card"]):
+    with solara.Column(classes=["card", "lstripe"]):
         with solara.Row(classes=["card-hd"]):
             solara.HTML(tag="div", unsafe_innerHTML=(
                 f"<div style='display:flex;align-items:center;gap:9px;flex:1;min-width:0'>"
                 f"<span class='ic'>{_CARD_IC['journey']}</span>"
                 f"<h3 style='margin:0;font-size:14px;font-weight:700;color:var(--ink,#1C2333);"
                 f"white-space:nowrap;letter-spacing:-0.01em'>Your Electrification Journey</h3>"
+                f"<span style='font-size:12px;color:var(--ink-3);white-space:nowrap;"
+                f"letter-spacing:0.01em'>— Configure Major Loads</span>"
                 f"<span class='count-pill'>6 devices</span></div>"
             ))
             HelpButton("journey_planner")
-        with solara.Column(classes=["jbody"]):
-            # Row 1 — MAJOR LOADS
-            solara.HTML(tag="div", unsafe_innerHTML=(
-                "<div class='jrow-label'>Major Loads</div>"))
+        with solara.Column(classes=["jbody"], gap="7px"):
+            # Row 1 — MAJOR LOADS (label folded into the panel header §3.4)
             with solara.Row(classes=["jgrid"]):
                 HVACSummaryCard()
                 WHSummaryCard()
                 TransportationSummaryCard()
-            # Row 2 — OTHER APPLIANCES
-            solara.HTML(tag="div", unsafe_innerHTML=(
-                "<div class='jrow-label'>Other Appliances</div>"))
+            # Row 2 — OTHER APPLIANCES (label removed §3.4)
             with solara.Row(classes=["jgrid"]):
                 CooktopSummaryCard()
                 DryerSummaryCard()
@@ -1010,7 +1039,7 @@ def Page():
 
     n = years.value
 
-    with solara.Column(classes=["app"], gap="10px"):
+    with solara.Column(classes=["app"], gap="7px"):
 
         # Scoped CSS: chart header selectors — no underline, larger arrow, code badge
         solara.HTML(
@@ -1080,17 +1109,26 @@ def Page():
                 "@media(max-width:860px){.v-row.deck{flex-wrap:wrap!important}}"
                 ".deck{display:flex!important;gap:var(--gap,16px);align-items:start}"
                 ".col{display:flex;flex-direction:column;gap:var(--gap,16px);flex:1}"
-                ".card{background:var(--surface,#fff)!important;border:1px solid var(--border,#e2e5ed)!important;"
+                ".card{background:var(--surface,#fff)!important;border:1px solid var(--border-strong,#cdd3e0)!important;"
                 "border-radius:var(--r-lg,14px)!important;box-shadow:var(--shadow-sm)!important;"
                 "overflow:hidden!important}"
+                # §2 — sticky topline band: pin Cockpit + charts while panels scroll
+                ".sticky-top{position:sticky!important;top:0!important;z-index:50!important;"
+                "background:var(--bg,#f7f8fb)!important;padding-bottom:7px!important;"
+                "box-shadow:0 8px 12px -10px rgba(20,28,46,.22)!important}"
+                # §3.4 — bold grey left accent stripe marks the major tunable panels as blocks
+                ".card.lstripe{border-left:4px solid var(--ink-2)!important}"
+                ".setup-group.lstripe{border-left:4px solid var(--ink-2)!important}"
+                # §3.4 — crisper edges on inner device/summary cards
+                ".device{border-color:var(--border-strong,#cdd3e0)!important}"
                 ".card-hd{display:flex!important;align-items:center!important;gap:9px!important;"
-                "padding:13px 16px!important;border-bottom:1px solid var(--border-soft,#eaedf3)!important;"
+                "padding:8px 14px!important;border-bottom:1px solid var(--border-soft,#eaedf3)!important;"
                 "background:var(--surface,#fff)!important}"
-                ".card-hd .ic{width:26px!important;height:26px!important;border-radius:7px!important;"
+                ".card-hd .ic{width:24px!important;height:24px!important;border-radius:7px!important;"
                 "flex-shrink:0!important;display:grid!important;place-items:center!important;"
                 "background:var(--accent-soft,#EEF2FC)!important;color:var(--accent-ink,#3355B5)!important}"
                 ".card-hd .ic svg{width:15px!important;height:15px!important}"
-                ".card-bd{padding:var(--pad,16px)!important}"
+                ".card-bd{padding:11px 13px!important}"
                 ".panel{display:flex!important;flex-direction:column!important}"
                 ".panel+.panel{border-top:1px solid var(--border-soft,#eaedf3)!important}"
                 ".panel-hd{display:flex!important;align-items:center!important;gap:8px!important;"
@@ -1174,11 +1212,11 @@ def Page():
                 "background:var(--surface-2,#F4F6FB);border-radius:0 0 8px 8px}"
                 # ── v2 layout: neutralize Vuetify v-col/v-row wrappers ──────────
                 ".v-col.cockpit{padding:0!important;margin:0!important}"
-                ".v-col.setup-group{padding:16px!important;margin:0!important;"
-                "display:flex!important;flex-direction:column!important}"
+                ".v-col.setup-group{padding:12px 14px!important;margin:0!important;"
+                "display:flex!important;flex-direction:column!important;gap:10px!important}"
                 ".v-row.sg-hd{margin:0!important;flex-wrap:nowrap!important}"
                 ".v-row.setup-grid{margin:0!important;display:flex!important;"
-                "flex-wrap:wrap!important;gap:16px!important}"
+                "flex-wrap:wrap!important;gap:12px!important}"
                 ".v-row.setup-grid>.v-col{padding:0!important}"
                 ".v-col.jbody{padding:var(--pad,16px)!important;margin:0!important;"
                 "display:flex!important;flex-direction:column!important;gap:14px!important}"
@@ -1198,65 +1236,54 @@ def Page():
             style="display:none",
         )
 
-        # ── Masthead (Phase 3 redesign §A) ──────────────────────────────────────
-        Masthead()
+        # ── Sticky topline band (§2): Masthead + Cockpit + dual charts pinned
+        #    while the Setup/Journey panels scroll underneath, so the metrics +
+        #    graphs stay in view during tuning (the core selling point).
+        with solara.Column(classes=["sticky-top"], gap="7px"):
+            # ── Masthead (Phase 3 redesign §A) ──────────────────────────────────
+            Masthead()
 
-        # ── Cockpit — merged payback · bars · panel guidance (v2 §B) ────────────
-        Cockpit(df, n, model)
+            # ── Cockpit — merged payback · bars · panel guidance (v2 §B) ────────
+            Cockpit(df, n, model)
 
-        # ── Dual chart panes ─────────────────────────────────────────────────────
-        with solara.Row(gap="8px", style="align-items:stretch"):
-            with solara.Column(classes=["card"],
-                               style="flex:1; min-width:300px; overflow:hidden"):
-                with solara.Row(classes=["card-hd", "chart-header-sel"]):
-                    solara.HTML(
-                        tag="span",
-                        unsafe_innerHTML=(
-                            f"<code class='chart-code'>"
-                            f"{CHART_CODES.get(chart_left.value, '')}"
-                            f"</code>"
-                        ),
-                        style="flex-shrink:0",
-                    )
-                    solara.Select("", value=chart_left, values=CHART_OPTIONS)
-                    ChartHelpButton(chart_left.value)
-                with solara.Column(style="padding:0 2px 2px"):
-                    ChartPane(chart_left.value, model, df, n)
-            with solara.Column(classes=["card"],
-                               style="flex:1; min-width:300px; overflow:hidden"):
-                with solara.Row(classes=["card-hd", "chart-header-sel"]):
-                    solara.HTML(
-                        tag="span",
-                        unsafe_innerHTML=(
-                            f"<code class='chart-code'>"
-                            f"{CHART_CODES.get(chart_right.value, '')}"
-                            f"</code>"
-                        ),
-                        style="flex-shrink:0",
-                    )
-                    solara.Select("", value=chart_right, values=CHART_OPTIONS)
-                    ChartHelpButton(chart_right.value)
-                with solara.Column(style="padding:0 2px 2px"):
-                    ChartPane(chart_right.value, model, df, n)
+            # ── Dual chart panes ─────────────────────────────────────────────────
+            with solara.Row(gap="8px", style="align-items:stretch"):
+                with solara.Column(classes=["card"],
+                                   style="flex:1; min-width:300px; overflow:hidden"):
+                    with solara.Row(classes=["card-hd", "chart-header-sel"]):
+                        solara.HTML(
+                            tag="span",
+                            unsafe_innerHTML=(
+                                f"<code class='chart-code'>"
+                                f"{CHART_CODES.get(chart_left.value, '')}"
+                                f"</code>"
+                            ),
+                            style="flex-shrink:0",
+                        )
+                        solara.Select("", value=chart_left, values=CHART_OPTIONS)
+                        ChartHelpButton(chart_left.value)
+                    with solara.Column(style="padding:0 2px 2px"):
+                        ChartPane(chart_left.value, model, df, n)
+                with solara.Column(classes=["card"],
+                                   style="flex:1; min-width:300px; overflow:hidden"):
+                    with solara.Row(classes=["card-hd", "chart-header-sel"]):
+                        solara.HTML(
+                            tag="span",
+                            unsafe_innerHTML=(
+                                f"<code class='chart-code'>"
+                                f"{CHART_CODES.get(chart_right.value, '')}"
+                                f"</code>"
+                            ),
+                            style="flex-shrink:0",
+                        )
+                        solara.Select("", value=chart_right, values=CHART_OPTIONS)
+                        ChartHelpButton(chart_right.value)
+                    with solara.Column(style="padding:0 2px 2px"):
+                        ChartPane(chart_right.value, model, df, n)
 
-        # ── Series key strip (legend + scenario eyebrow) ─────────────────────────
-        with solara.Row(style="align-items:center; gap:24px"):
-            leg = (
-                f"<span style='color:{_CC_B};font-weight:bold'>● Do nothing (A)</span>"
-                f"&nbsp;&nbsp;"
-                f"<span style='color:{_CC_J};font-weight:bold'>● Your journey (A)</span>"
-            )
-            if comparison_mode.value:
-                leg += (
-                    f"&nbsp;&nbsp;"
-                    f"<span style='color:{_CC_B};opacity:0.6;font-weight:bold'>┅ Do nothing (B)</span>"
-                    f"&nbsp;&nbsp;"
-                    f"<span style='color:{_CC_J};opacity:0.6;font-weight:bold'>┅ Your journey (B)</span>"
-                )
-            solara.HTML(tag="div", unsafe_innerHTML=leg, style="flex:1; min-width:0")
-            solara.HTML(tag="div", unsafe_innerHTML=(
-                "<span class='scenario-eyebrow'>Adjust the scenario below</span>"
-            ))
+        # ── Series key strip removed (§3.1): the migrated Plotly comparison charts
+        #    (JC.1/JC.2/JC.6) now carry the A/B legend in-plot, so the standalone
+        #    strip + "Adjust the scenario below" eyebrow are redundant.
 
         # ── Help — small popup window (dialog) with a "Learn more" link that
         #    opens the full help page in a new browser tab. Device detail still

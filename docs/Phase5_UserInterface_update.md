@@ -2,7 +2,8 @@
 
 **Status:** 🟡 OPEN — scoping/iterating.
 **Follows:** Phase 4.5 (UI relocation, JC.1 simplification, gasoline social cost).
-**Last updated:** 2026-06-21 — initial draft from user-testing feedback.
+**Last updated:** 2026-06-22 — §3 vertical compression + §2 sticky topline band **delivered**
+(§1 unified slider and §4 Plotly migration already closed in prior sessions).
 **Driver:** Real advocates are now running sessions with the tool. The live simulation is
 landing as the selling point; the friction is *interaction speed* and *vertical density*.
 
@@ -49,10 +50,10 @@ Ordered as confirmed with the user:
 
 | Order | § | Workstream | In this phase? |
 |-------|---|------------|----------------|
-| 1 | §1 | Unified slider: **debounce first**, then iterate design on ONE slider ("Climate Cost"), then roll out type-in + consistent component | ✅ Yes (confirmed) |
-| 2 | §4 | **Plotly chart migration** — sets charts to their final (shorter) height + improves responsiveness; must precede the vertical-space review | ✅ Yes (moved up) |
-| 3 | §3 | Vertical-space compression + §2 sticky band — measured **after** Plotly: remove redundant lines, collapse headers, tighten gaps, accent borders, pin topline | ✅ Yes (iterate) |
-| — | §2 | Sticky topline band — keep metrics (+ both charts) visible while tuning | ✅ Yes (part of the §3 layout pass) |
+| 1 | §1 | Unified slider: **debounce first**, then iterate design on ONE slider ("Climate Cost"), then roll out type-in + consistent component | ✅ **Done** |
+| 2 | §4 | **Plotly chart migration** — sets charts to their final (shorter) height + improves responsiveness; must precede the vertical-space review | ✅ **Done** (11/17 charts) |
+| 3 | §3 | Vertical-space compression + §2 sticky band — measured **after** Plotly: remove redundant lines, collapse headers, tighten gaps, accent borders, pin topline | ✅ **Done** |
+| — | §2 | Sticky topline band — keep metrics (+ both charts) visible while tuning | ✅ **Done** (masthead + cockpit + both charts pinned) |
 | ✔ | — | **Keep 2 charts side by side** (cost × consumption comparison) | ✅ Hard constraint — preserved |
 | ✗ | — | Separate React front-end | ❌ Dropped for now |
 
@@ -335,6 +336,30 @@ the tuning panels.
 **Acceptance for §2:** while tuning a Journey/Solar control near the bottom of the page, the
 topline savings/payback numbers and the hero chart remain visible and update live.
 
+### ✅ Delivered (2026-06-22)
+
+- **Sticky band = Masthead + Cockpit + BOTH charts**, wrapped in a `.sticky-top`
+  container ([layout.py](../src/ui/layout.py), `position:sticky; top:0; z-index:50`,
+  solid `--bg` background + soft bottom shadow). Both charts pinned (the user chose full
+  charts over metrics-only). Reactivity unchanged — the pinned charts update live as panels
+  below are tuned.
+- **Scroll context confirmed:** the page scrolls inside an inner `overflow:auto` container,
+  not page-level. The `.app` flex column is nested inside that scroller and spans full content
+  height, so a sticky child pins correctly to the scroller viewport (verified: after scrolling,
+  `.sticky-top` top = 0).
+- **Band height ≈ 591px** at 1366×900 (masthead 59 + cockpit 124 + both charts + gaps).
+  Comfortable on 1080p+ (the real target); on a 900px laptop it leaves ~310px of panel scroll.
+  Capping/shrinking charts when pinned is left as a future option if small screens matter.
+- **Detail-dock visibility fix (new issue surfaced during build):** the `DetailDock` renders
+  in one fixed spot just below the charts, but its triggers live in panels far down the scroll.
+  Opening one while scrolled left the editor hidden behind/above the taller sticky band.
+  Fix = a small **`_DockScroller` anywidget** mounted inside the dock, **keyed to the open
+  device** so it fires once per open (not on every slider re-render); on mount it smooth-scrolls
+  the dock to sit ~12px below the pinned band. Verified: opens into view; does **not** re-scroll
+  on slider re-renders.
+- **Series-key strip** decision (§3.1) resolved in favor of removal — the in-plot Plotly A/B
+  legend carries the key.
+
 ---
 
 ## §3 — Vertical compression (iterate with screenshots)
@@ -397,6 +422,38 @@ This section is explicitly **iterative**. For each change:
 **Acceptance for §3:** measurable reduction in total page height (target: the
 Cockpit + charts + at least the Journey panel header visible without scrolling on a
 1080p viewport), panels clearly delineated, nothing cramped or clipped.
+
+### ✅ Delivered (2026-06-22)
+
+Done in reviewable steps (screenshot-evaluated by the user between each). All edits in
+[layout.py](../src/ui/layout.py) inline CSS + [layout_v2.css](../src/layout_v2.css).
+
+- **§3.1 — series-key strip removed.** The redundant `● Do nothing (A) ● Your journey (A) …
+  Adjust the scenario below` row deleted; the migrated Plotly comparison charts carry the
+  in-plot A/B legend.
+- **§3.2 — Setup header + card headers.** Scope sentence → short hint `— your starting
+  assumptions` (full text in a tooltip); `setup-group` padding `16 → 12/14`, gap `14 → 10`.
+  **All-collapsed is now a true single line** (header + 3 chips inline; group `120 → 80px`) —
+  required `flex-direction:row` keyed off `.setup-group.collapsed-all` (note: the element is
+  `.v-sheet`, **not** `.v-col`, so the inline `.v-col.*` overrides were dead). Global
+  `card-hd` padding `13/16 → 8/14`, icon `26 → 24` → every card header `53 → 41px`.
+- **§3.3 — spacing pass.** Page column gap `10 → 7`; `card-bd` padding `16 → 11/13`; Journey
+  `jbody` padding `16 → 9/11` and row-gap `12 → 7` (the row-gap needed `gap="7px"` on the
+  `solara.Column` — Solara injects a default inline `gap:12px` that beat the stylesheet).
+- **§3.4 — delineation.** All card borders `--border → --border-strong`; **bold grey 4px left
+  accent stripe** (`--ink-2`, via a `lstripe` class) on the two most-tuned blocks — the
+  Journey card and the Setup group.
+- **Journey panel labels folded (user request).** In-body `Major Loads` / `Other Appliances`
+  jrow-labels removed; `Major Loads` reframed as a light-grey `— Configure Major Loads`
+  subtitle in the panel header. (`.jrow-label` CSS now dead — optional future cleanup.)
+
+**Net:** full page height **2240px → 2077px (−163px, ≈7%)** at 1366-wide, measured before the
+§2 sticky band; panels clearly delineated, nothing cramped.
+
+> **Tooling note for future CSS work:** `layout_v2.css` / `styles_redesign.css` are read **once
+> at Python import** ([theme.py:17](../src/ui/theme.py)). A browser reload alone uses the stale
+> copy — a `.css`-only edit needs a Solara module reload (touch a `.py`) or server restart to
+> take effect. `.py` edits hot-reload normally.
 
 ---
 
@@ -533,13 +590,15 @@ the live reactivity that is the product's selling point).
 
 ## Definition of done (Phase 5 core)
 
-- [ ] Dragging any slider triggers exactly one `run_simulation` (verified).
-- [ ] Every numeric input is directly type-able; all sliders share one component + style.
-- [ ] Topline metrics (and the dual charts where height allows) remain visible while tuning
-      Journey/Solar panels.
-- [ ] The two charts stay side by side (cost × consumption comparison preserved).
-- [ ] Redundant series-key strip resolved (removed or merged).
-- [ ] "Setup your home" collapses to a true single line; panel headers are single-line tight.
-- [ ] Page height measurably reduced; panels delineated by accented borders, not whitespace.
+- [x] Dragging any slider triggers exactly one `run_simulation` (verified). *(§1)*
+- [x] Every numeric input is directly type-able; all sliders share one component + style. *(§1)*
+- [x] Topline metrics (and the dual charts where height allows) remain visible while tuning
+      Journey/Solar panels. *(§2 — masthead + cockpit + both charts pinned)*
+- [x] The two charts stay side by side (cost × consumption comparison preserved).
+- [x] Redundant series-key strip resolved (removed). *(§3.1)*
+- [x] "Setup your home" collapses to a true single line; panel headers are single-line tight.
+      *(§3.2)*
+- [x] Page height measurably reduced (−163px / ≈7%); panels delineated by accented borders +
+      grey accent stripes, not whitespace. *(§3.3 / §3.4)*
 - [ ] Live simulation reactivity intact; existing tests green; no `MMBtu`; data contracts
-      unchanged.
+      unchanged. *(reactivity verified live; run test suite before phase close)*
