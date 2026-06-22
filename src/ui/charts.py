@@ -12,6 +12,7 @@ import matplotlib.ticker  # noqa: F401
 import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
 from matplotlib.figure import Figure
+import plotly.graph_objects as go  # Phase 5 §4 — Plotly migration
 
 from ui.theme import (
     _CC_J, _CC_B, _CC_GRID, _CC_TICK, _CC_SOLAR, CATEGORY_COLORS, KWH_PER_THERM,
@@ -82,177 +83,210 @@ def _legend_below(fig, ax, handles=None, labels=None, *, fontsize=8,
     return leg
 
 
-# Chart 1 — Cumulative Energy Costs
+# ── Plotly house style (Phase 5 §4 migration) ──────────────────────────────────
+
+# Match the app UI font (--font in styles_redesign.css) so chart text doesn't look
+# "finer" than the rest of the app (Inter/system fallback was lighter than Schibsted).
+_PL_FONT = dict(family="'Schibsted Grotesk', ui-sans-serif, system-ui, sans-serif",
+                size=12, color=_CC_TICK)
+
+
+def _rgba(hexcolor, alpha):
+    h = hexcolor.lstrip("#")
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
+
+
+def _pl_layout(height=300, ytitle="", xtitle="Year", money_y=True, xdtick=None):
+    """Compact house layout: transparent bg, tight margins, overlay legend top-inside.
+
+    `xdtick`: set to 1 on timeline charts so the Year axis ticks every year (consistent
+    across all timeline graphs). Margins are left/right-balanced so the x-axis title
+    reads centered under the plot.
+    """
+    xaxis = dict(title=xtitle, showgrid=False, zeroline=False, linecolor=_CC_GRID,
+                 ticks="outside", tickcolor=_CC_GRID, tickfont=dict(size=10))
+    if xdtick is not None:
+        xaxis["dtick"] = xdtick
+        xaxis["tick0"] = 0
+    return dict(
+        height=height,
+        autosize=True,                 # responsive width — fill the pane, don't default to 700px
+        margin=dict(l=54, r=46, t=8, b=36),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=_PL_FONT,
+        hovermode="x unified",
+        xaxis=xaxis,
+        yaxis=dict(title=ytitle, showgrid=True, gridcolor=_CC_GRID, zeroline=False,
+                   tickprefix="$" if money_y else "",
+                   tickformat=",.0f" if money_y else None, tickfont=dict(size=10)),
+        legend=dict(orientation="v", y=0.98, yanchor="top", x=0.01, xanchor="left",
+                    bgcolor="rgba(255,255,255,0.55)", borderwidth=0,
+                    font=dict(size=10), tracegroupgap=0),
+    )
+
+
+def _stacked_legend(lay, rows=1):
+    """Stacked-area legend treatment (Phase 5 §4): lift the legend out of the plot into a
+    horizontal box across the top, so a many-layer legend never overlaps the area fill.
+    `rows` reserves enough top margin for the expected number of wrapped legend lines.
+    Shared by JC.3 / EU.1 / EU.2 / EU.6."""
+    lay["legend"] = dict(orientation="h", x=0.5, xanchor="center", y=1.0, yanchor="bottom",
+                         bgcolor="rgba(255,255,255,0.85)", bordercolor=_CC_GRID, borderwidth=1,
+                         font=dict(size=9), itemwidth=30, tracegroupgap=0)
+    lay["margin"] = {**lay["margin"], "t": 16 + 17 * rows}
+    return lay
+
+
+def _pl_empty(msg, height=300):
+    """Annotation-only placeholder figure (e.g. 'no gas in this scenario')."""
+    fig = go.Figure()
+    fig.add_annotation(text=msg, xref="paper", yref="paper", x=0.5, y=0.5,
+                       showarrow=False, align="center",
+                       font=dict(size=12, color=_CC_TICK, family=_PL_FONT["family"]))
+    fig.update_layout(height=height, autosize=True, margin=dict(l=10, r=10, t=10, b=10),
+                      paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                      xaxis=dict(visible=False), yaxis=dict(visible=False))
+    return fig
+
+
+# Chart 1 — Cumulative Energy Costs  (Plotly — Phase 5 §4 pilot)
 def make_cumulative_opex(df, model, n):
-    fig = _new_fig()
-    fig.set_size_inches(6, 4.3)   # taller: makes room for the below-axes legend
-    ax  = fig.add_subplot(111)
-    x = np.arange(1, n + 1)
+    x = list(range(1, n + 1))
     b = df["Baseline Cum Cost"].values
     lbl_a = " (A)" if model.comparison_mode else ""
 
     # "Your journey" is a SINGLE line. When solar is selected, Journey Cum Cost is
-    # already net of solar+battery savings, so we only relabel it — never split into
-    # a second line. Keeps the graph to 4 lines max (×2 with social).
+    # already net of solar+battery savings, so we only relabel it — never split.
     has_solar = solar_planned.value and "Solar Saving" in df.columns
     e = df["Journey Cum Cost"].values
     j_color = _CC_SOLAR if has_solar else _CC_J
     j_label = f"Your journey + Solar{lbl_a}" if has_solar else f"Your journey{lbl_a}"
 
-    ax.plot(x, b, color=_CC_B,   lw=2.5)
-    ax.plot(x, e, color=j_color, lw=2.5)
-    # Shaded savings region — self-explanatory, deliberately kept out of the legend.
-    ax.fill_between(x, b, e, where=(b >= e), color=j_color, alpha=0.12)
-
-    # Payback marker — drawn at the SAME year the cockpit reports, so the two
-    # never disagree: the first year cumulative savings ("Opex Delta") turn
-    # positive. Skipped when there is no payback within the horizon.
-    if "Opex Delta" in df.columns:
-        delta_vals = df["Opex Delta"].values
-        payback_yr = next((i + 1 for i, d in enumerate(delta_vals) if d > 0), None)
-        if payback_yr is not None:
-            cal = model.sim_start_year + payback_yr - 1
-            ax.axvline(payback_yr, color="#555", lw=1.2, linestyle=(0, (4, 3)),
-                       alpha=0.85, zorder=2)
-            ax.annotate(f"Payback · Yr {payback_yr} ({cal})", xy=(payback_yr, 0.98),
-                        xycoords=ax.get_xaxis_transform(),
-                        xytext=(4, 0), textcoords="offset points",
-                        ha="left", va="top", fontsize=8, color="#555",
-                        bbox=dict(boxstyle="round,pad=0.25", facecolor="white",
-                                  edgecolor="#CCC", alpha=0.85))
+    fig = go.Figure()
+    # Do-nothing first (no fill); journey next with fill back to it = savings band.
+    fig.add_trace(go.Scatter(
+        x=x, y=b, name=f"Do nothing{lbl_a}", mode="lines",
+        line=dict(color=_CC_B, width=2.5), hovertemplate="$%{y:,.0f}<extra></extra>"))
+    fig.add_trace(go.Scatter(
+        x=x, y=e, name=j_label, mode="lines", line=dict(color=j_color, width=2.5),
+        fill="tonexty", fillcolor=_rgba(j_color, 0.12),
+        hovertemplate="$%{y:,.0f}<extra></extra>"))
 
     if model.comparison_mode:
-        bB = df["Baseline Cum Cost B"].values
-        eB = df["Journey Cum Cost B"].values
-        ax.plot(x, bB, color=_CC_B, lw=2.0, linestyle="--", label="Do nothing (B)")
-        ax.plot(x, eB, color=_CC_J, lw=2.0, linestyle="--", label="Your journey (B)")
-    # "+ social" lines use the combined social total (gas combustion + gasoline
-    # externalities), so they move with both the gas and gasoline adders.
-    social_on = False
+        fig.add_trace(go.Scatter(
+            x=x, y=df["Baseline Cum Cost B"].values, name="Do nothing (B)", mode="lines",
+            line=dict(color=_CC_B, width=2.0, dash="dash")))
+        fig.add_trace(go.Scatter(
+            x=x, y=df["Journey Cum Cost B"].values, name="Your journey (B)", mode="lines",
+            line=dict(color=_CC_J, width=2.0, dash="dash")))
+
+    # "+ social" lines move with both the gas and gasoline adders.
     if "Journey Social Total" in df.columns and (
             np.any(df["Journey Social Total"].values)
             or np.any(df["Baseline Social Total"].values)):
         j_social = np.cumsum(df["Journey Social Total"].values)
         b_social = np.cumsum(df["Baseline Social Total"].values)
-        ax.plot(x, b + b_social, color=_CC_B,   lw=1.5, linestyle=":", alpha=0.9)
-        ax.plot(x, e + j_social, color=j_color, lw=1.5, linestyle=":", alpha=0.9)
-        social_on = True
+        fig.add_trace(go.Scatter(
+            x=x, y=b + b_social, name=f"Do nothing +soc{lbl_a}", mode="lines",
+            line=dict(color=_CC_B, width=1.5, dash="dot")))
+        fig.add_trace(go.Scatter(
+            x=x, y=e + j_social, name=f"Your journey +soc{lbl_a}", mode="lines",
+            line=dict(color=j_color, width=1.5, dash="dot")))
 
-    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(_money))
-    ax.set_xlabel("Year")
-    ax.set_ylabel("Cumulative Energy Cost")
-    _style(ax)
+    # Payback marker — first year cumulative savings ("Opex Delta") turn positive.
+    if "Opex Delta" in df.columns:
+        delta_vals = df["Opex Delta"].values
+        payback_yr = next((i + 1 for i, d in enumerate(delta_vals) if d > 0), None)
+        if payback_yr is not None:
+            cal = model.sim_start_year + payback_yr - 1
+            fig.add_vline(x=payback_yr, line=dict(color="#555", width=1.2, dash="dash"),
+                          annotation_text=f"Payback · Yr {payback_yr} ({cal})",
+                          annotation_position="top right",
+                          annotation_font=dict(size=10, color="#555"))
 
-    # ── Grouped legend below the axes ─────────────────────────────────────────
-    # Left group = Energy Cost (solid lines); right group = + Social Cost (dotted).
-    # The shaded "saves" region is omitted (self-explanatory). The figure is taller
-    # (set above) so reserving this bottom band does not shrink the plot.
-    energy   = [Line2D([0], [0], color=_CC_B,   lw=2.5),
-                Line2D([0], [0], color=j_color, lw=2.5)]
-    e_labels = [f"Do nothing{lbl_a}", j_label]
-    if model.comparison_mode:
-        energy   += [Line2D([0], [0], color=_CC_B, lw=2.0, ls="--"),
-                     Line2D([0], [0], color=_CC_J, lw=2.0, ls="--")]
-        e_labels += ["Do nothing (B)", "Your journey (B)"]
-    leg1 = ax.legend(energy, e_labels, title="Energy Cost",
-                     loc="upper left", bbox_to_anchor=(0.0, -0.24),
-                     ncol=1, fontsize=8, title_fontsize=9,
-                     framealpha=0, borderaxespad=0, handlelength=2.4)
-    leg1._legend_box.align = "left"
-    ax.add_artist(leg1)
-    if social_on:
-        social = [Line2D([0], [0], color=_CC_B,   lw=1.5, ls=":"),
-                  Line2D([0], [0], color=j_color, lw=1.5, ls=":")]
-        leg2 = ax.legend(social, [f"Do nothing{lbl_a}", j_label],
-                         title="+ Social Cost",
-                         loc="upper right", bbox_to_anchor=(1.0, -0.24),
-                         ncol=1, fontsize=8, title_fontsize=9,
-                         framealpha=0, borderaxespad=0, handlelength=2.4)
-        leg2._legend_box.align = "left"
-
-    fig.subplots_adjust(left=0.16, right=0.97, top=0.96, bottom=0.33)
+    fig.update_layout(**_pl_layout(height=300, ytitle="Cumulative Energy Cost", xdtick=1))
     return fig
 
 
 # Chart 2 — Annual Cost by Year
 def make_annual_cost(df, model, n):
-    fig = _new_fig()
-    ax  = fig.add_subplot(111)
-    x = np.arange(1, n + 1)
+    yrs = list(range(1, n + 1))
+    fig = go.Figure()
     if model.comparison_mode and "Baseline Annual Cost B" in df.columns:
-        w = 0.18
-        ax.bar(x - 1.5 * w, df["Baseline Annual Cost"].values,  w, color=_CC_B, label="Do nothing (A)",   zorder=3)
-        ax.bar(x - 0.5 * w, df["Journey Annual Cost"].values,   w, color=_CC_J, label="Your journey (A)", zorder=3)
-        ax.bar(x + 0.5 * w, df["Baseline Annual Cost B"].values, w, color=_CC_B, alpha=0.55,
-               label="Do nothing (B)", zorder=3, hatch="//")
-        ax.bar(x + 1.5 * w, df["Journey Annual Cost B"].values,  w, color=_CC_J, alpha=0.55,
-               label="Your journey (B)", zorder=3, hatch="//")
+        # 4 bars per year (A solid, B hatched) — each its own offsetgroup
+        for name, col, color, pat in [
+            ("Do nothing (A)", "Baseline Annual Cost", _CC_B, None),
+            ("Your journey (A)", "Journey Annual Cost", _CC_J, None),
+            ("Do nothing (B)", "Baseline Annual Cost B", _CC_B, "/"),
+            ("Your journey (B)", "Journey Annual Cost B", _CC_J, "/"),
+        ]:
+            mk = dict(color=color, opacity=0.55 if pat else 1.0)
+            if pat:
+                mk["pattern"] = dict(shape="/", fgcolor="white", solidity=0.35)
+            fig.add_trace(go.Bar(x=yrs, y=df[col].values, name=name, offsetgroup=name,
+                                 marker=mk,
+                                 hovertemplate="$%{y:,.0f}<extra>" + name + "</extra>"))
     else:
-        w = 0.35
         b_ann = df["Baseline Annual Cost"].values
         j_ann = df["Journey Annual Cost"].values
-        ax.bar(x - w / 2, b_ann, w, color=_CC_B, label="Do nothing",   zorder=3)
-        ax.bar(x + w / 2, j_ann, w, color=_CC_J, label="Your journey", zorder=3)
-        # Social cost — stacked on top when enabled
+        fig.add_trace(go.Bar(x=yrs, y=b_ann, name="Do nothing", offsetgroup="b",
+                             marker=dict(color=_CC_B),
+                             hovertemplate="$%{y:,.0f}<extra>Do nothing</extra>"))
+        fig.add_trace(go.Bar(x=yrs, y=j_ann, name="Your journey", offsetgroup="j",
+                             marker=dict(color=_CC_J),
+                             hovertemplate="$%{y:,.0f}<extra>Your journey</extra>"))
         if "Baseline Social Total" in df.columns and (
                 np.any(df["Baseline Social Total"].values)
                 or np.any(df["Journey Social Total"].values)):
-            b_soc = df["Baseline Social Total"].values
-            j_soc = df["Journey Social Total"].values
-            ax.bar(x - w / 2, b_soc, w, bottom=b_ann,
-                   color="#FB8C00", alpha=0.85, label="Do nothing — social", zorder=3)
-            ax.bar(x + w / 2, j_soc, w, bottom=j_ann,
-                   color="#4CAF50", alpha=0.85, label="Your journey — social", zorder=3)
-    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(_money))
-    ax.set_xlabel("Year")
-    ax.set_ylabel("Annual Energy Cost")
-    _style(ax)
-    _legend_below(fig, ax)
+            fig.add_trace(go.Bar(x=yrs, y=df["Baseline Social Total"].values, offsetgroup="b",
+                                 name="Do nothing — social",
+                                 marker=dict(color="#FB8C00", opacity=0.85),
+                                 hovertemplate="$%{y:,.0f}<extra>social</extra>"))
+            fig.add_trace(go.Bar(x=yrs, y=df["Journey Social Total"].values, offsetgroup="j",
+                                 name="Your journey — social",
+                                 marker=dict(color="#4CAF50", opacity=0.85),
+                                 hovertemplate="$%{y:,.0f}<extra>social</extra>"))
+    lay = _pl_layout(height=300, ytitle="Annual Energy Cost", xtitle="Year",
+                     money_y=True, xdtick=1)
+    lay["barmode"] = "stack"
+    lay["hovermode"] = "closest"
+    fig.update_layout(**lay)
     return fig
 
 
 # Chart 3 — Cost Breakdown by Category (stacked cumulative, single pane with toggle)
 def make_cost_breakdown(df, model, n, home="journey"):
-    """Single-pane cost breakdown; home = 'journey' | 'baseline'."""
-    fig = _new_fig(wide=False)
-    ax  = fig.add_subplot(111)
+    """Single-pane cost breakdown; home = 'journey' | 'baseline' (Plotly — Phase 5 §4)."""
+    palette_idx = 1 if home == "journey" else 0
+    hobj = model.journey_home if home == "journey" else model.baseline_home
 
-    if home == "journey":
-        hobj        = model.journey_home
-        title_sub   = "Your Journey"
-        palette_idx = 1
-    else:
-        hobj        = model.baseline_home
-        title_sub   = "Do Nothing"
-        palette_idx = 0
+    x = list(range(1, n + 1))
+    fig = go.Figure()
 
-    x      = np.arange(1, n + 1)
-    bottom = np.zeros(n)
+    def _layer(cum, color, label, alpha=0.85):
+        # stackgroup="one" accumulates each layer on the previous (replaces the manual
+        # `bottom` running sum); the thin boundary line mirrors the matplotlib top edge.
+        fig.add_trace(go.Scatter(
+            x=x, y=list(cum), name=label, mode="lines", stackgroup="one",
+            line=dict(color=color, width=0.5), fillcolor=_rgba(color, alpha),
+            hovertemplate="$%{y:,.0f}<extra>" + label + "</extra>"))
+
     for cat in CATEGORY_ORDER:
         annual = hobj.cost_history_by_category.get(cat, [])
         if not annual:
             continue
-        cum   = np.cumsum(annual[:n])
-        color = CATEGORY_COLORS[cat][palette_idx]
-        ax.fill_between(x, bottom, bottom + cum,
-                        color=color, alpha=0.85, label=CATEGORY_LABELS[cat])
-        ax.plot(x, bottom + cum, color=color, lw=0.5, alpha=0.5)
-        bottom = bottom + cum
+        _layer(np.cumsum(annual[:n]), CATEGORY_COLORS[cat][palette_idx], CATEGORY_LABELS[cat])
 
     # Social & health cost layers — natural gas (stacked above market categories)
     cfg    = getattr(model, "social_cost_config", None)
     therms = np.array(hobj.gas_therms_history[:n], dtype=float)
     if cfg is not None and len(therms):
         if cfg.climate_eff > 0:
-            cum = np.cumsum(therms * cfg.climate_eff)
-            ax.fill_between(x, bottom, bottom + cum, color="#FB8C00",
-                            alpha=0.80, label="Gas — climate cost")
-            bottom = bottom + cum
+            _layer(np.cumsum(therms * cfg.climate_eff), "#FB8C00", "Gas — climate cost", 0.80)
         if cfg.health_eff > 0:
-            cum = np.cumsum(therms * cfg.health_eff)
-            ax.fill_between(x, bottom, bottom + cum, color="#C62828",
-                            alpha=0.80, label="Gas — health cost")
-            bottom = bottom + cum
+            _layer(np.cumsum(therms * cfg.health_eff), "#C62828", "Gas — health cost", 0.80)
 
     # Gasoline externalities (§3)
     gallons = np.array(hobj.gasoline_gallons_history[:n], dtype=float) if hobj.gasoline_gallons_history else np.zeros(n)
@@ -260,21 +294,12 @@ def make_cost_breakdown(df, model, n, home="journey"):
         gc = getattr(model, "gasoline_climate_cost_per_gallon", 0.0)
         gh = getattr(model, "gasoline_health_cost_per_gallon", 0.0)
         if gc > 0:
-            cum = np.cumsum(gallons * gc)
-            ax.fill_between(x, bottom, bottom + cum, color="#E67E22",
-                            alpha=0.80, label="Gasoline — climate")
-            bottom = bottom + cum
+            _layer(np.cumsum(gallons * gc), "#E67E22", "Gasoline — climate", 0.80)
         if gh > 0:
-            cum = np.cumsum(gallons * gh)
-            ax.fill_between(x, bottom, bottom + cum, color="#922B21",
-                            alpha=0.80, label="Gasoline — health")
-            bottom = bottom + cum
+            _layer(np.cumsum(gallons * gh), "#922B21", "Gasoline — health", 0.80)
 
-    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(_money))
-    ax.set_xlabel("Year")
-    ax.set_ylabel("Cumulative Cost")
-    _style(ax)
-    _legend_below(fig, ax, fontsize=7)
+    fig.update_layout(**_stacked_legend(_pl_layout(
+        height=300, ytitle="Cumulative Cost", xtitle="Year", money_y=True, xdtick=1), rows=3))
     return fig
 
 
@@ -313,37 +338,37 @@ def _gas_rate_label(model_str: str, cagr_pct: int, suffix: str = "") -> str:
     return f"Gas ACC seasonal{suffix}"
 
 
-def make_elec_price(df, model, n):
-    fig = _new_fig()
-    ax  = fig.add_subplot(111)
-    x = np.arange(1, n + 1)
-    lbl_a = _elec_rate_label(model.elec_rate_model_a, elec_cagr_pct_a.value)
-    ax.plot(x, df["Elec Rate"].values, color=_CC_J, lw=2.5, label=lbl_a)
-    if model.comparison_mode:
-        lbl_b = _elec_rate_label(model.elec_rate_model_b, elec_cagr_pct_b.value, " (B)")
-        ax.plot(x, df["Elec Rate B"].values, color=_CC_J, lw=2.0, linestyle="--", label=lbl_b)
-    ax.set_xlabel("Year")
-    ax.set_ylabel("Avg Electricity Price  ($/kWh)")
-    _style(ax)
-    _legend_below(fig, ax, max_cols=2)
+def _make_price_chart(df, model, n, col, color, label_a, label_b, ytitle, unit):
+    yrs = list(range(1, n + 1))
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=yrs, y=df[col].values, mode="lines", name=label_a,
+                             line=dict(color=color, width=2.5),
+                             hovertemplate="$%{y:.3f}" + unit + "<extra></extra>"))
+    if model.comparison_mode and f"{col} B" in df.columns:
+        fig.add_trace(go.Scatter(x=yrs, y=df[f"{col} B"].values, mode="lines", name=label_b,
+                                 line=dict(color=color, width=2.0, dash="dash"),
+                                 hovertemplate="$%{y:.3f}" + unit + "<extra></extra>"))
+    lay = _pl_layout(height=300, ytitle=ytitle, xtitle="Year", money_y=False, xdtick=1)
+    lay["yaxis"].update(tickprefix="$", tickformat=".2f")
+    fig.update_layout(**lay)
     return fig
+
+
+def make_elec_price(df, model, n):
+    return _make_price_chart(
+        df, model, n, "Elec Rate", _CC_J,
+        _elec_rate_label(model.elec_rate_model_a, elec_cagr_pct_a.value),
+        _elec_rate_label(model.elec_rate_model_b, elec_cagr_pct_b.value, " (B)"),
+        "Avg electricity price ($/kWh)", "/kWh")
 
 
 # Chart 6 — Gas CAGR Projection
 def make_gas_price(df, model, n):
-    fig = _new_fig()
-    ax  = fig.add_subplot(111)
-    x = np.arange(1, n + 1)
-    lbl_a = _gas_rate_label(model.gas_rate_model_a, gas_cagr_pct_a.value)
-    ax.plot(x, df["Gas Rate"].values, color="#EF6C00", lw=2.5, label=lbl_a)
-    if model.comparison_mode:
-        lbl_b = _gas_rate_label(model.gas_rate_model_b, gas_cagr_pct_b.value, " (B)")
-        ax.plot(x, df["Gas Rate B"].values, color="#EF6C00", lw=2.0, linestyle="--", label=lbl_b)
-    ax.set_xlabel("Year")
-    ax.set_ylabel("Avg Gas Price  ($/therm)")
-    _style(ax)
-    _legend_below(fig, ax, max_cols=2)
-    return fig
+    return _make_price_chart(
+        df, model, n, "Gas Rate", "#EF6C00",
+        _gas_rate_label(model.gas_rate_model_a, gas_cagr_pct_a.value),
+        _gas_rate_label(model.gas_rate_model_b, gas_cagr_pct_b.value, " (B)"),
+        "Avg gas price ($/therm)", "/therm")
 
 
 # Chart 7b — ACC Rate Projection (§24.3)
@@ -356,91 +381,82 @@ def _load_acc_shapes():
     return np.array(ed["shape_24h_by_month"], dtype=float), np.array(gd["monthly_shape"], dtype=float)
 
 
-def _plot_rate_band(ax, cal_x, base, lo_factor, hi_factor, lo_lbl, hi_lbl, color):
-    """Plot a CAGR base line + shaded seasonal band between lo_factor and hi_factor."""
-    ax.fill_between(cal_x, base * lo_factor, base * hi_factor,
-                    alpha=0.18, color=color)
-    ax.plot(cal_x, base,               color=color, lw=2.5, label="Annual avg")
-    ax.plot(cal_x, base * hi_factor,   color=color, lw=1.2, linestyle="--", label=hi_lbl)
-    ax.plot(cal_x, base * lo_factor,   color=color, lw=1.2, linestyle=":",  label=lo_lbl)
+def _pl_rate_band(fig, x, base, lo_factor, hi_factor, lo_lbl, hi_lbl, color, decimals):
+    """Add a CAGR annual-avg line + shaded band between lo_factor and hi_factor (Plotly).
+
+    Traces: lo (dotted) → hi (dashed, fills back to lo) → avg (solid, on top). `legendrank`
+    keeps the legend reading Annual avg / peak / off-peak regardless of draw order."""
+    fmt = "$%{y:." + str(decimals) + "f}"
+    lo, hi = base * lo_factor, base * hi_factor
+    fig.add_trace(go.Scatter(x=x, y=list(lo), mode="lines", name=lo_lbl, legendrank=3,
+                             line=dict(color=color, width=1.2, dash="dot"),
+                             hovertemplate=fmt + "<extra>" + lo_lbl + "</extra>"))
+    fig.add_trace(go.Scatter(x=x, y=list(hi), mode="lines", name=hi_lbl, legendrank=2,
+                             line=dict(color=color, width=1.2, dash="dash"),
+                             fill="tonexty", fillcolor=_rgba(color, 0.18),
+                             hovertemplate=fmt + "<extra>" + hi_lbl + "</extra>"))
+    fig.add_trace(go.Scatter(x=x, y=list(base), mode="lines", name="Annual avg", legendrank=1,
+                             line=dict(color=color, width=2.5),
+                             hovertemplate=fmt + "<extra>Annual avg</extra>"))
 
 
-def make_rate_trajectory(df, model, n):
-    fig = Figure(figsize=(7, 6), dpi=100)   # taller: below-axis legends per subplot
-    fig.patch.set_facecolor("#F9F9F9")
-    ax_elec = fig.add_subplot(211)
-    ax_gas  = fig.add_subplot(212)
-    x     = np.arange(1, n + 1)
-    cal_x = model.sim_start_year + x - 1
-
-    elec_base = df["Elec Rate"].values   # CAGR annual mean $/kWh
-    gas_base  = df["Gas Rate"].values    # CAGR annual mean $/therm
-
-    # ── Electric subplot ──────────────────────────────────────────────────────
-    if model.elec_rate_model_a == "acc_shaped":
-        elec_shape, _ = _load_acc_shapes()
-        flat = elec_shape.flatten()
-        # p25 = typical cheap off-peak hour; p90 = peak evening hour
-        p25 = float(np.percentile(flat, 25))
-        p90 = float(np.percentile(flat, 90))
-        _plot_rate_band(ax_elec, cal_x, elec_base, p25, p90,
-                        f"Off-peak (p25 = {p25:.2f}×)",
-                        f"Peak evening (p90 = {p90:.2f}×)",
-                        C_RATE_ELEC)
-        ax_elec.text(0.01, 0.04,
-                     "Shaded band = off-peak to peak-hour rate range (ACC hourly shape)",
-                     transform=ax_elec.transAxes, fontsize=6.5, color="#9E9E9E")
-    else:
-        lbl_ea = _elec_rate_label(model.elec_rate_model_a, elec_cagr_pct_a.value, " (A)")
-        ax_elec.plot(cal_x, elec_base, color=C_RATE_ELEC, lw=2.5, label=lbl_ea)
+def make_acc_elec_trajectory(df, model, n):
+    """R.3 — ACC electricity rate projection: the annual-avg trajectory (following the
+    selected rate model) with the ACC off-peak→peak hourly band always overlaid. The band
+    factors come from the ACC hourly shape, so it renders regardless of the rate model — this
+    is what distinguishes R.3 from the plain CAGR line in R.1."""
+    x = list(range(1, n + 1))
+    base = df["Elec Rate"].values
+    fig = go.Figure()
+    elec_shape, _ = _load_acc_shapes()
+    flat = elec_shape.flatten()
+    # p25 = typical cheap off-peak hour; p90 = peak evening hour
+    p25 = float(np.percentile(flat, 25))
+    p90 = float(np.percentile(flat, 90))
+    _pl_rate_band(fig, x, base, p25, p90,
+                  f"Off-peak (p25 = {p25:.2f}×)",
+                  f"Peak evening (p90 = {p90:.2f}×)", C_RATE_ELEC, 3)
 
     if model.comparison_mode and "Elec Rate B" in df.columns:
-        lbl_eb = _elec_rate_label(model.elec_rate_model_b, elec_cagr_pct_b.value, " (B)")
-        ax_elec.plot(cal_x, df["Elec Rate B"].values,
-                     color=C_RATE_ELEC, lw=2.0, linestyle="--", label=lbl_eb)
+        lbl_b = _elec_rate_label(model.elec_rate_model_b, elec_cagr_pct_b.value, " (B)")
+        fig.add_trace(go.Scatter(x=x, y=list(df["Elec Rate B"].values), mode="lines", name=lbl_b,
+                                 line=dict(color=C_RATE_ELEC, width=2.0, dash="dash"),
+                                 hovertemplate="$%{y:.3f}<extra></extra>"))
 
-    ax_elec.legend(loc="upper center", bbox_to_anchor=(0.5, -0.20), ncol=2,
-                   fontsize=7, framealpha=0, borderaxespad=0)
-    ax_elec.yaxis.set_major_formatter(
-        matplotlib.ticker.FuncFormatter(lambda v, _: f"${v:.3f}"))
-    ax_elec.set_ylabel("$/kWh")
-    _style(ax_elec)
-
-    # ── Gas subplot ───────────────────────────────────────────────────────────
-    if model.gas_rate_model_a == "acc_seasonal":
-        _, gas_shape = _load_acc_shapes()
-        winter_factor = float(np.max(gas_shape))   # ~1.20 (Jan/Dec)
-        summer_factor = float(np.min(gas_shape))   # ~0.85 (Apr–Oct)
-        _plot_rate_band(ax_gas, cal_x, gas_base, summer_factor, winter_factor,
-                        f"Summer (min {summer_factor:.2f}×)",
-                        f"Winter (max {winter_factor:.2f}×)",
-                        C_RATE_GAS)
-        ax_gas.text(0.01, 0.04,
-                    "Shaded band = summer low to winter peak (ACC seasonal gas shape)",
-                    transform=ax_gas.transAxes, fontsize=6.5, color="#9E9E9E")
-    else:
-        lbl_ga = _gas_rate_label(model.gas_rate_model_a, gas_cagr_pct_a.value, " (A)")
-        ax_gas.plot(cal_x, gas_base, color=C_RATE_GAS, lw=2.5, label=lbl_ga)
-
-    if model.comparison_mode and "Gas Rate B" in df.columns:
-        lbl_gb = _gas_rate_label(model.gas_rate_model_b, gas_cagr_pct_b.value, " (B)")
-        ax_gas.plot(cal_x, df["Gas Rate B"].values,
-                    color=C_RATE_GAS, lw=2.0, linestyle="--", label=lbl_gb)
-
-    ax_gas.legend(loc="lower center", bbox_to_anchor=(0.5, 0.01),
-                  bbox_transform=fig.transFigure, ncol=2,
-                  fontsize=7, framealpha=0, borderaxespad=0)
-    ax_gas.yaxis.set_major_formatter(
-        matplotlib.ticker.FuncFormatter(lambda v, _: f"${v:.2f}"))
-    ax_gas.set_ylabel("$/therm")
-    ax_gas.set_xlabel("Year")
-    _style(ax_gas)
-
-    fig.subplots_adjust(left=0.12, right=0.96, top=0.96, bottom=0.13, hspace=0.50)
+    lay = _pl_layout(height=300, ytitle="$/kWh", xtitle="Year", money_y=False, xdtick=1)
+    lay["yaxis"].update(tickprefix="$", tickformat=".3f")
+    fig.update_layout(**lay)
     return fig
 
 
-# Chart 7c — Electricity Rate Shape heatmap (§24.2)
+def make_acc_gas_trajectory(df, model, n):
+    """R.4 — ACC gas rate projection: the annual-avg trajectory (following the selected rate
+    model) with the ACC summer→winter seasonal band always overlaid. The band factors come
+    from the ACC seasonal shape, so it renders regardless of the rate model — this is what
+    distinguishes R.4 from the plain CAGR line in R.2."""
+    x = list(range(1, n + 1))
+    base = df["Gas Rate"].values
+    fig = go.Figure()
+    _, gas_shape = _load_acc_shapes()
+    winter_factor = float(np.max(gas_shape))   # ~1.20 (Jan/Dec)
+    summer_factor = float(np.min(gas_shape))   # ~0.85 (Apr–Oct)
+    _pl_rate_band(fig, x, base, summer_factor, winter_factor,
+                  f"Summer (min {summer_factor:.2f}×)",
+                  f"Winter (max {winter_factor:.2f}×)", C_RATE_GAS, 2)
+
+    if model.comparison_mode and "Gas Rate B" in df.columns:
+        lbl_b = _gas_rate_label(model.gas_rate_model_b, gas_cagr_pct_b.value, " (B)")
+        fig.add_trace(go.Scatter(x=x, y=list(df["Gas Rate B"].values), mode="lines", name=lbl_b,
+                                 line=dict(color=C_RATE_GAS, width=2.0, dash="dash"),
+                                 hovertemplate="$%{y:.2f}<extra></extra>"))
+
+    lay = _pl_layout(height=300, ytitle="$/therm", xtitle="Year", money_y=False, xdtick=1)
+    lay["yaxis"].update(tickprefix="$", tickformat=".2f")
+    fig.update_layout(**lay)
+    return fig
+
+
+# Chart 7c — ACC Electrical Rate Shape heatmap (§24.2)
 _ACC_SHAPE_PATH = (
     Path(__file__).parent.parent.parent / "data" / "rates" / "acc_electric_shape_pge_2024.json"
 )
@@ -449,59 +465,40 @@ _ACC_GAS_SHAPE_PATH = (
 )
 
 def make_acc_rate_shape(df, model, n):
-    uses_acc = (
-        model.elec_rate_model_a == "acc_shaped"
-        or (model.comparison_mode and model.elec_rate_model_b == "acc_shaped")
-    )
-    if not uses_acc:
-        fig = _new_fig(wide=True)
-        ax  = fig.add_subplot(111)
-        ax.text(0.5, 0.5,
-                "Select ACC-Shaped electricity\nto see the hourly rate shape",
-                ha="center", va="center", fontsize=11, color="#9E9E9E",
-                transform=ax.transAxes)
-        ax.set_axis_off()
-        fig.tight_layout()
-        return fig
-
+    """R.5 — ACC electricity rate-shape heatmap (Plotly): hour-of-day × month avoided-cost
+    factor. Always rendered from the ACC shape file — independent of the selected rate
+    model (the data is the same regardless)."""
     with open(_ACC_SHAPE_PATH) as f:
         shape_data = json.load(f)
-    shape = np.array(shape_data["shape_24h_by_month"], dtype=float)  # (12, 24)
+    shape = np.array(shape_data["shape_24h_by_month"], dtype=float)  # (12 months, 24 hours)
 
-    fig = Figure(figsize=(10, 4), dpi=100)
-    fig.patch.set_facecolor("#F9F9F9")
-    ax  = fig.add_subplot(111)
+    hours  = ["12a","1","2","3","4","5","6","7","8","9","10","11",
+              "12p","1","2","3","4","5","6","7","8","9","10","11"]
+    months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+    # Numeric x avoids Plotly collapsing the duplicate am/pm hour labels into one column;
+    # customdata carries the pretty "1pm" label for the hover.
+    hover_hours = np.tile(hours, (len(months), 1))
 
-    im = ax.pcolormesh(
-        np.arange(25),
-        np.arange(13),
-        shape,
-        cmap="RdYlBu_r",
-        vmin=0.5, vmax=1.8,
-        shading="flat",
-    )
-    fig.colorbar(im, ax=ax, label="Rate shape factor\n(1.0 = monthly average)")
+    fig = go.Figure(go.Heatmap(
+        z=shape, x=list(range(24)), y=months, customdata=hover_hours,
+        colorscale="RdYlBu", reversescale=True, zmin=0.5, zmax=1.8, xgap=0, ygap=0,
+        colorbar=dict(title=dict(text="Rate shape factor<br>(1.0 = monthly avg)",
+                                 font=dict(size=9, color=_CC_TICK)),
+                      thickness=12, tickfont=dict(size=9, color=_CC_TICK)),
+        hovertemplate="%{y} · %{customdata}<br>%{z:.2f}× monthly avg<extra></extra>"))
 
-    ax.set_xticks(np.arange(24) + 0.5)
-    ax.set_xticklabels(
-        ["12a","1","2","3","4","5","6","7","8","9","10","11",
-         "12p","1","2","3","4","5","6","7","8","9","10","11"],
-        fontsize=7,
+    fig.update_layout(
+        height=300, autosize=True, margin=dict(l=46, r=10, t=8, b=58),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=_PL_FONT,
+        xaxis=dict(title="Hour of day", showgrid=False, tickmode="array",
+                   tickvals=list(range(24)), ticktext=hours, tickfont=dict(size=9)),
+        yaxis=dict(title="Month", showgrid=False, tickfont=dict(size=9)),
     )
-    ax.set_yticks(np.arange(12) + 0.5)
-    ax.set_yticklabels(
-        ["Jan","Feb","Mar","Apr","May","Jun",
-         "Jul","Aug","Sep","Oct","Nov","Dec"],
-        fontsize=8,
-    )
-    ax.set_xlabel("Hour of day")
-    ax.set_ylabel("Month")
-    ax.text(0.01, -0.18,
-            "Source: 2024 CPUC ACC Model (E3), CZ12. Shows avoided cost per hour — "
-            "not retail TOU pricing. Winter overnight elevated by heating-season grid capacity.",
-            transform=ax.transAxes, fontsize=7, color="#9E9E9E")
-    _style(ax)
-    fig.tight_layout(pad=1.2)
+    fig.add_annotation(
+        text=("Source: 2024 CPUC ACC Model (E3), CZ12 — avoided cost per hour, not retail TOU "
+              "pricing.<br>Winter overnight elevated by heating-season grid capacity."),
+        xref="paper", yref="paper", x=0, y=-0.32, showarrow=False, xanchor="left",
+        align="left", font=dict(size=8, color="#9E9E9E"))
     return fig
 
 
@@ -589,42 +586,19 @@ def make_journey_timeline(df, model, n):
     return fig
 
 
-# Chart 7v2 — Journey Timeline v2 (Phase 4 §4.2)
+# Chart 7v2 — Journey Timeline v2  (Plotly — Phase 5 §4)
 def make_journey_timeline_v2(df, model, n):
     """
-    Central year-rail timeline.
-    Journey events (filled markers, device color) above the rail.
-    Do-nothing wear-out events (open markers) below the rail.
-    Dashed drift connectors link each pair. Add-on slots show journey only.
+    Central year-rail timeline (Plotly).
+    Journey events (filled badges, device color) above the rail; do-nothing wear-out
+    events (open badges) below; dashed drift connectors link each pair.
     """
+    BG = "#F9F9F9"
     display_slots = [s for s in model.journey_home.slots
                      if s.name != "Lights and Appliances"]
     capex_slots   = model.journey_home.capex_only_slots
 
-    fig = Figure(figsize=(9.5, 4.2), dpi=110)
-    fig.patch.set_facecolor("#F9F9F9")
-    ax = fig.add_subplot(111)
-    ax.set_facecolor("#F9F9F9")
-
-    # --- rail ---
-    ax.axhline(0, color=_CC_TICK, lw=1.2, zorder=2)
-    ax.set_ylim(-1.25, 1.25)
-    ax.set_xlim(-0.5, n + 0.5)
-    ax.set_xlabel("Year", fontsize=12)
-    ax.set_xticks(range(0, n + 1))
-    ax.tick_params(labelsize=12)
-    ax.get_yaxis().set_visible(False)
-    for spine in ("top", "left", "right"):
-        ax.spines[spine].set_visible(False)
-
-    # side labels
-    ax.text(-0.45, 0.18, "Your journey", fontsize=12, color=_CC_TICK,
-            va="bottom", ha="left", style="italic")
-    ax.text(-0.45, -0.18, "Do nothing",  fontsize=12, color=_CC_TICK,
-            va="top",    ha="left", style="italic")
-
-    # collision tracking for stagger — also stores placed y so connectors can read it back
-    journey_y_placed:   dict[int, list[float]] = {}   # yr → [y0, y1, ...]
+    journey_y_placed:   dict[int, list[float]] = {}
     donothing_y_placed: dict[int, list[float]] = {}
 
     def _y_journey(yr):
@@ -639,178 +613,201 @@ def make_journey_timeline_v2(df, model, n):
         lst.append(y)
         return y
 
-    def _draw_marker(x, y, color, filled, code):
-        """Draw a circle badge with 2-letter code using bbox annotation (no scatter spill)."""
-        ax.annotate(
-            code, xy=(x, y), ha="center", va="center",
-            fontsize=10, fontweight="bold",
-            color="white" if filled else color,
-            bbox=dict(
-                boxstyle="circle,pad=0.35",
-                facecolor=color if filled else "#F9F9F9",
-                edgecolor=color,
-                linewidth=1.8,
-            ),
-            zorder=5,
-        )
+    # Collect marker / connector / annotation data
+    jx, jy, jcode, jcolor, jhover = [], [], [], [], []   # journey (filled)
+    dx, dy, dcode, dcolor, dhover = [], [], [], [], []    # do-nothing (open)
+    connectors = []                                       # (x0, x1, y0, y1, color)
+    cost_anns  = []                                       # (x, y, text, color)
+    present:   dict[str, tuple] = {}                      # style_key → (color, label)
 
-    # Stagger cost labels above journey markers — cycle through 3 heights
     _COST_OFFSETS = [0.22, 0.40, 0.58]
     _ann_idx = 0
 
-    # --- DeviceSlots ---
+    def _add_journey(x, code, color, label, net):
+        nonlocal _ann_idx
+        yj = _y_journey(x)
+        jx.append(x); jy.append(yj); jcode.append(code); jcolor.append(color)
+        jhover.append(f"{label} · Yr {x} · ${net:,.0f}")
+        v_off = _COST_OFFSETS[_ann_idx % len(_COST_OFFSETS)]
+        _ann_idx += 1
+        cost_anns.append((x + 0.12, yj + v_off, f"${net:,.0f}", color))
+        present[code] = (color, label)
+        return yj
+
     for slot in display_slots:
-        color = dstyle(slot.style_key)["color"]
-        code  = dstyle(slot.style_key)["code"]
+        st = dstyle(slot.style_key)
+        color, code, label = st["color"], st["code"], st["label"]
         is_addon = slot.starting_state == "none"
         net_cost = slot.install_cost - slot.rebate
-
-        # Journey event — skip $0 slots (e.g. Transportation vehicle switch:
-        # no car CapEx is modeled; the EV charger CapExOnlySlot carries that marker)
         sw = slot.swap_year
-        if sw is not None and sw <= n and net_cost > 0:
-            yj = _y_journey(sw)
-            _draw_marker(sw, yj, color, filled=True, code=code)
-            v_off = _COST_OFFSETS[_ann_idx % len(_COST_OFFSETS)]
-            _ann_idx += 1
-            ax.annotate(f"${net_cost:,.0f}", xy=(sw, yj),
-                        xytext=(sw + 0.12, yj + v_off),
-                        fontsize=9, color=color, zorder=5)
 
-        # Do-nothing event — only for non-add-on slots with a baseline and modeled cost
+        if sw is not None and sw <= n and net_cost > 0:
+            _add_journey(sw, code, color, label, net_cost)
+
         if not is_addon and slot.baseline_devices and net_cost > 0:
             dn_yr = max(1, slot.lifespan - slot.existing_age)
             if dn_yr <= n:
                 ydn = _y_donothing(dn_yr)
-                _draw_marker(dn_yr, ydn, color, filled=False, code=code)
-
-                # Drift connector from journey marker to do-nothing marker
+                dx.append(dn_yr); dy.append(ydn); dcode.append(code); dcolor.append(color)
+                dhover.append(f"{label} wears out · Yr {dn_yr}")
+                present[code] = (color, label)
                 if sw is not None and sw <= n:
-                    yj_val  = journey_y_placed[sw][-1]
-                    ydn_val = donothing_y_placed[dn_yr][-1]
-                    ax.plot([sw, dn_yr], [yj_val, ydn_val],
-                            color=color, lw=1.3, linestyle="--", alpha=0.7, zorder=1)
+                    connectors.append((sw, dn_yr, journey_y_placed[sw][-1],
+                                       donothing_y_placed[dn_yr][-1], color))
 
-    # --- CapExOnlySlots (add-on: journey marker only) ---
     for cslot in capex_slots:
         if cslot.install_year is not None and cslot.install_year <= n:
-            color = dstyle(cslot.style_key)["color"]
-            code  = dstyle(cslot.style_key)["code"]
-            yj = _y_journey(cslot.install_year)
-            _draw_marker(cslot.install_year, yj, color, filled=True, code=code)
-            net = cslot.install_cost - cslot.rebate
-            v_off = _COST_OFFSETS[_ann_idx % len(_COST_OFFSETS)]
-            _ann_idx += 1
-            ax.annotate(f"${net:,.0f}", xy=(cslot.install_year, yj),
-                        xytext=(cslot.install_year + 0.12, yj + v_off),
-                        fontsize=9, color=color, zorder=5)
+            st = dstyle(cslot.style_key)
+            _add_journey(cslot.install_year, st["code"], st["color"], st["label"],
+                         cslot.install_cost - cslot.rebate)
 
-    # --- legend (below axes, reserves space via rect) ---
-    present_keys = [s.style_key for s in display_slots
-                    if s.swap_year is not None and s.swap_year <= n]
-    present_keys += [cs.style_key for cs in capex_slots
-                     if cs.install_year is not None and cs.install_year <= n]
-    if present_keys:
-        ax.legend(
-            handles=device_legend_handles(present_keys),
-            fontsize=10, framealpha=0.85,
-            loc="upper center",
-            bbox_to_anchor=(0.5, -0.14),
-            ncol=min(4, len(present_keys)),
-        )
+    fig = go.Figure()
+    fig.add_hline(y=0, line=dict(color=_CC_TICK, width=1.2))
 
-    fig.tight_layout(rect=[0, 0.14, 1, 1])
+    # dashed drift connectors (one trace per color so each keeps its device hue)
+    for x0, x1, y0, y1, color in connectors:
+        fig.add_trace(go.Scatter(x=[x0, x1], y=[y0, y1], mode="lines", opacity=0.7,
+                                 line=dict(color=color, width=1.3, dash="dash"),
+                                 hoverinfo="skip", showlegend=False))
+
+    # do-nothing badges (open), then journey badges (filled)
+    if dx:
+        fig.add_trace(go.Scatter(
+            x=dx, y=dy, mode="markers+text", text=dcode, hovertext=dhover,
+            textfont=dict(color=dcolor, size=10),
+            textposition="middle center",
+            marker=dict(symbol="circle", size=30, color=BG,
+                        line=dict(color=dcolor, width=2)),
+            hovertemplate="%{hovertext}<extra></extra>", showlegend=False))
+    if jx:
+        fig.add_trace(go.Scatter(
+            x=jx, y=jy, mode="markers+text", text=jcode, hovertext=jhover,
+            textfont=dict(color="white", size=10),
+            textposition="middle center",
+            marker=dict(symbol="circle", size=30, color=jcolor,
+                        line=dict(color=jcolor, width=2)),
+            hovertemplate="%{hovertext}<extra></extra>", showlegend=False))
+
+    # legend entries (one dummy point per present device)
+    for code, (color, label) in present.items():
+        fig.add_trace(go.Scatter(
+            x=[None], y=[None], mode="markers", name=f"{code} · {label}",
+            marker=dict(symbol="circle", size=10, color=color), showlegend=True))
+
+    # cost labels + side labels
+    for x, y, txt, color in cost_anns:
+        fig.add_annotation(x=x, y=y, text=txt, showarrow=False, xanchor="left",
+                           yanchor="middle", font=dict(size=9, color=color))
+    fig.add_annotation(x=-0.45, y=0.18, text="<i>Your journey</i>", showarrow=False,
+                       xanchor="left", yanchor="bottom", font=dict(size=11, color=_CC_TICK))
+    fig.add_annotation(x=-0.45, y=-0.18, text="<i>Do nothing</i>", showarrow=False,
+                       xanchor="left", yanchor="top", font=dict(size=11, color=_CC_TICK))
+
+    lay = _pl_layout(height=300, xtitle="Year", money_y=False, xdtick=1)
+    lay["hovermode"] = "closest"
+    lay["paper_bgcolor"] = BG
+    lay["plot_bgcolor"] = BG
+    lay["margin"] = dict(l=12, r=12, t=8, b=34)
+    lay["xaxis"].update(range=[-0.7, n + 0.5], showline=False, ticks="")
+    lay["yaxis"] = dict(visible=False, range=[-1.3, 1.3], fixedrange=True)
+    lay["legend"].update(orientation="h", y=1.0, yanchor="bottom", x=0.5, xanchor="center")
+    fig.update_layout(**lay)
     return fig
 
 
 # Chart 4v2 — Equipment Replacements (CapEx) v2 (Phase 4 §4.3)
-def make_capex_v2(df, model, n):
-    """Grouped + stacked CapEx bars colored by device. Left=do nothing (hatched), right=journey (solid)."""
-    fig = Figure(figsize=(9.5, 4.0), dpi=110)
-    fig.patch.set_facecolor("#F9F9F9")
-    ax = fig.add_subplot(111)
-    ax.set_facecolor("#F9F9F9")
+def _capex_keys(model):
+    return [k for k in DEVICE_ORDER
+            if any(model.journey_home.capex_by_device.get(k, {}).values())
+            or any(model.baseline_home.capex_by_device.get(k, {}).values())]
 
-    yrs = np.arange(1, n + 1)
-    w   = 0.38
 
-    for grp, sign, hatch in (("baseline", -1, "//"), ("journey", +1, None)):
-        home    = model.baseline_home if grp == "baseline" else model.journey_home
-        bottoms = np.zeros(len(yrs))
-        for key in DEVICE_ORDER:
-            seg = np.array([
-                home.capex_by_device.get(key, {}).get(int(y), 0) for y in yrs
-            ])
-            if not seg.any():
-                continue
-            c = dstyle(key)["color"]
-            ax.bar(yrs + sign * w / 2, seg, w, bottom=bottoms,
-                   color=("none" if hatch else c),
-                   edgecolor=c, hatch=hatch, linewidth=0.6, zorder=3)
-            bottoms += seg
+def make_capex_header(model, n) -> str:
+    """HTML header for JC.4 — stacked above the bars (legends + full-width net banner).
 
-    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(_money))
-    ax.set_xlabel("Year", fontsize=11)
-    ax.set_ylabel("Replacement cost", fontsize=11)
-    ax.tick_params(labelsize=11)
-
-    # ── Net CapEx over the period (transparency) — journey vs do-nothing total ──
-    # All CapEx is in today's dollars (no inflation/escalation), so these are
-    # straight nominal sums. Positive net = electrification costs more capital.
+    Rendered as HTML (not Plotly) so the two legends and the bordered banner stack
+    cleanly and stay responsive; the matplotlib/Plotly legend-wrapping fights this.
+    """
     j_total = sum(model.journey_home.capex_by_year.values())
     b_total = sum(model.baseline_home.capex_by_year.values())
-    net     = j_total - b_total
-    sign    = "+" if net >= 0 else "−"
+    net = j_total - b_total
+    sign = "+" if net >= 0 else "−"
     net_clr = "#B23A2E" if net >= 0 else "#2E7D32"
-    box = (f"Net CapEx over {n} yr (today's $)\n"
-           f"Your journey:   ${j_total:,.0f}\n"
-           f"Do nothing:     ${b_total:,.0f}\n"
-           f"Net:           {sign}${abs(net):,.0f}")
-    ax.text(0.985, 0.97, box, transform=ax.transAxes, ha="right", va="top",
-            fontsize=9.5, family="monospace", linespacing=1.4, zorder=6,
-            bbox=dict(boxstyle="round,pad=0.55", facecolor="white",
-                      edgecolor=net_clr, linewidth=1.5, alpha=0.95))
+    hatch = ("background:repeating-linear-gradient(45deg,#9e9e9e 0 2px,"
+             "#ffffff 2px 4px);border:1px solid #9e9e9e")
+    dev_chips = "".join(
+        f"<span style='display:inline-flex;align-items:center;gap:4px;margin-right:11px'>"
+        f"<span style='width:11px;height:11px;border-radius:2px;"
+        f"background:{dstyle(k)['color']}'></span>{dstyle(k)['label']}</span>"
+        for k in _capex_keys(model))
+    return (
+        "<div style=\"display:flex;flex-direction:column;gap:4px;"
+        "font-family:var(--font);font-size:11px;color:var(--ink-3);"
+        "padding:2px 4px 6px;background:#F9F9F9\">"
+        # row 1 — bar type (hatched vs solid)
+        "<div style='display:flex;gap:16px'>"
+        f"<span style='display:inline-flex;align-items:center;gap:5px'>"
+        f"<span style='width:14px;height:11px;{hatch}'></span>Do nothing (hatched)</span>"
+        "<span style='display:inline-flex;align-items:center;gap:5px'>"
+        "<span style='width:14px;height:11px;background:#9e9e9e;border:1px solid #9e9e9e'>"
+        "</span>Your journey (solid)</span></div>"
+        # row 2 — appliances
+        f"<div style='display:flex;flex-wrap:wrap;row-gap:3px'>{dev_chips}</div>"
+        # row 3 — full-width bordered net banner (2 lines: title + value)
+        f"<div style='border:1.4px solid {net_clr};border-radius:6px;padding:4px 10px;"
+        "font-family:var(--mono);text-align:center;color:var(--ink);line-height:1.35'>"
+        f"Net CapEx · {n} yr (today's $)<br>"
+        f"<b style='font-size:13px;color:{net_clr}'>{sign}${abs(net):,.0f}</b>"
+        " vs do nothing</div></div>"
+    )
 
-    keys_present = [k for k in DEVICE_ORDER
-                    if any(model.journey_home.capex_by_device.get(k, {}).values())
-                    or any(model.baseline_home.capex_by_device.get(k, {}).values())]
-    handles = None
-    if keys_present:
-        handles = device_legend_handles(keys_present)
-        from matplotlib.patches import Patch
-        handles += [
-            Patch(facecolor="none", edgecolor="#666", hatch="//", label="Do nothing (hatched)"),
-            Patch(facecolor="#aaa", edgecolor="#666", label="Your journey (solid)"),
-        ]
 
-    _style(ax)
-    _legend_below(fig, ax, handles=handles, fontsize=9)
+def make_capex_v2(df, model, n):
+    """Grouped + stacked CapEx bars by device (Plotly) — bars only; the legends and the
+    net banner are rendered as an HTML header above the chart (see make_capex_header)."""
+    BG = "#F9F9F9"
+    yrs = list(range(1, n + 1))
+    fig = go.Figure()
+
+    for key in DEVICE_ORDER:
+        st = dstyle(key)
+        color, label = st["color"], st["label"]
+        b_seg = [model.baseline_home.capex_by_device.get(key, {}).get(y, 0) for y in yrs]
+        j_seg = [model.journey_home.capex_by_device.get(key, {}).get(y, 0) for y in yrs]
+        if not any(b_seg) and not any(j_seg):
+            continue
+        fig.add_trace(go.Bar(
+            x=yrs, y=b_seg, offsetgroup="baseline", showlegend=False,
+            marker=dict(color=color, pattern=dict(shape="/", fgcolor="white", solidity=0.35)),
+            hovertemplate=f"{label} · do nothing · Yr %{{x}}<br>$%{{y:,.0f}}<extra></extra>"))
+        fig.add_trace(go.Bar(
+            x=yrs, y=j_seg, offsetgroup="journey", showlegend=False,
+            marker=dict(color=color),
+            hovertemplate=f"{label} · journey · Yr %{{x}}<br>$%{{y:,.0f}}<extra></extra>"))
+
+    lay = _pl_layout(height=300, ytitle="Replacement cost", xtitle="Year",
+                     money_y=True, xdtick=1)
+    lay["barmode"] = "stack"
+    lay["hovermode"] = "closest"
+    lay["showlegend"] = False
+    lay["paper_bgcolor"] = BG
+    lay["plot_bgcolor"] = BG
+    lay["margin"] = dict(l=58, r=20, t=10, b=36)
+    fig.update_layout(**lay)
     return fig
 
 
 def render_device_chart(model, home: str = "journey",
-                        chart_type: str = "device_cost") -> Figure:
-    """Stacked area chart — annual cost or kWh-equivalent per device per year."""
+                        chart_type: str = "device_cost"):
+    """Stacked area chart — annual cost or kWh-equivalent per device per year
+    (Plotly — Phase 5 §4). x is the simulation year (1..n); swap markers carry the
+    calendar year in their label."""
     jh = model.journey_home if home == "journey" else model.baseline_home
     n = model.n_years
-    cal_years = list(range(model.sim_start_year, model.sim_start_year + n))
-
-    fig = Figure(figsize=(8, 3.8), dpi=100)
-    fig.patch.set_facecolor("#F9F9F9")
-    ax = fig.add_subplot(111)
-    ax.set_facecolor("#F9F9F9")
-
-    stack = np.zeros(n)
-    patches = []
+    x = list(range(1, n + 1))
     is_cost = chart_type == "device_cost"
 
-    if is_cost:
-        y_fmt   = lambda v, _: f"${v/1000:.1f}k"
-        y_label = "$/yr"
-    else:
-        y_fmt   = lambda v, _: f"{v/1000:.1f}k"
-        y_label = "kWh-eq / yr"
-
+    fig = go.Figure()
     for i, name in enumerate(_SLOT_DISPLAY_ORDER):
         # "Home energy" = what lands on the home meter. Exclude gasoline
         # (transportation) and external/public EV charging in both modes.
@@ -834,129 +831,93 @@ def render_device_chart(model, home: str = "journey",
             data  = np.where(fuels == "gas", raw * KWH_PER_THERM, raw)
             data  = np.where(fuels == "gasoline", 0.0, data)
 
-        ax.fill_between(cal_years, stack, stack + data,
-                        color=DEVICE_COLORS[i], alpha=DEVICE_ALPHAS[i], linewidth=0)
-        ax.plot(cal_years, stack + data, color=DEVICE_COLORS[i], linewidth=1.2)
-        patches.append(mpatches.Patch(color=DEVICE_COLORS[i], label=DEVICE_LABELS[i]))
-        stack += data
+        htmpl = ("$%{y:,.0f}" if is_cost else "%{y:,.0f} kWh") + \
+                "<extra>" + DEVICE_LABELS[i] + "</extra>"
+        fig.add_trace(go.Scatter(
+            x=x, y=list(data), name=DEVICE_LABELS[i], mode="lines", stackgroup="one",
+            line=dict(color=DEVICE_COLORS[i], width=1.2),
+            fillcolor=_rgba(DEVICE_COLORS[i], DEVICE_ALPHAS[i]), hovertemplate=htmpl))
 
-    # Swap annotations — journey home only
+    # Swap markers — journey home only (vertical dashed line + device label at top)
     SWAP_COLORS = {"HVAC": "#0D47A1", "Water Heater": "#1565C0",
                    "Dryer": "#D0302D", "Cooktop": "#EC9B1E"}
     if home == "journey":
-        for slot in jh.slots:
-            if slot.swap_year is None:
-                continue
+        swaps = sorted((s for s in jh.slots if s.swap_year is not None),
+                       key=lambda s: s.swap_year)
+        for idx, slot in enumerate(swaps):
             cal = model.sim_start_year + slot.swap_year - 1
             color = SWAP_COLORS.get(slot.name, "#78909C")
-            ax.axvline(cal, color=color, linewidth=1.2,
-                       linestyle=(0, (4, 3)), alpha=0.7)
-            ax.text(cal + 0.15, 0.93, slot.name,
-                    transform=ax.get_xaxis_transform(),
-                    fontsize=7, color=color, va="top")
+            fig.add_vline(x=slot.swap_year, line=dict(color=color, width=1.2, dash="dash"),
+                          opacity=0.7)
+            # Stagger labels down the line so neighbouring swap years don't overprint.
+            fig.add_annotation(x=slot.swap_year, y=1.0, yref="paper", text=f"{slot.name} ({cal})",
+                               showarrow=False, xanchor="left", yanchor="top", xshift=3,
+                               yshift=-12 * (idx % 3), font=dict(size=8, color=color))
 
-    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(y_fmt))
-    ax.set_ylabel(y_label, fontsize=9, color="#78909C")
-    ax.set_xlabel("Year", fontsize=9, color="#78909C")
-    ax.tick_params(axis="both", labelsize=8, colors="#78909C")
-    ax.grid(axis="y", color="#78909C", alpha=0.12, linewidth=0.5)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    _legend_below(fig, ax, handles=patches, fontsize=8)
+    ytitle = "$/yr" if is_cost else "kWh-eq / yr"
+    lay = _stacked_legend(_pl_layout(height=300, ytitle=ytitle, xtitle="Year",
+                                     money_y=is_cost, xdtick=1), rows=2)
+    # Compact SI ticks ($12k / 12k) — mirrors the old "{v/1000:.1f}k" axis formatter.
+    lay["yaxis"].update(tickformat="~s", tickprefix="$" if is_cost else "")
+    fig.update_layout(**lay)
     return fig
 
 
 # EU.3 — Annual kWh by Device (stacked bar, single pane, toggle)
-def make_annual_kwh(df, model, n, home="journey"):
-    """EU.3 · Actual electricity consumption per device per year — stacked bars."""
-    hobj      = model.journey_home if home == "journey" else model.baseline_home
-    title_sub = "Your Journey" if home == "journey" else "Do Nothing"
-
-    fig = _new_fig(wide=False)
-    ax  = fig.add_subplot(111)
-    x   = np.arange(1, n + 1)
-
-    slot_names = list(hobj.consumption_history_by_slot.keys())
-    bottom = np.zeros(n)
-    for sname in slot_names:
-        raw   = np.array(hobj.consumption_history_by_slot.get(sname, [0]*n)[:n], dtype=float)
+def _annual_by_device(model, n, home, fuel, ytitle, unit, empty_msg):
+    """EU.3/EU.4 — stacked bars of per-device consumption for one fuel."""
+    hobj = model.journey_home if home == "journey" else model.baseline_home
+    yrs = list(range(1, n + 1))
+    fig = go.Figure()
+    any_data = False
+    for sname in hobj.consumption_history_by_slot.keys():
+        raw = np.array(hobj.consumption_history_by_slot.get(sname, [0]*n)[:n], dtype=float)
         fuels = hobj.fuel_history_by_slot.get(sname, ["electricity"]*n)[:n]
-        kwh   = np.where(np.array(fuels) == "electricity", raw, 0.0)
-        if kwh.sum() == 0:
+        seg = np.where(np.array(fuels) == fuel, raw, 0.0)
+        if seg.sum() == 0:
             continue
-        color = _SLOT_COLORS.get(sname, "#90A4AE")
-        ax.bar(x, kwh, bottom=bottom, label=sname, color=color, alpha=0.82, width=0.7)
-        bottom += kwh
-
-    ax.yaxis.set_major_formatter(
-        matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
-    ax.set_xlabel("Year")
-    ax.set_ylabel("kWh / year")
-    _style(ax)
-    _legend_below(fig, ax, fontsize=7)
+        any_data = True
+        fig.add_trace(go.Bar(
+            x=yrs, y=seg, name=sname, marker=dict(color=_SLOT_COLORS.get(sname, "#90A4AE")),
+            hovertemplate=f"{sname} · Yr %{{x}}<br>%{{y:,.0f}} {unit}<extra></extra>"))
+    if not any_data:
+        return _pl_empty(empty_msg)
+    lay = _pl_layout(height=300, ytitle=ytitle, xtitle="Year", money_y=False, xdtick=1)
+    lay["barmode"] = "stack"
+    lay["hovermode"] = "closest"
+    fig.update_layout(**lay)
     return fig
+
+
+def make_annual_kwh(df, model, n, home="journey"):
+    """EU.3 · Per-device electricity consumption per year — stacked bars."""
+    return _annual_by_device(model, n, home, "electricity", "kWh / year", "kWh",
+                             "No electricity consumption in this scenario")
 
 
 # EU.4 — Annual Gas Consumption by Device (stacked bar, single pane, toggle)
 def make_annual_gas(df, model, n, home="journey"):
-    """EU.4 · Actual gas consumption per device per year — stacked bars (therms)."""
-    hobj      = model.journey_home if home == "journey" else model.baseline_home
-    title_sub = "Your Journey" if home == "journey" else "Do Nothing"
-
-    fig = _new_fig(wide=False)
-    ax  = fig.add_subplot(111)
-    x   = np.arange(1, n + 1)
-
-    slot_names = list(hobj.consumption_history_by_slot.keys())
-    bottom = np.zeros(n)
-    has_any = False
-    for sname in slot_names:
-        raw   = np.array(hobj.consumption_history_by_slot.get(sname, [0]*n)[:n], dtype=float)
-        fuels = hobj.fuel_history_by_slot.get(sname, ["electricity"]*n)[:n]
-        therms = np.where(np.array(fuels) == "gas", raw, 0.0)
-        if therms.sum() == 0:
-            continue
-        has_any = True
-        color = _SLOT_COLORS.get(sname, "#90A4AE")
-        ax.bar(x, therms, bottom=bottom, label=sname, color=color, alpha=0.82, width=0.7)
-        bottom += therms
-
-    if not has_any:
-        ax.text(0.5, 0.5, "No gas consumption\nin this scenario",
-                ha="center", va="center", transform=ax.transAxes,
-                fontsize=11, color=_CC_TICK, style="italic")
-
-    ax.yaxis.set_major_formatter(
-        matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
-    ax.set_xlabel("Year")
-    ax.set_ylabel("Therms / year")
-    _style(ax)
-    _legend_below(fig, ax, fontsize=7)
-    return fig
+    """EU.4 · Per-device gas consumption per year — stacked bars (therms)."""
+    return _annual_by_device(model, n, home, "gas", "Therms / year", "therms",
+                             "No gas consumption in this scenario")
 
 
 # EU.5 — Annual Gasoline Consumption (gallons/year)
 def make_annual_gasoline(df, model, n, home="journey"):
     """EU.5 · Gasoline consumption (gallons/year) from the Transportation slot."""
     hobj = model.journey_home if home == "journey" else model.baseline_home
-    gallons = np.array(hobj.gasoline_gallons_history[:n], dtype=float) if hobj.gasoline_gallons_history else np.zeros(n)
-
-    fig = _new_fig(wide=False)
-    ax  = fig.add_subplot(111)
-    x   = np.arange(1, n + 1)
-
-    if gallons.sum() > 0:
-        ax.bar(x, gallons, color="#C0392B", alpha=0.82, width=0.7, label="Gasoline")
-    else:
-        ax.text(0.5, 0.5, "No gasoline consumption\nin this scenario",
-                ha="center", va="center", transform=ax.transAxes,
-                fontsize=11, color=_CC_TICK, style="italic")
-
-    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
-    ax.set_xlabel("Year")
-    ax.set_ylabel("Gallons / year")
-    _style(ax)
-    _legend_below(fig, ax, fontsize=7)
+    gallons = (np.array(hobj.gasoline_gallons_history[:n], dtype=float)
+               if hobj.gasoline_gallons_history else np.zeros(n))
+    if gallons.sum() <= 0:
+        return _pl_empty("No gasoline consumption in this scenario")
+    yrs = list(range(1, n + 1))
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=yrs, y=gallons, name="Gasoline", marker=dict(color="#C0392B"),
+                         hovertemplate="Yr %{x}<br>%{y:,.0f} gal<extra></extra>"))
+    lay = _pl_layout(height=300, ytitle="Gallons / year", xtitle="Year",
+                     money_y=False, xdtick=1)
+    lay["hovermode"] = "closest"
+    fig.update_layout(**lay)
     return fig
 
 
@@ -967,10 +928,7 @@ def make_energy_mix_timeline(df, model, n, home="journey"):
     Solar-Elec, External-Elec. Gas is converted via the 29.3 kWh/therm factor and
     gasoline via the 33.7 kWh/gallon (MPGe) factor — display only."""
     hobj = model.journey_home if home == "journey" else model.baseline_home
-
-    fig = _new_fig(wide=False)
-    ax  = fig.add_subplot(111)
-    x   = np.arange(1, n + 1)
+    x = list(range(1, n + 1))
 
     def _arr(hist):
         a = np.zeros(n)
@@ -994,78 +952,72 @@ def make_energy_mix_timeline(df, model, n, home="journey"):
     ext_kwh      = _arr(hobj.external_ev_kwh_history)
     util_kwh     = np.maximum(0.0, total_elec - solar_kwh)  # grid = home elec − solar self-use
 
-    labels = ["Gas", "Gasoline", "Utility-Elec", "Solar-Elec", "External-Elec"]
-    data   = [gas_kwh, gasoline_kwh, util_kwh, solar_kwh, ext_kwh]
-    colors = ["#FB8C00", "#6D4C41", "#1565C0", _CC_SOLAR, "#C0392B"]
+    layers = [("Gas", gas_kwh, "#FB8C00"), ("Gasoline", gasoline_kwh, "#6D4C41"),
+              ("Utility-Elec", util_kwh, "#1565C0"), ("Solar-Elec", solar_kwh, _CC_SOLAR),
+              ("External-Elec", ext_kwh, "#C0392B")]
+    if sum(d.sum() for _, d, _ in layers) <= 0:
+        return _pl_empty("No energy use in this scenario")
 
-    if sum(d.sum() for d in data) > 0:
-        ax.stackplot(x, *data, labels=labels, colors=colors, alpha=0.85)
-        ax.plot(x, np.sum(data, axis=0), color="#37474F", lw=0.6, alpha=0.4)
-    else:
-        ax.text(0.5, 0.5, "No energy use\nin this scenario",
-                ha="center", va="center", transform=ax.transAxes,
-                fontsize=11, color=_CC_TICK, style="italic")
+    fig = go.Figure()
+    for label, data, color in layers:
+        fig.add_trace(go.Scatter(
+            x=x, y=list(data), name=label, mode="lines", stackgroup="one",
+            line=dict(color=color, width=0.5), fillcolor=_rgba(color, 0.85),
+            hovertemplate="%{y:,.0f} kWh<extra>" + label + "</extra>"))
 
-    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
-    ax.set_xlabel("Year")
-    ax.set_ylabel("kWh-equivalent / year")
-    ax.set_xlim(1, n)
-    ax.margins(x=0)
-    _style(ax)
-    _legend_below(fig, ax, fontsize=7, max_cols=5)
+    fig.update_layout(**_stacked_legend(_pl_layout(
+        height=300, ytitle="kWh-equivalent / year", xtitle="Year", money_y=False, xdtick=1)))
     return fig
 
 
 # Chart JC.6 — Estimated Electrical Load (NEC panel load over the journey)
 def make_panel_load_timeline(df, model, n):
-    fig = _new_fig()
-    ax  = fig.add_subplot(111)
-    hc  = model.home_config
+    hc = model.home_config
     assessor = PanelAssessor(hc.square_footage, hc.panel_amps,
                              method=panel_calc_method.value)
     timeline = assessor.journey_load_timeline(model.journey_home, n)
-    x     = np.arange(1, n + 1)
-    amps  = np.array([t.service_amps for t in timeline], dtype=float)
+    yrs = list(range(1, n + 1))
+    amps = [t.service_amps for t in timeline]
     panel = hc.panel_amps
 
-    # Stepped service load — flat until a device activates, then jumps.
-    ax.step(x, amps, where="post", color=_CC_J, lw=2.5, zorder=4,
-            label="Estimated service load")
-    ax.fill_between(x, 0, amps, step="post", color=_CC_J, alpha=0.10, zorder=2)
-
+    fig = go.Figure()
+    # Stepped service load (flat until a device activates) + light fill.
+    fig.add_trace(go.Scatter(
+        x=yrs, y=amps, mode="lines", name="Estimated service load",
+        line=dict(color=_CC_J, width=2.5, shape="hv"), fill="tozeroy",
+        fillcolor=_rgba(_CC_J, 0.10), hovertemplate="%{y:.0f} A · Yr %{x}<extra></extra>"))
     # Panel capacity reference line.
-    ax.axhline(panel, color="#C62828", lw=2.0, linestyle="--", zorder=3,
-               label=f"{panel} A panel capacity")
-
-    # Device-activation markers + labels (alternating offset to limit overlap).
-    n_act = 0
-    for t in timeline:
-        if not t.new_device:
-            continue
+    fig.add_hline(y=panel, line=dict(color="#C62828", width=2.0, dash="dash"),
+                  annotation_text=f"{panel} A panel capacity",
+                  annotation_position="top left",
+                  annotation_font=dict(size=10, color="#C62828"))
+    # Device-activation markers + staggered labels.
+    mx, my, mtxt = [], [], []
+    for i, t in enumerate(tt for tt in timeline if tt.new_device):
         cal = sim_start_year.value + t.year - 1
-        ax.scatter([t.year], [t.service_amps], s=42, color="#F57C00",
-                   edgecolor="white", linewidth=1.0, zorder=6)
-        dy = 22 if (n_act % 2) else 9
-        ax.annotate(f"+ {t.new_device}\n{cal}",
-                    xy=(t.year, t.service_amps),
-                    xytext=(3, dy), textcoords="offset points",
-                    ha="left", va="bottom", fontsize=7.2, color="#5D4037",
-                    linespacing=0.95, zorder=7)
-        n_act += 1
+        mx.append(t.year); my.append(t.service_amps)
+        mtxt.append(f"+ {t.new_device} ({cal})")
+        fig.add_annotation(x=t.year, y=t.service_amps, text=f"+ {t.new_device}<br>{cal}",
+                           showarrow=False, xanchor="left", yanchor="bottom",
+                           xshift=4, yshift=(20 if i % 2 else 6),
+                           font=dict(size=8, color="#5D4037"), align="left")
+    if mx:
+        fig.add_trace(go.Scatter(
+            x=mx, y=my, mode="markers", showlegend=False, hovertext=mtxt,
+            marker=dict(size=10, color="#F57C00", line=dict(color="white", width=1)),
+            hovertemplate="%{hovertext}<extra></extra>"))
 
-    peak = max(timeline, key=lambda t: t.service_amps)
-    ax.set_ylim(0, max(panel, float(amps.max())) * 1.20)
-    ax.set_xlim(1, n)
+    peak = max(amps) if amps else 0
     method_lbl = ("Optional · NEC 220.82" if panel_calc_method.value == "optional"
                   else "Standard · NEC 220.42")
-    ax.set_title(f"Peak {peak.service_amps:.0f} A of {panel} A  ·  {method_lbl}",
-                 fontsize=9, color=_CC_TICK, loc="left", pad=8)
-    ax.yaxis.set_major_formatter(
-        matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:.0f} A"))
-    ax.set_xlabel("Year")
-    ax.set_ylabel("Service load (A)")
-    _style(ax)
-    _legend_below(fig, ax, max_cols=2)
+    lay = _pl_layout(height=300, ytitle="Service load (A)", xtitle="Year",
+                     money_y=False, xdtick=1)
+    lay["yaxis"].update(ticksuffix=" A", rangemode="tozero")
+    lay["title"] = dict(text=f"Peak {peak:.0f} A of {panel} A · {method_lbl}",
+                        x=0.5, xanchor="center", y=0.98,
+                        font=dict(size=11, color=_CC_TICK))
+    lay["margin"]["t"] = 28
+    fig.update_layout(**lay)
     return fig
 
 
@@ -1083,13 +1035,9 @@ def make_hvac_monthly(df, model, n, home="journey"):
     year_idx = max(0, min((swap_year - 1) if swap_year else (n - 1), n - 1))
     cal_year = model.sim_start_year + year_idx
 
-    fig = _new_fig(wide=False)
-    ax = fig.add_subplot(111)
     slot = next((s for s in hobj.slots if s.name == "HVAC"), None)
     if slot is None:
-        ax.text(0.5, 0.5, "No HVAC slot", ha="center", va="center",
-                transform=ax.transAxes, color=_CC_TICK)
-        return fig
+        return _pl_empty("No HVAC slot")
 
     # Active HVAC device(s) for this home at that year (mirrors DeviceSlot.step logic).
     if home == "baseline" or slot.swap_year is None or (year_idx + 1) < slot.swap_year:
@@ -1110,20 +1058,30 @@ def make_hvac_monthly(df, model, n, home="journey"):
             cooling += np.asarray(dev.monthly_cooling(), dtype=float) * f
     model.climate.advance_to(prev)
 
-    x = np.arange(12)
-    ax.bar(x, heating, color="#E2603A", label="Heating")
-    if cooling.sum() > 0:
-        ax.bar(x, cooling, bottom=heating, color="#4A90D9", label="Cooling")
-    ax.set_xticks(x); ax.set_xticklabels(_M, fontsize=7)
-    ax.set_ylabel("kWh-equivalent")
-    label = "Your journey" if home == "journey" else "Do nothing"
-    ax.set_title(f"HVAC monthly energy — {label}, {cal_year}",
-                 fontsize=11, fontweight="bold")
     if heating.sum() + cooling.sum() == 0:
-        ax.text(0.5, 0.5, "No HVAC energy\nthis year", ha="center", va="center",
-                transform=ax.transAxes, fontsize=11, color=_CC_TICK, style="italic")
-    _style(ax)
-    _legend_below(fig, ax, max_cols=2)
+        return _pl_empty("No HVAC energy this year")
+
+    label = "Your journey" if home == "journey" else "Do nothing"
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=_M, y=heating, name="Heating", marker=dict(color="#E2603A"),
+                         hovertemplate="%{x}<br>%{y:,.0f}<extra>Heating</extra>"))
+    if cooling.sum() > 0:
+        fig.add_trace(go.Bar(x=_M, y=cooling, name="Cooling", marker=dict(color="#4A90D9"),
+                             hovertemplate="%{x}<br>%{y:,.0f}<extra>Cooling</extra>"))
+    lay = _pl_layout(height=300, ytitle="kWh-equivalent", xtitle="", money_y=False)
+    lay["barmode"] = "stack"
+    lay["hovermode"] = "x unified"
+    lay["xaxis"] = dict(type="category", tickfont=dict(size=10))
+    lay["title"] = dict(text=f"HVAC monthly · {label}, {cal_year}", x=0.5, xanchor="center",
+                        y=0.98, font=dict(size=11, color=_CC_TICK))
+    lay["margin"]["t"] = 28
+    lay["margin"]["b"] = 52
+    # Default top-left overlay legend collides with the tall Jan/Dec heating bars
+    # (its translucent box tints the bar top). Put it in a horizontal row below the
+    # plot instead, clear of the bars.
+    lay["legend"] = dict(orientation="h", y=-0.16, yanchor="top", x=0.5, xanchor="center",
+                         bgcolor="rgba(0,0,0,0)", font=dict(size=10), tracegroupgap=0)
+    fig.update_layout(**lay)
     return fig
 
 
@@ -1135,8 +1093,9 @@ CHART_FNS = {
     "Equipment Replacements (CapEx)": make_capex_v2,
     "Electric CAGR Projection":        make_elec_price,
     "Gas CAGR Projection":                make_gas_price,
-    "ACC Rate Projection":                make_rate_trajectory,
-    "Electricity Rate Shape":         make_acc_rate_shape,
+    "ACC Electrical Rate Projection": make_acc_elec_trajectory,
+    "ACC Gas Rate Projection":        make_acc_gas_trajectory,
+    "ACC Electrical Rate Shape":      make_acc_rate_shape,
     "Journey Timeline":               make_journey_timeline_v2,
     "Annual kWh by Device":           make_annual_kwh,
     "Annual Gas by Device":           make_annual_gas,

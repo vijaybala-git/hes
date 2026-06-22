@@ -430,8 +430,9 @@ _CHART_NAME_TO_KEY = {
     # Rates (R)
     "Electric CAGR Projection":       "chart_r1",
     "Gas CAGR Projection":            "chart_r2",
-    "ACC Rate Projection":            "chart_r3",
-    "Electricity Rate Shape":         "chart_r4",
+    "ACC Electrical Rate Projection": "chart_r3",
+    "ACC Gas Rate Projection":        "chart_r3",
+    "ACC Electrical Rate Shape":      "chart_r4",
 }
 
 # Extra popup entries not tied to a page section (chart entries use chart keys).

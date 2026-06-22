@@ -5,3 +5,5 @@ networkx>=3.0
 numpy>=2.0
 pandas>=2.0
 matplotlib>=3.9
+plotly>=6.0
+anywidget>=0.9

@@ -146,7 +146,6 @@
     "chart_left": "Cumulative Energy Costs",
     "chart_right": "Journey Timeline",
     "device_chart_home": "journey",
-    "acc_shape_year": 1,
     "detail_open": null
   }
 }

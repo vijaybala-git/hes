@@ -9,6 +9,7 @@ import functools
 from pathlib import Path
 import solara
 import solara.lab
+import anywidget
 import numpy as np
 import matplotlib
 import matplotlib.ticker
@@ -22,6 +23,7 @@ from climate_loader import ClimateLoader, TREND_SCENARIOS
 from rate_resolver import RateResolver
 from journey import CATEGORY_ORDER, CATEGORY_LABELS, CapExOnlySlot, SolarBatteryConfig
 from ui.device_style import DEVICE_STYLE, DEVICE_ORDER, dstyle, device_legend_handles
+from ui.slider import WhyWattSlider, SliderSpec
 from panel_assessor import PanelAssessor
 from social_cost import SocialCostConfig
 from help_utils import (HelpButton, ChartHelpButton, HelpPopupOverlay,
@@ -120,6 +122,55 @@ def _toggle_buttons(active_rv):
             )
 
 
+class _PlotFitter(anywidget.AnyWidget):
+    """One-time client observer: relayouts any Plotly plot whose SVG width ≠ its pane,
+    fitting it to the container (Plotly's FigureWidget otherwise pins to ~700px and clips).
+    Re-fits on every re-render and on resize."""
+    _esm = """
+    export default { render({ el }) {
+      if (window.__wwPlotFit) return; window.__wwPlotFit = 1;
+      const fit = (p) => { try {
+        const s = p.querySelector('.main-svg');
+        if (window.Plotly && s && p.clientWidth &&
+            Math.abs(parseFloat(s.getAttribute('width')) - p.clientWidth) > 2)
+          window.Plotly.relayout(p, { width: null, autosize: true });
+      } catch (e) {} };
+      const all = () => document.querySelectorAll('.js-plotly-plot').forEach(fit);
+      // Debounced observer: coalesce bursts of mutations into one fit pass so we
+      // don't churn (which also lets screenshots/paint settle).
+      let t = null;
+      const schedule = () => { if (t) return; t = setTimeout(() => { t = null; all(); }, 120); };
+      new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
+      window.addEventListener('resize', schedule);
+    } };
+    """
+
+
+@solara.component
+def _FigurePlotlyResponsive(fig):
+    """solara.FigurePlotly + a CSS width reset + the one-time `_PlotFitter` observer so
+    the chart fills the pane width instead of Plotly's default 700px."""
+    solara.Style(".js-plotly-plot, .js-plotly-plot .svg-container { width:100%!important; }")
+    _PlotFitter.element()          # idempotent — installs the observer once per page
+    solara.FigurePlotly(fig)
+
+
+def _render_fig(fig, key=None):
+    """Render a chart figure — Plotly or matplotlib (mixed during the §4 migration).
+
+    `key` identifies the chart type so the Plotly widget *remounts* (rather than diffs)
+    when the pane switches to a different chart. Without this, solara.FigurePlotly reuses
+    the same FigureWidget and `Plotly.react()` leaves stale traces/shapes/annotations from
+    the previous chart behind (e.g. a lingering "Do nothing" line when switching C.1 → R.1).
+    Re-rendering the *same* chart with new data keeps the same key, so it still diffs
+    smoothly (no flicker on slider drags).
+    """
+    if fig.__class__.__module__.startswith("plotly"):
+        _FigurePlotlyResponsive(fig).key(f"plotly:{key}")
+    else:
+        solara.FigureMatplotlib(fig)
+
+
 @solara.component
 def ChartPane(chart_name, model, df, n):
     if chart_name in _DEVICE_CHART_NAMES:
@@ -128,58 +179,57 @@ def ChartPane(chart_name, model, df, n):
         with solara.Column(gap="4px"):
             _toggle_buttons(device_chart_home)
             fig = render_device_chart(model, home=home, chart_type=chart_type)
-            solara.FigureMatplotlib(fig)
+            _render_fig(fig, key=f"{chart_name}:{home}")
     elif chart_name == "Cost Breakdown by Category":
         home = device_chart_home.value
         with solara.Column(gap="4px"):
             _toggle_buttons(device_chart_home)
             fig = make_cost_breakdown(df, model, n, home=home)
-            solara.FigureMatplotlib(fig)
+            _render_fig(fig, key=f"{chart_name}:{home}")
     elif chart_name == "Annual kWh by Device":
         home = device_chart_home.value
         with solara.Column(gap="4px"):
             _toggle_buttons(device_chart_home)
             fig = make_annual_kwh(df, model, n, home=home)
-            solara.FigureMatplotlib(fig)
+            _render_fig(fig, key=f"{chart_name}:{home}")
     elif chart_name == "Annual Gas by Device":
         home = device_chart_home.value
         with solara.Column(gap="4px"):
             _toggle_buttons(device_chart_home)
             fig = make_annual_gas(df, model, n, home=home)
-            solara.FigureMatplotlib(fig)
+            _render_fig(fig, key=f"{chart_name}:{home}")
     elif chart_name == "Annual Gasoline by Vehicle":
         home = device_chart_home.value
         with solara.Column(gap="4px"):
             _toggle_buttons(device_chart_home)
             fig = make_annual_gasoline(df, model, n, home=home)
-            solara.FigureMatplotlib(fig)
+            _render_fig(fig, key=f"{chart_name}:{home}")
     elif chart_name == "HVAC Monthly Energy":
         home = device_chart_home.value
         with solara.Column(gap="4px"):
             _toggle_buttons(device_chart_home)
             fig = make_hvac_monthly(df, model, n, home=home)
-            solara.FigureMatplotlib(fig)
+            _render_fig(fig, key=f"{chart_name}:{home}")
     elif chart_name == "Energy Mix Timeline":
         home = device_chart_home.value
         with solara.Column(gap="4px"):
             _toggle_buttons(device_chart_home)
             fig = make_energy_mix_timeline(df, model, n, home=home)
-            solara.FigureMatplotlib(fig)
-    elif chart_name == "Electricity Rate Shape":
+            _render_fig(fig, key=f"{chart_name}:{home}")
+    elif chart_name == "ACC Electrical Rate Shape":
+        # No reference-year control: the ACC shape is year-independent (single static
+        # hour×month factor matrix), so R.5 renders bare — matching every other chart's
+        # vertical footprint. (The old acc_shape_year slider was a no-op.)
         fig = make_acc_rate_shape(df, model, n)
-        solara.FigureMatplotlib(fig)
-        cal = sim_start_year.value + acc_shape_year.value - 1
-        solara.SliderInt(
-            f"Year {acc_shape_year.value}  ({cal})",
-            value=acc_shape_year, min=1, max=n,
-        )
-        solara.Text(
-            "Shape shown for 2025 reference year — multi-year ACC data in Phase 3.",
-            style="font-size:0.76em; color:#9E9E9E",
-        )
+        _render_fig(fig, key=chart_name)
+    elif chart_name == "Equipment Replacements (CapEx)":
+        # JC.4 — HTML header (stacked legends + full-width net banner) above the bars
+        with solara.Column(gap="0px"):
+            solara.HTML(tag="div", unsafe_innerHTML=make_capex_header(model, n))
+            _render_fig(make_capex_v2(df, model, n), key=chart_name)
     else:
         fig = CHART_FNS[chart_name](df, model, n)
-        solara.FigureMatplotlib(fig)
+        _render_fig(fig, key=chart_name)
 
 
 @solara.component

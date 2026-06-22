@@ -185,9 +185,6 @@ solar_rebate           = solara.reactive(_DEFAULTS["solar_rebate"])
 # Device chart home selector (shared by both device chart types)
 device_chart_home = solara.reactive(_DEFAULTS["device_chart_home"])   # "journey" | "baseline"
 
-# ACC Rate Shape chart — year selector (chart-only, NOT a sim dep)
-acc_shape_year = solara.reactive(_DEFAULTS["acc_shape_year"])
-
 # Pricing & timeline
 # §2 per-fuel rate model — "cagr_flat" (= My Utility, EIA per-utility from ZIP) |
 # "ca_average" (EIA statewide) | "acc_shaped"/"acc_seasonal" (ACC). The CAGR slider applies
@@ -380,7 +377,6 @@ def reset_to_defaults():
     chart_left.set(_DEFAULTS["chart_left"])
     chart_right.set(_DEFAULTS["chart_right"])
     device_chart_home.set(_DEFAULTS["device_chart_home"])
-    acc_shape_year.set(_DEFAULTS["acc_shape_year"])
     detail_open.set(_DEFAULTS["detail_open"])
     _set_all_setup(False)
 

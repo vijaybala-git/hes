@@ -51,8 +51,9 @@ CHART_OPTIONS = [
     "Estimated Electrical Load",
     "Electric CAGR Projection",
     "Gas CAGR Projection",
-    "ACC Rate Projection",
-    "Electricity Rate Shape",
+    "ACC Electrical Rate Projection",
+    "ACC Gas Rate Projection",
+    "ACC Electrical Rate Shape",
     "Journey Timeline",
     "Home Energy Cost by Device",
     "Home Energy Use by Device",
@@ -78,8 +79,9 @@ CHART_CODES = {
     "Energy Mix Timeline":            "EU.6",
     "Electric CAGR Projection":       "R.1",
     "Gas CAGR Projection":            "R.2",
-    "ACC Rate Projection":            "R.3",
-    "Electricity Rate Shape":         "R.4",
+    "ACC Electrical Rate Projection": "R.3",
+    "ACC Gas Rate Projection":        "R.4",
+    "ACC Electrical Rate Shape":      "R.5",
 }
 
 # Per-slot color palette (consistent across EU.3 / EU.4 / cost charts)

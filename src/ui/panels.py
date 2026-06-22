@@ -19,62 +19,13 @@ from ui.estimators import (
     _est_gas_furnace, _est_hp_hvac_heating, _est_hp_hvac_cooling, _est_gas_wh, _est_hpwh,
     _est_gas_dryer, _est_hp_dryer, _est_gas_cooktop, _est_induction, _est_ev_kwh, _kwh_eq)
 from ui.device_style import DEVICE_STYLE, DEVICE_ORDER, dstyle, device_legend_handles
+from ui.slider import WhyWattSlider, SliderSpec
 from help_utils import HelpButton, ChartHelpButton, HelpPopupOverlay, HelpLink
 from journey import CATEGORY_ORDER, CATEGORY_LABELS, CapExOnlySlot, SolarBatteryConfig
 from home_config import HomeConfig, compute_baseload_kwh
 from model import HESModel
 from panel_assessor import PanelAssessor
 from social_cost import SocialCostConfig
-
-@solara.component
-def SliderWithDefault(label, value, default, min, max, step=1, unit="", fmt="{v}",
-                      show_delta=True):
-    """Slider with a default-position tick mark and a delta label when changed.
-
-    show_delta=False suppresses the "+X from default (Y)" sub-line (used where the
-    caller wants a more compact slider).
-    """
-    v = value.value
-    at_default = abs(v - default) < (step * 0.01)
-    delta = v - default
-    tick_pct = int(100 * (default - min) / (max - min)) if max != min else 50
-    display_label = f"{label}: {fmt.format(v=v)}{unit}"
-
-    with solara.Column(gap="0px"):
-        if isinstance(default, float):
-            solara.SliderFloat(display_label, value=value, min=min, max=max, step=step)
-        else:
-            solara.SliderInt(display_label, value=value, min=min, max=max, step=int(step))
-
-        solara.HTML(
-            tag="div",
-            unsafe_innerHTML=(
-                f"<div style='position:relative;height:6px;margin:-4px 0 2px 0;"
-                f"pointer-events:none;'>"
-                f"<div style='position:absolute;left:{tick_pct}%;top:0;bottom:0;"
-                f"width:2px;background:#0D47A1;opacity:0.5;border-radius:1px;'></div>"
-                f"<div style='position:absolute;left:{tick_pct}%;top:50%;"
-                f"transform:translate(-50%,-50%);width:6px;height:6px;"
-                f"background:#0D47A1;opacity:0.5;border-radius:50%;'></div>"
-                f"</div>"
-            ),
-        )
-
-        if show_delta and not at_default:
-            sign = "+" if delta > 0 else ""
-            color = "#D0302D" if delta < 0 else "#2E7D32"
-            solara.HTML(
-                tag="div",
-                unsafe_innerHTML=(
-                    f"<div style='font-size:0.75em;color:{color};"
-                    f"margin-top:1px;padding-left:2px;'>"
-                    f"{sign}{fmt.format(v=delta)}{unit} from default "
-                    f"({fmt.format(v=default)}{unit})</div>"
-                ),
-            )
-
-
-
 
 # ── §25 Unified Summary + Detail UI ──────────────────────────────────────────
 
@@ -148,12 +99,56 @@ def _DS(heading: str):
     )
 
 
+def _dec_from(fmt, step):
+    """Derive display decimals from a legacy fmt string, falling back to the step."""
+    for d in (3, 2, 1, 0):
+        if f".{d}f" in fmt:
+            return d
+    if float(step).is_integer():
+        return 0
+    return len(f"{step}".split(".")[1])
+
+
 @solara.component
 def _DSl(label, rv, default, lo, hi, step=1, unit="", fmt="{v}", show_delta=True):
-    """DetailSlider — wraps SliderWithDefault for use inside detail columns."""
-    with solara.Column(gap="0px", style="margin-bottom:4px"):
-        SliderWithDefault(label, rv, default, lo, hi, step, unit=unit, fmt=fmt,
-                          show_delta=show_delta)
+    """DetailSlider — unified inline WhyWattSlider (Phase 5 rollout). `show_delta`
+    is accepted for call-site compatibility but no longer used (inline has no delta)."""
+    WhyWattSlider(
+        SliderSpec(key=str(label), title=label, minimum=lo, maximum=hi, step=step,
+                   default=default, unit=unit.strip(), decimals=_dec_from(fmt, step),
+                   layout="inline"),
+        value=rv,
+    )
+
+
+def _HSl(title, rv, default, lo, hi, step=1, unit="", decimals=0):
+    """HVAC-detail inline slider (Phase 5) — label | track | editable value, aligned.
+
+    Fixed label width aligns every track down a column. Keep titles short.
+    """
+    WhyWattSlider(
+        SliderSpec(key=title.lower().replace(" ", "_"), title=title,
+                   minimum=lo, maximum=hi, step=step, default=default,
+                   unit=unit, decimals=decimals, layout="inline"),
+        value=rv,
+    )
+
+
+def _hp_size():
+    """Heat pump size slider + its electrical draw — lives in the HP (right) column."""
+    _HSl("Heat pump size", hvac_tonnage, _DEFAULTS["hvac_tonnage"],
+         2.0, 5.0, 0.5, unit="ton", decimals=1)
+    _elec_display(240, int(hvac_tonnage.value * 10))
+
+
+def _YSl(rv, default, title="Swap year", max_yr=25):
+    """Unified year slider (stack, editable calendar year) — swap/install years."""
+    WhyWattSlider(
+        SliderSpec(key=title.lower().replace(" ", "_"), title=title,
+                   minimum=1, maximum=max_yr, step=1, default=default,
+                   decimals=0, dtype="year", base_year=sim_start_year.value),
+        value=rv,
+    )
 
 
 def _elec_display(volts: int, amps: int):
@@ -334,7 +329,7 @@ def _cost_row(cost_rv, rebate_rv, net: int):
 
 
 def _appliance_rows(state_rv, planned_rv, year_rv, cost_rv, rebate_rv,
-                    state_values=("gas", "electric", "none")):
+                    state_values=("gas", "electric", "none"), year_default=1):
     """Row content for standard appliance summary cards (HVAC, WH, Cooktop, Dryer)."""
     state = state_rv.value
     # Row 1: state dropdown + plan checkbox (+ electrified badge)
@@ -348,17 +343,17 @@ def _appliance_rows(state_rv, planned_rv, year_rv, cost_rv, rebate_rv,
                 "<span style='font-size:0.80em; color:#2E7D32; margin-left:4px;'>"
                 "✓ Electrified</span>"
             ))
-    # Row 2: full-width year slider + subscript caption (only when planned)
+    # Row 2: full-width year slider (unified component, year mode) — only when planned
     if state != "electric" and planned_rv.value:
-        yr = year_rv.value
-        cal_yr = sim_start_year.value + yr - 1
         with solara.Column(style="width:100%"):
-            solara.SliderInt("", value=year_rv, min=1, max=25)
-            solara.HTML(tag="div", unsafe_innerHTML=(
-                f"<div style='font-size:0.72em;color:var(--ink-3,#888);"
-                f"margin-top:-4px;text-align:center'>"
-                f"Yr {yr} &nbsp;·&nbsp; {cal_yr}</div>"
-            ))
+            WhyWattSlider(
+                SliderSpec(
+                    key="swap_year", title="Swap year",
+                    minimum=1, maximum=25, step=1, default=year_default,
+                    decimals=0, dtype="year", base_year=sim_start_year.value,
+                ),
+                value=year_rv,
+            )
     # Row 2: install cost + rebate + net — all on one line, compact number inputs
     if state != "electric" and planned_rv.value:
         net = cost_rv.value - rebate_rv.value
@@ -378,7 +373,8 @@ def HVACSummaryCard():
     with solara.Column(classes=["device"]):
         _card_header("hvac", "HVAC")
         _appliance_rows(hvac_starting_state, hvac_swap_planned, hvac_swap_year,
-                        hvac_install_cost, hvac_rebate)
+                        hvac_install_cost, hvac_rebate,
+                        year_default=_DEFAULTS["hvac_swap_year"])
 
 
 @solara.component
@@ -387,7 +383,8 @@ def WHSummaryCard():
     with solara.Column(classes=["device"]):
         _card_header("water_heater", "Water Heater")
         _appliance_rows(wh_starting_state, wh_swap_planned, wh_swap_year,
-                        wh_install_cost, wh_rebate)
+                        wh_install_cost, wh_rebate,
+                        year_default=_DEFAULTS["wh_swap_year"])
 
 
 @solara.component
@@ -410,15 +407,8 @@ def TransportationSummaryCard():
             _PlanCheck(ev_swap_planned, "Plan EV Charger")
         # When EV charger is planned: Row 3 year slider + net cost
         if ev_swap_planned.value:
-            yr = ev_swap_year.value
-            cal_yr = sim_start_year.value + yr - 1
             with solara.Column(style="width:100%"):
-                solara.SliderInt("", value=ev_swap_year, min=1, max=25)
-                solara.HTML(tag="div", unsafe_innerHTML=(
-                    f"<div style='font-size:0.72em;color:var(--ink-3,#888);"
-                    f"margin-top:-4px;text-align:center'>"
-                    f"Yr {yr} &nbsp;·&nbsp; {cal_yr}</div>"
-                ))
+                _YSl(ev_swap_year, _DEFAULTS["ev_swap_year"])
             net = ev_install_cost.value - ev_rebate.value
             solara.HTML(tag="div", unsafe_innerHTML=(
                 "<div style='font-size:0.74em; color:#888; margin-bottom:2px;'>"
@@ -475,10 +465,8 @@ def TransportationDetail():
         with solara.Column(style="min-width:150px"):
             _Check(label="Plan EV + Charger", value=ev_swap_planned)
         if planned:
-            yr = ev_swap_year.value
-            cal_yr = sim_start_year.value + yr - 1
-            with solara.Column(style="min-width:170px"):
-                solara.SliderInt(f"Yr {yr} ({cal_yr})", value=ev_swap_year, min=1, max=25)
+            with solara.Column(style="flex:1; min-width:200px"):
+                _YSl(ev_swap_year, _DEFAULTS["ev_swap_year"])
 
     with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
         # ── Left column: Do Nothing (current vehicles) ────────────────────────
@@ -502,7 +490,7 @@ def TransportationDetail():
                 solara.Markdown(f"🔌 **EV** · ~{ev_now_kwh:,.0f} kWh/yr _(all external)_")
             else:
                 solara.Markdown("🔌 **EV** · none today")
-            _DSl("EV miles/yr today", transport_ev_miles_now,
+            _DSl("EV miles now", transport_ev_miles_now,
                  _DEFAULTS["transport_ev_miles_now"],
                  0, 30_000, step=500, unit=" mi/yr")
             solara.HTML(tag="div", unsafe_innerHTML=(
@@ -530,7 +518,7 @@ def TransportationDetail():
                     f"🚗 **ICE** · ~{gal_after:,.0f} gal/yr"
                     + ("  _(fully replaced)_" if transport_ice_miles_after.value == 0 else "")
                 )
-                _DSl("Gas miles/yr after", transport_ice_miles_after,
+                _DSl("Gas mi after", transport_ice_miles_after,
                      _DEFAULTS["transport_ice_miles_after"],
                      0, 30_000, step=500, unit=" mi/yr")
 
@@ -546,7 +534,7 @@ def TransportationDetail():
                      _DEFAULTS["transport_ev_eff"],
                      2.0, 5.5, step=0.1, unit=" mi/kWh", fmt="{v:.1f}")
                 _eff_presets()
-                _DSl("% charged at home", transport_pct_home_after,
+                _DSl("% at home", transport_pct_home_after,
                      _DEFAULTS["transport_pct_home_after"],
                      0.50, 1.0, step=0.05, fmt="{v:.0%}")
                 solara.HTML(tag="div", unsafe_innerHTML=(
@@ -554,7 +542,7 @@ def TransportationDetail():
                     "Rest billed at the External EV rate "
                     "<em style='color:#aaa'>(set in Energy &amp; Prices)</em>.</div>"
                 ))
-                _DSl("Charging efficiency", transport_charging_eff,
+                _DSl("Charge eff", transport_charging_eff,
                      _DEFAULTS["transport_charging_eff"],
                      0.80, 0.98, step=0.01, fmt="{v:.2f}")
 
@@ -586,7 +574,8 @@ def CooktopSummaryCard():
     with solara.Column(classes=["device", "minor"]):
         _card_header("cooktop", "Cooktop")
         _appliance_rows(cooktop_starting_state, cooktop_swap_planned, cooktop_swap_year,
-                        cooktop_install_cost, cooktop_rebate)
+                        cooktop_install_cost, cooktop_rebate,
+                        year_default=_DEFAULTS["cooktop_swap_year"])
 
 
 @solara.component
@@ -595,7 +584,8 @@ def DryerSummaryCard():
     with solara.Column(classes=["device", "minor"]):
         _card_header("dryer", "Dryer")
         _appliance_rows(dryer_starting_state, dryer_swap_planned, dryer_swap_year,
-                        dryer_install_cost, dryer_rebate)
+                        dryer_install_cost, dryer_rebate,
+                        year_default=_DEFAULTS["dryer_swap_year"])
 
 
 @solara.component
@@ -607,15 +597,8 @@ def _PanelControls():
         _PlanCheck(panel_upgrade_planned, "Plan panel upgrade", right=False)
     # Row 2: full-width year slider + subscript
     if planned:
-        yr = panel_upgrade_year.value
-        cal_yr = sim_start_year.value + yr - 1
         with solara.Column(style="width:100%"):
-            solara.SliderInt("", value=panel_upgrade_year, min=1, max=25)
-            solara.HTML(tag="div", unsafe_innerHTML=(
-                f"<div style='font-size:0.72em;color:var(--ink-3,#888);"
-                f"margin-top:-4px;text-align:center'>"
-                f"Yr {yr} &nbsp;·&nbsp; {cal_yr}</div>"
-            ))
+            _YSl(panel_upgrade_year, _DEFAULTS["panel_upgrade_year"])
         net = panel_upgrade_cost.value - panel_upgrade_rebate.value
         _cost_row(panel_upgrade_cost, panel_upgrade_rebate, net)
     else:
@@ -715,12 +698,13 @@ def SolarSummaryCard():
             panels = solar_panels.value
             system_kw = panels * solar_kw_per_panel.value
             with solara.Column(style="width:100%"):
-                solara.SliderInt("", value=solar_panels, min=1, max=30)
-                solara.HTML(tag="div", unsafe_innerHTML=(
-                    f"<div style='font-size:0.72em;color:var(--ink-3,#888);"
-                    f"margin-top:-4px;text-align:center'>"
-                    f"{panels} panels &nbsp;·&nbsp; {system_kw:.1f} kW</div>"
-                ))
+                WhyWattSlider(
+                    SliderSpec(key="solar_panels", title="Solar panels",
+                               minimum=1, maximum=30, step=1,
+                               default=_DEFAULTS["solar_panels"], decimals=0,
+                               unit=f"≈ {system_kw:.1f} kW"),
+                    value=solar_panels,
+                )
             # Battery toggle
             with solara.Row(gap="8px", style="align-items:center"):
                 _Check(label="Battery", value=solar_battery_enabled)
@@ -730,15 +714,9 @@ def SolarSummaryCard():
                         f"{solar_battery_kwh.value:.0f} kWh</div>"
                     ))
             # Install year
-            yr = solar_install_year.value
-            cal_yr = sim_start_year.value + yr - 1
             with solara.Column(style="width:100%"):
-                solara.SliderInt("", value=solar_install_year, min=1, max=25)
-                solara.HTML(tag="div", unsafe_innerHTML=(
-                    f"<div style='font-size:0.72em;color:var(--ink-3,#888);"
-                    f"margin-top:-4px;text-align:center'>"
-                    f"Install &nbsp; Yr {yr} &nbsp;·&nbsp; {cal_yr}</div>"
-                ))
+                _YSl(solar_install_year, _DEFAULTS["solar_install_year"],
+                     title="Install year")
         else:
             solara.HTML(tag="div", unsafe_innerHTML=(
                 "<div style='font-size:0.80em; color:#AAAAAA; margin-top:3px;'>"
@@ -873,17 +851,16 @@ def HVACDetail():
             with solara.Column(style="min-width:70px"):
                 _Check(label="Plan swap", value=hvac_swap_planned)
         if state != "electric" and hvac_swap_planned.value:
-            yr = hvac_swap_year.value
-            cal_yr = sim_start_year.value + yr - 1
-            with solara.Column(style="min-width:170px"):
-                solara.SliderInt(f"Yr {yr} ({cal_yr})", value=hvac_swap_year, min=1, max=25)
-
-    # ── Heat pump electrical sizing (Phase 3 §2.5) ────────────────────────────
-    _tons = hvac_tonnage.value
-    _amps = int(_tons * 10)
-    _DSl("Heat pump size", hvac_tonnage, _DEFAULTS["hvac_tonnage"],
-         2.0, 5.0, 0.5, unit=" ton", fmt="{v:.1f}")
-    _elec_display(240, _amps)
+            # unified year slider — same as the summary card, but to the right of "Plan"
+            with solara.Column(style="flex:1; min-width:200px"):
+                WhyWattSlider(
+                    SliderSpec(key="hvac_swap_year", title="Swap year",
+                               minimum=1, maximum=25, step=1,
+                               default=_DEFAULTS["hvac_swap_year"],
+                               decimals=0, dtype="year",
+                               base_year=sim_start_year.value),
+                    value=hvac_swap_year,
+                )
 
     if state == "gas":
         with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
@@ -895,20 +872,20 @@ def HVACDetail():
                     + (f"  ·  {_est_hp_hvac_cooling(hvac_ac_seer.value, ua):.0f} kWh/yr AC"
                        if hvac_has_cooling.value else "")
                 )
-                _DSl("Furnace AFUE", furnace_afue, _DEFAULTS["furnace_afue"],
-                     0.70, 0.95, 0.01, fmt="{v:.2f}")
-                _DSl("Furnace age", hvac_furnace_age, _DEFAULTS["hvac_furnace_age"],
-                     0, 30, 1, unit=" yrs")
-                _DSl("Furnace lifespan", hvac_baseline_lifespan, _DEFAULTS["hvac_baseline_lifespan"],
-                     5, 30, 1, unit=" yrs")
+                _HSl("Furnace AFUE", furnace_afue, _DEFAULTS["furnace_afue"],
+                     0.70, 0.95, 0.01, decimals=2)
+                _HSl("Furnace age", hvac_furnace_age, _DEFAULTS["hvac_furnace_age"],
+                     0, 30, 1, unit="yrs", decimals=0)
+                _HSl("Furnace life", hvac_baseline_lifespan, _DEFAULTS["hvac_baseline_lifespan"],
+                     5, 30, 1, unit="yrs", decimals=0)
                 solara.Markdown(
                     f"*In-kind replacement: **${hvac_baseline_replace_cost.value:,}***",
                     style="font-size:0.82em; color:#555; margin-top:2px;")
                 _Check(label="Has central AC (baseline)", value=hvac_has_cooling)
                 if hvac_has_cooling.value:
-                    _DSl("Central AC SEER", hvac_ac_seer, _DEFAULTS["hvac_ac_seer"], 10, 22, 1)
-                    _DSl("Central AC age", hvac_ac_age, _DEFAULTS["hvac_ac_age"],
-                         0, 20, 1, unit=" yrs")
+                    _HSl("AC SEER", hvac_ac_seer, _DEFAULTS["hvac_ac_seer"], 10, 22, 1)
+                    _HSl("AC age", hvac_ac_age, _DEFAULTS["hvac_ac_age"],
+                         0, 20, 1, unit="yrs", decimals=0)
             with solara.Column(style=_RIGHT_COL):
                 _DS("Replacement: Heat Pump HVAC")
                 heat_kwh  = _est_hp_hvac_heating(hp_cop_heating.value, ua)
@@ -918,9 +895,10 @@ def HVACDetail():
                     f"+ **{cool_kwh2:.0f} kWh/yr** cool  "
                     f"= **{heat_kwh + cool_kwh2:.0f} kWh/yr**"
                 )
-                _DSl("Heating COP", hp_cop_heating, _DEFAULTS["hp_cop_heating"],
-                     2.5, 4.5, 0.1, fmt="{v:.1f}")
-                _DSl("Cooling SEER", hp_seer_cooling, _DEFAULTS["hp_seer_cooling"], 16, 28, 1)
+                _hp_size()
+                _HSl("Heating COP", hp_cop_heating, _DEFAULTS["hp_cop_heating"],
+                     2.5, 4.5, 0.1, decimals=1)
+                _HSl("Cooling SEER", hp_seer_cooling, _DEFAULTS["hp_seer_cooling"], 16, 28, 1)
         if hvac_swap_planned.value:
             _DetailCosts(hvac_install_cost, hvac_rebate)
 
@@ -933,9 +911,10 @@ def HVACDetail():
             f"+ **{cool_kwh:.0f} kWh/yr** cooling  "
             f"= **{heat_kwh + cool_kwh:.0f} kWh/yr** total"
         )
-        _DSl("Heating COP", hp_cop_heating, _DEFAULTS["hp_cop_heating"],
-             2.5, 4.5, 0.1, fmt="{v:.1f}")
-        _DSl("Cooling SEER", hp_seer_cooling, _DEFAULTS["hp_seer_cooling"], 16, 28, 1)
+        _hp_size()
+        _HSl("Heating COP", hp_cop_heating, _DEFAULTS["hp_cop_heating"],
+             2.5, 4.5, 0.1, decimals=1)
+        _HSl("Cooling SEER", hp_seer_cooling, _DEFAULTS["hp_seer_cooling"], 16, 28, 1)
         solara.Markdown("<small style='color:#2E7D32'>✓ Already electrified</small>")
 
     else:  # none
@@ -952,9 +931,10 @@ def HVACDetail():
                     f"Est: **{heat_kwh:.0f} + {cool_kwh:.0f} = "
                     f"{heat_kwh + cool_kwh:.0f} kWh/yr**"
                 )
-                _DSl("Heating COP", hp_cop_heating, _DEFAULTS["hp_cop_heating"],
-                     2.5, 4.5, 0.1, fmt="{v:.1f}")
-                _DSl("Cooling SEER", hp_seer_cooling, _DEFAULTS["hp_seer_cooling"], 16, 28, 1)
+                _hp_size()
+                _HSl("Heating COP", hp_cop_heating, _DEFAULTS["hp_cop_heating"],
+                     2.5, 4.5, 0.1, decimals=1)
+                _HSl("Cooling SEER", hp_seer_cooling, _DEFAULTS["hp_seer_cooling"], 16, 28, 1)
         if hvac_swap_planned.value:
             _DetailCosts(hvac_install_cost, hvac_rebate)
 
@@ -976,30 +956,24 @@ def WaterHeaterDetail():
             with solara.Column(style="min-width:70px"):
                 _Check(label="Plan swap", value=wh_swap_planned)
         if state != "electric" and wh_swap_planned.value:
-            yr = wh_swap_year.value
-            cal_yr = sim_start_year.value + yr - 1
-            with solara.Column(style="min-width:170px"):
-                solara.SliderInt(f"Yr {yr} ({cal_yr})", value=wh_swap_year, min=1, max=25)
+            with solara.Column(style="flex:1; min-width:200px"):
+                _YSl(wh_swap_year, _DEFAULTS["wh_swap_year"])
 
     _ElecAmpsInput("HPWH breaker A", hpwh_amps)
 
     # Shared full-width parameters (affect both gas and HPWH estimates)
-    def _set_gal(v):
-        hw_daily_gallons.set(v)
-        hw_gallons_user_override.set(True)
-    solara.SliderInt(
-        f"Daily hot water: {gal} gal/day",
-        value=hw_daily_gallons, min=20, max=120, step=5,
-        on_value=_set_gal,
+    WhyWattSlider(
+        SliderSpec(key="hw_daily_gallons", title="Daily hot water",
+                   minimum=20, maximum=120, step=5,
+                   default=_DEFAULTS["hw_daily_gallons"], unit="gal/day",
+                   decimals=0, layout="inline"),
+        value=hw_daily_gallons,
+        on_change=lambda v: hw_gallons_user_override.set(True),
     )
-    solara.SliderInt(
-        f"Cold water inlet: {inlet}°F",
-        value=wh_inlet_temp_f, min=45, max=75, step=1,
-    )
-    solara.SliderInt(
-        f"Tank setpoint: {setp}°F",
-        value=wh_setpoint_f, min=110, max=140, step=5,
-    )
+    _DSl("Cold inlet", wh_inlet_temp_f, _DEFAULTS["wh_inlet_temp_f"],
+         45, 75, 1, unit="°F")
+    _DSl("Setpoint", wh_setpoint_f, _DEFAULTS["wh_setpoint_f"],
+         110, 140, 5, unit="°F")
 
     if state == "gas":
         with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
@@ -1113,10 +1087,8 @@ def EVDetail():
             with solara.Column(style="min-width:80px"):
                 _Check(label="Plan to add", value=ev_swap_planned)
         if state == "none" and ev_swap_planned.value:
-            yr = ev_swap_year.value
-            cal_yr = sim_start_year.value + yr - 1
-            with solara.Column(style="min-width:170px"):
-                solara.SliderInt(f"Yr {yr} ({cal_yr})", value=ev_swap_year, min=1, max=25)
+            with solara.Column(style="flex:1; min-width:200px"):
+                _YSl(ev_swap_year, _DEFAULTS["ev_swap_year"])
 
     with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
         with solara.Column(style=_LEFT_COL):
@@ -1162,7 +1134,7 @@ def EVDetail():
                         ),
                     )
             _elec_display(240, ev_charger_amps.value)
-            _DSl("Charging efficiency", ev_charging_efficiency,
+            _DSl("Charge eff", ev_charging_efficiency,
                  _DEFAULTS["ev_charging_efficiency"], 0.80, 0.98, step=0.01, fmt="{v:.2f}")
             solara.Markdown(
                 f"Est. consumption: **{annual_kwh:,.0f} kWh/yr**  \n"
@@ -1187,10 +1159,8 @@ def CooktopDetail():
             with solara.Column(style="min-width:70px"):
                 _Check(label="Plan swap", value=cooktop_swap_planned)
         if state != "electric" and cooktop_swap_planned.value:
-            yr = cooktop_swap_year.value
-            cal_yr = sim_start_year.value + yr - 1
-            with solara.Column(style="min-width:170px"):
-                solara.SliderInt(f"Yr {yr} ({cal_yr})", value=cooktop_swap_year, min=1, max=25)
+            with solara.Column(style="flex:1; min-width:200px"):
+                _YSl(cooktop_swap_year, _DEFAULTS["cooktop_swap_year"])
 
     _ElecAmpsInput("Induction breaker A", induction_amps)
 
@@ -1208,7 +1178,7 @@ def CooktopDetail():
                      3, 21, 1, unit=" /wk")
                 _DSl("Cooktop age", cooktop_age, _DEFAULTS["cooktop_age"],
                      0, 20, 1, unit=" yrs")
-                _DSl("Cooktop lifespan", cooktop_baseline_lifespan,
+                _DSl("Cooktop life", cooktop_baseline_lifespan,
                      _DEFAULTS["cooktop_baseline_lifespan"], 5, 30, 1, unit=" yrs")
                 solara.Markdown(
                     f"*In-kind replacement: **${cooktop_baseline_replace_cost.value:,}***",
@@ -1262,10 +1232,8 @@ def DryerDetail():
             with solara.Column(style="min-width:70px"):
                 _Check(label="Plan swap", value=dryer_swap_planned)
         if state != "electric" and dryer_swap_planned.value:
-            yr = dryer_swap_year.value
-            cal_yr = sim_start_year.value + yr - 1
-            with solara.Column(style="min-width:170px"):
-                solara.SliderInt(f"Yr {yr} ({cal_yr})", value=dryer_swap_year, min=1, max=25)
+            with solara.Column(style="flex:1; min-width:200px"):
+                _YSl(dryer_swap_year, _DEFAULTS["dryer_swap_year"])
 
     _ElecAmpsInput("HP dryer breaker A", dryer_amps)
 
@@ -1283,7 +1251,7 @@ def DryerDetail():
                      1, 14, 1, unit=" /wk")
                 _DSl("Dryer age", dryer_age, _DEFAULTS["dryer_age"],
                      0, 15, 1, unit=" yrs")
-                _DSl("Dryer lifespan", dryer_baseline_lifespan,
+                _DSl("Dryer life", dryer_baseline_lifespan,
                      _DEFAULTS["dryer_baseline_lifespan"], 5, 25, 1, unit=" yrs")
                 solara.Markdown(
                     f"*In-kind replacement: **${dryer_baseline_replace_cost.value:,}***",
@@ -1330,10 +1298,8 @@ def ElecPanelDetail():
     with solara.Row(gap="8px", style=_TOP_ROW):
         _Check(label="Plan 200A panel upgrade", value=panel_upgrade_planned)
         if planned:
-            yr = panel_upgrade_year.value
-            cal_yr = sim_start_year.value + yr - 1
-            with solara.Column(style="min-width:170px"):
-                solara.SliderInt(f"Yr {yr} ({cal_yr})", value=panel_upgrade_year, min=1, max=25)
+            with solara.Column(style="flex:1; min-width:200px"):
+                _YSl(panel_upgrade_year, _DEFAULTS["panel_upgrade_year"])
 
     solara.HTML(tag="div", unsafe_innerHTML=(
         "<div style='font-size:0.85em; color:#666; margin-bottom:10px;'>"
@@ -1370,7 +1336,7 @@ def BaseloadDetail():
         f"({square_footage.value:,} sqft × 0.45 + {num_bedrooms.value} bed × 200 "
         f"+ {baseload_constant_before.value})"
     )
-    _DSl("Always-on constant", baseload_constant_before,
+    _DSl("Always-on", baseload_constant_before,
          _DEFAULTS["baseload_constant_before"], 0, 1500, step=50, unit=" kWh/yr")
     # Effective A (Phase 3 §2.5.3) — informational; NOT used by PanelAssessor
     _eff_a = bl_before * 1000 / 8760 / 120
@@ -1386,10 +1352,8 @@ def BaseloadDetail():
         _Check(label="Plan efficiency upgrade (LED, smart plugs…)",
                         value=baseload_swap_planned)
         if baseload_swap_planned.value:
-            yr = baseload_swap_year.value
-            cal_yr = sim_start_year.value + yr - 1
-            with solara.Column(style="min-width:170px"):
-                solara.SliderInt(f"Yr {yr} ({cal_yr})", value=baseload_swap_year, min=1, max=25)
+            with solara.Column(style="flex:1; min-width:200px"):
+                _YSl(baseload_swap_year, _DEFAULTS["baseload_swap_year"])
     if baseload_swap_planned.value:
         bl_after = compute_baseload_kwh(square_footage.value, num_bedrooms.value,
                                         baseload_constant_after.value)
@@ -1397,7 +1361,7 @@ def BaseloadDetail():
         annual_saving_usd = saving * 0.386
         net_cost         = baseload_install_cost.value - baseload_rebate.value
         pb = (net_cost / annual_saving_usd) if annual_saving_usd > 0 else None
-        _DSl("After-upgrade always-on", baseload_constant_after,
+        _DSl("After upgrade", baseload_constant_after,
              _DEFAULTS["baseload_constant_after"], 0, 1500, step=50, unit=" kWh/yr")
         solara.Markdown(
             f"After: **{bl_after:,.0f} kWh/yr**  ·  "
@@ -1466,11 +1430,9 @@ def SolarDetail(model):
     with solara.Row(gap="12px", style=_TOP_ROW + " align-items:center"):
         _Check(label="Adding solar to my journey", value=solar_planned)
         if planned:
-            yr     = solar_install_year.value
-            cal_yr = sim_start_year.value + yr - 1
             with solara.Column(style="flex:1; min-width:220px"):
-                solara.SliderInt(f"Install yr {yr} ({cal_yr})",
-                                 value=solar_install_year, min=1, max=25)
+                _YSl(solar_install_year, _DEFAULTS["solar_install_year"],
+                     title="Install year")
 
     if not planned:
         solara.Text("Enable solar above to configure options.",
@@ -1504,8 +1466,13 @@ def SolarDetail(model):
         with solara.Column(style=_HALF):
             with solara.Column(style=_BOX):
                 _DS("System Size")
-                solara.SliderInt(f"Panels: {panels}  ({system_kw:.1f} kW)",
-                                 value=solar_panels, min=1, max=30)
+                WhyWattSlider(
+                    SliderSpec(key="solar_panels", title="Solar panels",
+                               minimum=1, maximum=30, step=1,
+                               default=_DEFAULTS["solar_panels"], decimals=0,
+                               unit=f"≈ {system_kw:.1f} kW"),
+                    value=solar_panels,
+                )
 
         # Right box — Battery & Net Metering
         with solara.Column(style=_HALF):
@@ -1554,10 +1521,8 @@ def SolarDetail(model):
     with solara.Column(style=_BOX):
         with solara.Row(gap="8px", style="align-items:center; flex-wrap:wrap"):
             with solara.Column(style="flex:1; min-width:160px"):
-                solara.SliderInt(
-                    f"Self-Consumption: {scf_pct}%",
-                    value=solar_scf, min=10, max=98, step=1,
-                )
+                _DSl("Self-use", solar_scf, _DEFAULTS["solar_scf"],
+                     10, 98, 1, unit="%")
             solara.HTML(tag="div", unsafe_innerHTML=(
                 "<div style='font-size:0.73em; color:#888; min-width:120px;'>"
                 "Default: 80% with battery · 35% solar-only</div>"
@@ -1720,16 +1685,23 @@ def _fuel_model_block(fuel: str, heading: str, color: str,
     _name, _prov, _ = _fuel_resolved_display(
         fuel, model_rv.value, cagr_rv.value, acc_cagr_rv.value, ri_auto, ri_ca)
     solara.HTML(tag="div", unsafe_innerHTML=_rate_line_html(fuel, _name, _prov, None))
+    _fkey = "elec" if fuel == "electricity" else "gas"
+    _cagr_def = _DEFAULTS[f"{_fkey}_cagr_pct_a"]            # A/B share factory default
+    _acc_def = _DEFAULTS[f"acc_{_fkey}_cagr_a"]
     if model_rv.value in ("cagr_flat", "ca_average"):
-        solara.SliderInt(
-            f"+{cagr_rv.value}%/yr  (EIA default — editable)",
-            value=cagr_rv, min=0, max=cagr_max,
+        WhyWattSlider(
+            SliderSpec(key=f"{fuel}_cagr", title="Escalation",
+                       minimum=0, maximum=cagr_max, step=1, default=_cagr_def,
+                       decimals=0, unit="%/yr", layout="inline"),
+            value=cagr_rv,
         )
     else:
         # ACC mode: expose base escalation slider
-        solara.SliderInt(
-            f"Base escalation (ACC shape applied on top): +{acc_cagr_rv.value}%/yr",
-            value=acc_cagr_rv, min=0, max=cagr_max,
+        WhyWattSlider(
+            SliderSpec(key=f"{fuel}_acc_cagr", title="Escalation",
+                       minimum=0, maximum=cagr_max, step=1, default=_acc_def,
+                       decimals=0, unit="%/yr", layout="inline"),
+            value=acc_cagr_rv,
         )
         solara.HTML(tag="div", unsafe_innerHTML=(
             "<div style='font-size:0.75em; color:#546E7A; margin:1px 0 4px'>"
@@ -1768,14 +1740,14 @@ def RatesDetail():
         "<div style='border-top:1px solid #E0E0E0; margin:10px 0 6px'></div>"
     ))
     _DS("Transport Fuels  (shared across scenarios)")
-    _DSl("⛽ Gasoline price", gasoline_price, _DEFAULTS["gasoline_price"],
+    _DSl("⛽ Gas price", gasoline_price, _DEFAULTS["gasoline_price"],
          2.00, 8.00, step=0.10, unit=" $/gal", fmt="{v:.2f}")
-    _DSl("⛽ Annual change", gasoline_escalation_pct, _DEFAULTS["gasoline_escalation_pct"],
+    _DSl("⛽ Change/yr", gasoline_escalation_pct, _DEFAULTS["gasoline_escalation_pct"],
          -5, 10, step=1, unit=" %/yr")
-    _DSl("🔌 External EV price", external_ev_price_per_kwh,
+    _DSl("🔌 EV price", external_ev_price_per_kwh,
          _DEFAULTS["external_ev_price_per_kwh"],
          0.10, 0.60, step=0.01, unit=" $/kWh", fmt="{v:.2f}")
-    _DSl("🔌 Annual change", external_ev_escalation_pct,
+    _DSl("🔌 Change/yr", external_ev_escalation_pct,
          _DEFAULTS["external_ev_escalation_pct"],
          -5, 10, step=1, unit=" %/yr")
     solara.HTML(tag="div", unsafe_innerHTML=(
@@ -1857,9 +1829,6 @@ def EnergyPricesPanel():
 @solara.component
 def _SocialBody():
     """Social & Health Cost of Gas — card-bd content (two .device sub-cards)."""
-    climate_on = social_climate_enabled.value
-    health_on  = social_health_enabled.value
-
     _CLIMATE_IC = ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
                    " stroke-linecap='round' stroke-linejoin='round'>"
                    "<path d='M12 2a7 7 0 017 7c0 5-7 13-7 13S5 14 5 9a7 7 0 017-7z'/>"
@@ -1878,15 +1847,18 @@ def _SocialBody():
                     f"<span class='dn'>Climate Cost</span>"
                     f"</div>"
                 ))
-                _Check(label="Include CO₂ + methane cost", value=social_climate_enabled)
-                if climate_on:
-                    SliderWithDefault("Rate", social_climate_rate,
-                                      _DEFAULTS["social_climate_rate"], 1.00, 2.00, 0.01,
-                                      unit=" $/therm", fmt="{v:.2f}")
-                else:
-                    solara.HTML(tag="div", unsafe_innerHTML=(
-                        "<div style='font-size:0.80em; color:#AAAAAA;'>Not included</div>"
-                    ))
+                # Phase 5 §1 test bed — unified debounced slider, owns its gate checkbox
+                WhyWattSlider(
+                    SliderSpec(
+                        key="social_climate_rate", title="Climate rate",
+                        minimum=1.00, maximum=2.00, step=0.01,
+                        default=_DEFAULTS["social_climate_rate"],
+                        unit="$/therm", decimals=2,
+                        gate_label="Add CO₂ + Methane Cost",
+                    ),
+                    value=social_climate_rate,
+                    enabled=social_climate_enabled,
+                )
 
             # ── Health Cost device card ───────────────────────────────────────
             with solara.Column(classes=["device"]):
@@ -1896,15 +1868,17 @@ def _SocialBody():
                     f"<span class='dn'>Health Cost</span>"
                     f"</div>"
                 ))
-                _Check(label="Include air quality cost", value=social_health_enabled)
-                if health_on:
-                    SliderWithDefault("Rate", social_health_rate,
-                                      _DEFAULTS["social_health_rate"], 0.50, 2.00, 0.01,
-                                      unit=" $/therm", fmt="{v:.2f}")
-                else:
-                    solara.HTML(tag="div", unsafe_innerHTML=(
-                        "<div style='font-size:0.80em; color:#AAAAAA;'>Not included</div>"
-                    ))
+                WhyWattSlider(
+                    SliderSpec(
+                        key="social_health_rate", title="Health rate",
+                        minimum=0.50, maximum=2.00, step=0.01,
+                        default=_DEFAULTS["social_health_rate"],
+                        unit="$/therm", decimals=2,
+                        gate_label="Add Air-Quality Cost",
+                    ),
+                    value=social_health_rate,
+                    enabled=social_health_enabled,
+                )
 
             # ── Gasoline externalities ────────────────────────────────────────
             _GAS_IC = ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
@@ -1918,23 +1892,25 @@ def _SocialBody():
                 f"<span class='dn'>Gasoline Externalities</span>"
                 f"</div>"
             ))
-            gas_clim_on = gasoline_climate_enabled.value
-            gas_hlth_on = gasoline_health_enabled.value
             with solara.Column(classes=["device"]):
-                _Check(label="Include climate cost", value=gasoline_climate_enabled)
-                if gas_clim_on:
-                    _DSl("Climate cost", gasoline_climate_cost_per_gallon,
-                         _DEFAULTS["gasoline_climate_cost_per_gallon"],
-                         0.50, 4.00, step=0.05, unit=" $/gal", fmt="{v:.2f}",
-                         show_delta=False)
+                WhyWattSlider(
+                    SliderSpec(key="gasoline_climate_cost_per_gallon",
+                               title="Climate rate", minimum=0.50, maximum=4.00, step=0.05,
+                               default=_DEFAULTS["gasoline_climate_cost_per_gallon"],
+                               unit="$/gal", decimals=2, gate_label="Add Climate Cost"),
+                    value=gasoline_climate_cost_per_gallon,
+                    enabled=gasoline_climate_enabled,
+                )
             with solara.Column(classes=["device"]):
-                _Check(label="Include health cost", value=gasoline_health_enabled)
-                if gas_hlth_on:
-                    _DSl("Health cost", gasoline_health_cost_per_gallon,
-                         _DEFAULTS["gasoline_health_cost_per_gallon"],
-                         0.25, 2.00, step=0.05, unit=" $/gal", fmt="{v:.2f}",
-                         show_delta=False)
+                WhyWattSlider(
+                    SliderSpec(key="gasoline_health_cost_per_gallon",
+                               title="Health rate", minimum=0.25, maximum=2.00, step=0.05,
+                               default=_DEFAULTS["gasoline_health_cost_per_gallon"],
+                               unit="$/gal", decimals=2, gate_label="Add Health Cost"),
+                    value=gasoline_health_cost_per_gallon,
+                    enabled=gasoline_health_enabled,
+                )
 
 
 
-__all__ = ['SliderWithDefault', '_DETAIL_TITLES', '_LEFT_COL', '_RIGHT_COL', '_COSTS_BOX', '_CARD_NORMAL', '_CARD_OPEN', '_ROW_CTRL', '_TOP_ROW', 'DetailTitleBar', '_DS', '_DSl', '_elec_display', '_ElecAmpsInput', '_DetailCosts', '_card_header', '_card_header_main', '_panel_hd', '_PlanCheck', '_Check', '_cost_row', '_appliance_rows', 'HVACSummaryCard', 'WHSummaryCard', 'TransportationSummaryCard', 'TransportationDetail', 'CooktopSummaryCard', 'DryerSummaryCard', '_PanelControls', 'PanelSummaryCard', '_BaseloadControls', 'BaseloadSummaryCard', 'HomeSummaryCard', 'SolarSummaryCard', '_model_toggle', 'RatesSummaryCard', 'HVACDetail', 'WaterHeaterDetail', 'EVDetail', 'CooktopDetail', 'DryerDetail', 'ElecPanelDetail', 'BaseloadDetail', 'HomeDetail', 'SolarDetail', '_fuel_model_block', 'RatesDetail', 'JourneyPlannerPanel', 'HomeProfilePanel', 'EnergyPricesPanel', '_SocialBody']
+__all__ = ['_DETAIL_TITLES', '_LEFT_COL', '_RIGHT_COL', '_COSTS_BOX', '_CARD_NORMAL', '_CARD_OPEN', '_ROW_CTRL', '_TOP_ROW', 'DetailTitleBar', '_DS', '_DSl', '_elec_display', '_ElecAmpsInput', '_DetailCosts', '_card_header', '_card_header_main', '_panel_hd', '_PlanCheck', '_Check', '_cost_row', '_appliance_rows', 'HVACSummaryCard', 'WHSummaryCard', 'TransportationSummaryCard', 'TransportationDetail', 'CooktopSummaryCard', 'DryerSummaryCard', '_PanelControls', 'PanelSummaryCard', '_BaseloadControls', 'BaseloadSummaryCard', 'HomeSummaryCard', 'SolarSummaryCard', '_model_toggle', 'RatesSummaryCard', 'HVACDetail', 'WaterHeaterDetail', 'EVDetail', 'CooktopDetail', 'DryerDetail', 'ElecPanelDetail', 'BaseloadDetail', 'HomeDetail', 'SolarDetail', '_fuel_model_block', 'RatesDetail', 'JourneyPlannerPanel', 'HomeProfilePanel', 'EnergyPricesPanel', '_SocialBody']
