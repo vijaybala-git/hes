@@ -73,6 +73,14 @@ HELP_POPUPS: dict[str, tuple[str, str]] = {
         " rate.",
         "ev.html",
     ),
+    "transportation": (
+        "Transportation models your driving as gasoline miles and electric miles."
+        " Pick your current vehicle mix — Gas, Mixed (gas + an EV), Electric, or"
+        " None. Your Journey can then add an electric vehicle and a home Level 2"
+        " charger, shifting charging from costly public stations to your home"
+        " electricity rate.",
+        "ev.html",
+    ),
     "solar": (
         "Solar is modeled from your system size and yield. The energy you use on-"
         " site saves at your retail rate; the surplus you export earns a credit. A"

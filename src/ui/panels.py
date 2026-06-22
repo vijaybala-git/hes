@@ -387,25 +387,63 @@ def WHSummaryCard():
                         year_default=_DEFAULTS["wh_swap_year"])
 
 
+# ── Transportation "Do Nothing" vehicle mix ─────────────────────────────────────
+# The summary dropdown (Gas / Mixed / Electric / None) is a *derived* view over the
+# two underlying do-nothing reactives — current gasoline miles + existing EV miles.
+# No separate state reactive: the model already reads these two, and detail-panel
+# edits keep the dropdown label in sync automatically.
+_TRANSPORT_STATES   = ["Gas", "Mixed", "Electric", "None"]
+_TRANSPORT_FULL_MILES = _DEFAULTS["transport_gasoline_miles"]   # 12,000 — a full driver
+_TRANSPORT_MIXED_EV   = 5000                                   # EV miles/yr when "Mixed"
+
+
+def _transport_state() -> str:
+    """Derive the current-vehicle state from the do-nothing miles."""
+    g = transport_gasoline_miles.value > 0
+    e = transport_ev_miles_now.value > 0
+    if g and e:
+        return "Mixed"
+    if e:
+        return "Electric"
+    if g:
+        return "Gas"
+    return "None"
+
+
+def _set_transport_state(s: str):
+    """Apply a vehicle-mix choice to the do-nothing miles. Preserves a non-zero
+    magnitude where it still applies; falls back to a full-driver default."""
+    cur_gas = transport_gasoline_miles.value
+    cur_ev  = transport_ev_miles_now.value
+    if s == "Gas":
+        transport_gasoline_miles.set(cur_gas or _TRANSPORT_FULL_MILES)
+        transport_ev_miles_now.set(0)
+    elif s == "Mixed":
+        transport_gasoline_miles.set(cur_gas or _TRANSPORT_FULL_MILES)
+        transport_ev_miles_now.set(_TRANSPORT_MIXED_EV)
+    elif s == "Electric":
+        transport_gasoline_miles.set(0)
+        transport_ev_miles_now.set(cur_ev or _TRANSPORT_FULL_MILES)
+    else:  # "None"
+        transport_gasoline_miles.set(0)
+        transport_ev_miles_now.set(0)
+
+
 @solara.component
 def TransportationSummaryCard():
-    """Transportation — ICE miles/MPG + plan EV Charger (single plan controls)."""
+    """Transportation — current-vehicle state dropdown (Gas/Mixed/Electric/None,
+    the 'Do Nothing' mix) + plan EV Charger. Mirrors the other appliance cards;
+    miles/MPG/efficiency are fine-tuned in the detail panel."""
     with solara.Column(classes=["device"]):
         _card_header("ice", "Transportation")
-        # Row 1: Gas mi/yr | MPG  (ICE — both scenarios)
-        with solara.Row(gap="6px", style=_ROW_CTRL + " align-items:center"):
-            with solara.Column(style="min-width:90px; max-width:100px"):
-                solara.InputInt("Gas mi/yr", value=transport_gasoline_miles)
-            with solara.Column(style="min-width:64px; max-width:72px"):
-                solara.InputFloat("MPG", value=transport_mpg)
-        # Row 2: Electric mi/yr | mi/kWh | Plan EV Charger  (always visible)
-        with solara.Row(gap="6px", style=_ROW_CTRL + " align-items:center; margin-top:2px"):
-            with solara.Column(style="min-width:90px; max-width:100px"):
-                solara.InputInt("Elec mi/yr", value=transport_plan_electric_miles)
-            with solara.Column(style="min-width:64px; max-width:72px"):
-                solara.InputFloat("mi/kWh", value=transport_ev_eff)
+        # Row 1: current-vehicle state dropdown + Plan EV Charger
+        with solara.Row(gap="8px", style=_ROW_CTRL):
+            with solara.Column(style="min-width:96px; max-width:110px"):
+                solara.Select("", values=_TRANSPORT_STATES,
+                              value=_transport_state(),
+                              on_value=_set_transport_state)
             _PlanCheck(ev_swap_planned, "Plan EV Charger")
-        # When EV charger is planned: Row 3 year slider + net cost
+        # When EV charger is planned: year slider + net cost
         if ev_swap_planned.value:
             with solara.Column(style="width:100%"):
                 _YSl(ev_swap_year, _DEFAULTS["ev_swap_year"])
@@ -415,6 +453,11 @@ def TransportationSummaryCard():
                 "Net EV Charger Cost &nbsp;<em style='color:#aaa'>(hardware only — car not modeled)</em></div>"
             ))
             _cost_row(ev_install_cost, ev_rebate, net)
+        else:
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                "<div style='font-size:0.80em; color:#AAAAAA; margin-top:3px;'>"
+                "No EV charger planned</div>"
+            ))
 
 
 @solara.component
@@ -617,35 +660,33 @@ def PanelSummaryCard():
 
 @solara.component
 def _BaseloadControls():
-    """Baseload inline controls (no .device wrapper / header)."""
+    """Baseload inline controls — clean elec/gas readout + the standard plan →
+    year + cost flow, matching the other appliance cards."""
     bl_kwh = compute_baseload_kwh(square_footage.value, num_bedrooms.value,
                                    baseload_constant_before.value)
-    # Row 1: elec kWh/mo
-    solara.HTML(tag="div", unsafe_innerHTML=(
-        f"<div style='font-size:0.80em; color:#444; margin-top:3px;'>"
-        f"~<strong>{bl_kwh/12:,.0f} kWh/mo</strong> electricity</div>"
-    ))
-    # Row 2: gas therms/mo + plan upgrade checkbox
-    with solara.Row(gap="8px", style=_ROW_CTRL):
-        solara.HTML(tag="span", unsafe_innerHTML=(
-            "<span style='font-size:0.80em; color:#888;'>0 therms/mo gas</span>"
+    # Clean two-line readout (electricity + gas), plan-upgrade checkbox on the right
+    with solara.Row(gap="8px", style=_ROW_CTRL + " align-items:center"):
+        solara.HTML(tag="div", style="min-width:0; flex:0 1 auto", unsafe_innerHTML=(
+            "<div style='display:grid; grid-template-columns:auto auto;"
+            " gap:2px 10px; justify-content:start; align-items:baseline;"
+            " font-size:0.82em; white-space:nowrap'>"
+            "<span style='color:#888'>Electricity Baseload</span>"
+            f"<strong style='color:#333'>{bl_kwh/12:,.0f} kWh/month</strong>"
+            "<span style='color:#888'>Gas Baseload</span>"
+            "<strong style='color:#333'>0 therms/month</strong>"
+            "</div>"
         ))
         _PlanCheck(baseload_swap_planned, "Plan upgrade")
-    # Row 3: saving or always-on constant info
+    # When planned: year slider + install/rebate cost row (same as other cards)
     if baseload_swap_planned.value:
-        bl_after = compute_baseload_kwh(square_footage.value, num_bedrooms.value,
-                                        baseload_constant_after.value)
-        saving  = bl_kwh - bl_after
-        yr      = baseload_swap_year.value
-        cal_yr  = sim_start_year.value + yr - 1
-        solara.HTML(tag="div", unsafe_innerHTML=(
-            f"<div style='font-size:0.80em; color:#2E7D32; margin-top:3px;'>"
-            f"Save ~{saving:,.0f} kWh/yr · yr {yr} ({cal_yr})</div>"
-        ))
+        with solara.Column(style="width:100%"):
+            _YSl(baseload_swap_year, _DEFAULTS["baseload_swap_year"])
+        net = baseload_install_cost.value - baseload_rebate.value
+        _cost_row(baseload_install_cost, baseload_rebate, net)
     else:
         solara.HTML(tag="div", unsafe_innerHTML=(
-            f"<div style='font-size:0.80em; color:#888; margin-top:3px;'>"
-            f"Always-on: {baseload_constant_before.value} kWh/yr constant</div>"
+            "<div style='font-size:0.80em; color:#AAAAAA; margin-top:3px;'>"
+            "No upgrade planned</div>"
         ))
 
 
