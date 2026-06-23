@@ -72,6 +72,8 @@ def _apply_ev_efficiency_preset(label: str):
 # ── Reactive state, defaults, reset — moved to ui/state.py (Phase 4.5) ────────
 from ui.state import *  # noqa: F401,F403 — reactives, _DEFAULTS, reset_to_defaults, helpers
 from ui import config   # Phase 4.5b — list/load configs (apply/export come from ui.state)
+from ui import share    # Share My Scenario — stateless ?s= links (Phase 1)
+import traitlets
 
 # ── Labels / option lists ─────────────────────────────────────────────────────
 _CZ_OPTIONS = ["CZ3", "CZ4", "CZ5", "CZ12", "CZ13", "CZ16"]
@@ -589,6 +591,63 @@ def DetailDock(model):
 
 # ── Phase 3 redesign — masthead + verdict band ──────────────────────────────────
 
+class _ShareLinkBox(anywidget.AnyWidget):
+    """Read-only URL field + Copy button, rendered client-side so it can build the absolute
+    link from window.location (correct host behind the HuggingFace proxy) and reach the
+    browser clipboard. Python only supplies the `?s=` blob; JS assembles origin+path+blob."""
+    blob = traitlets.Unicode("").tag(sync=True)
+    _esm = """
+    export default { render({ model, el }) {
+      el.innerHTML = `
+        <div style="display:flex; gap:8px; align-items:center; width:100%">
+          <input type="text" readonly style="flex:1; min-width:0; font:13px monospace;
+                 padding:8px 10px; border:1px solid #CFD8DC; border-radius:6px;
+                 background:#F8FAFB; color:#37474F" />
+          <button style="white-space:nowrap; padding:8px 14px; border:0; border-radius:6px;
+                  background:#1565C0; color:#fff; cursor:pointer; font-weight:600">Copy link</button>
+        </div>`;
+      const input = el.querySelector('input');
+      const btn = el.querySelector('button');
+      const build = () => window.location.origin + window.location.pathname +
+                          '?s=' + (model.get('blob') || '');
+      const refresh = () => { input.value = build(); };
+      refresh();
+      model.on('change:blob', refresh);
+      btn.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(input.value); }
+        catch (e) { input.focus(); input.select(); try { document.execCommand('copy'); } catch (_) {} }
+        const old = btn.textContent; btn.textContent = '✓ Copied!';
+        setTimeout(() => { btn.textContent = old; }, 1600);
+      });
+    } };
+    """
+
+
+@solara.component
+def _ShareDialog(open_rv):
+    """Modal: encode the current scenario delta into a ?s= link the user can copy.
+    Stateless — the whole scenario lives in the URL (Phase 1)."""
+    delta = share.scenario_delta()
+    blob = share.encode(delta)
+    n = len(delta)
+    with solara.v.Dialog(v_model=open_rv.value, on_v_model=open_rv.set, max_width="620"):
+        with solara.Card("🔗 Share My Scenario"):
+            if n == 0:
+                solara.Markdown(
+                    "This is the **default** scenario — nothing has been changed yet. "
+                    "Adjust some settings, then share to capture them in a link.")
+            else:
+                solara.Markdown(
+                    f"This link captures your **{n} changed setting"
+                    f"{'s' if n != 1 else ''}**. Anyone who opens it sees your exact scenario "
+                    "— no account or sign-in needed. The whole scenario travels in the URL, "
+                    "so the link never expires.")
+            _ShareLinkBox.element(blob=blob)
+            with solara.CardActions():
+                solara.v.Spacer()
+                solara.Button("Close", text=True, on_click=lambda: open_rv.set(False))
+
+
 @solara.component
 def _SettingsLoadDialog(open_rv, err_rv):
     """Modal (Phase 4.5b): pick a bundled sample config, or drop an exported .json — both
@@ -663,6 +722,7 @@ def Masthead():
     )
     _ci = _climate_info(zip_code.value, climate_trend.value)
     cz = _ci.zone_id.replace("CZ", "").strip()
+    _share_open = solara.use_reactive(False)
     _settings_load_open = solara.use_reactive(False)
     _settings_load_err = solara.use_reactive("")
     _settings_export_open = solara.use_reactive(False)
@@ -695,9 +755,11 @@ def Masthead():
         with solara.Row(classes=["actions"], style="gap:8px; flex-shrink:0; align-items:center"):
             solara.Button("↺ Reset", on_click=reset_to_defaults, classes=["btn"])
 
-            # Settings dropdown — Load… / Export… (each opens a dialog).
+            # Settings dropdown — Share / Load… / Export… (each opens a dialog).
             with solara.lab.Menu(activator=solara.Button("⚙ Settings ▾", classes=["btn"])):
-                with solara.Column(gap="0px", style="padding:4px; min-width:150px"):
+                with solara.Column(gap="0px", style="padding:4px; min-width:180px"):
+                    solara.Button("🔗 Share My Scenario", text=True,
+                                  on_click=lambda: _share_open.set(True))
                     solara.Button("Load…", text=True, on_click=lambda: (
                         _settings_load_err.set(""), _settings_load_open.set(True)))
                     solara.Button("Export…", text=True,
@@ -705,6 +767,7 @@ def Masthead():
 
             HelpLink("? Help", "index.html", classes=["btn", "primary"],
                      style="text-decoration:none")
+        _ShareDialog(_share_open)
         _SettingsLoadDialog(_settings_load_open, _settings_load_err)
         _SettingsExportDialog(_settings_export_open)
 
@@ -978,6 +1041,16 @@ def JourneyGrid():
 def Page():
     solara.Title("WhyWatt?")
     solara.Style(_REDESIGN_CSS + "\n" + _LAYOUT_V2_CSS)   # design system + v2 layout
+
+    # Share My Scenario (Phase 1): if the URL carries ?s=<blob>, decode + apply it ONCE on
+    # load. use_effect keyed on the search string runs after render (safe for reactive sets)
+    # and only re-fires if the query actually changes — so it won't clobber later edits.
+    router = solara.use_router()
+    def _consume_share_link():
+        blob = share.share_param(getattr(router, "search", None))
+        if blob:
+            apply_config(share.decode(blob))   # decode()/sanitize() make this safe vs tampering
+    solara.use_effect(_consume_share_link, [getattr(router, "search", None)])
 
     model, df = solara.use_memo(run_simulation, dependencies=[
         zip_code.value, climate_trend.value, num_bedrooms.value,

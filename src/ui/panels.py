@@ -1936,7 +1936,7 @@ def _SocialBody():
             with solara.Column(classes=["device"]):
                 WhyWattSlider(
                     SliderSpec(key="gasoline_climate_cost_per_gallon",
-                               title="Climate rate", minimum=0.50, maximum=4.00, step=0.05,
+                               title="Climate rate", minimum=0.50, maximum=4.00, step=0.01,
                                default=_DEFAULTS["gasoline_climate_cost_per_gallon"],
                                unit="$/gal", decimals=2, gate_label="Add Climate Cost"),
                     value=gasoline_climate_cost_per_gallon,

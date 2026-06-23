@@ -7,7 +7,7 @@ instance per cell (Phase 4.5 invariant #1).
 """
 import solara
 
-from ui.config import factory_defaults, merge, make_envelope
+from ui.config import factory_defaults, merge, make_envelope, sanitize
 
 # ── Defaults — externalized to data/config/whywatt_default.json (Phase 4.5b) ──
 # Single source of truth: the reactives below initialize from this dict; reset uses it.
@@ -381,12 +381,18 @@ def reset_to_defaults():
     _set_all_setup(False)
 
 
-def apply_config(values: dict) -> None:
+def apply_config(values: dict) -> list[str]:
     """Load a config (Phase 4.5b, REPLACE semantics): set EVERY persistent reactive from
-    factory ⊕ values. Keys absent from `values` revert to factory; unknown keys are ignored.
-    Transient UI reactives are untouched."""
-    for k, v in merge({k: v for k, v in values.items() if k in _DEFAULTS}).items():
+    factory ⊕ values. Keys absent from `values` revert to factory.
+
+    `values` is treated as UNTRUSTED (it may come from a shared link or a dropped file):
+    it is run through sanitize() first, which drops unknown/transient/wrong-typed keys and
+    clamps out-of-range numbers. Returns the list of sanitization warnings (empty == clean)
+    so callers can surface "we adjusted/ignored some settings" without crashing."""
+    clean, warnings = sanitize(values)
+    for k, v in merge(clean).items():
         globals()[k].set(v)
+    return warnings
 
 
 def export_config(name: str = "my_whywatt_config", description: str = "") -> dict:
