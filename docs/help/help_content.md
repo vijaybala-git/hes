@@ -461,10 +461,11 @@ directly to the pan.
 
 ## §8 · Transportation — Driving, EVs & Charging
 @file: ev.html
-@keys: ev_charger
-@popup: Transportation models your driving as gasoline miles and electric miles.
-  Your Journey can add an electric vehicle and a home Level 2 charger, shifting
-  charging from costly public stations to your home electricity rate.
+@keys: ev_charger, transportation
+@popup: Transportation models your driving as gasoline miles and electric miles. Pick your
+  current vehicle mix — Gas, Mixed, Electric, or None — then Your Journey can add an electric
+  vehicle and a home Level 2 charger, shifting charging from costly public stations to your
+  home electricity rate.
 
 ### What this means for you
 
@@ -740,7 +741,7 @@ must verify before any work is performed.
 
 ## §12 · ACC — Avoided Cost of Carbon
 @file: acc.html
-@keys: chart_r3, chart_r4
+@keys: chart_r3, chart_r4, chart_r5
 @popup: The ACC (Avoided Cost Calculator) seasonal shape shows how the
   effective electricity rate varies by month under the CPUC's
   avoided-cost framework. Summer peak hours carry the highest rate.
@@ -937,15 +938,20 @@ R.2 · Gas CAGR Projection
 Your natural-gas price projected forward each year from your utility's current rate, using the
 escalation you chose. A second dashed line appears when you compare two scenarios.
 
-R.3 · ACC Rate Projection
-Electricity and gas prices projected forward together, with a shaded band showing the seasonal
-or hourly range under the CPUC Avoided Cost Calculator when an ACC rate model is selected. The
-center line is the annual average.
+R.3 · ACC Electrical Rate Projection
+Your electricity price projected forward each year along the selected rate model's
+annual-average line, with the CPUC Avoided Cost Calculator's off-peak-to-peak hourly band shaded
+around it. A second dashed line appears when you compare two scenarios.
 
-R.4 · Electricity Rate Shape
+R.4 · ACC Gas Rate Projection
+Your natural-gas price projected forward each year along the selected rate model's
+annual-average line, with the CPUC Avoided Cost Calculator's summer-to-winter seasonal band
+shaded around it. A second dashed line appears when you compare two scenarios.
+
+R.5 · ACC Electrical Rate Shape
 A heatmap of how the effective electricity rate varies by hour of day and by month under the
 CPUC Avoided Cost Calculator. Summer afternoons and winter evenings carry the highest avoided
-cost. Shown only when an ACC-shaped electricity model is selected.
+cost.
 
 ### Default values
 

@@ -68,6 +68,7 @@ HELP_POPUPS: dict[str, tuple[str, str]] = {
     ),
     "ev_charger": (
         "Transportation models your driving as gasoline miles and electric miles."
+        " Pick your current vehicle mix — Gas, Mixed, Electric, or None — then"
         " Your Journey can add an electric vehicle and a home Level 2 charger,"
         " shifting charging from costly public stations to your home electricity"
         " rate.",
@@ -75,10 +76,10 @@ HELP_POPUPS: dict[str, tuple[str, str]] = {
     ),
     "transportation": (
         "Transportation models your driving as gasoline miles and electric miles."
-        " Pick your current vehicle mix — Gas, Mixed (gas + an EV), Electric, or"
-        " None. Your Journey can then add an electric vehicle and a home Level 2"
-        " charger, shifting charging from costly public stations to your home"
-        " electricity rate.",
+        " Pick your current vehicle mix — Gas, Mixed, Electric, or None — then"
+        " Your Journey can add an electric vehicle and a home Level 2 charger,"
+        " shifting charging from costly public stations to your home electricity"
+        " rate.",
         "ev.html",
     ),
     "solar": (
@@ -228,17 +229,23 @@ HELP_POPUPS: dict[str, tuple[str, str]] = {
         "rates.html",
     ),
     "chart_r3": (
-        "Electricity and gas prices projected forward together, with a shaded"
-        " band showing the seasonal or hourly range under the CPUC Avoided Cost"
-        " Calculator when an ACC rate model is selected. The center line is the"
-        " annual average.",
+        "Your electricity price projected forward each year along the selected"
+        " rate model's annual-average line, with the CPUC Avoided Cost"
+        " Calculator's off-peak-to-peak hourly band shaded around it. A second"
+        " dashed line appears when you compare two scenarios.",
         "acc.html",
     ),
     "chart_r4": (
+        "Your natural-gas price projected forward each year along the selected"
+        " rate model's annual-average line, with the CPUC Avoided Cost"
+        " Calculator's summer-to-winter seasonal band shaded around it. A second"
+        " dashed line appears when you compare two scenarios.",
+        "acc.html",
+    ),
+    "chart_r5": (
         "A heatmap of how the effective electricity rate varies by hour of day"
         " and month under the CPUC Avoided Cost Calculator. Summer afternoon and"
-        " winter evening peaks carry the highest avoided cost. Shown only when an"
-        " ACC-shaped electricity model is selected.",
+        " winter evening peaks carry the highest avoided cost.",
         "acc.html",
     ),
 
@@ -259,8 +266,8 @@ HELP_POPUPS: dict[str, tuple[str, str]] = {
         "Electric CAGR Projection": "chart_r1",
         "Gas CAGR Projection": "chart_r2",
         "ACC Electrical Rate Projection": "chart_r3",
-        "ACC Gas Rate Projection": "chart_r3",
-        "ACC Electrical Rate Shape": "chart_r4",
+        "ACC Gas Rate Projection": "chart_r4",
+        "ACC Electrical Rate Shape": "chart_r5",
     },
 
 }

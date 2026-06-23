@@ -411,7 +411,7 @@ def render_index(sections: list[HelpSection]) -> str:
 
 # Keys that map chart names to popup keys — not in .md, kept stable here.
 # Names MUST match CHART_OPTIONS in src/ui/theme.py; keys are aligned to the chart's
-# reference code in CHART_CODES (chart_jc1 ↔ JC.1, chart_eu7 ↔ EU.7, chart_r3 ↔ R.3).
+# reference code in CHART_CODES (chart_jc1 ↔ JC.1, chart_eu7 ↔ EU.7, chart_r5 ↔ R.5).
 _CHART_NAME_TO_KEY = {
     # Journey Costs (JC)
     "Cumulative Energy Costs":        "chart_jc1",
@@ -431,8 +431,8 @@ _CHART_NAME_TO_KEY = {
     "Electric CAGR Projection":       "chart_r1",
     "Gas CAGR Projection":            "chart_r2",
     "ACC Electrical Rate Projection": "chart_r3",
-    "ACC Gas Rate Projection":        "chart_r3",
-    "ACC Electrical Rate Shape":      "chart_r4",
+    "ACC Gas Rate Projection":        "chart_r4",
+    "ACC Electrical Rate Shape":      "chart_r5",
 }
 
 # Extra popup entries not tied to a page section (chart entries use chart keys).
@@ -506,14 +506,19 @@ _EXTRA_POPUP_KEYS = {
                   "current EIA effective rate, using the escalation you choose. A second dashed "
                   "line appears when you compare two scenarios.",
                   "rates.html"),
-    "chart_r3":  ("Electricity and gas prices projected forward together, with a shaded band "
-                  "showing the seasonal or hourly range under the CPUC Avoided Cost Calculator "
-                  "when an ACC rate model is selected. The center line is the annual average.",
+    "chart_r3":  ("Your electricity price projected forward each year along the selected rate "
+                  "model's annual-average line, with the CPUC Avoided Cost Calculator's "
+                  "off-peak-to-peak hourly band shaded around it. A second dashed line appears "
+                  "when you compare two scenarios.",
                   "acc.html"),
-    "chart_r4":  ("A heatmap of how the effective electricity rate varies by hour of day and "
+    "chart_r4":  ("Your natural-gas price projected forward each year along the selected rate "
+                  "model's annual-average line, with the CPUC Avoided Cost Calculator's "
+                  "summer-to-winter seasonal band shaded around it. A second dashed line appears "
+                  "when you compare two scenarios.",
+                  "acc.html"),
+    "chart_r5":  ("A heatmap of how the effective electricity rate varies by hour of day and "
                   "month under the CPUC Avoided Cost Calculator. Summer afternoon and winter "
-                  "evening peaks carry the highest avoided cost. Shown only when an ACC-shaped "
-                  "electricity model is selected.",
+                  "evening peaks carry the highest avoided cost.",
                   "acc.html"),
 }
 
