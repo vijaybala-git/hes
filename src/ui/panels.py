@@ -328,6 +328,13 @@ def _cost_row(cost_rv, rebate_rv, net: int):
         ))
 
 
+# Display labels for the appliance state dropdowns. The stored reactive values stay
+# lowercase ("gas"/"electric"/"none" — the validated config enum); only the visible
+# label is title-cased. on_value maps the chosen label back to the stored value.
+_STATE_LABELS = {"gas": "Gas", "electric": "Electric", "none": "None"}
+_STATE_FROM_LABEL = {v: k for k, v in _STATE_LABELS.items()}
+
+
 def _appliance_rows(state_rv, planned_rv, year_rv, cost_rv, rebate_rv,
                     state_values=("gas", "electric", "none"), year_default=1):
     """Row content for standard appliance summary cards (HVAC, WH, Cooktop, Dryer)."""
@@ -335,7 +342,9 @@ def _appliance_rows(state_rv, planned_rv, year_rv, cost_rv, rebate_rv,
     # Row 1: state dropdown + plan checkbox (+ electrified badge)
     with solara.Row(gap="8px", style=_ROW_CTRL):
         with solara.Column(style="min-width:90px; max-width:90px"):
-            solara.Select("", value=state_rv, values=list(state_values))
+            solara.Select("", value=_STATE_LABELS.get(state, state),
+                          values=[_STATE_LABELS.get(v, v) for v in state_values],
+                          on_value=lambda lbl: state_rv.set(_STATE_FROM_LABEL.get(lbl, lbl)))
         if state != "electric":
             _PlanCheck(planned_rv, "Plan")
         elif state == "electric":
@@ -392,7 +401,7 @@ def WHSummaryCard():
 # two underlying do-nothing reactives — current gasoline miles + existing EV miles.
 # No separate state reactive: the model already reads these two, and detail-panel
 # edits keep the dropdown label in sync automatically.
-_TRANSPORT_STATES   = ["Gas", "Mixed", "Electric", "None"]
+_TRANSPORT_STATES   = ["Gasoline", "Mixed", "Electric", "None"]
 _TRANSPORT_FULL_MILES = _DEFAULTS["transport_gasoline_miles"]   # 12,000 — a full driver
 _TRANSPORT_MIXED_EV   = 5000                                   # EV miles/yr when "Mixed"
 
@@ -406,7 +415,7 @@ def _transport_state() -> str:
     if e:
         return "Electric"
     if g:
-        return "Gas"
+        return "Gasoline"
     return "None"
 
 
@@ -415,7 +424,7 @@ def _set_transport_state(s: str):
     magnitude where it still applies; falls back to a full-driver default."""
     cur_gas = transport_gasoline_miles.value
     cur_ev  = transport_ev_miles_now.value
-    if s == "Gas":
+    if s == "Gasoline":
         transport_gasoline_miles.set(cur_gas or _TRANSPORT_FULL_MILES)
         transport_ev_miles_now.set(0)
     elif s == "Mixed":
@@ -438,7 +447,7 @@ def TransportationSummaryCard():
         _card_header("ice", "Transportation")
         # Row 1: current-vehicle state dropdown + Plan EV Charger
         with solara.Row(gap="8px", style=_ROW_CTRL):
-            with solara.Column(style="min-width:96px; max-width:110px"):
+            with solara.Column(style="min-width:124px; max-width:140px"):
                 solara.Select("", values=_TRANSPORT_STATES,
                               value=_transport_state(),
                               on_value=_set_transport_state)
@@ -1337,7 +1346,7 @@ def ElecPanelDetail():
     planned = panel_upgrade_planned.value
 
     with solara.Row(gap="8px", style=_TOP_ROW):
-        _Check(label="Plan 200A panel upgrade", value=panel_upgrade_planned)
+        _Check(label="Plan 200 Amps panel upgrade", value=panel_upgrade_planned)
         if planned:
             with solara.Column(style="flex:1; min-width:200px"):
                 _YSl(panel_upgrade_year, _DEFAULTS["panel_upgrade_year"])
@@ -1349,7 +1358,7 @@ def ElecPanelDetail():
     ))
     # Current panel size — drives the Estimated Electrical Load assessment (Phase 3 §5)
     with solara.Column(style="max-width:220px; margin-bottom:8px"):
-        solara.Select("Current panel size (A)", value=panel_amps, values=[100, 150, 200])
+        solara.Select("Current panel size (Amps)", value=panel_amps, values=[100, 150, 200])
     # NEC load-calculation method — Optional (220.82) is the Bay Area permit default
     with solara.Column(style="max-width:260px; margin-bottom:6px"):
         solara.Select("Load calc method", value=panel_calc_method,

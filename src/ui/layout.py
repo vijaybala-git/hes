@@ -913,10 +913,10 @@ def Cockpit(df, n, model):
             f"<div class='guide-metrics {peak_cls}'>"
             "<div class='gm'><span class='k'>Current</span>"
             f"<div class='row'><span class='num'>{yr1.service_amps:.0f}</span>"
-            "<span class='unit'>A</span></div></div>"
+            "<span class='unit'>Amps</span></div></div>"
             "<div class='gm peak'><span class='k'>Peak</span>"
             f"<div class='row'><span class='num'>{peak.service_amps:.0f}</span>"
-            "<span class='unit'>A</span></div></div>"
+            "<span class='unit'>Amps</span></div></div>"
             f"<span class='peak-badge'>{badge_icon} {badge_text}</span>"
             "</div></div>"
         )
