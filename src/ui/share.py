@@ -11,10 +11,18 @@ import base64
 import gzip
 import io
 import json
+import os
 from urllib.parse import parse_qs
 
 from ui.config import factory_defaults, sanitize, SHARE_EXCLUDE, SHARE_DERIVED
 from ui.state import export_config
+
+# Canonical public URL the app is reached at. The app is embedded in an iframe on
+# hes.whywatt.org, so window.location inside the iframe is the *.hf.space origin — and
+# cross-origin policy blocks reading the parent URL. So we configure the pretty base here
+# rather than letting the iframe guess. Override per-deploy with WHYWATT_SHARE_BASE; the
+# JS skips it on localhost so local-dev links stay local.
+CANONICAL_BASE = "https://hes.whywatt.org"
 
 # Keys never carried in a share link: transient UI state + ZIP-derived seeded values.
 _OMIT = SHARE_EXCLUDE | SHARE_DERIVED
@@ -91,3 +99,10 @@ def share_param(search: str | None) -> str:
 def current_blob() -> str:
     """Convenience: encode the live scenario delta into a shareable blob."""
     return encode(scenario_delta())
+
+
+def share_base() -> str:
+    """The canonical public origin for share links (no trailing slash). Env override
+    WHYWATT_SHARE_BASE wins; falls back to CANONICAL_BASE. The browser ignores this on
+    localhost so local dev links point at the dev server."""
+    return os.environ.get("WHYWATT_SHARE_BASE", CANONICAL_BASE).rstrip("/")

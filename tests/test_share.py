@@ -127,6 +127,13 @@ def test_decode_tampered_values_sanitized():
 
 # ── ?s= param parsing ────────────────────────────────────────────────────────────
 
+def test_share_base_default_and_env_override(monkeypatch):
+    monkeypatch.delenv("WHYWATT_SHARE_BASE", raising=False)
+    assert share.share_base() == share.CANONICAL_BASE
+    monkeypatch.setenv("WHYWATT_SHARE_BASE", "https://example.org/")
+    assert share.share_base() == "https://example.org"   # trailing slash stripped
+
+
 def test_share_param_extraction():
     assert share.share_param("s=abc123") == "abc123"
     assert share.share_param("x=1&s=abc&y=2") == "abc"

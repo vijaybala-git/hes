@@ -592,10 +592,13 @@ def DetailDock(model):
 # ── Phase 3 redesign — masthead + verdict band ──────────────────────────────────
 
 class _ShareLinkBox(anywidget.AnyWidget):
-    """Read-only URL field + Copy button, rendered client-side so it can build the absolute
-    link from window.location (correct host behind the HuggingFace proxy) and reach the
-    browser clipboard. Python only supplies the `?s=` blob; JS assembles origin+path+blob."""
+    """Read-only URL field + Copy button, rendered client-side so it can reach the browser
+    clipboard. Python supplies the `?s=` blob and the canonical public `base` (the app runs
+    inside a cross-origin iframe, so window.location is the *.hf.space URL and the parent's
+    pretty domain can't be read from here). JS uses `base` except on localhost, where it
+    falls back to window.location so dev links stay local."""
     blob = traitlets.Unicode("").tag(sync=True)
+    base = traitlets.Unicode("").tag(sync=True)
     _esm = """
     export default { render({ model, el }) {
       el.innerHTML = `
@@ -608,11 +611,18 @@ class _ShareLinkBox(anywidget.AnyWidget):
         </div>`;
       const input = el.querySelector('input');
       const btn = el.querySelector('button');
-      const build = () => window.location.origin + window.location.pathname +
-                          '?s=' + (model.get('blob') || '');
+      const build = () => {
+        const loc = window.location;
+        const isLocal = /^(localhost|127\\.|0\\.0\\.0\\.0|\\[?::1)/.test(loc.hostname);
+        const base = model.get('base');
+        const root = (base && !isLocal) ? base : (loc.origin + loc.pathname);
+        const sep = root.endsWith('/') ? '' : '/';
+        return root + sep + '?s=' + (model.get('blob') || '');
+      };
       const refresh = () => { input.value = build(); };
       refresh();
       model.on('change:blob', refresh);
+      model.on('change:base', refresh);
       btn.addEventListener('click', async () => {
         try { await navigator.clipboard.writeText(input.value); }
         catch (e) { input.focus(); input.select(); try { document.execCommand('copy'); } catch (_) {} }
@@ -642,7 +652,7 @@ def _ShareDialog(open_rv):
                     f"{'s' if n != 1 else ''}**. Anyone who opens it sees your exact scenario "
                     "— no account or sign-in needed. The whole scenario travels in the URL, "
                     "so the link never expires.")
-            _ShareLinkBox.element(blob=blob)
+            _ShareLinkBox.element(blob=blob, base=share.share_base())
             with solara.CardActions():
                 solara.v.Spacer()
                 solara.Button("Close", text=True, on_click=lambda: open_rv.set(False))
