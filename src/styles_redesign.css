@@ -140,6 +140,7 @@ body {
 .brand-name { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
 .brand-name b { color: var(--journey-ink); }
 .brand-tag { font-size: 11px; color: var(--ink-3); margin-top: 3px; font-weight: 500; letter-spacing: 0.01em; }
+.brand-tag .hex { font-size: 13px; font-weight: 800; color: var(--journey-ink); }
 
 .context {
   flex: 1; min-width: 0;

@@ -744,7 +744,10 @@ def Masthead():
         f"<div class='brand-mark'>{_WHYWATT_ICON_SVG}</div>"
         "<div style='display:flex;flex-direction:column;line-height:1.1'>"
         "<div class='brand-name'>Why<b>Watt?</b></div>"
-        "<div class='brand-tag'>Home Electrification Explorer</div>"
+        "<div class='brand-tag'>"
+        "<span class='hex'>H</span>ome "
+        "<span class='hex'>E</span>lectrification "
+        "e<span class='hex'>X</span>plorer</div>"
         "</div>"
     )
     with solara.Row(classes=["masthead"], style="gap:16px"):
