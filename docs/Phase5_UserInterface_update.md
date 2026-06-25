@@ -53,7 +53,7 @@ Ordered as confirmed with the user:
 | 1 | §1 | Unified slider: **debounce first**, then iterate design on ONE slider ("Climate Cost"), then roll out type-in + consistent component | ✅ **Done** |
 | 2 | §4 | **Plotly chart migration** — sets charts to their final (shorter) height + improves responsiveness; must precede the vertical-space review | ✅ **Done** (11/17 charts) |
 | 3 | §3 | Vertical-space compression + §2 sticky band — measured **after** Plotly: remove redundant lines, collapse headers, tighten gaps, accent borders, pin topline | ✅ **Done** |
-| — | §2 | Sticky topline band — keep metrics (+ both charts) visible while tuning | ✅ **Done** (masthead + cockpit + both charts pinned) |
+| — | §2 | Sticky topline band — keep metrics (+ both charts) visible while tuning | ✅ changed - see section below  (masthead + cockpit + both charts pinned) |
 | ✔ | — | **Keep 2 charts side by side** (cost × consumption comparison) | ✅ Hard constraint — preserved |
 | ✗ | — | Separate React front-end | ❌ Dropped for now |
 
@@ -335,6 +335,74 @@ the tuning panels.
 
 **Acceptance for §2:** while tuning a Journey/Solar control near the bottom of the page, the
 topline savings/payback numbers and the hero chart remain visible and update live.
+
+### ⛔ Sticky band REMOVED (superseded — 2026-06-25)
+
+The §2 sticky band (Masthead + Cockpit + both charts pinned, `.sticky-top`) is
+**removed.** On 1080p laptops and tablets the ~591px pinned block consumed most of the
+viewport, leaving too little room to work the panels below — the fix became the problem.
+Masthead, Cockpit, and the charts return to **normal scroll flow**. The `_DockScroller`
+scroll-correction anywidget (which existed only to push the detail dock clear of the
+pinned band) is retired with it.
+
+**Replaced by:** per-block **collapse** controls (below). Same goal — let the user shed
+vertical space they aren't using so the tuning panel stays close to the top — but
+user-driven and not screen-eating.
+
+---
+
+## §5 — Per-block collapse (replaces the sticky band)
+
+### 5.1 Goal
+
+Give the three top blocks — **Cockpit**, **Graphs**, **Setup your home** — a uniform
+collapse control so the user can hide what they aren't looking at and shorten the page,
+instead of pinning everything in a fixed band. Reuses the existing collapse machinery
+(`setup_collapsed` reactive + `_toggle_setup` in [state.py:222](../src/ui/state.py),
+`.chev-btn` in [layout_v2.css:87](../src/layout_v2.css)).
+
+### 5.2 The control (identical across all three blocks)
+
+- **Icon-only chevron.** NOT the `…` three-dot icon — that is reserved for "Details".
+  Reuses `.chev-btn` styling (`--ink-3`, hover → `--ink`).
+- **Rotation = points right (−90°) when collapsed**, standardized across all three.
+  This drops the current −180° flip on the "Collapse all" button so every collapse
+  control behaves the same (disclosure-triangle convention: arrow points at the hidden
+  content).
+- **Placement:**
+  - **Cockpit** — corner-floated top-right (`position:absolute`) over the card, since the
+    Cockpit has no header row. Costs no vertical space.
+  - **Graphs** — in a single new group header line hosting the one shared chevron.
+  - **Setup your home** — in the existing group header, replacing the bordered
+    "Collapse all" text button so it matches the other two.
+
+### 5.3 Per-block behavior
+
+- **Cockpit — collapses to one line, two items:**
+  1. Payback headline — e.g. `Payback yr 8 (2033)   +$24,500` or
+     `No payback · 20 yrs   −$X,XXX`.
+  2. Short electrical-panel badge — e.g. `200A OK` / `⚠ Upgrade to 200A`.
+  Everything else (comparison bars, full panel-guidance block) hides.
+- **Graphs — one chevron collapses BOTH charts together.** Accepts the one extra header
+  line as the cost of a single shared toggle. Collapsed = only the group header remains;
+  the two side-by-side charts are preserved when expanded (hard constraint, unchanged).
+- **Setup your home — unchanged collapse target** (its existing single chip-row line);
+  only the control swaps to the unified chevron.
+
+### 5.4 Default state
+
+**All three blocks expanded on load.**
+
+### 5.5 Acceptance
+
+- Sticky band gone; page scrolls normally; no fixed block over ~1 line when a block is
+  collapsed.
+- One uniform chevron (icon-only, −90° collapsed) on Cockpit / Graphs / Setup.
+- Cockpit collapsed shows exactly the payback line + short panel badge.
+- Graphs chevron hides/shows both charts together.
+- Live reactivity intact — collapsed blocks still recompute when reopened.
+
+
 
 ### ✅ Delivered (2026-06-22)
 

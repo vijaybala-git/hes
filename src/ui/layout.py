@@ -149,16 +149,16 @@ class _PlotFitter(anywidget.AnyWidget):
 
 
 class _DockScroller(anywidget.AnyWidget):
-    """Mounts inside the DetailDock; on open it scrolls the dock into view just
-    below the sticky topline band (§2). Keyed to the open device so render() fires
-    once per open — NOT on every slider re-render (which would yank the scroll)."""
+    """Mounts inside the DetailDock; on open it scrolls the dock into view. The dock
+    renders in a fixed DOM spot above the panels, so opening it from a panel far down
+    the scroll would otherwise leave the editor off-screen. Keyed to the open device so
+    render() fires once per open — NOT on every slider re-render (which would yank the
+    scroll)."""
     _esm = """
     export default { render({ el }) {
       const run = () => {
         const dock = el.closest('.detail-dock');
         if (!dock) return;
-        const band = document.querySelector('.sticky-top');
-        const bandH = band ? band.getBoundingClientRect().height : 0;
         // nearest real scroll container above the dock
         let sc = dock.parentElement;
         while (sc && !((sc.scrollHeight > sc.clientHeight) &&
@@ -166,10 +166,9 @@ class _DockScroller(anywidget.AnyWidget):
         if (!sc) sc = document.scrollingElement;
         const dockTop = dock.getBoundingClientRect().top;
         const scTop = sc.getBoundingClientRect ? sc.getBoundingClientRect().top : 0;
-        sc.scrollTo({ top: sc.scrollTop + (dockTop - scTop) - bandH - 12,
-                      behavior: 'smooth' });
+        sc.scrollTo({ top: sc.scrollTop + (dockTop - scTop) - 12, behavior: 'smooth' });
       };
-      // let the dock + band settle before measuring
+      // let the dock settle before measuring
       setTimeout(run, 80);
     } };
     """
@@ -565,8 +564,8 @@ def DetailDock(model):
     help_key = _DETAIL_HELP.get(dopen, "")
 
     with solara.Column(classes=["card", "dock", "detail-dock"]):
-        # On open, pull the dock into view below the sticky band (§2). Keyed to
-        # `dopen` so it fires once per open, not on every slider re-render.
+        # On open, pull the dock into view. Keyed to `dopen` so it fires once per
+        # open, not on every slider re-render.
         _DockScroller.element().key(f"dock-scroll-{dopen}")
         # Dock header — icon + title (flex:1) push [?] + Done to the right
         with solara.Row(classes=["modal-hd"]):
@@ -1198,10 +1197,8 @@ def Page():
                 ".card{background:var(--surface,#fff)!important;border:1px solid var(--border-strong,#cdd3e0)!important;"
                 "border-radius:var(--r-lg,14px)!important;box-shadow:var(--shadow-sm)!important;"
                 "overflow:hidden!important}"
-                # §2 — sticky topline band: pin Cockpit + charts while panels scroll
-                ".sticky-top{position:sticky!important;top:0!important;z-index:50!important;"
-                "background:var(--bg,#f7f8fb)!important;padding-bottom:7px!important;"
-                "box-shadow:0 8px 12px -10px rgba(20,28,46,.22)!important}"
+                # §2 sticky topline band REMOVED (Phase 5 §5) — it ate the viewport on
+                # 1080p/tablets; replaced by per-block collapse. Topline now scrolls normally.
                 # §3.4 — bold grey left accent stripe marks the major tunable panels as blocks
                 ".card.lstripe{border-left:4px solid var(--ink-2)!important}"
                 ".setup-group.lstripe{border-left:4px solid var(--ink-2)!important}"
@@ -1322,10 +1319,10 @@ def Page():
             style="display:none",
         )
 
-        # ── Sticky topline band (§2): Masthead + Cockpit + dual charts pinned
-        #    while the Setup/Journey panels scroll underneath, so the metrics +
-        #    graphs stay in view during tuning (the core selling point).
-        with solara.Column(classes=["sticky-top"], gap="7px"):
+        # ── Topline band: Masthead + Cockpit + dual charts. Formerly pinned
+        #    (§2 sticky) — now scrolls normally; the band consumed too much of a
+        #    1080p/tablet viewport. Per-block collapse (§5) replaces the pinning.
+        with solara.Column(gap="7px"):
             # ── Masthead (Phase 3 redesign §A) ──────────────────────────────────
             Masthead()
 
