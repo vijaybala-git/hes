@@ -899,6 +899,8 @@ def Cockpit(df, n, model):
     assessor = PanelAssessor(hc.square_footage, hc.panel_amps,
                              method=panel_calc_method.value)
     timeline = assessor.journey_load_timeline(model.journey_home, model.n_years)
+    badge_mini    = ""    # short panel badge reused in the collapsed one-liner (§5)
+    mini_peak_cls = ""
     if timeline:
         yr1   = timeline[0]
         peak  = max(timeline, key=lambda t: t.service_amps)
@@ -906,6 +908,8 @@ def Cockpit(df, n, model):
         peak_cls, badge_tmpl = _PEAK_BADGE.get(peak.status, _PEAK_BADGE["green"])
         badge_text = badge_tmpl.format(p=panel)
         badge_icon = _CHECK_SVG if peak_cls == "peak-ok" else "⚠"
+        mini_peak_cls = peak_cls
+        badge_mini    = f"<span class='peak-badge'>{badge_icon} {badge_text}</span>"
         guide_html = (
             "<div class='ck-guide'>"
             "<div class='guide-box-title'>ELECTRICAL PANEL GUIDANCE</div>"
@@ -922,8 +926,24 @@ def Cockpit(df, n, model):
     else:
         guide_html = "<div class='ck-guide'></div>"
 
-    solara.HTML(tag="div", classes=["card", "cockpit"],
-                unsafe_innerHTML=(call_html + bars_html + guide_html))
+    # ── Collapse (§5) — corner chevron; collapsed → payback line + short badge ──
+    collapsed = cockpit_collapsed.value
+    pay_cls   = "ck-pay" if positive else "ck-pay neg"
+    mini_html = (
+        f"<div class='cockpit-mini {mini_peak_cls}'>"
+        f"<span class='{pay_cls}'><span class='k'>{eyebrow}</span>"
+        f"<span class='big'>{big}</span></span>"
+        f"{badge_mini}</div>"
+    )
+    with solara.Column(classes=["card", "cockpit-card", "lstripe"], gap="0px"):
+        _collapse_chev(collapsed,
+                       lambda: cockpit_collapsed.set(not cockpit_collapsed.value),
+                       extra_classes=["ck-collapse"])
+        if collapsed:
+            solara.HTML(tag="div", unsafe_innerHTML=mini_html)
+        else:
+            solara.HTML(tag="div", classes=["cockpit"], style="margin-bottom:0",
+                        unsafe_innerHTML=(call_html + bars_html + guide_html))
 
 
 # ── v2 §D — "Setup your home" collapsible group ─────────────────────────────────
@@ -938,6 +958,22 @@ def _chev_button(collapse_key: str):
         "",
         on_click=lambda k=collapse_key: _toggle_setup(k),
         classes=["iconbtn", "chev-btn"],
+        children=[solara.HTML(tag="span", unsafe_innerHTML=_CHEVRON_SVG)],
+    )
+
+
+def _collapse_chev(collapsed: bool, on_click, extra_classes=None):
+    """Phase 5 §5 — unified icon-only collapse toggle for the Cockpit / Graphs /
+    Setup headers. Chevron points down when expanded, right (−90°) when collapsed
+    (the `is-collapsed` class rotates the button itself). Not the `…` glyph — that
+    is reserved for Details."""
+    cls = ["iconbtn", "chev-btn"] + (["is-collapsed"] if collapsed else [])
+    if extra_classes:
+        cls += extra_classes
+    solara.Button(
+        "",
+        on_click=on_click,
+        classes=cls,
         children=[solara.HTML(tag="span", unsafe_innerHTML=_CHEVRON_SVG)],
     )
 
@@ -981,15 +1017,13 @@ def SetupGroup():
     all_collapsed = all(sc.get(k, False) for k in ("home", "energy", "social"))
     group_cls = ["setup-group", "lstripe"] + (["collapsed-all"] if all_collapsed else [])
 
-    label = "Expand all" if all_collapsed else "Collapse all"
-    rot   = "transform:rotate(180deg);" if all_collapsed else ""
-    btn_inner = (
-        f"<span style='display:inline-flex;align-items:center;gap:7px'>{label}"
-        f"<span style='display:inline-flex;{rot}transition:transform .18s ease'>"
-        f"{_CHEVRON_SVG}</span></span>"
-    )
-
     with solara.Column(classes=group_cls):
+        # §5 — unified icon-only chevron (matches Cockpit + Graphs). Absolutely
+        # positioned top-right of the group so it stays visible in the same spot
+        # whether expanded (column) or collapsed-all (single chip row).
+        _collapse_chev(all_collapsed,
+                       lambda: _set_all_setup(not all_collapsed),
+                       extra_classes=["setup-collapse"])
         # Group header
         with solara.Row(classes=["sg-hd"], style="align-items:center; gap:10px"):
             solara.HTML(tag="div", style="flex:1; min-width:0", unsafe_innerHTML=(
@@ -1000,12 +1034,6 @@ def SetupGroup():
                 f"and Social &amp; Health collapse together'>— your starting assumptions"
                 f"</span></div>"
             ))
-            solara.Button(
-                "",
-                on_click=lambda: _set_all_setup(not all_collapsed),
-                classes=["collapse-all"],
-                children=[solara.HTML(tag="span", unsafe_innerHTML=btn_inner)],
-            )
         # 3-card grid (flex; collapsed-all CSS turns this into a chip row)
         with solara.Row(classes=["setup-grid"]):
             _SetupCard("home",   _CARD_IC["home"],   "Home, Panel &amp; Solar",
@@ -1022,10 +1050,12 @@ def SetupGroup():
 @solara.component
 def JourneyGrid():
     """v2 §E — full-width journey card with two labeled appliance rows."""
-    with solara.Column(classes=["card", "lstripe"]):
+    collapsed = journey_collapsed.value
+    card_cls = ["card", "lstripe"] + (["is-collapsed"] if collapsed else [])
+    with solara.Column(classes=card_cls):
         with solara.Row(classes=["card-hd"]):
-            solara.HTML(tag="div", unsafe_innerHTML=(
-                f"<div style='display:flex;align-items:center;gap:9px;flex:1;min-width:0'>"
+            solara.HTML(tag="div", style="flex:1; min-width:0", unsafe_innerHTML=(
+                f"<div style='display:flex;align-items:center;gap:9px;min-width:0'>"
                 f"<span class='ic'>{_CARD_IC['journey']}</span>"
                 f"<h3 style='margin:0;font-size:14px;font-weight:700;color:var(--ink,#1C2333);"
                 f"white-space:nowrap;letter-spacing:-0.01em'>Your Electrification Journey</h3>"
@@ -1033,18 +1063,23 @@ def JourneyGrid():
                 f"letter-spacing:0.01em'>— Configure Major Loads</span>"
                 f"<span class='count-pill'>6 devices</span></div>"
             ))
+            # §5 — help first, then the collapse chevron as the rightmost control
+            # (lets users shrink the biggest panel to bring the graphs back into view).
             HelpButton("journey_planner")
-        with solara.Column(classes=["jbody"], gap="7px"):
-            # Row 1 — MAJOR LOADS (label folded into the panel header §3.4)
-            with solara.Row(classes=["jgrid"]):
-                HVACSummaryCard()
-                WHSummaryCard()
-                TransportationSummaryCard()
-            # Row 2 — OTHER APPLIANCES (label removed §3.4)
-            with solara.Row(classes=["jgrid"]):
-                CooktopSummaryCard()
-                DryerSummaryCard()
-                BaseloadSummaryCard()
+            _collapse_chev(collapsed,
+                           lambda: journey_collapsed.set(not journey_collapsed.value))
+        if not collapsed:
+            with solara.Column(classes=["jbody"], gap="7px"):
+                # Row 1 — MAJOR LOADS (label folded into the panel header §3.4)
+                with solara.Row(classes=["jgrid"]):
+                    HVACSummaryCard()
+                    WHSummaryCard()
+                    TransportationSummaryCard()
+                # Row 2 — OTHER APPLIANCES (label removed §3.4)
+                with solara.Row(classes=["jgrid"]):
+                    CooktopSummaryCard()
+                    DryerSummaryCard()
+                    BaseloadSummaryCard()
 
 
 # ── Main Page ──────────────────────────────────────────────────────────────────
@@ -1237,6 +1272,40 @@ def Page():
                 "min-width:24px!important;width:24px!important;height:24px!important;"
                 "padding:0!important;cursor:pointer;color:var(--ink-4,#999)}"
                 ".iconbtn svg{width:15px!important;height:15px!important;display:block}"
+                # §5 — unified collapse chevron rotates to point right when collapsed
+                ".chev-btn.is-collapsed{transform:rotate(-90deg)!important}"
+                # §5 Cockpit — corner chevron + collapsed one-liner (payback + badge)
+                ".cockpit-card{position:relative!important;margin-bottom:var(--gap)!important}"
+                ".ck-collapse{position:absolute!important;top:5px!important;right:7px!important;z-index:3!important}"
+                ".cockpit-mini{display:flex!important;align-items:center;gap:18px;"
+                "flex-wrap:wrap;padding:10px 42px 10px 18px}"
+                ".cockpit-mini .ck-pay{display:inline-flex;align-items:baseline;gap:9px}"
+                ".cockpit-mini .ck-pay .k{font-size:10px;font-weight:800;letter-spacing:.08em;"
+                "text-transform:uppercase;color:var(--positive-ink)}"
+                ".cockpit-mini .ck-pay.neg .k{color:var(--baseline-ink)}"
+                ".cockpit-mini .ck-pay .big{font-family:var(--mono);font-size:21px;font-weight:600;"
+                "color:var(--positive-ink);letter-spacing:-.02em;line-height:1}"
+                ".cockpit-mini .ck-pay.neg .big{color:var(--baseline-ink)}"
+                # §5 — panel badge right-justified on the collapsed cockpit line
+                ".cockpit-mini .peak-badge{margin-left:auto}"
+                # §5 — Setup chevron pinned top-right of the group (visible whether
+                #      expanded or collapsed to the single chip row)
+                ".setup-group{position:relative!important}"
+                ".setup-collapse{position:absolute!important;top:14px!important;right:14px!important;z-index:4!important}"
+                ".setup-group.collapsed-all{padding-right:46px!important}"
+                # §5 Graphs — rounded left-accent block (matches the Setup group:
+                #   full border + radius so the corners curve, plus the grey stripe)
+                ".graphs-group{background:var(--surface-2)!important;"
+                "border:1px solid var(--border-strong)!important;"
+                "border-left:4px solid var(--ink-2)!important;"
+                "border-radius:var(--r-xl,16px)!important;padding:10px 12px!important}"
+                # §5 Graphs — one-line group header; chevron collapses both charts
+                ".graphs-hd{display:flex!important;align-items:center;gap:9px;padding:1px 4px}"
+                ".graphs-hd .gic{width:24px;height:24px;border-radius:7px;background:var(--journey-soft);"
+                "color:var(--journey-ink);display:grid;place-items:center;flex-shrink:0}"
+                ".graphs-hd .gic svg{width:15px;height:15px}"
+                ".graphs-hd h3{font-size:14px;font-weight:700;margin:0;letter-spacing:-.01em;color:var(--ink)}"
+                ".graphs-hd .scope{font-size:11.5px;color:var(--ink-3)}"
                 ".detail-body .v-input{margin-bottom:2px!important}"
                 ".detail-body .v-input__details{min-height:0!important}"
                 ".detail-body .v-slider{margin-top:4px!important;margin-bottom:2px!important}"
@@ -1329,40 +1398,53 @@ def Page():
             # ── Cockpit — merged payback · bars · panel guidance (v2 §B) ────────
             Cockpit(df, n, model)
 
-            # ── Dual chart panes ─────────────────────────────────────────────────
-            with solara.Row(gap="8px", style="align-items:stretch"):
-                with solara.Column(classes=["card"],
-                                   style="flex:1; min-width:300px; overflow:hidden"):
-                    with solara.Row(classes=["card-hd", "chart-header-sel"]):
-                        solara.HTML(
-                            tag="span",
-                            unsafe_innerHTML=(
-                                f"<code class='chart-code'>"
-                                f"{CHART_CODES.get(chart_left.value, '')}"
-                                f"</code>"
-                            ),
-                            style="flex-shrink:0",
-                        )
-                        solara.Select("", value=chart_left, values=CHART_OPTIONS)
-                        ChartHelpButton(chart_left.value)
-                    with solara.Column(style="padding:0 2px 2px"):
-                        ChartPane(chart_left.value, model, df, n)
-                with solara.Column(classes=["card"],
-                                   style="flex:1; min-width:300px; overflow:hidden"):
-                    with solara.Row(classes=["card-hd", "chart-header-sel"]):
-                        solara.HTML(
-                            tag="span",
-                            unsafe_innerHTML=(
-                                f"<code class='chart-code'>"
-                                f"{CHART_CODES.get(chart_right.value, '')}"
-                                f"</code>"
-                            ),
-                            style="flex-shrink:0",
-                        )
-                        solara.Select("", value=chart_right, values=CHART_OPTIONS)
-                        ChartHelpButton(chart_right.value)
-                    with solara.Column(style="padding:0 2px 2px"):
-                        ChartPane(chart_right.value, model, df, n)
+            # ── Graphs group (§5): left-accent block; one header line + shared
+            #    chevron collapses BOTH charts (panes stay side by side when open).
+            graphs_c = graphs_collapsed.value
+            with solara.Column(classes=["graphs-group", "lstripe"], gap="6px"):
+                with solara.Row(classes=["graphs-hd"]):
+                    solara.HTML(tag="div", style="flex:1; min-width:0", unsafe_innerHTML=(
+                        f"<div style='display:flex;align-items:center;gap:9px;min-width:0'>"
+                        f"<span class='gic'>{_CARD_IC['energy']}</span>"
+                        f"<h3>Your Cost, Consumption &amp; Timeline</h3></div>"
+                    ))
+                    _collapse_chev(graphs_c,
+                                   lambda: graphs_collapsed.set(not graphs_collapsed.value))
+                if not graphs_c:
+                    # ── Dual chart panes ───────────────────────────────────────────
+                    with solara.Row(gap="8px", style="align-items:stretch"):
+                        with solara.Column(classes=["card"],
+                                           style="flex:1; min-width:300px; overflow:hidden"):
+                            with solara.Row(classes=["card-hd", "chart-header-sel"]):
+                                solara.HTML(
+                                    tag="span",
+                                    unsafe_innerHTML=(
+                                        f"<code class='chart-code'>"
+                                        f"{CHART_CODES.get(chart_left.value, '')}"
+                                        f"</code>"
+                                    ),
+                                    style="flex-shrink:0",
+                                )
+                                solara.Select("", value=chart_left, values=CHART_OPTIONS)
+                                ChartHelpButton(chart_left.value)
+                            with solara.Column(style="padding:0 2px 2px"):
+                                ChartPane(chart_left.value, model, df, n)
+                        with solara.Column(classes=["card"],
+                                           style="flex:1; min-width:300px; overflow:hidden"):
+                            with solara.Row(classes=["card-hd", "chart-header-sel"]):
+                                solara.HTML(
+                                    tag="span",
+                                    unsafe_innerHTML=(
+                                        f"<code class='chart-code'>"
+                                        f"{CHART_CODES.get(chart_right.value, '')}"
+                                        f"</code>"
+                                    ),
+                                    style="flex-shrink:0",
+                                )
+                                solara.Select("", value=chart_right, values=CHART_OPTIONS)
+                                ChartHelpButton(chart_right.value)
+                            with solara.Column(style="padding:0 2px 2px"):
+                                ChartPane(chart_right.value, model, df, n)
 
         # ── Series key strip removed (§3.1): the migrated Plotly comparison charts
         #    (JC.1/JC.2/JC.6) now carry the A/B legend in-plot, so the standalone

@@ -402,6 +402,37 @@ instead of pinning everything in a fixed band. Reuses the existing collapse mach
 - Graphs chevron hides/shows both charts together.
 - Live reactivity intact — collapsed blocks still recompute when reopened.
 
+### ✅ Delivered (2026-06-25)
+
+Sticky band removed (separate commit) and per-block collapse shipped. All in
+[layout.py](../src/ui/layout.py) + [state.py](../src/ui/state.py); CSS in the hot-reloading
+inline `<style>` block so `.py` edits take effect without a server restart.
+
+- **Unified control** — one `_collapse_chev(collapsed, on_click, extra_classes)` helper,
+  icon-only chevron (reuses `.chev-btn`), rotates −90° to point **right** when collapsed via
+  `.chev-btn.is-collapsed`. Standardized across all blocks (the old "Collapse all" −180° flip
+  is gone). Reactives `cockpit_collapsed` / `graphs_collapsed` / `journey_collapsed` (view
+  state, left out of `reset_to_defaults`). **Default: all expanded.**
+- **Cockpit** — corner-floated chevron (no header row); collapsed → one line: payback
+  headline (left) + the short `.peak-badge` (right-justified). Wrapped in `.card.cockpit-card`
+  so the inner `.cockpit` grid is unchanged.
+- **Graphs** — wrapped header + dual charts in a `.graphs-group` block; one chevron collapses
+  **both** charts together (side-by-side preserved when open). Header renamed
+  **"Your Cost, Consumption & Timeline"** (per user). Block styled as a rounded tinted
+  container matching the Setup group (full border + `r-xl` radius + grey left stripe) — a
+  left stripe alone left the corners square.
+- **Setup** — "Collapse all" text button replaced by the unified chevron, **absolutely
+  positioned top-right** of the group so it stays visible in the same spot whether expanded
+  (column) or collapsed to the single chip row (which reflows to a row and would otherwise
+  bury an inline chevron).
+- **Journey** — same chevron added (collapses the 6 device cards to the header line); placed
+  as the **rightmost** control (`[title] [?] [chevron]`).
+- **Delineation** — grey 4px `--ink-2` left stripe now on all four blocks (Cockpit, Graphs,
+  Setup, Journey).
+- **`_DockScroller`** de-coupled from the removed `.sticky-top` band; it still scrolls the
+  detail dock into view on open. Verified live (1366-wide): every block toggles
+  collapse↔expand cleanly, re-expansion restores full content, no console/server errors.
+
 
 
 ### ✅ Delivered (2026-06-22)

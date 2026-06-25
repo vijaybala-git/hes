@@ -221,6 +221,13 @@ detail_open = solara.reactive(_DEFAULTS["detail_open"])   # None | "hvac" | "wat
 # v2 §D — "Setup your home" collapse state (one bool per domain card)
 setup_collapsed = solara.reactive({"home": False, "energy": False, "social": False})
 
+# Phase 5 §5 — per-block collapse (icon-only chevron; default expanded). Replaces
+# the removed §2 sticky band: the user collapses what they aren't using instead of
+# everything being pinned. View state only — left out of reset_to_defaults.
+cockpit_collapsed = solara.reactive(False)
+graphs_collapsed = solara.reactive(False)
+journey_collapsed = solara.reactive(False)
+
 def _toggle_setup(key: str):
     """Flip the collapsed flag for one setup card (immutable dict update)."""
     cur = dict(setup_collapsed.value)
