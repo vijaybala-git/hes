@@ -123,7 +123,14 @@
       "Bash(.venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('src/app.py',encoding='utf-8'\\).read\\(\\)\\); print\\('app.py OK,', sum\\(1 for _ in open\\('src/app.py',encoding='utf-8'\\)\\), 'lines'\\)\")",
       "Bash(.venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('src/app.py',encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('src/ui/charts.py',encoding='utf-8'\\).read\\(\\)\\); print\\('both parse'\\)\")",
       "Bash(cd /d/vijay/MyDocuments/hes && grep -nE \"^import json|^import os|^from ui import|^from ui.state import\" src/ui/layout.py | head)",
-      "Bash(cd \"D:/vijay/MyDocuments/hes\" && rm -f docs/_t_*.png docs/_jc1_*.png && git status --short src/ui/charts.py)"
+      "Bash(cd \"D:/vijay/MyDocuments/hes\" && rm -f docs/_t_*.png docs/_jc1_*.png && git status --short src/ui/charts.py)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/test_share_validation.py tests/test_config.py -q)",
+      "Bash(.venv/Scripts/python.exe -c \"import solara, inspect; print\\('solara', solara.__version__\\); from solara.routing import Router; print\\([a for a in dir\\(Router\\) if not a.startswith\\('__'\\)]\\)\")",
+      "Bash(.venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('src/ui/panels.py'\\).read\\(\\)\\); print\\('panels.py OK'\\)\")",
+      "WebFetch(domain:developer.nrel.gov)",
+      "Bash(.venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('src/ui/layout.py',encoding='utf-8'\\).read\\(\\)\\); print\\('layout.py parses OK'\\)\")",
+      "Bash(.venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('src/ui/layout.py',encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('src/ui/state.py',encoding='utf-8'\\).read\\(\\)\\); print\\('both parse OK'\\)\")",
+      "Bash(.venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('src/ui/layout.py',encoding='utf-8'\\).read\\(\\)\\); print\\('parse OK'\\)\")"
     ]
   }
 }
