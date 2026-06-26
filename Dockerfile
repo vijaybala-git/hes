@@ -21,6 +21,8 @@ COPY --chown=user data/ ./data/
 COPY --chown=user docs/assets/ ./docs/assets/
 # public/ is served by Solara at /static/public/ (Help pages + logo) — required
 COPY --chown=user public/ ./public/
+# templates/ overrides Solara's default HTML template (adds GoatCounter analytics)
+COPY --chown=user templates/ ./templates/
 
 EXPOSE $PORT
 

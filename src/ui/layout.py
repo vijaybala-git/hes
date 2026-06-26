@@ -1088,15 +1088,6 @@ def JourneyGrid():
 def Page():
     solara.Title("WhyWatt?")
     solara.Style(_REDESIGN_CSS + "\n" + _LAYOUT_V2_CSS)   # design system + v2 layout
-    solara.HTML(
-        tag="script",
-        attributes={
-            "data-goatcounter": "https://whywatt.goatcounter.com/count",
-            "async": True,
-            "src": "//gc.zgo.at/count.js",
-        },
-        unsafe_innerHTML="",
-    )
 
     # Share My Scenario (Phase 1): if the URL carries ?s=<blob>, decode + apply it ONCE on
     # load. use_effect keyed on the search string runs after render (safe for reactive sets)
