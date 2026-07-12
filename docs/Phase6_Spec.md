@@ -202,6 +202,62 @@ is review-only in Phase 6).
 > **Deferred to Phase 7:** the peak/non-peak *rate interface* (`get_peak_offpeak_rates`) and the
 > consumption split. Phase 6 collects and validates the data; Phase 7 flows it through the model.
 
+### §4 — Social Cost of Carbon: SC-CH₄ explicit citation + model-anchor tick marks
+
+**Motivation.** The climate-cost slider already embeds SC-CH₄ in the $1.07/therm default
+(EPA SC-CO₂ + 2% upstream leakage) but it is silent about it. Advocates get challenged on
+this number; the response "same EPA framework, just the methane emission factor" needs to be
+a one-click answer. At the same time, presenting the slider as a *range with named models*
+rather than a single default is more honest and more useful for homeowner sessions.
+
+**What changes — purely UI + documentation; zero simulation output change; golden unaffected.**
+
+#### §4a — SC-CH₄ explicit in `social_cost.py` and labels
+
+- Split the `SocialCostConfig` docstring into two clearly cited sub-components:
+  - **SC-CO₂ combustion:** $0.97/therm — EIA factor 5.306 kg CO₂/therm × EPA 2023 central
+    $190/tCO₂ (Rennert et al. 2022, *Nature*; EPA SC-GHG Technical Report 2023).
+  - **SC-CH₄ leakage adder:** $0.10/therm — EPA SC-CH₄ 2023 central (~$1,600/short ton CH₄)
+    applied to a 2% upstream pipeline leakage rate (EPA/GRI leakage inventory baseline).
+  - Total remains **$1.07/therm** — no numeric change, citation made explicit.
+- Change the gate label in `panels.py` from "Add CO₂ + Methane Cost" →
+  **"Add SC-CO₂ + SC-CH₄ (EPA)"** so advocates can name the source in the room.
+
+#### §4b — Named model anchors as tick marks on the climate-rate slider
+
+Extend `SliderSpec` (in `ui/slider.py`) with an optional `anchors` field —
+`list[tuple[float, str]]` of `(value, label)` pairs. `_track()` renders each anchor as a
+labelled `.ww-tick` beneath the slider rail (label rotated or stacked, fitting within the
+existing track width). The default tick (the `spec.default` mark already rendered) is
+unchanged; anchors are additive.
+
+**Four anchors for the climate-rate slider** ($1.00–$2.00 range):
+
+| Label | $/therm | Source / rationale |
+|---|---|---|
+| EPA CO₂ | $1.00 | Combustion only, no leakage — floor of the EPA framework |
+| **EPA+CH₄** *(default)* | **$1.07** | Existing default; SC-CH₄ at 2% pipeline leakage |
+| +CH₄ 3.7% | $1.15 | Same EPA SC-CH₄ applied to NRDC avg US leakage rate (3.7% from Alvarez et al. 2018, *Science*) |
+| High-Urgency | $1.80 | GIVE model at 1.5% discount rate — EPA 2023 Tech Report App. 3B "high-urgency sensitivity"; same science, lower discounting of future harm |
+
+The "High-Urgency" label is deliberately EPA-attributed ("EPA 2023 high-urgency sensitivity"),
+not activist-attributed — when challenged in a session the advocate can say "that's EPA's own
+number, just a different discount rate assumption."
+
+**Tooltip / help:** each anchor tick shows a tooltip on hover with the one-line source. The
+help page (`public/help/social_cost.html`) gains a new table under the climate-cost section
+summarising all four models with proper citations.
+
+#### §4c — Acceptance
+
+- `social_cost.py` docstring cites SC-CH₄ report; `climate_rate` value unchanged (1.07).
+- Gate label updated in `panels.py`.
+- `SliderSpec.anchors` field added; `_track()` renders up to N labelled tick marks.
+- Climate-rate slider in the UI shows all four anchors with hover tooltips.
+- Help page updated with citation table.
+- `python scripts/run_regression.py` → zero diffs (no simulation path touched).
+- `pytest` green.
+
 ---
 
 ## Module / data deltas (Phase 6 target state)
@@ -213,7 +269,10 @@ src/
   ui/state.py           + 5 solar-geometry reactives
   ui/config.py          + INT_KEYS / ENUMS / RANGES / sanitize entries
   ui/sim.py             pass SolarConfig + BatteryConfig (or shim) to HESModel
-  ui/panels.py          Home Profile: roof geometry inputs (inert)
+  ui/panels.py          Home Profile: roof geometry inputs (inert); SC-CH₄ gate label (§4)
+  ui/slider.py          SliderSpec.anchors field + labelled tick rendering (§4)
+  social_cost.py        SC-CH₄ explicit citation in docstring (§4)
+public/help/social_cost.html  citation table for 4-model SCC range (§4)
 data/
   climate/tmy3_zones.json     + per-zone lat/lon
   config/whywatt_default.json + new solar-geometry default values
@@ -246,5 +305,6 @@ docs/
 - [ ] URDB harvested for **Bay Area** PG&E TOU tariffs (SoCal optional/second) → `urdb_tou.json` + snapshots.
 - [ ] Validation tests green; `pvwatts_review.ipynb` / `urdb_review.ipynb` run top-to-bottom and render figures.
 - [ ] `git grep` confirms no `src/` code reads the new data files (review-only in Phase 6).
+- [ ] SC-CH₄ cited explicitly in `social_cost.py`; gate label updated; climate-rate slider shows 4 named anchors with tooltips; help page updated (§4).
 - [ ] `python scripts/run_regression.py` → zero diffs; full `pytest` green.
 - [ ] CLAUDE.md updated: Phase 6 closed, Phase 7 entered.
