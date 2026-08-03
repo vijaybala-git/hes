@@ -15,7 +15,7 @@ from pathlib import Path
 import mesa
 import numpy as np
 
-from home_config import HomeConfig, compute_baseload_kwh, HOT_WATER_GAL_PER_DAY, UA_BY_INSULATION
+from home_config import HomeConfig, compute_baseload_kwh, HOT_WATER_GAL_PER_DAY, compute_ua
 from climate_loader import ClimateLoader
 from social_cost import SocialCostConfig
 from journey import JourneyHome, DeviceSlot, CapExOnlySlot, CATEGORY_ORDER, CATEGORY_LABELS, SolarBatteryConfig
@@ -381,8 +381,9 @@ class HESModel(mesa.Model):
         self.climate.advance_to(0)
         self.climate_trend = climate_trend
 
-        # UA is building physics, not climate-zone data (§1.9.5).
-        ua = float(UA_BY_INSULATION[home_config.insulation_quality])
+        # UA is building physics, not climate-zone data (§1.9.5). Scales with conditioned
+        # floor area so furnace/AC energy tracks home size (Phase 5.5 Fix 1).
+        ua = float(compute_ua(home_config.insulation_quality, home_config.square_footage))
 
         # ── Baseload formula ──────────────────────────────────────────────────
         baseload_before = compute_baseload_kwh(

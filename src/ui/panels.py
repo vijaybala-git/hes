@@ -11,7 +11,7 @@ from ui.state import *   # noqa: F401,F403
 from ui.sim import *     # noqa: F401,F403
 from ui.charts import *  # noqa: F401,F403
 from ui.theme import (
-    C_NAVY, C_SKY, C_RED, C_BASE, C_ELEC, C_RATE_ELEC, C_RATE_GAS, UA_MAP, KWH_PER_THERM,
+    C_NAVY, C_SKY, C_RED, C_BASE, C_ELEC, C_RATE_ELEC, C_RATE_GAS, KWH_PER_THERM,
     KWH_PER_GALLON_GASOLINE, CATEGORY_COLORS, CHART_OPTIONS, CHART_CODES,
     DEVICE_LABELS, DEVICE_COLORS, DEVICE_ALPHAS, _SLOT_COLORS, _SLOT_DISPLAY_ORDER)
 from ui.icons import _DEVICE_ICONS, _CARD_IC, _PANEL_IC, _DEVICE_HELP_KEY, _SOCIAL_IC
@@ -22,7 +22,7 @@ from ui.device_style import DEVICE_STYLE, DEVICE_ORDER, dstyle, device_legend_ha
 from ui.slider import WhyWattSlider, SliderSpec
 from help_utils import HelpButton, ChartHelpButton, HelpPopupOverlay, HelpLink
 from journey import CATEGORY_ORDER, CATEGORY_LABELS, CapExOnlySlot, SolarBatteryConfig
-from home_config import HomeConfig, compute_baseload_kwh
+from home_config import HomeConfig, compute_baseload_kwh, compute_ua
 from model import HESModel
 from panel_assessor import PanelAssessor
 from social_cost import SocialCostConfig
@@ -890,7 +890,7 @@ def RatesSummaryCard():
 def HVACDetail():
     """HVAC detail — two-column layout per §25.4.3."""
     state = hvac_starting_state.value
-    ua    = UA_MAP[insulation_quality.value]
+    ua    = compute_ua(insulation_quality.value, square_footage.value)
 
     # Full-width: state + plan controls
     with solara.Row(gap="8px", style=_TOP_ROW):
@@ -1462,10 +1462,10 @@ def HomeDetail():
     _DS("Building Performance")
     solara.Select("Insulation quality", value=insulation_quality,
                   values=["poor", "average", "good"])
-    ua = UA_MAP[insulation_quality.value]
+    ua = compute_ua(insulation_quality.value, square_footage.value)
     solara.HTML(tag="div", unsafe_innerHTML=(
         f"<div style='font-size:0.82em; color:#666; margin-top:4px;'>"
-        f"UA = {ua} BTU/hr/°F  ·  Annual HDD {_ci.annual_hdd_65f:,.0f} · "
+        f"UA = {ua:,.0f} BTU/hr/°F  ·  Annual HDD {_ci.annual_hdd_65f:,.0f} · "
         f"CDD {_ci.annual_cdd_65f:,.0f} ({_ci.reference_city} TMY3)</div>"
     ))
 

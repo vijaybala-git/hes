@@ -70,8 +70,15 @@ files (16 reference stations). Built offline by `scripts/build_climate_db.py` in
 ```
 CZ4 annual_hdd_65f: 2242   annual_cdd_65f: 554   (TMYx 2011-2025, daily-mean base 65°F)
 setpoint_water_f: 120   daily_hot_water_gal: 65 (3BR)
-UA_poor: 650   UA_average: 500   UA_good: 350   BTU/hr/°F   (home_config.UA_BY_INSULATION)
+UA_poor: 650   UA_average: 500   UA_good: 350   BTU/hr/°F  @ 1,800 sq ft (home_config.UA_BY_INSULATION)
 ```
+
+> **UA scales with home size (Phase 5.5 Fix 1).** The UA_BY_INSULATION values above are the
+> reference-size figures; the live model uses `compute_ua(quality, sq_ft) = base × sq_ft /
+> UA_REFERENCE_SQFT` (UA_REFERENCE_SQFT = 1,800). So furnace/AC energy now tracks square
+> footage, and a 1,800 sq ft "average" home still resolves to UA 500 (defaults unchanged).
+> `tests/test_devices.py` still injects UA directly, so the formula regression targets below
+> are unaffected.
 
 > **Re-baselined in Phase 4.** Phase 2's hardcoded "Bay Area HDD = 1,910 / CDD = 340" was an
 > undocumented hand estimate — no real San Jose weather file produces it (NREL TMY3 ≈ 2,501;

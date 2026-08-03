@@ -326,3 +326,50 @@ def test_journey_baseline_diverge_with_defaults():
     delta = df["Opex Delta"].iloc[-1]
     # Net divergence from CapEx and energy differential must exceed $2,000
     assert abs(delta) > 2000, f"Lines barely diverge: delta={delta:.0f}"
+
+
+# ── Phase 5.5 Fix 1 — UA scales with square footage ────────────────────────────
+
+def test_compute_ua_anchor_and_scaling():
+    """UA is anchored at the reference size and scales linearly with floor area."""
+    from home_config import compute_ua, UA_BY_INSULATION, UA_REFERENCE_SQFT
+    # 1,800 sq ft (reference) returns the per-insulation base unchanged
+    for q, base in UA_BY_INSULATION.items():
+        assert compute_ua(q, UA_REFERENCE_SQFT) == pytest.approx(base)
+    # Linear in floor area: double the sq ft → double the UA
+    assert compute_ua("average", 3600) == pytest.approx(1000.0)
+    assert compute_ua("average", 900) == pytest.approx(250.0)
+    # Insulation still orders UA at a fixed size
+    assert compute_ua("poor", 2000) > compute_ua("average", 2000) > compute_ua("good", 2000)
+
+
+def test_furnace_and_ac_scale_with_sqft(mock_model, monthly_hdd, monthly_cdd):
+    """A larger home draws more furnace therms and more AC kWh at the same climate."""
+    from home_config import compute_ua
+    from devices.physics import GasFurnace, CentralAC
+
+    ua_small = compute_ua("average", 1200)
+    ua_large = compute_ua("average", 2400)
+
+    furn_small = GasFurnace(mock_model, ua_btu_hr_f=ua_small, monthly_hdd=monthly_hdd)
+    furn_large = GasFurnace(mock_model, ua_btu_hr_f=ua_large, monthly_hdd=monthly_hdd)
+    ac_small = CentralAC(mock_model, ua_btu_hr_f=ua_small, monthly_cdd=monthly_cdd)
+    ac_large = CentralAC(mock_model, ua_btu_hr_f=ua_large, monthly_cdd=monthly_cdd)
+
+    # 2x floor area → ~2x heat-loss-driven energy (both furnace and AC share UA)
+    assert furn_large.annual_consumption() == pytest.approx(2 * furn_small.annual_consumption())
+    assert ac_large.annual_consumption() == pytest.approx(2 * ac_small.annual_consumption())
+
+
+def test_hvac_energy_scales_with_sqft_at_model_level():
+    """End-to-end: two homes differing only in sq ft yield different baseline furnace therms."""
+    from model import HESModel
+    from home_config import HomeConfig
+
+    small = HESModel(home_config=HomeConfig(square_footage=1200), n_years=5)
+    large = HESModel(home_config=HomeConfig(square_footage=2400), n_years=5)
+    small.run_all(); large.run_all()
+
+    hvac_small = small.baseline_home.consumption_history_by_slot["HVAC"][0]
+    hvac_large = large.baseline_home.consumption_history_by_slot["HVAC"][0]
+    assert hvac_large > hvac_small

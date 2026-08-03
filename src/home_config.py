@@ -21,10 +21,22 @@ def compute_baseload_kwh(sq_ft: int, bedrooms: int, constant: float) -> float:
 HOT_WATER_GAL_PER_DAY = {1: 30, 2: 50, 3: 65, 4: 75, 5: 85}
 # Source: DOE/ENERGY STAR; 3BR = TMY3 reference 65 gal/day
 
-# Building envelope UA (BTU/hr/°F) by insulation quality. Climate-INDEPENDENT — a
-# property of the building, not the climate zone. Relocated from the old
-# data/climate/bayarea_tmy3.json per Phase 4 §1.9.5 (zone files hold HDD/CDD/inlet only).
+# Building envelope UA (BTU/hr/°F) by insulation quality, at the reference home size.
+# Climate-INDEPENDENT — a property of the building, not the climate zone. Relocated from
+# the old data/climate/bayarea_tmy3.json per Phase 4 §1.9.5 (zone files hold HDD/CDD/inlet).
 UA_BY_INSULATION = {"poor": 650, "average": 500, "good": 350}
+
+# Reference conditioned floor area the UA_BY_INSULATION values are calibrated to (a 3BR,
+# 1,800 sq ft "average" home resolves to UA 500). UA scales linearly with floor area:
+# envelope heat loss ∝ conditioned area is the standard first-order simplification, and it
+# makes furnace/AC energy finally track home size (Phase 5.5 Fix 1).
+UA_REFERENCE_SQFT = 1800
+
+
+def compute_ua(insulation_quality: str, sq_ft: int) -> float:
+    """Building heat-loss coefficient (BTU/hr/°F), scaled from the reference-size UA by
+    conditioned floor area. A 1,800 sq ft home returns UA_BY_INSULATION[q] unchanged."""
+    return UA_BY_INSULATION[insulation_quality] * sq_ft / UA_REFERENCE_SQFT
 
 
 @dataclass
