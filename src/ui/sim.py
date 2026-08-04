@@ -181,7 +181,6 @@ def _build_slot_configs() -> list:
                 "installation_cost": wh_baseline_replace_cost.value,
                 "daily_gallons_override": hw_override,
                 "setpoint_f": wh_setpoint_f.value,
-                "inlet_temp_f": wh_inlet_temp_f.value,
             }],
             "existing_age": wh_gas_age.value,
             "electric_device": {
@@ -191,7 +190,6 @@ def _build_slot_configs() -> list:
                 "daily_gallons_override": hw_override,
                 "ambient_location": hpwh_ambient_location.value,
                 "setpoint_f": wh_setpoint_f.value,
-                "inlet_temp_f": wh_inlet_temp_f.value,
                 "circuit_volts": 240, "circuit_amps": hpwh_amps.value, "continuous": False,
             },
             "swap_year": _eff_swap_year(wh_starting_state.value,

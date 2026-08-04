@@ -89,7 +89,6 @@
     "wh_baseline_replace_cost": 1200,
     "hw_daily_gallons": 65,
     "hpwh_ambient_location": "conditioned",
-    "wh_inlet_temp_f": 60,
     "wh_setpoint_f": 120,
     "dryer_gas_therms_per_cycle": 0.22,
     "dryer_loads_per_week": 5,

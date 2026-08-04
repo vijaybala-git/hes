@@ -114,7 +114,6 @@ wh_baseline_replace_cost     = solara.reactive(_DEFAULTS["wh_baseline_replace_co
 hw_daily_gallons             = solara.reactive(_DEFAULTS["hw_daily_gallons"])    # gal/day
 hw_gallons_user_override     = solara.reactive(False)
 hpwh_ambient_location        = solara.reactive(_DEFAULTS["hpwh_ambient_location"])
-wh_inlet_temp_f              = solara.reactive(_DEFAULTS["wh_inlet_temp_f"])    # °F
 wh_setpoint_f                = solara.reactive(_DEFAULTS["wh_setpoint_f"])   # °F
 
 # Dryer detail specs
@@ -309,7 +308,6 @@ def reset_to_defaults():
     hw_daily_gallons.set(_DEFAULTS["hw_daily_gallons"])
     hw_gallons_user_override.set(False)
     hpwh_ambient_location.set(_DEFAULTS["hpwh_ambient_location"])
-    wh_inlet_temp_f.set(_DEFAULTS["wh_inlet_temp_f"])
     wh_setpoint_f.set(_DEFAULTS["wh_setpoint_f"])
     dryer_gas_therms_per_cycle.set(_DEFAULTS["dryer_gas_therms_per_cycle"])
     dryer_loads_per_week.set(_DEFAULTS["dryer_loads_per_week"])

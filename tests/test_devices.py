@@ -404,3 +404,32 @@ def test_hpwh_default_ambient_is_conditioned(mock_model, monthly_inlet_temp):
                                ambient_location="conditioned",
                                monthly_inlet_temp_f=monthly_inlet_temp)
     assert default.annual_consumption() == pytest.approx(cond.annual_consumption())
+
+
+# ── Phase 5.5 Fix 4 — WH setpoint drives energy (now wired into the sim) ────────
+
+def test_gas_wh_setpoint_changes_therms(mock_model, monthly_inlet_temp):
+    """A higher target temperature raises the ΔT and thus annual gas therms."""
+    from devices.physics import GasWaterHeater
+    warm = GasWaterHeater(mock_model, uef=0.65, daily_gallons=65, setpoint_f=120,
+                          monthly_inlet_temp_f=monthly_inlet_temp)
+    hot = GasWaterHeater(mock_model, uef=0.65, daily_gallons=65, setpoint_f=140,
+                         monthly_inlet_temp_f=monthly_inlet_temp)
+    assert hot.annual_consumption() > warm.annual_consumption()
+
+
+def test_wh_setpoint_flows_through_model():
+    """End-to-end: a higher WH setpoint in the slot spec raises baseline gas therms."""
+    from model import HESModel
+    from home_config import HomeConfig
+    from ui.sim import _build_slot_configs
+    import ui.state as S
+
+    def _therms(setpoint):
+        S.reset_to_defaults()
+        S.wh_setpoint_f.set(setpoint)
+        m = HESModel(home_config=HomeConfig(), n_years=3, slot_configs=_build_slot_configs())
+        m.run_all()
+        return m.baseline_home.consumption_history_by_slot["Water Heater"][0]
+
+    assert _therms(140) > _therms(120)

@@ -891,6 +891,9 @@ def HVACDetail():
     """HVAC detail — two-column layout per §25.4.3."""
     state = hvac_starting_state.value
     ua    = compute_ua(insulation_quality.value, square_footage.value)
+    # Preview off the ZIP's live climate so it matches the simulation (Phase 5.5 Fix 4).
+    _ci = _climate_info(zip_code.value, climate_trend.value)
+    hdd, cdd = _ci.annual_hdd_65f, _ci.annual_cdd_65f
 
     # Full-width: state + plan controls
     with solara.Row(gap="8px", style=_TOP_ROW):
@@ -916,10 +919,10 @@ def HVACDetail():
         with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
             with solara.Column(style=_LEFT_COL):
                 _DS("Current: Gas Furnace")
-                therms = _est_gas_furnace(furnace_afue.value, ua)
+                therms = _est_gas_furnace(furnace_afue.value, ua, hdd)
                 solara.Markdown(
                     f"~**{therms:.0f} therms/yr** heating"
-                    + (f"  ·  {_est_hp_hvac_cooling(hvac_ac_seer.value, ua):.0f} kWh/yr AC"
+                    + (f"  ·  {_est_hp_hvac_cooling(hvac_ac_seer.value, ua, cdd):.0f} kWh/yr AC"
                        if hvac_has_cooling.value else "")
                 )
                 _HSl("Furnace AFUE", furnace_afue, _DEFAULTS["furnace_afue"],
@@ -938,8 +941,8 @@ def HVACDetail():
                          0, 20, 1, unit="yrs", decimals=0)
             with solara.Column(style=_RIGHT_COL):
                 _DS("Replacement: Heat Pump HVAC")
-                heat_kwh  = _est_hp_hvac_heating(hp_cop_heating.value, ua)
-                cool_kwh2 = _est_hp_hvac_cooling(hp_seer_cooling.value, ua)
+                heat_kwh  = _est_hp_hvac_heating(hp_cop_heating.value, ua, hdd)
+                cool_kwh2 = _est_hp_hvac_cooling(hp_seer_cooling.value, ua, cdd)
                 solara.Markdown(
                     f"~**{heat_kwh:.0f} kWh/yr** heat  "
                     f"+ **{cool_kwh2:.0f} kWh/yr** cool  "
@@ -954,8 +957,8 @@ def HVACDetail():
 
     elif state == "electric":
         _DS("Current: Heat Pump HVAC")
-        heat_kwh = _est_hp_hvac_heating(hp_cop_heating.value, ua)
-        cool_kwh = _est_hp_hvac_cooling(hp_seer_cooling.value, ua)
+        heat_kwh = _est_hp_hvac_heating(hp_cop_heating.value, ua, hdd)
+        cool_kwh = _est_hp_hvac_cooling(hp_seer_cooling.value, ua, cdd)
         solara.Markdown(
             f"~**{heat_kwh:.0f} kWh/yr** heating  "
             f"+ **{cool_kwh:.0f} kWh/yr** cooling  "
@@ -975,8 +978,8 @@ def HVACDetail():
                             style="font-size:0.85em; color:#888")
             with solara.Column(style=_RIGHT_COL):
                 _DS("Adding: Heat Pump HVAC")
-                heat_kwh = _est_hp_hvac_heating(hp_cop_heating.value, ua)
-                cool_kwh = _est_hp_hvac_cooling(hp_seer_cooling.value, ua)
+                heat_kwh = _est_hp_hvac_heating(hp_cop_heating.value, ua, hdd)
+                cool_kwh = _est_hp_hvac_cooling(hp_seer_cooling.value, ua, cdd)
                 solara.Markdown(
                     f"Est: **{heat_kwh:.0f} + {cool_kwh:.0f} = "
                     f"{heat_kwh + cool_kwh:.0f} kWh/yr**"
@@ -991,10 +994,12 @@ def HVACDetail():
 
 @solara.component
 def WaterHeaterDetail():
-    """Water heater detail — §25.4.4 + §20 tank size & ambient location."""
+    """Water heater detail — §25.4.4 + HPWH ambient location."""
     state   = wh_starting_state.value
     gal     = hw_daily_gallons.value
-    inlet   = wh_inlet_temp_f.value
+    # Inlet water temperature is a climate property — read it from the ZIP's zone so the
+    # preview matches the simulation, which uses the same monthly inlet (Phase 5.5 Fix 4).
+    inlet   = float(_climate_info(zip_code.value, climate_trend.value).monthly_inlet.mean())
     setp    = wh_setpoint_f.value
 
     # Top row: starting state / plan / year (mirrors summary card for direct-jump users)
@@ -1020,8 +1025,10 @@ def WaterHeaterDetail():
         value=hw_daily_gallons,
         on_change=lambda v: hw_gallons_user_override.set(True),
     )
-    _DSl("Cold inlet", wh_inlet_temp_f, _DEFAULTS["wh_inlet_temp_f"],
-         45, 75, 1, unit="°F")
+    solara.HTML(tag="div", unsafe_innerHTML=(
+        f"<div style='font-size:0.8em; color:#666; margin:2px 0 4px 0;'>"
+        f"Cold inlet water: <strong>{inlet:.0f}°F</strong> "
+        f"(from your climate zone)</div>"))
     _DSl("Setpoint", wh_setpoint_f, _DEFAULTS["wh_setpoint_f"],
          110, 140, 5, unit="°F")
 

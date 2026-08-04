@@ -187,7 +187,7 @@ RANGES = {
     "gasoline_climate_cost_per_gallon": (0.0, 50.0), "gasoline_health_cost_per_gallon": (0.0, 50.0),
     "baseload_constant_before": (0, 50000), "baseload_constant_after": (0, 50000),
     "hw_daily_gallons": (0, 500),
-    "wh_inlet_temp_f": (30, 90), "wh_setpoint_f": (90, 160),
+    "wh_setpoint_f": (90, 160),
     "dryer_gas_therms_per_cycle": (0.0, 5.0), "dryer_hp_kwh_per_cycle": (0.0, 20.0),
     "dryer_loads_per_week": (0, 50), "cooktop_gas_therms_per_meal": (0.0, 5.0),
     "cooktop_induction_kwh_per_meal": (0.0, 20.0), "cooktop_meals_per_week": (0, 100),
