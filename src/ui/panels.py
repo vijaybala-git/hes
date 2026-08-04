@@ -1040,22 +1040,18 @@ def WaterHeaterDetail():
                 solara.Markdown(
                     f"*In-kind replacement: **${wh_baseline_replace_cost.value:,}***",
                     style="font-size:0.82em; color:#555; margin-top:2px;")
-                solara.Select(
-                    f"Tank size: {gas_wh_tank_gallons.value} gal",
-                    value=gas_wh_tank_gallons,
-                    values=[30, 40, 50, 65, 80],
-                )
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    "<div style='font-size:0.75em; color:#999; margin-top:6px;'>"
+                    "Standby loss is included in the UEF rating. Set household size "
+                    "with the Daily hot water (gal/day) control above.</div>"
+                ))
             with solara.Column(style=_RIGHT_COL):
                 _DS("Replacement: Heat Pump Water Heater")
-                kwh = _est_hpwh(hpwh_uef.value, gal, inlet, setp)
+                kwh = _est_hpwh(hpwh_uef.value, gal, inlet, setp,
+                                ambient_location=hpwh_ambient_location.value)
                 solara.Markdown(f"~**{kwh:.0f} kWh/yr**")
                 _DSl("HPWH UEF", hpwh_uef, _DEFAULTS["hpwh_uef"],
                      2.5, 4.0, 0.1, fmt="{v:.1f}")
-                solara.Select(
-                    f"Tank size: {hpwh_tank_gallons.value} gal",
-                    value=hpwh_tank_gallons,
-                    values=[50, 65, 80],
-                )
                 solara.ToggleButtonsSingle(
                     value=hpwh_ambient_location,
                     values=["conditioned", "unconditioned"],
@@ -1063,7 +1059,7 @@ def WaterHeaterDetail():
                 solara.HTML(tag="div", unsafe_innerHTML=(
                     "<div style='font-size:0.75em; color:#999; margin-top:6px;'>"
                     "Preview uses UEF + load only. Ambient COP degradation "
-                    "and standby losses are applied in the simulation.</div>"
+                    "is applied in the simulation.</div>"
                 ))
         if wh_swap_planned.value:
             _DetailCosts(wh_install_cost, wh_rebate)
@@ -1072,17 +1068,13 @@ def WaterHeaterDetail():
         with solara.Row(gap="0px", style="align-items:flex-start; flex-wrap:wrap"):
             with solara.Column(style=_LEFT_COL):
                 _DS("Current: Heat Pump Water Heater")
-                kwh = _est_hpwh(hpwh_uef.value, gal, inlet, setp)
+                kwh = _est_hpwh(hpwh_uef.value, gal, inlet, setp,
+                                ambient_location=hpwh_ambient_location.value)
                 solara.Markdown(f"~**{kwh:.0f} kWh/yr**")
                 solara.Markdown("<small style='color:#2E7D32'>✓ Already electrified</small>")
             with solara.Column(style=_RIGHT_COL):
                 _DS("HPWH Specs")
                 _DSl("HPWH UEF", hpwh_uef, _DEFAULTS["hpwh_uef"], 2.5, 4.0, 0.1, fmt="{v:.1f}")
-                solara.Select(
-                    f"Tank size: {hpwh_tank_gallons.value} gal",
-                    value=hpwh_tank_gallons,
-                    values=[50, 65, 80],
-                )
                 solara.ToggleButtonsSingle(
                     value=hpwh_ambient_location,
                     values=["conditioned", "unconditioned"],
@@ -1090,7 +1082,7 @@ def WaterHeaterDetail():
                 solara.HTML(tag="div", unsafe_innerHTML=(
                     "<div style='font-size:0.75em; color:#999; margin-top:6px;'>"
                     "Preview uses UEF + load only. Ambient COP degradation "
-                    "applied in simulation.</div>"
+                    "is applied in the simulation.</div>"
                 ))
 
     else:  # none
@@ -1100,15 +1092,11 @@ def WaterHeaterDetail():
                 solara.Text("No baseline WH installed.", style="font-size:0.85em; color:#888")
             with solara.Column(style=_RIGHT_COL):
                 _DS("Adding: Heat Pump Water Heater")
-                kwh = _est_hpwh(hpwh_uef.value, gal, inlet, setp)
+                kwh = _est_hpwh(hpwh_uef.value, gal, inlet, setp,
+                                ambient_location=hpwh_ambient_location.value)
                 solara.Markdown(f"Est: **{kwh:.0f} kWh/yr**")
                 _DSl("HPWH UEF", hpwh_uef, _DEFAULTS["hpwh_uef"],
                      2.5, 4.0, 0.1, fmt="{v:.1f}")
-                solara.Select(
-                    f"Tank size: {hpwh_tank_gallons.value} gal",
-                    value=hpwh_tank_gallons,
-                    values=[50, 65, 80],
-                )
                 solara.ToggleButtonsSingle(
                     value=hpwh_ambient_location,
                     values=["conditioned", "unconditioned"],
@@ -1116,7 +1104,7 @@ def WaterHeaterDetail():
                 solara.HTML(tag="div", unsafe_innerHTML=(
                     "<div style='font-size:0.75em; color:#999; margin-top:6px;'>"
                     "Preview uses UEF + load only. Ambient COP degradation "
-                    "applied in simulation.</div>"
+                    "is applied in the simulation.</div>"
                 ))
         if wh_swap_planned.value:
             _DetailCosts(wh_install_cost, wh_rebate)

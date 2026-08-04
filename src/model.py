@@ -154,6 +154,7 @@ def _make_device(spec: dict, mesa_model: mesa.Model, *,
         return HeatPumpWaterHeater(mesa_model,
                                    uef=spec.get("uef", 3.5),
                                    daily_gallons=daily_gal,
+                                   ambient_location=spec.get("ambient_location", "conditioned"),
                                    climate=climate,
                                    age=age, lifespan=ls, installation_cost=cost, **elec)
 

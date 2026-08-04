@@ -1146,8 +1146,7 @@ def Page():
         elec_rate_model_b.value, elec_cagr_pct_b.value, acc_elec_cagr_b.value,
         gas_rate_model_b.value,  gas_cagr_pct_b.value,  acc_gas_cagr_b.value,
         years.value, sim_start_year.value,
-        wh_inlet_temp_f.value, wh_setpoint_f.value,
-        gas_wh_tank_gallons.value, hpwh_tank_gallons.value, hpwh_ambient_location.value,
+        wh_inlet_temp_f.value, wh_setpoint_f.value, hpwh_ambient_location.value,
         # Phase 3 §5 — panel sizing inputs
         panel_amps.value, panel_calc_method.value,
         hvac_tonnage.value, ev_charger_amps.value,

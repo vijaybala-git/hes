@@ -13,6 +13,11 @@ from devices.base import EnergyConsumer
 
 _DAYS = np.array([31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31], dtype=float)
 
+# Heat-pump water heater effective-efficiency multiplier by where the tank lives. An
+# unconditioned space (garage/utility) runs the evaporator on colder ambient air for much
+# of the year, lowering effective COP by ~15% (Phase 5.5 Fix 2).
+AMBIENT_COP_FACTOR = {"conditioned": 1.00, "unconditioned": 0.85}
+
 
 def _as_monthly(arr):
     """Coerce a (12,) array or return None."""
@@ -144,7 +149,10 @@ class GasWaterHeater(PhysicsDevice):
 
 class HeatPumpWaterHeater(PhysicsDevice):
     """
-    kWh[m] = gallons × days[m] × 8.33 × ΔT[m] × (1/3412) / uef
+    kWh[m] = gallons × days[m] × 8.33 × ΔT[m] × (1/3412) / (uef × ambient_factor)
+
+    ambient_location degrades the effective COP when the tank sits in an unconditioned
+    space (§20.3 / Phase 5.5 Fix 2); ``conditioned`` = 1.00, ``unconditioned`` ≈ 0.85.
     """
     fuel_type = "electricity"
 
@@ -152,6 +160,7 @@ class HeatPumpWaterHeater(PhysicsDevice):
                  uef: float = 3.5,
                  daily_gallons: float = 65,
                  setpoint_f: float = 120,
+                 ambient_location: str = "conditioned",
                  monthly_inlet_temp_f: np.ndarray | None = None,
                  climate=None,
                  **kwargs):
@@ -159,6 +168,8 @@ class HeatPumpWaterHeater(PhysicsDevice):
         self.uef = uef
         self.daily_gallons = daily_gallons
         self.setpoint_f = setpoint_f
+        self.ambient_location = ambient_location
+        self.ambient_factor = AMBIENT_COP_FACTOR.get(ambient_location, 1.00)
         self._climate = climate
         self._inlet_static = _as_monthly(monthly_inlet_temp_f)
         if self._climate is None and self._inlet_static is None:
@@ -170,7 +181,7 @@ class HeatPumpWaterHeater(PhysicsDevice):
 
     def monthly_consumption(self) -> np.ndarray:
         delta_t = self.setpoint_f - self._inlet
-        return self.daily_gallons * _DAYS * 8.33 * delta_t / (3412 * self.uef)
+        return self.daily_gallons * _DAYS * 8.33 * delta_t / (3412 * self.uef * self.ambient_factor)
 
 
 class CentralAC(PhysicsDevice):

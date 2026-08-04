@@ -88,8 +88,6 @@
     "wh_baseline_lifespan": 12,
     "wh_baseline_replace_cost": 1200,
     "hw_daily_gallons": 65,
-    "gas_wh_tank_gallons": 50,
-    "hpwh_tank_gallons": 65,
     "hpwh_ambient_location": "conditioned",
     "wh_inlet_temp_f": 60,
     "wh_setpoint_f": 120,

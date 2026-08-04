@@ -49,14 +49,16 @@
     <h2 id="how-we-calculate-it">How we calculate it</h2>
     <p>heat load = daily_gallons × 8.33 × (120°F - inlet_temp°F)  [BTU/day]</p>
 <p>Gas water heater: annual therms = heat_load × 365 / (UEF × 100,000)</p>
-<p>Heat pump water heater: annual kWh = heat_load × 365 / (UEF × 3,412)</p>
-<p>Where inlet temperature varies monthly with your climate zone, and UEF is the uniform energy factor — the appliance's overall water-heating efficiency.</p>
+<p>Heat pump water heater: annual kWh = heat_load × 365 / (UEF × ambient_factor × 3,412)</p>
+<p>Where inlet temperature varies monthly with your climate zone, and UEF is the uniform energy factor — the appliance's overall water-heating efficiency. The UEF rating already includes the tank's standby loss, so <strong>tank capacity does not change annual energy in this model</strong> — to represent a larger household, raise <em>Daily hot water (gal/day)</em>. For a heat pump water heater, the <em>ambient_factor</em> reflects where the tank sits: <strong>conditioned = 1.00</strong>, <strong>unconditioned (garage) ≈ 0.85</strong> (about 15% more electricity, since it pulls heat from colder air).</p>
 
     <h2 id="key-assumptions">Key assumptions</h2>
     <ul>
 <li>Default daily hot water use: 65 gallons (DOE reference household)</li>
 <li>Scales with bedrooms: 1BR=30 gal, 2BR=50 gal, 3BR=65 gal, 4BR=75 gal, 5BR=85 gal</li>
 <li>Target water temperature: 120°F</li>
+<li>Tank capacity does not change annual energy (standby is captured by UEF) — size the household with Daily hot water (gal/day)</li>
+<li>Heat-pump water heater in an unconditioned space (e.g. garage) uses ~15% more electricity</li>
 </ul>
 
     <h2 id="default-values">Default values</h2>

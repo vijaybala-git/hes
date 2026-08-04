@@ -373,3 +373,34 @@ def test_hvac_energy_scales_with_sqft_at_model_level():
     hvac_small = small.baseline_home.consumption_history_by_slot["HVAC"][0]
     hvac_large = large.baseline_home.consumption_history_by_slot["HVAC"][0]
     assert hvac_large > hvac_small
+
+
+# ── Phase 5.5 Fix 2 — HPWH ambient COP degradation ─────────────────────────────
+
+def test_hpwh_unconditioned_uses_more_than_conditioned(mock_model, monthly_inlet_temp):
+    """An unconditioned (garage) HPWH runs at lower effective COP → more kWh."""
+    from devices.physics import HeatPumpWaterHeater, AMBIENT_COP_FACTOR
+
+    cond = HeatPumpWaterHeater(mock_model, uef=3.5, daily_gallons=65,
+                               ambient_location="conditioned",
+                               monthly_inlet_temp_f=monthly_inlet_temp)
+    uncond = HeatPumpWaterHeater(mock_model, uef=3.5, daily_gallons=65,
+                                 ambient_location="unconditioned",
+                                 monthly_inlet_temp_f=monthly_inlet_temp)
+
+    assert uncond.annual_consumption() > cond.annual_consumption()
+    # Ratio is exactly 1 / factor (0.85 default)
+    ratio = uncond.annual_consumption() / cond.annual_consumption()
+    assert ratio == pytest.approx(1.0 / AMBIENT_COP_FACTOR["unconditioned"])
+
+
+def test_hpwh_default_ambient_is_conditioned(mock_model, monthly_inlet_temp):
+    """Unset ambient_location behaves as conditioned (factor 1.0) — no default drift."""
+    from devices.physics import HeatPumpWaterHeater
+
+    default = HeatPumpWaterHeater(mock_model, uef=3.5, daily_gallons=65,
+                                  monthly_inlet_temp_f=monthly_inlet_temp)
+    cond = HeatPumpWaterHeater(mock_model, uef=3.5, daily_gallons=65,
+                               ambient_location="conditioned",
+                               monthly_inlet_temp_f=monthly_inlet_temp)
+    assert default.annual_consumption() == pytest.approx(cond.annual_consumption())

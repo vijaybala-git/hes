@@ -113,8 +113,6 @@ wh_baseline_lifespan         = solara.reactive(_DEFAULTS["wh_baseline_lifespan"]
 wh_baseline_replace_cost     = solara.reactive(_DEFAULTS["wh_baseline_replace_cost"])  # $ — in-kind gas WH replacement
 hw_daily_gallons             = solara.reactive(_DEFAULTS["hw_daily_gallons"])    # gal/day
 hw_gallons_user_override     = solara.reactive(False)
-gas_wh_tank_gallons          = solara.reactive(_DEFAULTS["gas_wh_tank_gallons"])    # gal
-hpwh_tank_gallons            = solara.reactive(_DEFAULTS["hpwh_tank_gallons"])    # gal
 hpwh_ambient_location        = solara.reactive(_DEFAULTS["hpwh_ambient_location"])
 wh_inlet_temp_f              = solara.reactive(_DEFAULTS["wh_inlet_temp_f"])    # °F
 wh_setpoint_f                = solara.reactive(_DEFAULTS["wh_setpoint_f"])   # °F
@@ -310,8 +308,6 @@ def reset_to_defaults():
     wh_baseline_replace_cost.set(_DEFAULTS["wh_baseline_replace_cost"])
     hw_daily_gallons.set(_DEFAULTS["hw_daily_gallons"])
     hw_gallons_user_override.set(False)
-    gas_wh_tank_gallons.set(_DEFAULTS["gas_wh_tank_gallons"])
-    hpwh_tank_gallons.set(_DEFAULTS["hpwh_tank_gallons"])
     hpwh_ambient_location.set(_DEFAULTS["hpwh_ambient_location"])
     wh_inlet_temp_f.set(_DEFAULTS["wh_inlet_temp_f"])
     wh_setpoint_f.set(_DEFAULTS["wh_setpoint_f"])
