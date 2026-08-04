@@ -130,7 +130,11 @@
       "WebFetch(domain:developer.nrel.gov)",
       "Bash(.venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('src/ui/layout.py',encoding='utf-8'\\).read\\(\\)\\); print\\('layout.py parses OK'\\)\")",
       "Bash(.venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('src/ui/layout.py',encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('src/ui/state.py',encoding='utf-8'\\).read\\(\\)\\); print\\('both parse OK'\\)\")",
-      "Bash(.venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('src/ui/layout.py',encoding='utf-8'\\).read\\(\\)\\); print\\('parse OK'\\)\")"
+      "Bash(.venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('src/ui/layout.py',encoding='utf-8'\\).read\\(\\)\\); print\\('parse OK'\\)\")",
+      "Bash(.venv/Scripts/python.exe scripts/run_regression.py --quiet)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/test_config.py -q)",
+      "Bash(../.venv/Scripts/python.exe -c \"import solara; print\\('use_ref:', hasattr\\(solara, 'use_ref'\\)\\); import ui.layout; print\\('layout imports OK'\\)\")",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/test_share.py -q)"
     ]
   }
 }
