@@ -1,9 +1,11 @@
 # Phase 5.5 — Fixups Spec (post-Phase 5)
 
-> **Status:** Planned — not yet implemented.
+> **Status:** Implemented (app-side). Fixes 1, 2, 3, 4 landed on `main`. The only remaining
+> work is the **parent-wrapper snippet in §3.3**, which lives in the separate `hes.whywatt.org`
+> repo (hand-off below).
 > **Type:** Maintenance / correctness fixes surfaced during live user testing.
 > **Scope:** Four defects only. Phase 6 and Phase 7 remain unscoped and untouched.
-> Last updated: 2026-08-03.
+> Last updated: 2026-08-04.
 
 ---
 
@@ -263,16 +265,51 @@ in-progress scenario leaves that scenario intact (no factory wipe).
 
 ### 3.3 Parent-wrapper fix (separate repo — user-controlled)
 
-The `hes.whywatt.org` wrapper must get the blob into the frame. Two options; **(a)
-recommended** for simplicity:
+The app-side reader (`_ShareLinkReader`, shipped in this repo) understands **two**
+delivery contracts. The wrapper on `hes.whywatt.org` needs to implement **either one**
+(implementing both is belt-and-suspenders and harmless).
 
-- **(a) Forward the query string** onto the iframe `src` when building the page:
-  `iframe.src = APP_URL + window.location.search;` — one line, no handshake.
-- **(b) postMessage** after the iframe loads:
-  `iframe.onload = () => iframe.contentWindow.postMessage({ whywatt_share: new URLSearchParams(location.search).get('s') }, APP_ORIGIN);`
-  Pairs with the app-side listener in 3.2.B and survives in-frame navigation.
+**Option (a) — forward the query string (simplest, recommended).** When the wrapper builds
+the iframe URL, append its own query string so `?s=` lands inside the frame. The reader
+reads `window.location.search` on mount:
 
-Exact snippets to be handed off with the implementation.
+```html
+<iframe id="whywatt" title="WhyWatt"></iframe>
+<script>
+  var APP_URL = "https://<your-space>.hf.space/";   // the app origin, no query
+  document.getElementById("whywatt").src = APP_URL + window.location.search;  // carries ?s=
+</script>
+```
+
+**Option (b) — postMessage handshake (survives in-frame navigation).** The reader posts
+`{ whywatt_ready: true }` on mount and listens for `{ whywatt_share: "<blob>" }`. The
+wrapper replies with the blob from its own URL:
+
+```html
+<iframe id="whywatt" src="https://<your-space>.hf.space/" title="WhyWatt"></iframe>
+<script>
+  var APP_ORIGIN = "https://<your-space>.hf.space";   // exact origin, for targeted postMessage
+  var blob = new URLSearchParams(window.location.search).get("s");
+  window.addEventListener("message", function (ev) {
+    if (ev.origin === APP_ORIGIN && ev.data && ev.data.whywatt_ready && blob) {
+      document.getElementById("whywatt").contentWindow.postMessage(
+        { whywatt_share: blob }, APP_ORIGIN);
+    }
+  });
+</script>
+```
+
+Either path delivers the blob to `_ShareLinkReader.blob`; Python then decodes and applies
+it through the non-empty guard (`_apply_share_blob`), so a blank/corrupt blob is a no-op.
+Contract for whoever edits the wrapper:
+
+| Direction | Message | Meaning |
+|-----------|---------|---------|
+| app → parent | `{ whywatt_ready: true }` | frame mounted; safe to send the blob |
+| parent → app | `{ whywatt_share: "<blob>" }` | the `s` value from the pretty URL |
+
+> Share links are still generated as `https://hes.whywatt.org/?s=<blob>` via `CANONICAL_BASE`
+> (`src/ui/share.py:25`) — unchanged. This fix only ensures the blob **reaches** the frame.
 
 ### 3.4 Test & regression impact
 

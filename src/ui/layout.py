@@ -632,6 +632,49 @@ class _ShareLinkBox(anywidget.AnyWidget):
     """
 
 
+class _ShareLinkReader(anywidget.AnyWidget):
+    """Surface an incoming share blob independent of Solara's router (Phase 5.5 Fix 3).
+
+    The app runs in a cross-origin iframe, so a ?s= on the parent's pretty URL may never
+    reach `router.search` inside the frame. This reader looks in two places the frame CAN
+    see: (1) the iframe's own query string — populated when the parent forwards ?s= onto the
+    iframe src; and (2) a `postMessage` from the parent of the form { whywatt_share: "<blob>" }.
+    Whichever it finds is pushed to the `blob` trait, and Python decodes+applies it once.
+    On mount it also posts { whywatt_ready: true } to the parent so a message-based wrapper
+    knows when to send the blob."""
+    blob = traitlets.Unicode("").tag(sync=True)
+    _esm = """
+    export default { render({ model, el }) {
+      el.style.display = 'none';
+      const publish = (b) => { if (b && typeof b === 'string') { model.set('blob', b); model.save_changes(); } };
+      try {
+        const s = new URLSearchParams(window.location.search).get('s');
+        if (s) publish(s);
+      } catch (e) {}
+      window.addEventListener('message', (ev) => {
+        const d = ev && ev.data;
+        if (d && typeof d.whywatt_share === 'string') publish(d.whywatt_share);
+      });
+      try { if (window.parent && window.parent !== window) window.parent.postMessage({ whywatt_ready: true }, '*'); } catch (e) {}
+    } };
+    """
+
+
+def _apply_share_blob(blob: str) -> bool:
+    """Decode a share blob and apply it iff it yields a non-empty scenario (Phase 5.5 Fix 3).
+
+    Returns True when a scenario was applied. A blank, truncated, or tampered blob decodes to
+    {} and is a NO-OP here — it must never reset the recipient's in-progress edits to factory
+    (the old code called apply_config({}), which wiped everything to defaults)."""
+    if not blob:
+        return False
+    clean = share.decode(blob)          # decode()/sanitize() make this safe vs tampering
+    if not clean:
+        return False
+    apply_config(clean)
+    return True
+
+
 @solara.component
 def _ShareDialog(open_rv):
     """Modal: encode the current scenario delta into a ?s= link the user can copy.
@@ -1089,15 +1132,21 @@ def Page():
     solara.Title("WhyWatt?")
     solara.Style(_REDESIGN_CSS + "\n" + _LAYOUT_V2_CSS)   # design system + v2 layout
 
-    # Share My Scenario (Phase 1): if the URL carries ?s=<blob>, decode + apply it ONCE on
-    # load. use_effect keyed on the search string runs after render (safe for reactive sets)
-    # and only re-fires if the query actually changes — so it won't clobber later edits.
+    # Share My Scenario: restore a ?s=<blob> scenario ONCE on load. The blob can arrive two
+    # ways (Phase 5.5 Fix 3): via Solara's router.search (when the parent forwards ?s= onto
+    # the iframe src), or via the _ShareLinkReader below (the iframe's own URL / a parent
+    # postMessage) when the router never sees it across the cross-origin boundary. A per-
+    # session flag applies the first non-empty scenario and ignores the rest, so neither path
+    # clobbers the user's later edits, and an empty/corrupt blob is a no-op (never a wipe).
     router = solara.use_router()
-    def _consume_share_link():
-        blob = share.share_param(getattr(router, "search", None))
-        if blob:
-            apply_config(share.decode(blob))   # decode()/sanitize() make this safe vs tampering
-    solara.use_effect(_consume_share_link, [getattr(router, "search", None)])
+    applied = solara.use_ref(False)
+    def _apply_once(blob):
+        if not applied.current and _apply_share_blob(blob):
+            applied.current = True
+    def _consume_router():
+        _apply_once(share.share_param(getattr(router, "search", None)))
+    solara.use_effect(_consume_router, [getattr(router, "search", None)])
+    _ShareLinkReader.element(blob="", on_blob=_apply_once)
 
     model, df = solara.use_memo(run_simulation, dependencies=[
         zip_code.value, climate_trend.value, num_bedrooms.value,

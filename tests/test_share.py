@@ -140,3 +140,31 @@ def test_share_param_extraction():
     assert share.share_param("x=1") == ""
     assert share.share_param("") == ""
     assert share.share_param(None) == ""
+
+
+# ── Phase 5.5 Fix 3 — guarded applier never wipes on a bad blob ─────────────────
+
+def test_apply_share_blob_ignores_bad_blobs_without_wiping():
+    """A blank/corrupt/truncated blob is a no-op — it must NOT reset in-progress edits."""
+    from ui.layout import _apply_share_blob
+    S.reset_to_defaults()
+    S.square_footage.set(2600)          # user's in-progress scenario
+    S.num_bedrooms.set(5)
+    for bad in ("", "!!!not-base64!!!", "YWJj", "A" * (share._MAX_BLOB + 1)):
+        assert _apply_share_blob(bad) is False
+    # Untouched — no wipe to factory
+    assert S.square_footage.value == 2600
+    assert S.num_bedrooms.value == 5
+
+
+def test_apply_share_blob_applies_a_real_scenario():
+    """A valid blob is decoded and applied, returning True."""
+    from ui.layout import _apply_share_blob
+    S.reset_to_defaults()
+    S.num_bedrooms.set(4)
+    S.zip_code.set("90001")
+    blob = share.current_blob()
+    S.reset_to_defaults()               # simulate a fresh recipient session
+    assert _apply_share_blob(blob) is True
+    assert S.num_bedrooms.value == 4
+    assert S.zip_code.value == "90001"
