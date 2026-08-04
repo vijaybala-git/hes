@@ -168,3 +168,23 @@ def test_apply_share_blob_applies_a_real_scenario():
     assert _apply_share_blob(blob) is True
     assert S.num_bedrooms.value == 4
     assert S.zip_code.value == "90001"
+
+
+# ── Phase 5.5 Fix 5 — shared CAGR is deterministic (re-derived from ZIP) ────────
+
+def test_share_reseeds_cagr_deterministically():
+    """A link that omits CAGR (SHARE_DERIVED) must re-derive it from the ZIP on load, so the
+    same link yields the same escalation regardless of pre-load slider state — no browser
+    race between apply_config (factory) and the auto-seeder (ZIP)."""
+    from ui.layout import _apply_share_blob
+    from ui.sim import _rate_info
+    S.reset_to_defaults()
+    S.solar_planned.set(True)                     # a non-CAGR change, like the real repro
+    blob = share.current_blob()
+    zip_gas = round(_rate_info(S.zip_code.value, "auto").gas.cagr * 100)
+
+    # Race resolving the WRONG way first: leave a stale/factory gas CAGR of 8 in place
+    S.reset_to_defaults()
+    S.gas_cagr_pct_a.set(8)
+    assert _apply_share_blob(blob) is True
+    assert S.gas_cagr_pct_a.value == zip_gas      # re-seeded from ZIP → deterministic

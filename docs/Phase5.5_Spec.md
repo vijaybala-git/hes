@@ -1,10 +1,10 @@
 # Phase 5.5 — Fixups Spec (post-Phase 5)
 
-> **Status:** Implemented (app-side). Fixes 1, 2, 3, 4 landed on `main`. The only remaining
-> work is the **parent-wrapper snippet in §3.3**, which lives in the separate `hes.whywatt.org`
-> repo (hand-off below).
+> **Status:** Implemented (app-side). Fixes 1–5 landed on `main`. The only remaining work is
+> the **parent-wrapper snippet in §3.3**, which lives in the separate `hes.whywatt.org` repo
+> (hand-off below) — and it turned out to already be in place, so the app just needs a redeploy.
 > **Type:** Maintenance / correctness fixes surfaced during live user testing.
-> **Scope:** Four defects only. Phase 6 and Phase 7 remain unscoped and untouched.
+> **Scope:** Five defects. Phase 6 and Phase 7 remain unscoped and untouched.
 > Last updated: 2026-08-04.
 
 ---
@@ -22,6 +22,9 @@ place where the model or UI does not behave the way a user reasonably expects:
    in the link never reaches the app.
 4. **Panel previews use a fixed reference climate, not the ZIP's** — and two Water-Heater
    sliders (inlet, setpoint) don't match the simulation. Surfaced while fixing #1/#2.
+5. **The same share link shows different payback in different browsers.** The ZIP-derived
+   CAGR is excluded from the link and races the auto-seeder on load. Surfaced during Fix 3
+   cross-browser testing.
 
 Each fix is grounded below with root cause, the exact change, and its test/regression
 impact. Read this before implementing.
@@ -390,6 +393,50 @@ and the device's setpoint. But:
   `GasWaterHeater(setpoint_f=130)` consumes more therms than at 120.
 - **WH inlet removal** — sim already used ZIP inlet, so **no** golden change; only the dead
   slider and its schema key go away.
+
+---
+
+## Fix 5 — Shared links are deterministic (CAGR re-derived from ZIP)
+
+### 5.1 Root cause
+
+A user reported the **same** `?s=` link showing a different payback in Edge vs Chrome
+(~$87.6K vs ~$95.1K). The blob was byte-identical apart from the gzip MTIME header
+(a timestamp gzip stamps into every stream — a red herring; both decompress to the same
+payload).
+
+The real cause: the price-escalation sliders `elec_cagr_pct_a/b` and `gas_cagr_pct_a/b`
+are excluded from the share delta (`SHARE_DERIVED`, `src/ui/config.py:111`) on the theory
+that the recipient re-derives them from the ZIP. But two things write those reactives on
+load and disagree:
+
+- `_seed_eia_cagr()` (a `use_effect` in `RatesSummaryCard`, `src/ui/panels.py:804`) writes
+  the **ZIP-derived** value (gas = **7%** for 95112);
+- the share-link `apply_config()` writes the **factory** value (`whywatt_default.json` gas
+  CAGR = **8%**, which does not match the ZIP seed).
+
+Whichever effect runs **last** wins, and that order isn't stable across browsers/renders.
+Confirmed end-to-end: gas CAGR 7% → net delta **$87,602**; gas CAGR 8% → **$95,059** — the
+two reported figures exactly.
+
+### 5.2 Decision & change
+
+Per the "CAGR follows the local utility" design, the ZIP-derived value is authoritative.
+Make it **win deterministically** by re-seeding right after any config/share apply, so load
+order no longer matters.
+
+| File | Change |
+|------|--------|
+| `src/ui/layout.py` `_apply_share_blob()` | After `apply_config(clean)`, call `_seed_eia_cagr()`. |
+| `src/ui/layout.py` `_SettingsLoadDialog._apply()` | After `apply_config(...)`, call `_seed_eia_cagr()` (same race for bundled/uploaded configs). |
+
+Trade-off (already documented at `config.py:111`): a **manually-overridden** CAGR is not
+carried in a link — the recipient re-derives from their ZIP. Accepted; determinism wins.
+
+### 5.3 Test & regression impact
+
+No model change; `golden.json` unaffected. Added `tests/test_share.py`: a link that omits
+CAGR re-seeds `gas_cagr_pct_a` to the ZIP value regardless of the pre-load slider state.
 
 ---
 
