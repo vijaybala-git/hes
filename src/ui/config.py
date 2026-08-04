@@ -102,15 +102,14 @@ SHARE_EXCLUDE = {
     "chart_left", "chart_right", "device_chart_home", "detail_open",
 }
 
-# Auto-seeded / ZIP-derived reactives: _seed_eia_cagr() (ui/sim.py) overwrites these on load
-# with the CAGR EIA reports for the resolved ZIP's utility, so they diverge from the static
-# factory JSON even with zero user edits. Excluded from the SHARE delta (not from import):
-# they re-derive identically from `zip_code` on the recipient's load, so carrying them is
-# redundant and risks a re-seed race. (Trade-off: a manual CAGR override isn't shared — rare,
-# and the re-seeded value lands close.) Import/sanitize still accepts them if present.
-SHARE_DERIVED = {
-    "elec_cagr_pct_a", "gas_cagr_pct_a", "elec_cagr_pct_b", "gas_cagr_pct_b",
-}
+# Reactives excluded from the SHARE delta beyond SHARE_EXCLUDE. Empty since Phase 5.5 Fix 6:
+# the CAGR sliders (elec/gas_cagr_pct_a/b) used to live here on the theory they re-derive
+# from the ZIP on load — but that made a shared scenario non-deterministic (the ZIP seeder
+# raced apply_config) and silently dropped a manual CAGR override. CAGR is now captured like
+# any other input; the ZIP→CAGR auto-fill is an interactive-only convenience (it no longer
+# runs on load — see state.mark_scenario_loaded / _seed_eia_cagr). Kept as a named set so the
+# share layer's `SHARE_EXCLUDE | SHARE_DERIVED` union and imports stay stable.
+SHARE_DERIVED: set[str] = set()
 
 MAX_KEYS = 200      # front-line DoS guard: reject the whole payload before per-key work
 MAX_STR_LEN = 64    # bounds payload size; blocks giant-string abuse

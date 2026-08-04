@@ -170,21 +170,61 @@ def test_apply_share_blob_applies_a_real_scenario():
     assert S.zip_code.value == "90001"
 
 
-# ── Phase 5.5 Fix 5 — shared CAGR is deterministic (re-derived from ZIP) ────────
+# ── Phase 5.5 Fix 6 — a scenario reproduces verbatim (CAGR + hot water captured) ─
 
-def test_share_reseeds_cagr_deterministically():
-    """A link that omits CAGR (SHARE_DERIVED) must re-derive it from the ZIP on load, so the
-    same link yields the same escalation regardless of pre-load slider state — no browser
-    race between apply_config (factory) and the auto-seeder (ZIP)."""
+def test_manual_cagr_is_captured_in_the_link():
+    """A manually-overridden CAGR travels in the share link (no longer SHARE_DERIVED)."""
+    S.reset_to_defaults()
+    S.gas_cagr_pct_a.set(15)
+    assert share.scenario_delta().get("gas_cagr_pct_a") == 15
+
+
+def test_manual_cagr_survives_share_and_is_not_reseeded():
+    """A shared manual CAGR restores exactly, and the seeder does NOT clobber it on load."""
     from ui.layout import _apply_share_blob
-    from ui.sim import _rate_info
+    from ui.sim import _seed_eia_cagr
     S.reset_to_defaults()
-    S.solar_planned.set(True)                     # a non-CAGR change, like the real repro
+    S.gas_cagr_pct_a.set(15)
     blob = share.current_blob()
-    zip_gas = round(_rate_info(S.zip_code.value, "auto").gas.cagr * 100)
 
-    # Race resolving the WRONG way first: leave a stale/factory gas CAGR of 8 in place
-    S.reset_to_defaults()
-    S.gas_cagr_pct_a.set(8)
+    S.reset_to_defaults()                 # fresh recipient
     assert _apply_share_blob(blob) is True
-    assert S.gas_cagr_pct_a.value == zip_gas      # re-seeded from ZIP → deterministic
+    assert S.gas_cagr_pct_a.value == 15   # restored verbatim
+    _seed_eia_cagr()                      # seeder runs on the same context → must be suppressed
+    assert S.gas_cagr_pct_a.value == 15   # not clobbered
+
+
+def test_export_load_preserves_manual_cagr():
+    """Export → Load reproduces a manual CAGR (apply_config marks the context; seeder skips)."""
+    from ui.sim import _seed_eia_cagr
+    S.reset_to_defaults()
+    S.gas_cagr_pct_a.set(15)
+    snap = S.export_config()
+    S.reset_to_defaults()
+    S.apply_config(snap["values"])
+    _seed_eia_cagr()
+    assert S.gas_cagr_pct_a.value == 15
+
+
+def test_hw_override_round_trips():
+    """A custom daily-hot-water setting (value + override flag) survives a share round-trip."""
+    from ui.layout import _apply_share_blob
+    S.reset_to_defaults()
+    S.hw_daily_gallons.set(100)
+    S.hw_gallons_user_override.set(True)
+    blob = share.current_blob()
+    S.reset_to_defaults()
+    assert _apply_share_blob(blob) is True
+    assert S.hw_daily_gallons.value == 100
+    assert S.hw_gallons_user_override.value is True
+
+
+def test_seeder_still_runs_for_a_fresh_session():
+    """Determinism must not disable the interactive seed: with no scenario loaded, seeding
+    runs and (at the default ZIP) matches the aligned factory default → empty delta."""
+    from ui.sim import _seed_eia_cagr, _rate_info
+    S.reset_to_defaults()
+    _seed_eia_cagr()                                   # not suppressed — no load happened
+    zip_gas = round(_rate_info(S.zip_code.value, "auto").gas.cagr * 100)
+    assert S.gas_cagr_pct_a.value == zip_gas           # seeded
+    assert share.scenario_delta() == {}                # factory aligned → still an empty link

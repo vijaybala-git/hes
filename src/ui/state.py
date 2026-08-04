@@ -112,7 +112,9 @@ wh_gas_age                   = solara.reactive(_DEFAULTS["wh_gas_age"])    # yrs
 wh_baseline_lifespan         = solara.reactive(_DEFAULTS["wh_baseline_lifespan"])    # yrs — gas WH expected lifespan
 wh_baseline_replace_cost     = solara.reactive(_DEFAULTS["wh_baseline_replace_cost"])  # $ — in-kind gas WH replacement
 hw_daily_gallons             = solara.reactive(_DEFAULTS["hw_daily_gallons"])    # gal/day
-hw_gallons_user_override     = solara.reactive(False)
+# Captured since Phase 5.5 Fix 6 — gates whether hw_daily_gallons overrides the bedroom
+# default, so it must round-trip in a shared/exported scenario for faithful reproduction.
+hw_gallons_user_override     = solara.reactive(_DEFAULTS["hw_gallons_user_override"])
 hpwh_ambient_location        = solara.reactive(_DEFAULTS["hpwh_ambient_location"])
 wh_setpoint_f                = solara.reactive(_DEFAULTS["wh_setpoint_f"])   # °F
 
@@ -306,7 +308,7 @@ def reset_to_defaults():
     wh_baseline_lifespan.set(_DEFAULTS["wh_baseline_lifespan"])
     wh_baseline_replace_cost.set(_DEFAULTS["wh_baseline_replace_cost"])
     hw_daily_gallons.set(_DEFAULTS["hw_daily_gallons"])
-    hw_gallons_user_override.set(False)
+    hw_gallons_user_override.set(_DEFAULTS["hw_gallons_user_override"])
     hpwh_ambient_location.set(_DEFAULTS["hpwh_ambient_location"])
     wh_setpoint_f.set(_DEFAULTS["wh_setpoint_f"])
     dryer_gas_therms_per_cycle.set(_DEFAULTS["dryer_gas_therms_per_cycle"])
@@ -380,6 +382,29 @@ def reset_to_defaults():
     device_chart_home.set(_DEFAULTS["device_chart_home"])
     detail_open.set(_DEFAULTS["detail_open"])
     _set_all_setup(False)
+    global _loaded_ctx
+    _loaded_ctx = None   # a plain reset is not a scenario load — let the seeder run again
+
+
+# ── CAGR seed suppression (Phase 5.5 Fix 6) ────────────────────────────────────
+# The ZIP→CAGR auto-fill (_seed_eia_cagr, ui/sim.py) is an interactive convenience, not a
+# load-time transform. When a scenario is loaded it already carries its CAGR, so the seeder
+# must not re-derive (and clobber) it. apply_config records the loaded rate context here;
+# the seeder skips while the live context still matches it, and resumes once the user changes
+# the ZIP or a rate model. This is robust to effect/mount ordering — no matter whether the
+# seeder or the loader runs first, the loaded CAGR wins.
+_loaded_ctx = None
+
+
+def _seed_ctx() -> tuple:
+    """The rate context the CAGR seed depends on (ZIP + the four rate-model selectors)."""
+    return (zip_code.value, elec_rate_model_a.value, gas_rate_model_a.value,
+            elec_rate_model_b.value, gas_rate_model_b.value)
+
+
+def _seed_suppressed() -> bool:
+    """True when the live context matches a just-loaded scenario — seeding must not run."""
+    return _loaded_ctx is not None and _seed_ctx() == _loaded_ctx
 
 
 def apply_config(values: dict) -> list[str]:
@@ -389,10 +414,15 @@ def apply_config(values: dict) -> list[str]:
     `values` is treated as UNTRUSTED (it may come from a shared link or a dropped file):
     it is run through sanitize() first, which drops unknown/transient/wrong-typed keys and
     clamps out-of-range numbers. Returns the list of sanitization warnings (empty == clean)
-    so callers can surface "we adjusted/ignored some settings" without crashing."""
+    so callers can surface "we adjusted/ignored some settings" without crashing.
+
+    Records the loaded rate context so the CAGR seeder won't re-derive the loaded CAGR
+    (Phase 5.5 Fix 6) — a loaded scenario reproduces verbatim."""
+    global _loaded_ctx
     clean, warnings = sanitize(values)
     for k, v in merge(clean).items():
         globals()[k].set(v)
+    _loaded_ctx = _seed_ctx()
     return warnings
 
 

@@ -102,7 +102,13 @@ def _fuel_resolved_display(fuel: str, mode: str, cagr_pct: int, acc_cagr_pct: in
 def _seed_eia_cagr():
     """Seed the per-fuel CAGR sliders from each utility's EIA historical CAGR (the JSON
     default), for the two EIA modes (both scenarios). Re-seeds on ZIP/mode change; manual
-    edits persist until the context changes. ACC modes keep their own base-escalation slider."""
+    edits persist until the context changes. ACC modes keep their own base-escalation slider.
+
+    Skips entirely right after a scenario load (Phase 5.5 Fix 6): a loaded scenario carries
+    its own CAGR and must reproduce verbatim, so seeding does not clobber it until the user
+    next changes the ZIP or a rate model."""
+    if _seed_suppressed():
+        return
     pairs = [(elec_rate_model_a, elec_cagr_pct_a, "electricity"),
              (gas_rate_model_a,  gas_cagr_pct_a,  "gas"),
              (elec_rate_model_b, elec_cagr_pct_b, "electricity"),

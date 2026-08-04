@@ -14,7 +14,7 @@ import ui.state as S
 from ui import config
 
 # Module-level reactives that are intentionally NOT config-driven (ephemeral UI state).
-_TRANSIENT = {"setup_collapsed", "_panel_state", "_baseload_state", "hw_gallons_user_override",
+_TRANSIENT = {"setup_collapsed", "_panel_state", "_baseload_state",
               # Phase 5 §5 per-block collapse chevrons — view state, left out of reset/config.
               "cockpit_collapsed", "graphs_collapsed", "journey_collapsed"}
 

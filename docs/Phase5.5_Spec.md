@@ -1,8 +1,9 @@
 # Phase 5.5 — Fixups Spec (post-Phase 5)
 
-> **Status:** Implemented (app-side). Fixes 1–5 landed on `main`. The only remaining work is
-> the **parent-wrapper snippet in §3.3**, which lives in the separate `hes.whywatt.org` repo
-> (hand-off below) — and it turned out to already be in place, so the app just needs a redeploy.
+> **Status:** Implemented (app-side). Fixes 1–6 landed on `main` (Fix 6 supersedes Fix 5's
+> mechanism). The only remaining work is the **parent-wrapper snippet in §3.3**, which lives in
+> the separate `hes.whywatt.org` repo (hand-off below) — and it turned out to already be in
+> place, so the app just needs a redeploy.
 > **Type:** Maintenance / correctness fixes surfaced during live user testing.
 > **Scope:** Five defects. Phase 6 and Phase 7 remain unscoped and untouched.
 > Last updated: 2026-08-04.
@@ -437,6 +438,60 @@ carried in a link — the recipient re-derives from their ZIP. Accepted; determi
 
 No model change; `golden.json` unaffected. Added `tests/test_share.py`: a link that omits
 CAGR re-seeds `gas_cagr_pct_a` to the ZIP value regardless of the pre-load slider state.
+
+> **Superseded by Fix 6.** Fix 5 made Share *deterministic* but by re-deriving CAGR from the
+> ZIP — which discards a manually-set CAGR (and doesn't help Export→Load). Fix 6 replaces the
+> forced re-seed with faithful capture; the Fix 5 re-seed calls and its test are removed.
+
+---
+
+## Fix 6 — Scenarios reproduce verbatim (capture inputs; seed only interactively)
+
+### 6.1 The principle
+
+A **scenario is the complete set of user inputs**. Save/Share captures them all; Load/Open
+restores them **verbatim**. Output = f(model version, inputs); **nothing is re-derived at
+load time**. The only allowed source of a different result is a change to the model itself.
+
+Auditing against this invariant surfaced two violations and confirmed there were no others:
+
+- **CAGR** was excluded from the link (`SHARE_DERIVED`) and re-derived from the ZIP on load
+  — a manual override was silently dropped, and the re-derivation raced the loader
+  (Fix 5's symptom). *(Only load-time race: verified every `use_effect`; the slider syncs
+  follow loads without clobbering, and `on_value` handlers fire only on user action.)*
+- **`hw_gallons_user_override`** — a bool that gates whether `hw_daily_gallons` overrides the
+  bedroom default (`sim.py:146`, `:336`) — affected the sim but was **not captured** (it sat
+  in the transient set). A custom hot-water draw was dropped on load. *(The only non-captured
+  reactive that feeds the sim; the other six transient reactives are pure view/label state.)*
+
+`climate_zone` is captured but the sim re-derives it from the ZIP, so it can't cause a
+mismatch (vestigial display state).
+
+### 6.2 Changes
+
+| File | Change |
+|------|--------|
+| `src/ui/config.py` | `SHARE_DERIVED` → empty set — CAGR is now captured like any input. |
+| `src/ui/state.py` | Capture `hw_gallons_user_override` (init from `_DEFAULTS`, add to reset). Add the seed-suppression guard: `apply_config()` records the loaded rate context (`_loaded_ctx = _seed_ctx()`); `reset_to_defaults()` clears it; expose `_seed_suppressed()`. |
+| `src/ui/sim.py` | `_seed_eia_cagr()` returns early when `_seed_suppressed()` — a loaded scenario's CAGR is never clobbered until the user changes the ZIP or a rate model. |
+| `src/ui/layout.py` | Remove Fix 5's forced `_seed_eia_cagr()` calls (the `apply_config` mark handles it). |
+| `data/config/whywatt_default.json` | Add `hw_gallons_user_override: false`. Align factory `gas_cagr_pct_a/b` **8 → 7** to match the default ZIP's real value (the ACC `acc_gas_cagr_*` sliders are untouched). |
+
+**Why the seed-context guard is robust:** whether the seeder or the loader runs first on
+mount, the loaded CAGR wins — after `apply_config` the live context equals `_loaded_ctx`, so
+any seeder firing for that context is a no-op. Seeding resumes the moment the user changes
+the ZIP or a rate model (context diverges). No widget wiring, no ordering assumptions.
+
+### 6.3 Test & regression impact
+
+- `golden.json` **re-baselined** (designed): aligning factory gas CAGR 8→7 lowers the
+  all-gas "do nothing" baseline across the 12 cases (every `baseline_cost` fell, none rose;
+  journey costs fell slightly from residual pre-swap gas years; electric unaffected). Trends
+  still 37/37. This also *corrects* a latent gap — the harness had been running the default
+  at 8% while the live app seeded 7%.
+- `tests/test_share.py` (Fix 6): a manual CAGR is captured; it survives Share and Export→Load
+  and is not re-seeded; a custom hot-water setting round-trips; a fresh session still seeds
+  and (factory now aligned) still yields an empty link.
 
 ---
 

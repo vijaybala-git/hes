@@ -671,12 +671,7 @@ def _apply_share_blob(blob: str) -> bool:
     clean = share.decode(blob)          # decode()/sanitize() make this safe vs tampering
     if not clean:
         return False
-    apply_config(clean)
-    # apply_config resets the ZIP-derived CAGR sliders to their factory value (they're
-    # excluded from the share delta). Re-seed them from the recipient's ZIP so the result is
-    # deterministic — otherwise the factory value races the auto-seeder and the same link can
-    # resolve to a different escalation (and payback) in different browsers (Phase 5.5 Fix 5).
-    _seed_eia_cagr()
+    apply_config(clean)   # records the loaded rate context; the CAGR seeder won't clobber it
     return True
 
 
@@ -711,8 +706,7 @@ def _SettingsLoadDialog(open_rv, err_rv):
     apply with REPLACE semantics (factory ⊕ values)."""
     def _apply(source):
         try:
-            apply_config(config.load_config(source))
-            _seed_eia_cagr()   # CAGR follows the loaded ZIP — deterministic (Phase 5.5 Fix 5)
+            apply_config(config.load_config(source))   # loaded CAGR reproduces verbatim
             err_rv.set(""); open_rv.set(False)
         except Exception as e:                      # noqa: BLE001 — surface, never crash
             err_rv.set(f"Could not load settings: {e}")
