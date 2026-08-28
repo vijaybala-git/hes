@@ -1,0 +1,79 @@
+Thank you so much for putting WhyWatt together.  I see this as being a truly engaging tool for those interested in reducing their carbon footprint.
+
+ 
+
+As I pose questions and offer suggestions here, I realize that they might be redundant with what was discussed when you initially demonstrated the application.  As I mentioned to David, even though I was in that meeting, I missed a lot.  It was late in the eastern time zone.  I was tired.  Enough said.
+
+ 
+
+As I offer suggestions, I fully understand that you are the sole developer and have limited time to work on this.  I’ll completely understand that you’ll need to pick and choose which changes, if any, to focus on.  The work you put into this application is greatly appreciated.
+
+ 
+
+For some of my recommendations, please be aware that I’ve used a home energy modeling tool previously – BEOpt – from NREL.  So I’m familiar with some of the tables that are available that you might be referencing.  I mention this strictly so that if you want to explain some of things as it relates to data that might be available, there’s a chance that I’ll understand it.
+
+ 
+
+While I still have more to review, here are my initial suggestions and questions:
+
+While having a calculation that includes social cost of carbon is great, I’d like to suggest having a straight calculation of CO2 or perhaps CO2e.  I don’t recall seeing this in the app.  Social cost is fine for those familiar with carbon pricing, but some are not – especially those outside the CCL sphere.  (See my suggestion for reaching out to RewiringAmerica.org.)
+ 
+
+I would suggest including the emissions in the horizontal bar chart at the top – 2 bars – for both Do Nothing and Your Journey.  
+
+ 
+
+(This one can get complicated.  I hesitate to even mention it.  Perhaps a feature in the future.)  I was wondering how hard it would be to automatically adjust the HVAC tonnage based on home size.  Many people aren’t going to know their tonnage requirement.  I realize there are factors that contribute to this, including climate zone and how well a home is insulated.  But maybe there is a generalized table that could be used. 
+ 
+
+To accomplish this, it might also help for people to specify how well their home is insulated (poor, medium, well).
+
+ 
+
+For the graphs:
+With the side-by-side graphs, can you allow one graph to be “Do Nothing” and the other “Your Journey”, for the same graph type.  See mock-up below.  This gives me a side-by-side before-and-after.  Currently, when I select that “Your Journey” button, both graphs change to “Your Journey”.  Same with “Do Nothing”.
+ 
+
+For any graph with Your Journey and Do Nothing, would there be a way for the vertical scales to match?  I realize that this might be difficult, but as you see in the mock-up below, without using the same scale for both charts, comparisons are difficult.
+ 
+
+Is there a way to enlarge the graph to full screen?
+
+
+ 
+
+While I had no trouble figuring out how to set the specifications, I can imagine some people struggling without training.  It’s probably hard to take the user through a step-by-step for the major elements of “Set-up Your Home”, but I’ll suggest it here anyhow.  I suppose a video might be enough.  If you have a video, have the link next to the Help and by the “Set-up Your Home” section.
+ 
+
+Small detail – On the Annual Cost by Year chart, perhaps change the green to a lighter blue for “Your Journey - social”, which would then be similar to the coloration technique for “Do Nothing – Social”.
+ 
+
+Have you thought about approaching RewiringAmerical.org?  As best as I can tell, they don’t have anything quite like this. 
+ 
+
+I know that you’re planning to allow the user to set their location.  How hard would it be to create a version soon to cover Ann Arbor, MI, or just Michigan?  I could get more people to start playing now if I could get a localized version.
+
+
+
+Rich Fein
+Wed, Aug 12, 5:44 PM (4 days ago)
+to me, David
+
+Hi again Vijay –
+
+ 
+
+I reviewed WhyWatt with some members of our Efficiency & Electrification Action Team this evening.  There were a few items that came up that I thought worth putting on the table.  Sorry to keep sending you suggestions.  I figure it’s better to forward these and let you decide, rather than just leaving them out and having someone else bring these up later.
+
+ 
+
+In order to simplify the set-up, perhaps put some of the settings in an “Advanced Settings” section that shows up on a separate window via an “Advanced Settings” button.
+ 
+
+(This one is from me, not from the group.)   I had an inclination to review my journey as individual steps.  In other words “What’s the impact of upgrading my HVAC only?  “What’s the impact of upgrading my water heater only?  Etc.   To make using it that way simpler, put check boxes/circles to turn on or off devices (HVAC, water heater, solar, stove, EV) all at the top of the settings, (perhaps in duplication of and interacting with the check circles you have now.   That way I could check the impact of each device without having to scroll down to change what’s include and what isn’t.
+ 
+
+The group was especially interested in a break-even analysis.  Are you planning for a break-even graph?  FYI - I did not notice the break-even box in the top right until after the meeting.  Seems that to do a breakeven graph you would need separate graphs for each component.  Messy.
+ 
+
+Any thoughts on having a way to print?   I could see showing this at a tabling event and offering to print or email a pdf to the participant.  Thinking ahead, if you are planning a printed version, having a way to insert the organization’s name and contact info would be nice.

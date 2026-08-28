@@ -28,3 +28,6 @@ downloads/
 
 # Regression report — regenerated on every run
 tests/regression/report.md
+
+# Jupyter checkpoints
+.ipynb_checkpoints/

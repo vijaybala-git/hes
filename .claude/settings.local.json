@@ -134,7 +134,10 @@
       "Bash(.venv/Scripts/python.exe scripts/run_regression.py --quiet)",
       "Bash(.venv/Scripts/python.exe -m pytest tests/test_config.py -q)",
       "Bash(../.venv/Scripts/python.exe -c \"import solara; print\\('use_ref:', hasattr\\(solara, 'use_ref'\\)\\); import ui.layout; print\\('layout imports OK'\\)\")",
-      "Bash(.venv/Scripts/python.exe -m pytest tests/test_share.py -q)"
+      "Bash(.venv/Scripts/python.exe -m pytest tests/test_share.py -q)",
+      "Bash(grep -nA 20 \"def _model_toggle\" src/ui/panels.py)",
+      "Bash(.venv/Scripts/python.exe scripts/run_regression.py --update --quiet)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/test_regression.py -q)"
     ]
   }
 }
