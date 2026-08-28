@@ -1,0 +1,26 @@
+{
+  "object": "benchmark_e3_pathways_2020",
+  "role": "gas death-spiral (managed high-electrification)",
+  "publisher": "E3 (Energy + Environmental Economics)",
+  "report": "The Challenge of Retail Gas in California's Low-Carbon Future: Technology Options, Customer Costs, and Public Policy Implications",
+  "authors": "Dan Aas, Amber Mahone, Zack Subin, Snuller Price",
+  "date": "2020-04-17",
+  "model": "E3 PATHWAYS",
+  "basis": "real (2020 dollars)",
+  "scenario": "High building electrification — gas demand ~-60% by 2050; residential gas RATES rise as fixed system cost is spread over fewer therms.",
+  "note": "E3 reports rate INCREASES (multipliers on the 2020 residential gas rate), not $/therm. We anchor to PG&E residential 2020 base $1.22/therm (data/rates/pge_gas_g1.json) and also give a nominal conversion via the CEC GDP deflator (deflator[y]/deflator[2020]) for comparison against nominal sources.",
+  "citation": {
+    "quote": "In a high building electrification future, residential gas rates could increase 80% by 2030 and 480% by 2050; gas demand could decline ~60%.",
+    "url": "https://www.ethree.com/at-cec-e3-highlights-need-for-gas-transition-strategy-in-california/",
+    "accessed": "2026-08-26"
+  },
+  "gas": {
+    "base_year": 2020,
+    "base_rate_therm_nominal_2020": 1.22,
+    "real_multiplier": { "2020": 1.00, "2030": 1.80, "2050": 5.80 },
+    "real_therm_2020dollars": { "2020": 1.22, "2030": 2.20, "2050": 7.08 },
+    "nominal_therm_approx": { "2020": 1.22, "2030": 2.62, "2050": 13.82 },
+    "nominal_conversion": "real_2020$ x deflator[y]/deflator[2020]; deflator[2030]/[2020]=1.255, [2050]/[2020]=1.952",
+    "demand_decline_2050": -0.60
+  }
+}

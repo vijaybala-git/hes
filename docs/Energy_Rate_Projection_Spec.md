@@ -216,6 +216,15 @@ grid defection) with `RR_f(y)` ~fixed or rising, `r̄_f(y)` rises. For gas this 
 a roughly fixed pipeline revenue requirement over a shrinking therm base. Note the base level is
 still pinned by the plug; the death spiral acts on the **growth** of `r̄` after year 0.
 
+> **The `Sales` denominator is not optional — it is the whole asymmetry (implementation note,
+> 2026-08-26).** For **electricity** `Sales_elec(y)` *grows* (electrification adds kWh — CEC CED
+> ~+2.5%/yr), which offsets rising `RR` and holds `r̄_elec` roughly flat in real terms. The CEC
+> Final 2025 IEPR states this directly: *"annual growth in sales (2.5% average 2025–40) offsets
+> continued growth in revenue requirements."* Dropping the denominator and growing `r̄` at a bare
+> CAGR overstates electricity 2–3× by 2050 (verified against IEPR Figure 8). **Electricity does not
+> death-spiral; gas does** — same equation, opposite `Sales` direction. Implement `r̄ = RR/Sales`
+> for *both* fuels, never a fuel-agnostic residual CAGR.
+
 ### 5.3 Fixed charge — `F_f(y)` (policy scenario)
 
 Fixed-charge revenue and volumetric residual are complementary shares of the same `RR`:
