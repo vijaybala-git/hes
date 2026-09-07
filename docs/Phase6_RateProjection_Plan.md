@@ -4,6 +4,11 @@
 **Inputs reconciled:** `docs/Phase6_Spec.md` (planned) + `docs/Energy_Rate_Projection_Spec.md` (methodology v1.0).
 **Prepared:** 2026-07-07. **Rev:** 2026-07-08 — added §0 (resolved decisions) and §8 (spec clarity fixes).
 
+> **Note (2026-08-26):** the rate-projection work is now proceeding first as a **standalone offline
+> sub-project** — see `docs/OfflineRateProjection_Plan.md` for the active build plan. This document
+> remains the record of the eventual **live wire-in** (the Phase-7 golden re-baseline), which the
+> offline model feeds once reviewed.
+
 ---
 
 ## 0. Decisions resolved in this review cycle (2026-07-08)

@@ -1,0 +1,49 @@
+{
+  "object": "benchmark_cec_2025_iepr_gas",
+  "role": "gas death-spiral (BAU investment, slow electrification) \u00e2\u20ac\u201d upper bound",
+  "publisher": "California Energy Commission (CEC)",
+  "source_dataset": "2025 IEPR Gas Rate Forecast workbook tn=264063, scenario 'GT AAFS 2.5 Demand Flat RR' (aggressive electrification + BAU/Flat revenue recovery)",
+  "basis": "nominal",
+  "scenario": "GT AAFS 2.5 (Additional Achievable Fuel Substitution) demand decline + Flat RR recovery (business-as-usual gas investment). The most extreme published PG&E residential death-spiral case.",
+  "note": "This is the most extreme, and most current, official state death-spiral figure \u00e2\u20ac\u201d driven by the assumption that gas-system INVESTMENT is NOT curtailed as demand falls (contrast E3 2020's managed high-electrification path, ~$13.8/therm nominal by 2050). Applies to PG&E residential.",
+  "citation": {
+    "workbook_url": "https://efiling.energy.ca.gov/GetDocument.aspx?tn=264063",
+    "accessed": "2026-08-26",
+    "note": "Confirms the earlier ~$102.76/therm figure (= this scenario's 2050 delivered price)."
+  },
+  "gas": {
+    "utility": "PG&E",
+    "class": "Residential",
+    "unit": "$/therm",
+    "series": {
+      "2025": 2.59,
+      "2026": 2.76,
+      "2027": 3.01,
+      "2028": 3.32,
+      "2029": 3.67,
+      "2030": 4.09,
+      "2031": 4.62,
+      "2032": 5.27,
+      "2033": 6.05,
+      "2034": 6.99,
+      "2035": 8.12,
+      "2036": 9.42,
+      "2037": 11.05,
+      "2038": 13.13,
+      "2039": 15.81,
+      "2040": 19.52,
+      "2041": 24.22,
+      "2042": 30.28,
+      "2043": 38.91,
+      "2044": 49.45,
+      "2045": 62.06,
+      "2046": 74.65,
+      "2047": 86.14,
+      "2048": 91.71,
+      "2049": 97.34,
+      "2050": 103.37
+    },
+    "multiple_2025_to_2050": 39.9,
+    "implied_cagr": 0.166
+  }
+}
