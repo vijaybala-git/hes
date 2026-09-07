@@ -1,9 +1,13 @@
 # WhyWatt — Phase 7 Development Spec
 
-**Status:** 🔵 PLANNED — the data-pipeline phase. Flow new simulation data through the model.
-**Follows:** Phase 6 (seams built: Solar/Battery split, roof-geometry inputs, offline build
-skeletons, peak/non-peak rate interface).
-**Last updated:** 2026-06-23 — initial plan.
+**Status:** 🔵 PLANNED — the data-pipeline + golden-rebaseline phase. Flow new simulation data
+through the model, and adopt the CEC projected-rate escalation as the default.
+**Follows:** Phase 6 (`docs/Phase6_Spec.md`) — Solar/Battery split, inert roof-geometry inputs, and
+the **non-default `cec_projection` rate hand-off interface** (evaluated but not switched). Offline
+PVWatts/URDB data is harvested and validated separately in `docs/OfflineSolarData_Plan.md`.
+**Last updated:** 2026-09-07 — reconciled with the Phase 6 collapse: added §5 (adopt the projected-
+rate escalation as default) and repointed the data references from "Phase 6 §3a/§3b" to the offline
+solar-data plan. Original plan: 2026-06-23.
 
 ---
 
@@ -80,7 +84,7 @@ window that is mostly *off*-peak, which is what makes the battery valuable):
 - **HDD/CDD** (monthly) ÷ days-in-month → representative-day HVAC energy, distributed across
   hours by the `hvac_heat` / `hvac_cool` shapes.
 - **Solar**: `daily_gen[m] = ac_monthly[m] / days`, placed into periods by the
-  **intra-day solar shape** harvested in Phase 6 §3a.
+  **intra-day solar shape** harvested in `OfflineSolarData_Plan.md` §4a.
 
 **Dispatch waterfall** (locked decisions in brackets):
 ```
@@ -95,8 +99,8 @@ OFF-PEAK:      grid → load @ off-peak;  [grid→battery arbitrage OFF by defau
    path); revisit only for battery-without-solar cases.
 2. **3-period representative-day granularity** — not 24-h or 8760-h. Transparent and cheap;
    loses within-period timing detail (acceptable for an advocacy simulator).
-3. **Solar placement uses the Phase 6 intra-day shape** — accurate solar-window vs peak-tail
-   split per zone/month.
+3. **Solar placement uses the offline intra-day shape** (`OfflineSolarData_Plan.md` §4a) —
+   accurate solar-window vs peak-tail split per zone/month.
 
 **Net cost assembly (electricity):**
 ```
@@ -156,7 +160,7 @@ to devices — **this changes no total, dispatch, or physics**. Convention:
 
 ### §1 — PVWatts solar generation (offline-baked monthly yield)
 
-- **Data:** already harvested, validated, and committed in **Phase 6 §3a**
+- **Data:** already harvested, validated, and committed in `OfflineSolarData_Plan.md` §4a
   (`data/solar/pvwatts_zones.json` — per-zone per-kW monthly yield + provenance). Phase 7
   *consumes* it; no re-harvest unless the curated zone list expands.
 - **Model:** `SolarConfig.monthly_production_kwh()` = `system_kw × zone_yield[12]`. The Solar
@@ -186,8 +190,8 @@ to devices — **this changes no total, dispatch, or physics**. Convention:
 
 - **Data:** the curated residential TOU tariffs (PG&E E-TOU-C / E-ELEC, SCE TOU-D, SDG&E …)
   were fetched, parsed into the simplified `{peak_rate, offpeak_rate, peak_hours, tiers}`
-  schema, and validated in **Phase 6 §3b** (`data/rates/urdb_tou.json`). Phase 7 consumes it;
-  expand the curated list (toward full US) as needed.
+  schema, and validated in `OfflineSolarData_Plan.md` §4b (`data/rates/urdb_tou.json`). Phase 7
+  consumes it; expand the curated list (toward full US) as needed.
 - **Consumption split:** reuse `data/rates/device_load_shapes.json` 24h profiles —
   `peak_fraction[device] = Σ(profile over peak hours)`; `peak_kWh = monthly_kWh × peak_fraction`,
   `offpeak_kWh = remainder`. This is the existing ACC hourly machinery repurposed (already does
@@ -205,7 +209,39 @@ to devices — **this changes no total, dispatch, or physics**. Convention:
   split; battery self-consumption vs export. Update Help (`solar.html`, rate help) to describe
   the new model.
 - Home Profile roof-geometry inputs (inert in P6) become **live**.
-- Rate-model selector gains a **URDB TOU** option alongside today's EIA/ACC/CAGR modes.
+- Rate-model selector gains a **URDB TOU** option alongside today's EIA/ACC/CAGR modes and the
+  `cec_projection` option added (non-default) in Phase 6 — which §5 now promotes to the default.
+- **Plan-button consolidation (Spec 5.6 #6)** lands here, alongside the Solar/Battery/Panel UI
+  work, when a unified plan-row can be coherent (it was deferred from 5.6 for exactly this moment).
+
+---
+
+### §5 — Adopt the CEC projected-rate escalation as the default (Phase 6 WS1 → live)
+
+Phase 6 built `cec_projection` as a **non-default** rate model (a `ProjectedRateSource` reading
+`data/rates/projection/whywatt_rate_projection.json`) and produced a difference evaluation
+(`notebooks/rate_switch_review.ipynb`) quantifying what switching would change. Phase 7 makes the
+switch.
+
+This is a **separate rate axis from §3** and can be its own commit + its own golden re-baseline:
+§3 changes the rate *structure* (adds the peak/non-peak TOU dimension); §5 changes the rate
+*escalation* (today's single CAGR → the CEC-driven trajectory: electricity real-flat, gas spiral).
+Sequence them independently so each golden diff is attributable to one cause.
+
+- **Default switch.** Flip the factory defaults in `data/config/whywatt_default.json` from
+  `cagr_flat` to `cec_projection` (per fuel / scenario slot), guided by the Phase 6 evaluation.
+- **Extend the scope beyond retail.** Phase 6 fed only retail `get_rate`. Phase 7 decides whether
+  the projection also drives the **NEM export path** (`get_nem3_export_rates`, which today consumes
+  ACC × CAGR) and the **time-varying social overlay** (`social_cost.py`, today a flat $1.07/therm).
+  Each extension is an intentional, separately-baselined output change.
+- **Golden re-baseline** with the diff explained — the escalation change is expected to move
+  numbers materially (Invariant 5).
+- **Gas social overlay.** The gas carbon/methane/health layer the projection deliberately left to
+  the live sim (`OfflineRateProjection_Plan.md` §8c) is applied here; the CO₂/methane params are
+  already harvested in `data/rates/projection/acc_marginal_gas.json`.
+
+**Acceptance (§5):** `cec_projection` is the default; the golden is re-baselined in a dedicated
+commit whose diff matches the Phase 6 evaluation; NEM/social extension decisions are recorded.
 
 ---
 
@@ -218,10 +254,12 @@ src/
   model.py              wire peak/non-peak split + solar/battery reduction order
   ui/sim.py, panels.py  roof geometry live; URDB TOU rate-model option
   ui/charts.py          solar-monthly / peak-offpeak / battery-dispatch charts
+  data/config/whywatt_default.json   default rate model cagr_flat → cec_projection (§5)
 data/
-  solar/pvwatts_zones.json     (from Phase 6) now CONSUMED by SolarConfig
-  rates/urdb_tou.json          (from Phase 6) now CONSUMED by URDBRateLoader
-  (curated lists may expand toward full-US coverage; re-run the Phase 6 build scripts)
+  solar/pvwatts_zones.json     (from OfflineSolarData_Plan) now CONSUMED by SolarConfig
+  rates/urdb_tou.json          (from OfflineSolarData_Plan) now CONSUMED by URDBRateLoader
+  rates/projection/whywatt_rate_projection.json  (from Phase 6 interface) now the DEFAULT rate source (§5)
+  (curated solar/TOU lists may expand toward full-US coverage; re-run the offline build scripts)
 scripts/
   build_pvwatts.py / build_urdb.py   (from Phase 6; re-run only to add zones/tariffs)
 tests/
@@ -236,7 +274,7 @@ tests/
 - ✅ Battery dispatch fidelity → **3-period representative-day**, scaled by days-in-month.
 - ✅ Battery charge source → **solar only**; stored energy reserved for peak.
 - ✅ Tiered slabs → apply on the **monthly grid-import total** (billing-accurate).
-- ✅ Solar placement into periods → **Phase 6 intra-day shape** (PVWatts hourly).
+- ✅ Solar placement into periods → **offline intra-day shape** (PVWatts hourly, `OfflineSolarData_Plan.md` §4a).
 - ✅ Per-device $ allocation for charts → **gross period-priced grid-cost share** (§0.2).
 
 ## Still open (resolve during Phase 7)
@@ -251,6 +289,8 @@ tests/
 - [ ] Battery dispatch physics produce self-consumption/export from real load.
 - [ ] URDB TOU peak/non-peak + slabs baked; consumption split via 24h shapes; pricing applied.
 - [ ] CA validated first; out-of-CA degrades gracefully to flat pricing.
-- [ ] Golden re-baselined with documented diff; full `pytest` green.
+- [ ] `cec_projection` promoted to the default rate model (§5); NEM/social extension decisions recorded.
+- [ ] Golden re-baselined with documented diff — escalation switch (§5) and TOU structure (§3) as
+      separate, attributable commits; full `pytest` green.
 - [ ] Charts + Help updated; roof geometry live.
 - [ ] CLAUDE.md updated: Phase 7 closed.

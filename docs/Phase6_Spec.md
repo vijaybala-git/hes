@@ -1,119 +1,177 @@
-# WhyWatt — Phase 6 Development Spec
+# WhyWatt — Phase 6 Development Spec (Mesa Simulation: Rate Hand-off Interface + Seams)
 
-**Status:** 🔵 PLANNED — preparation phase. Build the seams; no new data source touches output.
-**Follows:** Post Phase 2 user-testing line; sits ahead of Phase 7 (Solar/Battery physics + TOU rates).
-**Last updated:** 2026-06-23 — initial plan.
+**Status:** 🔵 PLANNED — simulation-focused preparation phase. Build the rate hand-off *interface*
+and the Phase 7 seams; **no default output changes** (golden bit-for-bit).
+**Follows:** Post Phase 2 user-testing line + the closed offline sub-projects
+(`OfflineRateProjection_Plan.md`). **Sits ahead of** Phase 7 (default rate switch + golden
+re-baseline, Solar/Battery physics, URDB TOU rates).
+**Last updated:** 2026-09-07 — recentered on the simulation; folded in Spec 5.6 items; the rate
+hand-off interface is now the lead deliverable.
+
+> **What changed from the 2026-06-23 draft.** The original Phase 6 mixed a large offline PVWatts/URDB
+> harvest into the phase. That harvest is now its own track (`docs/OfflineSolarData_Plan.md`), and
+> Phase 6 is about the **simulation**: standing up the interface that lets the model consume the
+> now-complete rate-projection bundle (`whywatt_rate_projection.json`) **without** switching the
+> default. This supersedes `docs/Phase5.6_Spec.md` (items folded into WS3) and the wire-in portion of
+> `docs/Phase6_RateProjection_Plan.md` (the *default switch* remains Phase 7).
 
 ---
 
 ## Goal
 
-Prepare the codebase for the large Phase 7 data-pipeline changes (PVWatts solar generation,
-battery charge physics, URDB peak/non-peak TOU rates) **without adding any new data source
-that affects final output**. Phase 6 creates the structural seams so Phase 7 is a data swap,
-not a rewrite.
+Make the projected-rate bundle *consumable by the simulation* — and *evaluable against today's
+formula rates* — while the default user-visible output stays byte-for-byte unchanged. Concretely,
+three work-streams in priority order:
 
-Three deliverables:
-
-1. **Split `Solar + Battery` into two independently-simulated devices** — a Solar
-   *generation* unit and a Battery *storage* unit — preserving today's formulas so output is
-   unchanged.
-2. **Add the PVWatts-relevant inputs to `HomeConfig` + Home Profile UI** (roof tilt, azimuth,
-   array type, module type, system losses) plus per-zone lat/lon — **carried but inert**,
-   exactly as `panel_amps` was introduced ahead of the panel assessor.
-3. **Harvest the full offline datasets** from PVWatts and URDB (CA-first, but with a
-   geo-general schema), commit them with provenance, and add **validation tests + diagnostic
-   graphs** to review data quality and build intuition for the Phase 7 mechanics — but **do
-   not wire the data into the model** (output stays unchanged).
+1. **WS1 (lead) — Rate hand-off interface.** Add a new, **non-default** rate model
+   (`cec_projection`) backed by a `ProjectedRateSource` that reads
+   `data/rates/projection/whywatt_rate_projection.json`. Leave every default `rate_model` untouched
+   so the golden passes bit-for-bit. Ship an **end-of-phase difference evaluation** that quantifies
+   what Phase 7 will change when the switch is flipped.
+2. **WS2 — Phase 7 seams (output-preserving).** Split `Solar + Battery` into two independently
+   simulated devices (same arithmetic), and add the inert PVWatts inputs (roof geometry + per-zone
+   lat/lon) that `OfflineSolarData_Plan.md` keys off.
+3. **WS3 — Minor folds from Spec 5.6 + old Phase 6 §4.** SC-CH₄ citations & slider anchors; direct
+   CO₂/CO₂e emissions chart; per-state grid-mix Help table; independent per-pane scenario toggle;
+   HVAC design-temperature groundwork.
 
 ## The central constraint (read before starting)
 
-**No new data source may change a number the user sees.** Phase 6 is a refactor + plumbing
-phase. The Solar/Battery device split must keep the exact same production, self-consumption,
-export, and savings math the single `SolarBatteryConfig` produces today. The regression
-golden (`tests/regression/golden.json`) is the gate: **it must pass bit-for-bit after Phase 6**
-(see Invariant 1). New config fields are accepted, sanitized, shared, and persisted, but never
-read by the simulation.
+**No new data source may change a number the user sees by default.** Phase 6 is a seam + interface
+phase. The regression golden (`tests/regression/golden.json`) is the gate: it must pass bit-for-bit
+after Phase 6 (Invariant 1). New rate paths, config fields, and datasets are accepted, sanitized,
+shared, and persisted — but the **default** simulation path is unchanged.
+
+The one deliberate evolution from the original Phase 6: the rate-projection bundle moves from
+*"committed but wholly unconsumed"* to *"consumable via a non-default rate model, guarded by a
+golden-neutrality test."* This is still golden-safe (see Invariant 5). PVWatts/URDB data stays
+wholly unconsumed (that's the offline-solar track).
 
 ## Decisions locked for Phase 6/7 (do not re-litigate)
 
 | Decision | Choice | Reason |
 |---|---|---|
-| API integration mode | **Bake offline, never call live** | Matches climate/EIA/ACC pipeline; keeps UI synchronous |
-| PVWatts geo granularity | **Per CEC zone, single default orientation** | Smallest data; tilt/azimuth become Phase 7 correction factors |
-| Peak/non-peak split location | **Fully in Phase 7** | Phase 6 keeps one monthly consumption stream; output stays stable |
-| Solar vs Battery | **Two devices, independent simulation** | Generation and storage are physically distinct; enables Phase 7 dispatch model |
+| Rate interface vs rate switch | **Interface in Phase 6, default switch in Phase 7** | Lets us *evaluate the difference* before re-baselining the golden |
+| Which consumers the projection feeds (Phase 6) | **Retail `get_rate` escalation only** | Cleanest diff; isolates the CAGR-vs-CEC effect; NEM export + social overlay stay on legacy |
+| Projection integration mode | **Read the baked JSON bundle only** | Core never imports `src/rate_projection/` (the offline package's portability rule) |
+| Scenario mapping | **1:1 by label** (`conservative`/`moderate`/`stress`) | The bundle's `scenario_keys` already match the sim's scenarios exactly |
+| API integration mode (solar/TOU) | **Bake offline, never call live** | Matches climate/EIA/ACC/rate pipeline; keeps UI synchronous |
+| PVWatts geo granularity | **Per CEC zone, single default orientation** | Roof tilt/azimuth become Phase 7 correction factors |
+| Peak/non-peak split location | **Fully in Phase 7** | Phase 6 keeps one monthly consumption stream |
+| Solar vs Battery | **Two devices, independent simulation** | Generation and storage are physically distinct; enables Phase 7 dispatch |
 
 ## Invariants (must hold after every step)
 
-1. **Golden output is unchanged.** `python scripts/run_regression.py` passes against the
-   existing `tests/regression/golden.json` with **zero** diffs after Phase 6. If a refactor
-   forces an unavoidable rounding change, it must be justified and the golden re-baselined in
-   its own commit with the diff explained.
-2. **New HomeConfig fields are inert.** `roof_tilt`, `roof_azimuth`, `array_type`,
-   `module_type`, `system_losses`, lat/lon are carried, sanitized, shared, and reset — but no
-   device or rate code reads them. (Precedent: `panel_amps`, `year_built`.)
-3. **`monthly_consumption()` still returns shape `(12,)`.** No peak/non-peak dimension yet.
-4. **Hard rules from CLAUDE.md still hold** — no MMBtu; devices never read data files;
-   `cost_history_by_category` appends once per step; logo `os.path.exists` guard; `HomeConfig`
-   is the only home-detail carrier.
-5. **Harvested data is committed but unconsumed.** `scripts/build_pvwatts.py` / `build_urdb.py`
-   are real and run offline (manually — they need API keys, not in CI); their output JSON is
-   committed with provenance. But **no device or rate code in Phase 6 reads these files**, so
-   the golden is unaffected (Invariant 1). The data exists to be reviewed, not yet to drive output.
+1. **Default golden output is unchanged.** `python scripts/run_regression.py` passes against the
+   existing `tests/regression/golden.json` with **zero** diffs after Phase 6.
+2. **The projected-rate path is off by default.** `cec_projection` is a new value in the rate-model
+   enum; no default config selects it. A test asserts the factory-default config produces the golden.
+3. **New HomeConfig fields are inert.** `roof_tilt`, `roof_azimuth`, `array_type`, `module_type`,
+   `system_losses`, per-zone lat/lon are carried, sanitized, shared, and reset — but no device or
+   rate code reads them (precedent: `panel_amps`, `year_built`).
+4. **`monthly_consumption()` still returns shape `(12,)`.** No peak/non-peak dimension yet.
+5. **Core reads the bundle as data, never imports the offline package.** `git grep` confirms no
+   `src/` file imports `src/rate_projection/`. The bundle JSON may be read only by the
+   `ProjectedRateSource` behind the `cec_projection` branch. PVWatts/URDB data stays unconsumed.
+6. **Hard rules from CLAUDE.md still hold** — no MMBtu; devices never read data files;
+   `cost_history_by_category` appends once per step; logo `os.path.exists` guard; `HomeConfig` is the
+   only home-detail carrier.
 
 ---
 
-## Work breakdown
+## WS1 — Rate hand-off interface (lead deliverable)
 
-### §1 — Split Solar + Battery into two devices (output-preserving)
+### The seam already exists
 
-Today `journey.py:SolarBatteryConfig` is one dataclass; the solar block in
-`JourneyHome.step()` (≈ lines 370–412) computes `production = system_kw × specific_yield`,
-splits it by a single `scf` self-consumption fraction, prices the split against retail +
-export rates, and caps at electricity spend. Battery presence only nudges `scf`.
+`src/model.py:_make_loader(base_rl, rate_model, fuel, fuel_res)` already dispatches on a `rate_model`
+string; the allowed values live in `src/ui/config.py:_RATE_MODELS = {"cagr_flat", "ca_average",
+"acc_shaped", "acc_seasonal"}`, selected per fuel and per scenario slot
+(`elec_rate_model_a/b`, `gas_rate_model_a/b`). Defaults today: `elec/gas_rate_model_a = "cagr_flat"`,
+`elec_rate_model_b = "acc_shaped"`, `gas_rate_model_b = "acc_seasonal"`.
 
-**Refactor to two configs with independent step hooks, same arithmetic:**
+So WS1 is **additive**: add one branch, one enum value, one adapter. No existing path is rewired.
+
+### §1a — `ProjectedRateSource` adapter
+
+- New pure reader (e.g. `src/rate_loader.py` or `src/projected_rate_source.py`) that loads
+  `data/rates/projection/whywatt_rate_projection.json`, selects `markets.<default_market>` (CA_PGE)
+  and a scenario by **label** (`conservative`/`moderate`/`stress` — a 1:1 map to the sim's scenario),
+  and exposes the **same interface `get_rate(fuel, year, month, scenario)` uses today**: an annual
+  retail level × the bundle's `monthly_shape`. Base year and monthly resolution match the current
+  `get_annual_monthly_rates` contract, so the model's monthly sub-calculation is unaffected.
+- **Reads the bundle as plain data.** It must not import `src/rate_projection/` (Invariant 5).
+- Base-year sanity: the bundle anchors to the same PG&E tariff ($0.386/kWh, $2.08/therm) as
+  CLAUDE.md, so `cec_projection` ≈ the formula path at `year 0` and diverges only via escalation —
+  which is exactly the quantity WS1 exists to measure.
+
+### §1b — Wire it as a non-default `rate_model`
+
+- Add `"cec_projection"` to `_RATE_MODELS` and a branch in `_make_loader` that returns the new
+  adapter. **Do not change any default** in `data/config/whywatt_default.json`.
+- **Scope: retail `get_rate` only** (locked decision). The NEM export path
+  (`get_nem3_export_rates`, `model.py:474`) and the social overlay stay on their existing sources in
+  Phase 6 — even when `cec_projection` is selected — so the diff isolates retail escalation and the
+  known output-leak surfaces (RateProjection_Plan §3.6 b/c) stay closed.
+- Round-trip the new enum value through Share links / saved configs (it's already covered by the
+  `ENUMS` machinery once added to `_RATE_MODELS`).
+
+### §1c — End-of-Phase-6 difference evaluation (the payoff)
+
+- **Notebook** `notebooks/rate_switch_review.ipynb`: run the sim (or the rate series directly) under
+  the default formula path vs `cec_projection`, per fuel and per scenario, and report the headline
+  deltas — e.g. 25-yr do-nothing gas cost, 25-yr journey electricity cost, and total lifetime
+  savings — nominal and real. This is the "what Phase 7 will change" chart for stakeholder sign-off.
+  - Expected shape of the finding: today's `moderate` formula escalates elec **+7%/yr** and gas
+    **+8%/yr** flat; the bundle's CEC-driven `moderate` is elec **real-flat (~+2.2%/yr nominal)** and
+    gas **spiral** — so switching lowers projected electricity cost and reshapes gas materially.
+- **Test** `tests/test_projected_rate_source.py`: (a) the factory-default config still reproduces the
+  golden (Invariant 2); (b) `cec_projection` loads, returns shape-`(12,)` monthly rates, base-year
+  matches the tariff, and each scenario is monotonic-sane; (c) `git grep` gate — no `src/` import of
+  `src/rate_projection/`.
+
+**Acceptance (WS1):** golden bit-for-bit with defaults; `cec_projection` selectable and correct;
+`rate_switch_review.ipynb` renders the difference; the Phase 7 default-switch decision has a number
+behind it.
+
+---
+
+## WS2 — Phase 7 seams (output-preserving)
+
+### §2a — Split Solar + Battery into two devices
+
+Today `journey.py:SolarBatteryConfig` is one dataclass; the solar block in `JourneyHome.step()`
+computes `production = system_kw × specific_yield`, splits it by a single `scf` self-consumption
+fraction, prices the split against retail + export rates, and caps at electricity spend. Battery
+presence only nudges `scf`.
+
+Refactor to two configs with independent step hooks, **same arithmetic**:
 
 ```
-SolarConfig          # generation + self-use + export pricing (the "system")
-  panels, kw_per_panel, specific_yield   →  annual_production_kwh = system_kw × specific_yield
-  scf            (the "Self-use %" slider) → self_consumed = production × scf; exported = rest
-  nem_mode, nbc  (export credit rule)      → grid property of the system
-  (Phase 7: specific_yield → per-zone monthly yield vector; roof geometry applied)
-
-BatteryConfig        # cost + lifetime ONLY — energy-inert in Phase 6
-  battery_enabled, battery_kwh           →  labels/sizes the "Solar + Battery" capex slot
-  (Phase 7: battery_kwh + round-trip eff → dispatch physics that COMPUTES self-use,
-            superseding SolarConfig.scf)
+SolarConfig    panels, kw_per_panel, specific_yield → annual_production_kwh = system_kw × specific_yield
+               scf ("Self-use %") → self_consumed = production × scf; exported = rest
+               nem_mode, nbc (export credit rule)
+               (Phase 7: specific_yield → per-zone monthly yield vector from pvwatts_zones.json)
+BatteryConfig  battery_enabled, battery_kwh → labels/sizes the "Solar + Battery" capex slot
+               (Phase 7: battery_kwh + round-trip eff → dispatch physics that COMPUTES self-use)
 ```
 
-- Keep `SolarBatteryConfig` as a thin composition/back-compat shim **or** migrate
-  `model.py`/`ui/sim.py` wiring to pass both configs. Either way, the computed
-  `solar_savings_history`, `solar_production_kwh_history`, `solar_self_consumed_history`,
-  `solar_exported_kwh_history` arrays must be **numerically identical** to today.
-- **Self-use (`scf`) stays a single fraction owned by `SolarConfig`** — it is the only input
-  the self-consumption math reads. `BatteryConfig` carries **no** energy behavior in Phase 6.
-  We deliberately do **not** decompose self-use into a "solar base + battery boost"; Phase 7's
-  dispatch model will *compute* self-consumption and supersede the slider, so a decomposition
-  would only have to be unwound.
-- **The battery→self-use link stays a UI default-snap, not a sim coupling.** Preserve the
-  existing `_on_battery` callback ([panels.py:1532](../src/ui/panels.py)): toggling Battery
-  sets `solar_scf` to 80 (on) / 35 (off); the slider remains user-editable. The simulation
-  still reads only `scf`, so output is bit-identical. `battery_enabled` continues to drive the
-  capex slot only.
-- The single `CapExOnlySlot` named `"Solar + Battery"` stays one install event for now
-  (Hard Rule analog: one capex event). Whether to visually split the slot is a Phase 7 UI call.
+- Keep `SolarBatteryConfig` as a thin composition/back-compat shim, or migrate `model.py`/`ui/sim.py`
+  wiring to pass both configs. Either way `solar_savings_history`, `solar_production_kwh_history`,
+  `solar_self_consumed_history`, `solar_exported_kwh_history` must be **numerically identical**.
+- **`scf` stays a single fraction owned by `SolarConfig`.** No "solar base + battery boost"
+  decomposition — Phase 7's dispatch model will *compute* self-consumption and supersede the slider.
+- **The battery→self-use link stays a UI default-snap, not a sim coupling.** Preserve `_on_battery`
+  (`panels.py:1532`): toggling Battery sets `solar_scf` to 80/35; slider stays user-editable; the sim
+  still reads only `scf`. `battery_enabled` drives the capex slot only.
+- The single `CapExOnlySlot` "Solar + Battery" stays one install event (Hard Rule 9 analog).
 
-**Acceptance:** golden unchanged; `test_journey.py` solar assertions unchanged; new unit
-tests assert `SolarConfig`/`BatteryConfig` reproduce `SolarBatteryConfig` for the default
-config and for a solar-only (battery off) config.
+**Acceptance:** golden unchanged; `test_journey.py` solar assertions unchanged; new tests assert
+`SolarConfig`/`BatteryConfig` reproduce `SolarBatteryConfig` for the default and solar-only configs.
 
-### §2 — Home Profile inputs for PVWatts (inert)
+### §2b — Home Profile inputs for PVWatts (inert)
 
-Add to `home_config.py:HomeConfig` (with sensible CA defaults), wire through
-`ui/state.py` reactives, `ui/config.py` (`INT_KEYS`/`ENUMS`/`RANGES`/sanitize), the Home
-Profile panel, and `reset_to_defaults()`:
+Add to `home_config.py:HomeConfig` (CA defaults), wired through `ui/state.py`, `ui/config.py`
+(`INT_KEYS`/`ENUMS`/`RANGES`/sanitize), the Home Profile panel, and `reset_to_defaults()`:
 
 | Field | Type | Default | Allowed / range | PVWatts param |
 |---|---|---|---|---|
@@ -123,140 +181,71 @@ Profile panel, and `reset_to_defaults()`:
 | `module_type` | enum | `"standard"` | standard / premium / thin_film | `module_type` |
 | `system_losses` | float (%) | 14.0 | 0–99 | `losses` |
 
-- Add **lat/lon per CEC zone** to `data/climate/tmy3_zones.json` (each zone already names its
-  `tmy3_station`; the trend fit already used station lat/lon — surface it into the record via
-  `scripts/build_climate_db.py` or a one-off augmentation). Phase 7 PVWatts precompute keys
-  off this.
-- These fields must round-trip through Share links and saved configs (extend
-  `whywatt_default.json` `values`, `ENUMS`, `RANGES`, `INT_KEYS`).
-- **No device reads them.** Add a test asserting that toggling each new field leaves the
-  regression output unchanged.
+- Add **lat/lon per CEC zone** to `data/climate/tmy3_zones.json` (surface it from the station
+  lat/lon the trend fit already used, via `scripts/build_climate_db.py` or a one-off augmentation).
+  This is the canonical source `OfflineSolarData_Plan.md` keys off.
+- Fields round-trip through Share links + saved configs. **No device reads them** — add a test that
+  toggling each leaves the regression output unchanged.
 
-### §3 — Full offline data harvest + validation (committed, unconsumed)
+---
 
-Collect the **real** PVWatts and URDB datasets now, so Phase 7 is "wire in data we've already
-seen and trust." The data is committed but no model code reads it (Invariant 5). **CA-first,
-but the file schema is geo-general** — keyed so out-of-CA stations/tariffs add without a schema
-change (no CA-only assumptions baked into the structure).
+## WS3 — Minor folds (Spec 5.6 + old Phase 6 §4)
 
-**Targeted, region-at-a-time harvest.** Rather than grabbing all 16 CEC zones at once, the
-batch scripts take a `--region` and we validate one region end-to-end before broadening:
+All display / documentation / UI-state only. Zero simulation output change; golden unaffected.
 
-| Target | Region | Utilities | CEC zones (core) | TOU tariffs (verify labels in URDB at harvest) |
-|---|---|---|---|---|
-| **1 (now)** | Bay Area | PG&E | CZ3 (coast), CZ4 (South Bay, default), CZ2 (inland N. Bay) | PG&E E-TOU-C, E-ELEC, EV2-A |
-| **2 (next)** | SoCal | SCE, SDG&E | CZ6/CZ8 (LA basin), CZ9/CZ10 (inland), CZ7 (San Diego), CZ14 (desert) | SCE TOU-D-4-9PM, TOU-D-PRIME; SDG&E TOU-DR1, EV-TOU-5 |
+### §3a — SC-CH₄ explicit citation + slider anchors (old Phase 6 §4)
 
-The region→(zones, utilities, tariff ids) mapping lives in a small table in each build script
-(or a shared `scripts/regions.py`), so adding a region is a data edit, not new code.
+- Split the `SocialCostConfig` docstring into cited sub-components: **SC-CO₂ combustion** $0.97/therm
+  (EIA 5.306 kg CO₂/therm × EPA 2023 central $190/tCO₂; Rennert et al. 2022; EPA SC-GHG 2023) and
+  **SC-CH₄ leakage adder** $0.10/therm (EPA SC-CH₄ 2023 ~$1,600/short ton × 2% pipeline leakage).
+  Total stays **$1.07/therm** — no numeric change, citation made explicit.
+- Change the `panels.py` gate label "Add CO₂ + Methane Cost" → **"Add SC-CO₂ + SC-CH₄ (EPA)"**.
+- Extend `SliderSpec` (`ui/slider.py`) with an optional `anchors: list[tuple[float,str]]`; `_track()`
+  renders each as a labelled `.ww-tick`. Four anchors for the climate-rate slider ($1.00–$2.00):
+  EPA CO₂ $1.00 · **EPA+CH₄ $1.07 (default)** · +CH₄ 3.7% $1.15 (Alvarez et al. 2018) · High-Urgency
+  $1.80 (EPA 2023 Tech Report App. 3B, 1.5% discount). Each tick shows a source tooltip; the help
+  page (`public/help/social_cost.html`) gains a 4-model citation table.
 
-API keys (free NREL + OpenEI) are read from env vars (`NREL_API_KEY`, `URDB_API_KEY`), never
-committed. Scripts are run manually offline, not in CI.
+### §3b — Direct CO₂ / CO₂e emissions chart (Spec 5.6 #2)
 
-**§3a — PVWatts batch harvest (`scripts/build_pvwatts.py --region bayarea`):**
-- For each CEC-zone reference station in the region (lat/lon from §2), call PVWatts v8 with
-  `system_capacity=1`, default orientation (`array_type=fixed_roof`, `module_type=standard`,
-  `tilt=20`, `azimuth=180`, `losses=14`).
-- Append `ac_monthly` (the **per-kW monthly yield vector**), `ac_annual`, the request params,
-  and `sha256(raw_response)` to `data/solar/pvwatts_zones.json` (keyed by zone, additive across
-  regions); snapshot raw responses under `data/solar/sources/`.
-- **Also request `timeframe=hourly`** and derive a **normalized intra-day solar shape** per
-  month per zone — the fraction of each month's generation that falls in the solar-window /
-  peak / off-peak periods (a 12×24 normalized shape, or the collapsed 12×3 period fractions).
-  Store as `intraday_shape` in the zone record. Phase 7's dispatch engine needs this to place
-  monthly generation into the three daily periods (it can't be recovered from `ac_monthly`
-  alone). This is the only reason hourly output is fetched; the monthly totals still drive sizing.
+Display-only view over existing `gas_therms_history` / `gasoline_gallons_history` (journey +
+baseline). New menu entry "Direct Emissions (CO₂ / CO₂e)"; Journey↔Do-nothing toggle (reuse
+`device_chart_home` pattern); CO₂/CO₂e metric toggle; stacked bars by source; y-axis metric tons
+CO₂e/yr. Factors as named constants: gas 5.30 kg CO₂/therm (EPA), CO₂e ≈ 6.5 kg/therm (combustion +
+2.3% leakage × GWP100 28); gasoline 8.89 kg/gal. **Electricity excluded, with the mandatory caveat
+footnote** — journey electricity that replaced gas/gasoline carries an uncounted grid-carbon
+footprint, so the true net reduction is smaller (grid-carbon modeling is Phase 7).
 
-**§3b — URDB batch harvest (`scripts/build_urdb.py --region bayarea`):**
-- For the region's curated residential TOU tariffs, fetch URDB v8 `detail=full` and parse
-  `energyratestructure` (tiered slabs: `{max, rate, adj, sell}`) + `energyweekdayschedule` /
-  `energyweekendschedule` (12×24 period grid) into the simplified schema `{tariff_id, utility,
-  region, peak_rate, offpeak_rate, peak_hours (12×24 period index or bool grid), tiers,
-  fixed_charge}` → `data/rates/urdb_tou.json` (additive across regions); snapshot raw responses
-  with sha256 under `data/rates/sources/`.
+### §3c — Per-state electricity-mix Help table (Spec 5.6 #3)
 
-**§3c — Analysis notebooks + validation tests (the point of doing this in Phase 6):**
-- **Jupyter notebooks** (`notebooks/pvwatts_review.ipynb`, `notebooks/urdb_review.ipynb`) read
-  the committed JSON and produce the data review:
-  - *PVWatts:* per-zone monthly yield curves, a cross-zone annual-yield bar, and a Bay-Area vs
-    SoCal coastal/inland comparison; a table comparing each zone's annual per-kW yield against
-    today's scalar `specific_yield=1500`.
-  - *URDB:* a 12×24 **peak-hour heatmap** per tariff (confirm the ~4–9pm peak window), a
-    peak-vs-offpeak rate bar with tier-threshold overlays, and a table of each tariff's
-    load-weighted flat-equivalent vs the EIA per-utility rate already in the model.
-  - These notebooks are the human review surface — run them, eyeball the figures, sanity-check
-    the numbers from both APIs before Phase 7 trusts them. (Add `notebook` + `nbconvert` to a
-    dev/analysis requirements pin; numpy/pandas/matplotlib/plotly are already in `requirements.txt`.)
-- **Automated tests** (`tests/test_pvwatts_data.py`, `tests/test_urdb_data.py`) encode the same
-  checks as a CI gate, independent of the notebooks: each yield vector is length-12,
-  summer-peaked, with annual sum in a sane CA band (~1,300–1,750 kWh/kW/yr, coastal < inland)
-  and CZ4 default-orientation annual ≈ `specific_yield=1500`; URDB schedules parse to 12×24 with
-  every hour mapped to a defined period, tier `max` thresholds ascend, and each tariff's
-  load-weighted flat-equivalent lands within tolerance of the matching EIA per-utility rate.
+Static reference table in Help (CA first) so users can interpret the "electricity not counted"
+caveat from §3b. Generated fragment (`docs/help/_generated/grid_mix.md`) from a committed
+`data/grid/state_mix.json`; columns clean/carbon-free % vs fossil % + year + source. **Lead with the
+CEC Power Content Label** (consumption-based, includes imports — the honest "behind my plug"
+figure), corroborate with CAISO in-state. Not wired into the model.
 
-**Acceptance:** Bay Area datasets committed with provenance (SoCal optional/second); validation
-tests green; both review notebooks run top-to-bottom and render their figures; `git grep`
-confirms **no `src/` model/rate code imports `data/solar/` or `data/rates/urdb_tou.json`** (data
-is review-only in Phase 6).
+### §3d — Independent per-pane scenario toggle (Spec 5.6 #4)
 
-> **Deferred to Phase 7:** the peak/non-peak *rate interface* (`get_peak_offpeak_rates`) and the
-> consumption split. Phase 6 collects and validates the data; Phase 7 flows it through the model.
+Split the global `device_chart_home` reactive (`state.py:185`) into
+`device_chart_home_left`/`device_chart_home_right` (+ reset), add the two keys to
+`whywatt_default.json`, swap them into `SHARE_EXCLUDE` (`config.py`), and give `ChartPane` a
+`home_rv` param (`layout.py`) so left/right pass their own reactive. No chart-builder/model/data
+change. Optional nicety: default the right pane to `"baseline"`.
 
-### §4 — Social Cost of Carbon: SC-CH₄ explicit citation + model-anchor tick marks
+### §3e — HVAC tonnage groundwork (Spec 5.6 #1)
 
-**Motivation.** The climate-cost slider already embeds SC-CH₄ in the $1.07/therm default
-(EPA SC-CO₂ + 2% upstream leakage) but it is silent about it. Advocates get challenged on
-this number; the response "same EPA framework, just the methane emission factor" needs to be
-a one-click answer. At the same time, presenting the slider as a *range with named models*
-rather than a single default is more honest and more useful for homeowner sessions.
+Auto-size HVAC tonnage from home size for a credibility/narrative number (tonnage does **not** affect
+annual degree-day energy; it's a design-day concept). The rigorous form `tons = UA × design_ΔT /
+12,000` reuses existing `UA` but needs a **per-zone design temperature** (99% heating / 1% cooling)
+that `tmy3_zones.json` lacks. This is the only WS3 item touching the climate pipeline — add design
+temps alongside the WS2 lat/lon augmentation of `build_climate_db.py`. Display/label only; no energy
+math change.
 
-**What changes — purely UI + documentation; zero simulation output change; golden unaffected.**
+### Not in Phase 6
 
-#### §4a — SC-CH₄ explicit in `social_cost.py` and labels
-
-- Split the `SocialCostConfig` docstring into two clearly cited sub-components:
-  - **SC-CO₂ combustion:** $0.97/therm — EIA factor 5.306 kg CO₂/therm × EPA 2023 central
-    $190/tCO₂ (Rennert et al. 2022, *Nature*; EPA SC-GHG Technical Report 2023).
-  - **SC-CH₄ leakage adder:** $0.10/therm — EPA SC-CH₄ 2023 central (~$1,600/short ton CH₄)
-    applied to a 2% upstream pipeline leakage rate (EPA/GRI leakage inventory baseline).
-  - Total remains **$1.07/therm** — no numeric change, citation made explicit.
-- Change the gate label in `panels.py` from "Add CO₂ + Methane Cost" →
-  **"Add SC-CO₂ + SC-CH₄ (EPA)"** so advocates can name the source in the room.
-
-#### §4b — Named model anchors as tick marks on the climate-rate slider
-
-Extend `SliderSpec` (in `ui/slider.py`) with an optional `anchors` field —
-`list[tuple[float, str]]` of `(value, label)` pairs. `_track()` renders each anchor as a
-labelled `.ww-tick` beneath the slider rail (label rotated or stacked, fitting within the
-existing track width). The default tick (the `spec.default` mark already rendered) is
-unchanged; anchors are additive.
-
-**Four anchors for the climate-rate slider** ($1.00–$2.00 range):
-
-| Label | $/therm | Source / rationale |
-|---|---|---|
-| EPA CO₂ | $1.00 | Combustion only, no leakage — floor of the EPA framework |
-| **EPA+CH₄** *(default)* | **$1.07** | Existing default; SC-CH₄ at 2% pipeline leakage |
-| +CH₄ 3.7% | $1.15 | Same EPA SC-CH₄ applied to NRDC avg US leakage rate (3.7% from Alvarez et al. 2018, *Science*) |
-| High-Urgency | $1.80 | GIVE model at 1.5% discount rate — EPA 2023 Tech Report App. 3B "high-urgency sensitivity"; same science, lower discounting of future harm |
-
-The "High-Urgency" label is deliberately EPA-attributed ("EPA 2023 high-urgency sensitivity"),
-not activist-attributed — when challenged in a session the advocate can say "that's EPA's own
-number, just a different discount rate assumption."
-
-**Tooltip / help:** each anchor tick shows a tooltip on hover with the one-line source. The
-help page (`public/help/social_cost.html`) gains a new table under the climate-cost section
-summarising all four models with proper citations.
-
-#### §4c — Acceptance
-
-- `social_cost.py` docstring cites SC-CH₄ report; `climate_rate` value unchanged (1.07).
-- Gate label updated in `panels.py`.
-- `SliderSpec.anchors` field added; `_track()` renders up to N labelled tick marks.
-- Climate-rate slider in the UI shows all four anchors with hover tooltips.
-- Help page updated with citation table.
-- `python scripts/run_regression.py` → zero diffs (no simulation path touched).
-- `pytest` green.
+- **Spec 5.6 #5 (match y-axis scales across panes)** — tabled; marginal payoff.
+- **Spec 5.6 #6 (consolidate "Plan" buttons into one row)** — **Phase 7**, alongside the
+  Solar/Battery/Panel redesign, when a unified plan-row can be coherent.
 
 ---
 
@@ -264,47 +253,46 @@ summarising all four models with proper citations.
 
 ```
 src/
+  rate_loader.py / projected_rate_source.py  (NEW) ProjectedRateSource reads whywatt_rate_projection.json
+  model.py              _make_loader: + "cec_projection" branch (non-default)
+  ui/config.py          _RATE_MODELS: + "cec_projection"
   journey.py            SolarBatteryConfig → SolarConfig + BatteryConfig (+ shim)
   home_config.py        + roof_tilt, roof_azimuth, array_type, module_type, system_losses
-  ui/state.py           + 5 solar-geometry reactives
-  ui/config.py          + INT_KEYS / ENUMS / RANGES / sanitize entries
+  ui/state.py           + 5 solar-geometry reactives; split device_chart_home → left/right (§3d)
   ui/sim.py             pass SolarConfig + BatteryConfig (or shim) to HESModel
-  ui/panels.py          Home Profile: roof geometry inputs (inert); SC-CH₄ gate label (§4)
-  ui/slider.py          SliderSpec.anchors field + labelled tick rendering (§4)
-  social_cost.py        SC-CH₄ explicit citation in docstring (§4)
-public/help/social_cost.html  citation table for 4-model SCC range (§4)
+  ui/panels.py          Home Profile roof geometry (inert); SC-CH₄ gate label (§3a); Direct Emissions (§3b)
+  ui/slider.py          SliderSpec.anchors + labelled tick rendering (§3a)
+  ui/layout.py          ChartPane home_rv param (§3d); Direct Emissions menu entry (§3b)
+  social_cost.py        SC-CH₄ explicit citation in docstring (§3a)
+public/help/social_cost.html   4-model SCC citation table (§3a)
 data/
-  climate/tmy3_zones.json     + per-zone lat/lon
-  config/whywatt_default.json + new solar-geometry default values
-  solar/pvwatts_zones.json    (NEW, baked) per-zone per-kW monthly yield + provenance
-  solar/sources/              (NEW) raw PVWatts JSON snapshots (sha256)
-  rates/urdb_tou.json         (NEW, baked) simplified peak/offpeak + slabs per tariff
-  rates/sources/              (NEW) raw URDB JSON snapshots (sha256)
-scripts/
-  regions.py            (NEW) region → (CEC zones, utilities, tariff ids) mapping
-  build_pvwatts.py      (NEW, run offline) PVWatts batch harvest --region → pvwatts_zones.json
-  build_urdb.py         (NEW, run offline) URDB batch harvest --region → urdb_tou.json
+  climate/tmy3_zones.json     + per-zone lat/lon (§2b) + design temps (§3e)
+  config/whywatt_default.json + solar-geometry defaults; device_chart_home_left/right (§3d)
+  grid/state_mix.json         (NEW) per-state clean/fossil mix, CA first (§3c)
 notebooks/
-  pvwatts_review.ipynb  (NEW) yield curves / cross-zone + Bay-vs-SoCal / specific_yield table
-  urdb_review.ipynb     (NEW) 12×24 peak-hour heatmap / rate bars / EIA cross-check table
+  rate_switch_review.ipynb    (NEW) formula vs cec_projection difference eval (§1c)
 tests/
-  test_journey.py       + Solar/Battery split equivalence tests
-  test_config.py        + new-field round-trip + inertness tests
-  test_pvwatts_data.py  (NEW) yield-vector shape/plausibility + CZ4 sanity bridge
-  test_urdb_data.py     (NEW) schedule parse + slab order + EIA cross-source sanity
+  test_projected_rate_source.py  (NEW) default=golden; cec_projection sanity; import gate (§1c)
+  test_journey.py                + Solar/Battery split equivalence
+  test_config.py                 + new-field round-trip + inertness; cec_projection round-trip
 docs/
   Phase6_Spec.md        this file
-  Phase7_Spec.md        the follow-on data-flow phase
+  OfflineSolarData_Plan.md   the offline PVWatts/URDB harvest (separate track)
+  Phase7_Spec.md        default rate switch + golden re-baseline; TOU; solar/battery dispatch
 ```
 
 ## Definition of done
 
+- [ ] `ProjectedRateSource` reads the bundle; `cec_projection` selectable as a **non-default**
+      `rate_model`; retail `get_rate` only; core imports no `src/rate_projection/` code.
+- [ ] `rate_switch_review.ipynb` runs top-to-bottom and reports the formula-vs-projection deltas.
 - [ ] `SolarConfig` + `BatteryConfig` reproduce `SolarBatteryConfig` numerics (golden unchanged).
 - [ ] 5 roof-geometry fields + per-zone lat/lon land, round-trip through Share/save, and are inert.
-- [ ] PVWatts harvested for **Bay Area** zones (SoCal optional/second) → `pvwatts_zones.json` + snapshots.
-- [ ] URDB harvested for **Bay Area** PG&E TOU tariffs (SoCal optional/second) → `urdb_tou.json` + snapshots.
-- [ ] Validation tests green; `pvwatts_review.ipynb` / `urdb_review.ipynb` run top-to-bottom and render figures.
-- [ ] `git grep` confirms no `src/` code reads the new data files (review-only in Phase 6).
-- [ ] SC-CH₄ cited explicitly in `social_cost.py`; gate label updated; climate-rate slider shows 4 named anchors with tooltips; help page updated (§4).
-- [ ] `python scripts/run_regression.py` → zero diffs; full `pytest` green.
-- [ ] CLAUDE.md updated: Phase 6 closed, Phase 7 entered.
+- [ ] WS3 folds landed: SC-CH₄ citations + 4 anchors; Direct Emissions chart; grid-mix Help table;
+      per-pane scenario toggle; HVAC design-temps in the climate DB (display/label only).
+- [ ] `python scripts/run_regression.py` → **zero diffs** with factory defaults; full `pytest` green.
+- [ ] CLAUDE.md updated: Phase 6 closed, Phase 7 entered (default rate switch + golden re-baseline).
+
+> **Deferred to Phase 7** (the golden-rebaseline moment): make `cec_projection` the default; extend
+> it to the NEM export path and the time-varying social overlay; PVWatts/URDB consumption + the
+> peak/non-peak rate interface; Solar/Battery dispatch physics; plan-button consolidation.
