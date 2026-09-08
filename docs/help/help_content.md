@@ -811,6 +811,24 @@ upstream methane leakage at a 2% pipeline leakage rate.
 
 Slider range: $1.00 (EPA SC-CO2 only, no leakage) to $2.00 (high leakage + high scenario).
 
+The default $1.07 is two cited sub-components: SC-CO2 combustion $0.97/therm (EIA
+5.306 kg CO2/therm x EPA 2023 central $190/tonne CO2) plus an SC-CH4 leakage adder of
+$0.10/therm (EPA SC-CH4 2023 ~$1,600/short ton x ~2% pipeline leakage).
+
+### The four climate-rate anchor models
+
+The climate-rate slider marks four reference points — hover each tick on the slider for its
+source citation:
+
+    Rate       Model                          Basis / source
+    ------------------------------------------------------------------------------
+    $1.00      EPA SC-CO2 only                EIA 5.306 kgCO2/therm x EPA 2023 $190/tCO2
+    $1.07 (*)  EPA SC-CO2 + SC-CH4 (default)  + $0.10 at ~2% pipeline methane leakage
+    $1.15      Higher CH4 leakage (3.7%)      Alvarez et al. 2018, Science
+    $1.80      High-urgency                   EPA 2023 SC-GHG Tech Report App. 3B (1.5% disc.)
+    ------------------------------------------------------------------------------
+    (*) default. SC-CO2 combustion = $0.97/therm; SC-CH4 leakage adder = $0.10/therm.
+
 ### Natural gas — health cost ($1.23/therm default)
 
 Based on CPUC Decision D.24-07-015 (July 2024), using E3's "Quantifying
@@ -859,7 +877,7 @@ Both are added to the modeled gasoline cost only when their checkboxes are on.
 
 ## §14 · Charts Reference
 @file: charts.html
-@keys: chart_jc1, chart_jc2, chart_jc3, chart_jc4, chart_jc5, chart_jc6, chart_eu1, chart_eu2, chart_eu3, chart_eu4, chart_eu6, chart_eu7
+@keys: chart_jc1, chart_jc2, chart_jc3, chart_jc4, chart_jc5, chart_jc6, chart_eu1, chart_eu2, chart_eu3, chart_eu4, chart_eu6, chart_eu7, chart_eu8
 @popup: Charts are organized into three groups — Journey Costs (JC),
   Energy Use (EU), and Rates (R). Pick any chart from the dropdown above
   each chart panel; the code (JC.1, EU.7, R.3 …) appears in the chart's header.
@@ -927,6 +945,15 @@ The heat pump's energy across the twelve months of the HVAC-swap year, split int
 kilowatt-hour-equivalent (29.3 kWh per therm) so a gas furnace and a heat pump sit on the same
 axis; cooling is omitted for homes that have none. Switch the scenario toggle to contrast a gas
 furnace against a heat pump month by month.
+
+EU.8 · Direct Emissions (CO2 / CO2e)
+Direct combustion emissions — natural gas and gasoline — as stacked bars in metric tons per
+year, for Your Journey or Do Nothing. Toggle between CO2 (combustion only) and CO2e (adds
+methane leakage weighted by GWP100). Factors: gas 5.30 kg CO2/therm, CO2e 6.5 kg/therm
+(combustion + 2.3% leakage x GWP100 28); gasoline 8.89 kg/gal. Electricity is deliberately not
+counted — journey electricity that replaced gas or gasoline still carries a grid-carbon
+footprint, so the true net reduction is smaller than the drop shown here (grid-carbon modeling
+is a later phase).
 
 ### Rates (R)
 
@@ -1180,3 +1207,67 @@ clean seasonal price shape for natural gas.
 These are real, recent, utility-specific rates from federal data — a substantial improvement
 over a single hand-entered number — but they are an annual average, not your exact tariff. For
 a precise bill, use the manual override with figures from your own statement.
+
+---
+
+## §18 · Release Notes
+@file: release_notes.html
+@keys:
+@popup: Version history for WhyWatt. Each release is labeled Release <number> <Month> <Year>.
+
+### About releases
+
+This is the version history for WhyWatt. Each release is labeled **Release &lt;number&gt; &lt;Month&gt; &lt;Year&gt;**. The newest release is listed first.
+
+### Release 2 — September 2026
+
+Phase 6 — the rate hand-off interface and Phase 7 groundwork.
+
+- New projection-backed rate models — WhyWatt (Conservative / Moderate / Stress), US EIA,
+  EIA Pacific, and CEC 2025 — selectable per fuel under Energy &amp; Prices → Details. These
+  are non-default; the standard results are unchanged.
+- New "Rate Projection — methodology" page (under Technical reference) documenting how the
+  projected rates are built and sourced, with a chart of the projected curves.
+- New "Direct Emissions (CO2 / CO2e)" chart showing combustion emissions from gas and
+  gasoline, with a CO2 / CO2e toggle. Electricity is deliberately not counted (see the
+  chart's caveat).
+- Explicit EPA SC-CO2 + SC-CH4 citations on the climate-cost slider, with labeled reference
+  anchors you can hover for sources.
+- Independent scenario toggle for the left and right chart panes.
+- Inert roof / solar-array inputs (tilt, azimuth, array &amp; module type, losses) and a
+  design-load HVAC size estimate — groundwork for future solar modeling.
+
+### Release 1 — July 2026
+
+The first WhyWatt release (all development through Phase 5).
+
+- The core home-electrification journey: your planned upgrades vs. doing nothing, priced
+  year by year over the modeling horizon.
+- ZIP-driven CEC climate zones; per-utility electricity and gas rates (PG&amp;E / EIA /
+  CPUC ACC), escalation scenarios, and a manual override.
+- Appliance models (HVAC, water heater, dryer, cooktop), transportation / EV charging,
+  rooftop solar &amp; battery, and the electrical-panel load check.
+- Social &amp; health cost overlays for gas and gasoline; a full chart suite; and
+  save / load / share of scenarios.
+
+---
+
+## §19 · Support
+@file: support.html
+@keys:
+@popup: Frequently asked questions and how to reach us. We will expand this as WhyWatt grows.
+
+### FAQ
+
+**Which geographies does the tool support?**
+
+Detailed modeling of gas and electric rates is available for the California Bay Area. You can
+use this to get projections for most of California assuming PG&amp;E rates.
+
+**How can I get support for a new geography?**
+
+Use Contact (below) to learn what it takes to enable a new area.
+
+### Contact
+
+Email: <a href="mailto:vijay@whywatt.org">vijay@whywatt.org</a>

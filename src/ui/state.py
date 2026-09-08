@@ -25,6 +25,12 @@ year_built         = solara.reactive(_DEFAULTS["year_built"])
 insulation_quality = solara.reactive(_DEFAULTS["insulation_quality"])
 panel_amps         = solara.reactive(_DEFAULTS["panel_amps"])        # Phase 3 §5 — service size 100/150/200
 panel_calc_method  = solara.reactive(_DEFAULTS["panel_calc_method"]) # NEC load calc: "optional" (220.82) | "standard"
+# Phase 6 §2b — inert PVWatts roof/array geometry (carried, sanitized, shared, reset; no device reads them)
+roof_tilt          = solara.reactive(_DEFAULTS["roof_tilt"])
+roof_azimuth       = solara.reactive(_DEFAULTS["roof_azimuth"])
+array_type         = solara.reactive(_DEFAULTS["array_type"])
+module_type        = solara.reactive(_DEFAULTS["module_type"])
+system_losses      = solara.reactive(_DEFAULTS["system_losses"])
 
 # Electrical nameplate sizing (Phase 3 §2.5) — drive panel assessment, inert for energy
 hvac_tonnage    = solara.reactive(_DEFAULTS["hvac_tonnage"])   # slider 2.0–5.0; amps = tonnage × 10
@@ -181,8 +187,12 @@ solar_nbc              = solara.reactive(_DEFAULTS["solar_nbc"])    # $/kWh NBC 
 solar_system_cost      = solara.reactive(_DEFAULTS["solar_system_cost"])    # total installed cost from contractor quote
 solar_rebate           = solara.reactive(_DEFAULTS["solar_rebate"])
 
-# Device chart home selector (shared by both device chart types)
-device_chart_home = solara.reactive(_DEFAULTS["device_chart_home"])   # "journey" | "baseline"
+# Device chart home selector — Phase 6 §3d: one per pane so the left/right charts can show
+# different scenarios (e.g. journey vs do-nothing side by side). "journey" | "baseline".
+device_chart_home_left  = solara.reactive(_DEFAULTS["device_chart_home_left"])
+device_chart_home_right = solara.reactive(_DEFAULTS["device_chart_home_right"])
+# §3b Direct Emissions chart — CO2 vs CO2e metric toggle ("co2" | "co2e")
+emissions_metric = solara.reactive(_DEFAULTS["emissions_metric"])
 
 # Pricing & timeline
 # §2 per-fuel rate model — "cagr_flat" (= My Utility, EIA per-utility from ZIP) |
@@ -248,6 +258,11 @@ def reset_to_defaults():
     year_built.set(_DEFAULTS["year_built"])
     insulation_quality.set(_DEFAULTS["insulation_quality"])
     panel_amps.set(_DEFAULTS["panel_amps"])
+    roof_tilt.set(_DEFAULTS["roof_tilt"])
+    roof_azimuth.set(_DEFAULTS["roof_azimuth"])
+    array_type.set(_DEFAULTS["array_type"])
+    module_type.set(_DEFAULTS["module_type"])
+    system_losses.set(_DEFAULTS["system_losses"])
     panel_calc_method.set(_DEFAULTS["panel_calc_method"])
     hvac_tonnage.set(_DEFAULTS["hvac_tonnage"])
     ev_charger_amps.set(_DEFAULTS["ev_charger_amps"])
@@ -379,7 +394,9 @@ def reset_to_defaults():
     social_health_rate.set(_DEFAULTS["social_health_rate"])
     chart_left.set(_DEFAULTS["chart_left"])
     chart_right.set(_DEFAULTS["chart_right"])
-    device_chart_home.set(_DEFAULTS["device_chart_home"])
+    device_chart_home_left.set(_DEFAULTS["device_chart_home_left"])
+    device_chart_home_right.set(_DEFAULTS["device_chart_home_right"])
+    emissions_metric.set(_DEFAULTS["emissions_metric"])
     detail_open.set(_DEFAULTS["detail_open"])
     _set_all_setup(False)
     global _loaded_ctx

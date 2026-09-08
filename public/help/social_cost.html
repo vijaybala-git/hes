@@ -50,6 +50,18 @@
     <h2 id="natural-gas-climate-cost-1-07-therm-default">Natural gas — climate cost ($1.07/therm default)</h2>
     <p>Based on EPA 2023 Social Cost of CO2 ($190/tonne CO2) applied to the EIA combustion emission factor (5.3 kg CO2/therm), plus an allowance for upstream methane leakage at a 2% pipeline leakage rate.</p>
 <p>Slider range: $1.00 (EPA SC-CO2 only, no leakage) to $2.00 (high leakage + high scenario).</p>
+<p>The default $1.07 is two cited sub-components: SC-CO2 combustion $0.97/therm (EIA 5.306 kg CO2/therm x EPA 2023 central $190/tonne CO2) plus an SC-CH4 leakage adder of $0.10/therm (EPA SC-CH4 2023 ~$1,600/short ton x ~2% pipeline leakage).</p>
+
+    <h2 id="the-four-climate-rate-anchor-models">The four climate-rate anchor models</h2>
+    <p>The climate-rate slider marks four reference points — hover each tick on the slider for its source citation:</p>
+<div class="formula">Rate       Model                          Basis / source
+------------------------------------------------------------------------------
+$1.00      EPA SC-CO2 only                EIA 5.306 kgCO2/therm x EPA 2023 $190/tCO2
+$1.07 (*)  EPA SC-CO2 + SC-CH4 (default)  + $0.10 at ~2% pipeline methane leakage
+$1.15      Higher CH4 leakage (3.7%)      Alvarez et al. 2018, Science
+$1.80      High-urgency                   EPA 2023 SC-GHG Tech Report App. 3B (1.5% disc.)
+------------------------------------------------------------------------------
+(*) default. SC-CO2 combustion = $0.97/therm; SC-CH4 leakage adder = $0.10/therm.</div>
 
     <h2 id="natural-gas-health-cost-1-23-therm-default">Natural gas — health cost ($1.23/therm default)</h2>
     <p>Based on CPUC Decision D.24-07-015 (July 2024), using E3's "Quantifying Air Quality Impacts of Decarbonization" report. Computed using the EPA COBRA tool with California population and pollution data. Covers outdoor air quality damage (NO2, PM2.5) from building gas combustion.</p>

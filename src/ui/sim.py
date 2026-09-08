@@ -347,6 +347,12 @@ def run_simulation():
         hot_water_daily_gallons=(hw_daily_gallons.value
                                   if hw_gallons_user_override.value else None),
         panel_amps=panel_amps.value,
+        # Phase 6 §2b — inert PVWatts geometry (carried through; no device reads them).
+        roof_tilt=roof_tilt.value,
+        roof_azimuth=roof_azimuth.value,
+        array_type=array_type.value,
+        module_type=module_type.value,
+        system_losses=system_losses.value,
     )
     capex_slots = []
     if panel_upgrade_planned.value:

@@ -340,7 +340,7 @@ _INDEX_GROUPS: list[tuple[str, list[str]]] = [
     # Phase 7 when the projection becomes the default). It's a standalone page, not a §section.
     ("Technical reference",    ["climate_data.html", "rates_reference.html",
                                 "rate_projection_guide.html"]),
-    ("About",                  ["about.html"]),
+    ("About & support",        ["about.html", "release_notes.html", "support.html"]),
 ]
 
 # Standalone pages (not parsed §sections) that still appear on the index. Maps the served
@@ -462,6 +462,7 @@ _CHART_NAME_TO_KEY = {
     "Annual Gas by Device":           "chart_eu4",
     "Energy Mix Timeline":            "chart_eu6",
     "HVAC Monthly Energy":            "chart_eu7",
+    "Direct Emissions (CO₂ / CO₂e)":  "chart_eu8",
     # Rates (R)
     "Electric CAGR Projection":       "chart_r1",
     "Gas CAGR Projection":            "chart_r2",
@@ -526,6 +527,13 @@ _EXTRA_POPUP_KEYS = {
                   "kilowatt-hour-equivalent terms: natural gas, gasoline, grid electricity, your "
                   "own solar, and external EV charging. It tells the decarbonization story at a "
                   "glance as gas shrinks and solar grows.",
+                  "charts.html"),
+    "chart_eu8": ("Direct combustion emissions — natural gas and gasoline — as stacked bars in "
+                  "metric tons per year, for your journey or the do-nothing home. Toggle CO₂ "
+                  "(combustion only) vs CO₂e (adds methane leakage at GWP100). Electricity is "
+                  "deliberately excluded: journey electricity that replaced gas still carries a "
+                  "grid-carbon footprint, so the true net reduction is smaller (grid-carbon "
+                  "modeling is a later phase).",
                   "charts.html"),
     "chart_eu7": ("The heat pump's energy across the twelve months of the HVAC-swap year, split "
                   "into heating (bottom) and cooling (top). Do-nothing gas heating is shown in "

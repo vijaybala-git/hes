@@ -22,7 +22,7 @@ from ui.device_style import DEVICE_STYLE, DEVICE_ORDER, dstyle, device_legend_ha
 from ui.slider import WhyWattSlider, SliderSpec
 from help_utils import HelpButton, ChartHelpButton, HelpPopupOverlay, HelpLink
 from journey import CATEGORY_ORDER, CATEGORY_LABELS, CapExOnlySlot, SolarBatteryConfig
-from home_config import HomeConfig, compute_baseload_kwh, compute_ua
+from home_config import HomeConfig, compute_baseload_kwh, compute_ua, suggest_hvac_tons
 from model import HESModel
 from panel_assessor import PanelAssessor
 from projected_rate_source import (
@@ -141,6 +141,17 @@ def _hp_size():
     _HSl("Heat pump size", hvac_tonnage, _DEFAULTS["hvac_tonnage"],
          2.0, 5.0, 0.5, unit="ton", decimals=1)
     _elec_display(240, int(hvac_tonnage.value * 10))
+    # Phase 6 §3e — design-day size estimate (label only; does not change energy or the slider).
+    _ci = _climate_info(zip_code.value, climate_trend.value)
+    _tons = suggest_hvac_tons(compute_ua(insulation_quality.value, square_footage.value),
+                              getattr(_ci, "heating_design_temp_f", None),
+                              getattr(_ci, "cooling_design_temp_f", None))
+    if _tons is not None:
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            f"<div style='font-size:0.72em; color:#90A4AE; margin:2px 0 0 2px'>"
+            f"Design-load estimate ≈ <b>{_tons:.1f} ton</b> "
+            f"({_ci.zone_id} 99% heat {_ci.heating_design_temp_f:.0f}°F / "
+            f"1% cool {_ci.cooling_design_temp_f:.0f}°F, envelope only)</div>"))
 
 
 def _YSl(rv, default, title="Swap year", max_yr=25):
@@ -1438,6 +1449,27 @@ def HomeDetail():
     solara.Select("Bedrooms", value=num_bedrooms, values=[1, 2, 3, 4, 5])
     solara.InputInt("Square footage", value=square_footage)
     solara.InputInt("Year built", value=year_built)
+
+    # ── Roof & solar array geometry (Phase 6 §2b — inert PVWatts inputs) ────────
+    _ci_lat = getattr(_ci, "latitude", None)
+    _geo = (f" · site {_ci_lat:.3f}, {_ci.longitude:.3f}"
+            if _ci_lat is not None and getattr(_ci, "longitude", None) is not None else "")
+    solara.HTML(tag="div", unsafe_innerHTML=(
+        f"<div style='font-size:0.80em; font-weight:600; color:#455A64; margin:10px 0 2px'>"
+        f"Roof &amp; solar array</div>"
+        f"<div style='font-size:0.72em; color:#90A4AE; margin-bottom:4px'>"
+        f"Used for future solar (PVWatts) modeling — does not affect current results{_geo}.</div>"))
+    with solara.Columns([1, 1]):
+        solara.InputInt("Roof tilt (°)", value=roof_tilt)
+        solara.InputInt("Azimuth (°)", value=roof_azimuth)
+    with solara.Columns([1, 1]):
+        solara.Select("Array type", value=array_type,
+                      values=["fixed_roof", "fixed_open", "tracking_1ax", "tracking_2ax"])
+        solara.Select("Module type", value=module_type,
+                      values=["standard", "premium", "thin_film"])
+    with solara.Columns([1, 1]):
+        solara.InputFloat("System losses (%)", value=system_losses)
+        solara.Div()   # keep the last field half-width, aligned with the grid above
     solara.Markdown("---")
 
     _DS("Climate Trend")
@@ -1932,7 +1964,17 @@ def _SocialBody():
                         minimum=1.00, maximum=2.00, step=0.01,
                         default=_DEFAULTS["social_climate_rate"],
                         unit="$/therm", decimals=2,
-                        gate_label="Add CO₂ + Methane Cost",
+                        gate_label="Add SC-CO₂ + SC-CH₄ (EPA)",
+                        anchors=[
+                            (1.00, "EPA SC-CO₂ only — $1.00/therm "
+                                   "(EIA 5.306 kgCO₂/therm × EPA 2023 central $190/tCO₂)"),
+                            (1.07, "EPA SC-CO₂ + SC-CH₄ — $1.07/therm (default): "
+                                   "$0.97 combustion + $0.10 at ~2% pipeline leakage"),
+                            (1.15, "Higher CH₄ leakage (3.7%) — $1.15/therm "
+                                   "(Alvarez et al. 2018, Science)"),
+                            (1.80, "High-urgency — $1.80/therm "
+                                   "(EPA 2023 SC-GHG Tech Report App. 3B, 1.5% discount rate)"),
+                        ],
                     ),
                     value=social_climate_rate,
                     enabled=social_climate_enabled,
