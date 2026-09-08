@@ -38,6 +38,11 @@ ROOT        = Path(__file__).parent.parent
 SOURCE_DIR  = ROOT / "docs" / "help"          # hand-edited source (md + includes)
 CONTENT_MD  = SOURCE_DIR / "help_content.md"
 HELP_PY     = ROOT / "src" / "help_content.py"
+# Phase 6 WS1 — the rate-projection methodology guide (a standalone reviewer page, not a
+# parsed §section). Rendered to public/help/ so the in-app help can link to it; reworked
+# into a proper §section in Phase 7 when the projection becomes the default.
+GUIDE_MD    = SOURCE_DIR / "rate_projection_guide.md"
+GUIDE_HTML  = "rate_projection_guide.html"
 # Generated, served output — Solara serves project-root public/ at /static/public/
 PUBLIC_HELP   = ROOT / "public" / "help"
 PUBLIC_ASSETS = ROOT / "public" / "assets"
@@ -46,7 +51,7 @@ PUBLIC_ASSETS = ROOT / "public" / "assets"
 _CSS = """
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
            max-width: 760px; margin: 2rem auto; padding: 0 1.5rem;
-           color: #222; line-height: 1.65; }
+           color: #222; background: #fff; color-scheme: light; line-height: 1.65; }
     header { display: flex; align-items: center; gap: 1rem;
              border-bottom: 2px solid #E8EAF6; padding-bottom: 1rem; margin-bottom: 1rem; }
     header img { height: 40px; }
@@ -282,6 +287,13 @@ def render_html(section: HelpSection) -> str:
         heading_safe = heading.replace("&", "&amp;")
         content_html += f'\n    <h2 id="{slug}">{heading_safe}</h2>\n    {body}\n'
 
+    # "See also" cross-links (Phase 6 WS1 — e.g. rates.html → methodology guide).
+    related = _RELATED_LINKS.get(section.html_file)
+    if related:
+        links = "\n".join(f'      <li><a href="{url}">{label}</a></li>' for url, label in related)
+        content_html += ('\n    <h2 id="see-also">See also</h2>\n'
+                         f'    <ul>\n{links}\n    </ul>\n')
+
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -324,14 +336,30 @@ _INDEX_GROUPS: list[tuple[str, list[str]]] = [
     ("Energy prices",          ["rates.html", "acc.html"]),
     ("Charts",                 ["charts.html"]),
     ("Costs beyond the bill",  ["social_cost.html"]),
-    ("Technical reference",    ["climate_data.html", "rates_reference.html"]),
+    # Phase 6 WS1: link the rate-projection methodology guide for reviewers (reworked in
+    # Phase 7 when the projection becomes the default). It's a standalone page, not a §section.
+    ("Technical reference",    ["climate_data.html", "rates_reference.html",
+                                "rate_projection_guide.html"]),
     ("About",                  ["about.html"]),
 ]
+
+# Standalone pages (not parsed §sections) that still appear on the index. Maps the served
+# file to its index title. Built by dedicated renderers, listed in _INDEX_GROUPS above.
+_EXTRA_INDEX_TITLES: dict[str, str] = {
+    "rate_projection_guide.html": "Rate Projection — methodology (draft)",
+}
+
+# "See also" cross-links appended to the bottom of specific section pages (html_file → list
+# of (url, label)). Phase 6 WS1: point the Energy & Prices page at the methodology guide.
+_RELATED_LINKS: dict[str, list[tuple[str, str]]] = {
+    "rates.html": [("rate_projection_guide.html",
+                    "Rate Projection — methodology & data sources (technical, draft)")],
+}
 
 _INDEX_CSS = """
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
            max-width: 760px; margin: 2rem auto; padding: 0 1.5rem;
-           color: #222; line-height: 1.65; }
+           color: #222; background: #fff; color-scheme: light; line-height: 1.65; }
     header { display: flex; align-items: center; gap: 1rem;
              border-bottom: 2px solid #E8EAF6; padding-bottom: 1rem; margin-bottom: 1.5rem; }
     header img { height: 48px; }
@@ -360,11 +388,18 @@ def render_index(sections: list[HelpSection]) -> str:
     def _li(s: HelpSection) -> str:
         return f'    <li><a href="{s.html_file}">{s.title.replace("&", "&amp;")}</a></li>'
 
+    def _li_file(f: str) -> str | None:
+        """List item for a file — a parsed §section, or a standalone extra page."""
+        if f in by_file:
+            placed.add(f)
+            return _li(by_file[f])
+        if f in _EXTRA_INDEX_TITLES:
+            placed.add(f)
+            return f'    <li><a href="{f}">{_EXTRA_INDEX_TITLES[f].replace("&", "&amp;")}</a></li>'
+        return None
+
     for group_name, files in _INDEX_GROUPS:
-        items = [_li(by_file[f]) for f in files if f in by_file]
-        for f in files:
-            if f in by_file:
-                placed.add(f)
+        items = [li for f in files if (li := _li_file(f)) is not None]
         if items:
             blocks.append(f"  <h2>{group_name}</h2>\n  <ul>\n" + "\n".join(items) + "\n  </ul>")
 
@@ -599,6 +634,81 @@ def render_help_content_py(sections: list[HelpSection]) -> str:
     return "\n".join(lines)
 
 
+# ── Standalone guide renderer (Phase 6 WS1) ─────────────────────────────────────
+
+def render_guide(md_path: Path) -> str:
+    """Render the rate-projection methodology guide (docs/help/rate_projection_guide.md) to a
+    standalone served page. Uses the `markdown` lib (tables/fenced code) since the guide has
+    tables the hand-rolled section converter doesn't handle. Drops the editor-only preamble
+    (everything before the first `## §R` header) and the section-status glyphs in headers, so
+    reviewers see just the methodology."""
+    import markdown as _md
+
+    raw = md_path.read_text(encoding="utf-8")
+
+    # Drop the editor-only preamble (living-doc note, status legend, writing rules).
+    m = re.search(r"^## §R", raw, re.MULTILINE)
+    body_md = raw[m.start():] if m else raw
+
+    # Strip section-status glyphs (✅ 🚧 ⬜ ↗) and `@popup:`/`@include:` directive prefixes so
+    # the served page reads cleanly; keep the popup text itself as an italic lead-in.
+    cleaned: list[str] = []
+    for line in body_md.splitlines():
+        if line.lstrip().startswith("@include:"):
+            continue
+        if line.lstrip().startswith("@popup:"):
+            cleaned.append("*" + line.split("@popup:", 1)[1].strip() + "*")
+            continue
+        if line.startswith("## §") or line.startswith("### "):
+            line = re.sub(r"\s*[✅🚧⬜↗]+\s*$", "", line)
+        cleaned.append(line)
+
+    html_body = _md.markdown("\n".join(cleaned),
+                             extensions=["tables", "fenced_code", "sane_lists"])
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WhyWatt Help — Rate Projection Methodology</title>
+  <style>
+{textwrap.indent(_CSS, "    ")}
+    table {{ border-collapse: collapse; margin: 1rem 0; font-size: 0.88rem; }}
+    th, td {{ border: 1px solid #E0E0E0; padding: 4px 10px; text-align: left; }}
+    th {{ background: #F5F6FF; color: #283593; }}
+    h3 {{ color: #3949AB; font-size: 0.98rem; margin-top: 1.2rem; }}
+    blockquote {{ border-left: 4px solid #9FA8DA; margin: 1rem 0; padding: 0.4rem 1rem;
+                  background: #F7F8FF; color: #444; }}
+  </style>
+</head>
+<body>
+  <header>
+    <img src="../assets/whywatt_logo.svg" alt="WhyWatt"
+         onerror="this.style.display='none'">
+    <h1>Rate Projection — Methodology</h1>
+  </header>
+  <nav>
+    <a href="index.html">← Help Index</a>
+    <a href="rates.html">Energy &amp; Prices</a>
+  </nav>
+  <div class="note">
+    <strong>Draft methodology reference.</strong> This page explains how WhyWatt's projected
+    rate models (the WhyWatt / EIA / CEC options) are built and sourced. It is a living draft
+    for reviewers; it will be folded into the main help when the projection becomes the default
+    in a later phase.
+  </div>
+  <main>
+{textwrap.indent(html_body, "    ")}
+  </main>
+  <footer>
+    <span>WhyWatt v3.0 &middot; <a href="about.html" style="color:#9E9E9E">About</a></span>
+    <span class="section-tag">source: docs/help/rate_projection_guide.md</span>
+  </footer>
+</body>
+</html>
+"""
+
+
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def main():
@@ -627,6 +737,15 @@ def main():
         out_path.write_text(render_html(section), encoding="utf-8")
         written_html.append(section.html_file)
         print(f"  wrote {out_path.relative_to(ROOT)}")
+
+    # Standalone methodology guide (Phase 6 WS1) — rendered from its own md source.
+    if GUIDE_MD.exists():
+        (PUBLIC_HELP / GUIDE_HTML).write_text(render_guide(GUIDE_MD), encoding="utf-8")
+        written_html.append(GUIDE_HTML)
+        print(f"  wrote {(PUBLIC_HELP / GUIDE_HTML).relative_to(ROOT)}")
+    else:
+        print(f"  WARN: {GUIDE_MD.relative_to(ROOT)} not found — guide page skipped",
+              file=sys.stderr)
 
     # Generate the help index (from the sections, so it never drifts).
     (PUBLIC_HELP / "index.html").write_text(render_index(sections), encoding="utf-8")

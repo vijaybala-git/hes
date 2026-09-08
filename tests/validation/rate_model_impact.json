@@ -1,0 +1,209 @@
+{
+  "generated_utc": "2026-09-08T02:39:31Z",
+  "note": "Rate-model impact snapshot (Phase 6 WS1). Non-default projection paths are exercised deliberately \u2014 this is not the golden. sim_start_year=2025, 20-year horizon (app default); HVAC swap 2027, WH swap 2029.",
+  "reference_run": "legacy_default_cagr",
+  "scenarios": {
+    "hvac2027_wh2029": {
+      "description": "HVAC swap 2027 + Water Heater swap 2029 only (the requested scenario).",
+      "runs": {
+        "legacy_default_cagr": {
+          "label": "Legacy default (CAGR-flat, EIA per-utility)",
+          "elec_model": "cagr_flat",
+          "gas_model": "cagr_flat",
+          "journey_cumulative_opex": 140731,
+          "baseline_cumulative_opex": 132000,
+          "opex_delta": -8731,
+          "payback_year": null,
+          "net_social_cost_avoided": 19934,
+          "opex_delta_vs_reference": 0,
+          "baseline_vs_reference": 0
+        },
+        "legacy_acc": {
+          "label": "Legacy ACC (PG&E/CPUC base)",
+          "elec_model": "acc_shaped",
+          "gas_model": "acc_seasonal",
+          "journey_cumulative_opex": 143040,
+          "baseline_cumulative_opex": 129420,
+          "opex_delta": -13620,
+          "payback_year": null,
+          "net_social_cost_avoided": 19934,
+          "opex_delta_vs_reference": -4889,
+          "baseline_vs_reference": -2580
+        },
+        "whywatt_conservative": {
+          "label": "WhyWatt Conservative",
+          "elec_model": "whywatt_conservative",
+          "gas_model": "whywatt_conservative",
+          "journey_cumulative_opex": 102333,
+          "baseline_cumulative_opex": 164850,
+          "opex_delta": 62516,
+          "payback_year": 7,
+          "net_social_cost_avoided": 19934,
+          "opex_delta_vs_reference": 71247,
+          "baseline_vs_reference": 32850
+        },
+        "whywatt_moderate": {
+          "label": "WhyWatt Moderate",
+          "elec_model": "whywatt_moderate",
+          "gas_model": "whywatt_moderate",
+          "journey_cumulative_opex": 108459,
+          "baseline_cumulative_opex": 183385,
+          "opex_delta": 74926,
+          "payback_year": 7,
+          "net_social_cost_avoided": 19934,
+          "opex_delta_vs_reference": 83657,
+          "baseline_vs_reference": 51385
+        },
+        "whywatt_stress": {
+          "label": "WhyWatt Stress",
+          "elec_model": "whywatt_stress",
+          "gas_model": "whywatt_stress",
+          "journey_cumulative_opex": 123083,
+          "baseline_cumulative_opex": 242441,
+          "opex_delta": 119358,
+          "payback_year": 9,
+          "net_social_cost_avoided": 19934,
+          "opex_delta_vs_reference": 128089,
+          "baseline_vs_reference": 110441
+        },
+        "cec_deathspiral": {
+          "label": "CEC 2025 IEPR (elec) + CEC 2025 BAU-invest (gas)",
+          "elec_model": "cec_iepr",
+          "gas_model": "cec_bau",
+          "journey_cumulative_opex": 118680,
+          "baseline_cumulative_opex": 223091,
+          "opex_delta": 104410,
+          "payback_year": 6,
+          "net_social_cost_avoided": 19934,
+          "opex_delta_vs_reference": 113141,
+          "baseline_vs_reference": 91091
+        },
+        "eia_national": {
+          "label": "US EIA national average",
+          "elec_model": "eia_national",
+          "gas_model": "eia_national",
+          "journey_cumulative_opex": 68431,
+          "baseline_cumulative_opex": 67077,
+          "opex_delta": -1354,
+          "payback_year": null,
+          "net_social_cost_avoided": 19934,
+          "opex_delta_vs_reference": 7377,
+          "baseline_vs_reference": -64923
+        },
+        "eia_pacific": {
+          "label": "EIA AEO Pacific",
+          "elec_model": "eia_pacific",
+          "gas_model": "eia_pacific",
+          "journey_cumulative_opex": 78045,
+          "baseline_cumulative_opex": 78613,
+          "opex_delta": 567,
+          "payback_year": 11,
+          "net_social_cost_avoided": 19934,
+          "opex_delta_vs_reference": 9298,
+          "baseline_vs_reference": -53387
+        }
+      }
+    },
+    "full_electrification_2027_29": {
+      "description": "HVAC 2027 + WH 2029 + dryer/cooktop/EV planned; 200 A panel (case 01 style).",
+      "runs": {
+        "legacy_default_cagr": {
+          "label": "Legacy default (CAGR-flat, EIA per-utility)",
+          "elec_model": "cagr_flat",
+          "gas_model": "cagr_flat",
+          "journey_cumulative_opex": 171298,
+          "baseline_cumulative_opex": 132000,
+          "opex_delta": -39298,
+          "payback_year": 2,
+          "net_social_cost_avoided": 42433,
+          "opex_delta_vs_reference": 0,
+          "baseline_vs_reference": 0
+        },
+        "legacy_acc": {
+          "label": "Legacy ACC (PG&E/CPUC base)",
+          "elec_model": "acc_shaped",
+          "gas_model": "acc_seasonal",
+          "journey_cumulative_opex": 167634,
+          "baseline_cumulative_opex": 129420,
+          "opex_delta": -38214,
+          "payback_year": 2,
+          "net_social_cost_avoided": 42433,
+          "opex_delta_vs_reference": 1084,
+          "baseline_vs_reference": -2580
+        },
+        "whywatt_conservative": {
+          "label": "WhyWatt Conservative",
+          "elec_model": "whywatt_conservative",
+          "gas_model": "whywatt_conservative",
+          "journey_cumulative_opex": 85588,
+          "baseline_cumulative_opex": 164850,
+          "opex_delta": 79262,
+          "payback_year": 2,
+          "net_social_cost_avoided": 42433,
+          "opex_delta_vs_reference": 118560,
+          "baseline_vs_reference": 32850
+        },
+        "whywatt_moderate": {
+          "label": "WhyWatt Moderate",
+          "elec_model": "whywatt_moderate",
+          "gas_model": "whywatt_moderate",
+          "journey_cumulative_opex": 91659,
+          "baseline_cumulative_opex": 183385,
+          "opex_delta": 91726,
+          "payback_year": 2,
+          "net_social_cost_avoided": 42433,
+          "opex_delta_vs_reference": 131024,
+          "baseline_vs_reference": 51385
+        },
+        "whywatt_stress": {
+          "label": "WhyWatt Stress",
+          "elec_model": "whywatt_stress",
+          "gas_model": "whywatt_stress",
+          "journey_cumulative_opex": 102221,
+          "baseline_cumulative_opex": 242441,
+          "opex_delta": 140220,
+          "payback_year": 2,
+          "net_social_cost_avoided": 42433,
+          "opex_delta_vs_reference": 179518,
+          "baseline_vs_reference": 110441
+        },
+        "cec_deathspiral": {
+          "label": "CEC 2025 IEPR (elec) + CEC 2025 BAU-invest (gas)",
+          "elec_model": "cec_iepr",
+          "gas_model": "cec_bau",
+          "journey_cumulative_opex": 99215,
+          "baseline_cumulative_opex": 223091,
+          "opex_delta": 123876,
+          "payback_year": 2,
+          "net_social_cost_avoided": 42433,
+          "opex_delta_vs_reference": 163174,
+          "baseline_vs_reference": 91091
+        },
+        "eia_national": {
+          "label": "US EIA national average",
+          "elec_model": "eia_national",
+          "gas_model": "eia_national",
+          "journey_cumulative_opex": 50861,
+          "baseline_cumulative_opex": 67077,
+          "opex_delta": 16216,
+          "payback_year": 2,
+          "net_social_cost_avoided": 42433,
+          "opex_delta_vs_reference": 55514,
+          "baseline_vs_reference": -64923
+        },
+        "eia_pacific": {
+          "label": "EIA AEO Pacific",
+          "elec_model": "eia_pacific",
+          "gas_model": "eia_pacific",
+          "journey_cumulative_opex": 64700,
+          "baseline_cumulative_opex": 78613,
+          "opex_delta": 13913,
+          "payback_year": 2,
+          "net_social_cost_avoided": 42433,
+          "opex_delta_vs_reference": 53211,
+          "baseline_vs_reference": -53387
+        }
+      }
+    }
+  }
+}
