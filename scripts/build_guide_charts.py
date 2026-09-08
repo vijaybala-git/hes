@@ -22,7 +22,10 @@ sys.path.insert(0, str(REPO / "src"))
 
 from projected_rate_source import ProjectedRateSource, PROJECTION_LABELS, _bundle
 
-OUT = REPO / "public" / "help" / "rate_projection_curves.png"
+# SVG (vector text), not PNG: Hugging Face pushes binary images through Git-Xet/LFS and
+# rejects an untracked one even when small; an SVG is plain text, so it deploys as a normal
+# file, stays crisp, and renders in the guide's <img>.
+OUT = REPO / "public" / "help" / "rate_projection_curves.svg"
 
 YEARS = list(range(2025, 2051))          # bundle horizon 2025-2050
 
@@ -74,7 +77,7 @@ def main():
     fig.tight_layout(rect=(0, 0.03, 1, 0.95))
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(OUT, dpi=120, facecolor="white")
+    fig.savefig(OUT, format="svg", facecolor="white")
     plt.close(fig)
     print(f"wrote {OUT.relative_to(REPO)}")
 

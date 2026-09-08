@@ -97,7 +97,7 @@ and the rate climbs. Same math, opposite direction. This is why electricity and 
 @popup: Conservative, Moderate, and Stress — a low, central, and high path. All three come from the
 California Energy Commission's own 2025 forecast; Moderate is the default.
 
-![Projected retail rates for every selectable rate model, electricity and gas, 2025–2050](rate_projection_curves.png)
+![Projected retail rates for every selectable rate model, electricity and gas, 2025–2050](rate_projection_curves.svg)
 
 *Figure: the projected retail rate for every selectable rate model — the three WhyWatt scenarios
 plus the CEC and EIA reference lines — both fuels, 2025–2050 (gas on a log scale). Electricity stays
