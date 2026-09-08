@@ -340,7 +340,7 @@ _INDEX_GROUPS: list[tuple[str, list[str]]] = [
     # Phase 7 when the projection becomes the default). It's a standalone page, not a §section.
     ("Technical reference",    ["climate_data.html", "rates_reference.html",
                                 "rate_projection_guide.html"]),
-    ("About",                  ["about.html"]),
+    ("About & support",        ["about.html", "release_notes.html", "support.html"]),
 ]
 
 # Standalone pages (not parsed §sections) that still appear on the index. Maps the served

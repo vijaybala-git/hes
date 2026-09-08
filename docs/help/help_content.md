@@ -1198,3 +1198,67 @@ clean seasonal price shape for natural gas.
 These are real, recent, utility-specific rates from federal data — a substantial improvement
 over a single hand-entered number — but they are an annual average, not your exact tariff. For
 a precise bill, use the manual override with figures from your own statement.
+
+---
+
+## §18 · Release Notes
+@file: release_notes.html
+@keys:
+@popup: Version history for WhyWatt. Each release is labeled Release <number> <Month> <Year>.
+
+### About releases
+
+This is the version history for WhyWatt. Each release is labeled **Release &lt;number&gt; &lt;Month&gt; &lt;Year&gt;**. The newest release is listed first.
+
+### Release 2 — September 2026
+
+Phase 6 — the rate hand-off interface and Phase 7 groundwork.
+
+- New projection-backed rate models — WhyWatt (Conservative / Moderate / Stress), US EIA,
+  EIA Pacific, and CEC 2025 — selectable per fuel under Energy &amp; Prices → Details. These
+  are non-default; the standard results are unchanged.
+- New "Rate Projection — methodology" page (under Technical reference) documenting how the
+  projected rates are built and sourced, with a chart of the projected curves.
+- New "Direct Emissions (CO2 / CO2e)" chart showing combustion emissions from gas and
+  gasoline, with a CO2 / CO2e toggle. Electricity is deliberately not counted (see the
+  chart's caveat).
+- Explicit EPA SC-CO2 + SC-CH4 citations on the climate-cost slider, with labeled reference
+  anchors you can hover for sources.
+- Independent scenario toggle for the left and right chart panes.
+- Inert roof / solar-array inputs (tilt, azimuth, array &amp; module type, losses) and a
+  design-load HVAC size estimate — groundwork for future solar modeling.
+
+### Release 1 — July 2026
+
+The first WhyWatt release (all development through Phase 5).
+
+- The core home-electrification journey: your planned upgrades vs. doing nothing, priced
+  year by year over the modeling horizon.
+- ZIP-driven CEC climate zones; per-utility electricity and gas rates (PG&amp;E / EIA /
+  CPUC ACC), escalation scenarios, and a manual override.
+- Appliance models (HVAC, water heater, dryer, cooktop), transportation / EV charging,
+  rooftop solar &amp; battery, and the electrical-panel load check.
+- Social &amp; health cost overlays for gas and gasoline; a full chart suite; and
+  save / load / share of scenarios.
+
+---
+
+## §19 · Support
+@file: support.html
+@keys:
+@popup: Frequently asked questions and how to reach us. We will expand this as WhyWatt grows.
+
+### FAQ
+
+**Which geographies does the tool support?**
+
+Detailed modeling of gas and electric rates is available for the California Bay Area. You can
+use this to get projections for most of California assuming PG&amp;E rates.
+
+**How can I get support for a new geography?**
+
+Use Contact (below) to learn what it takes to enable a new area.
+
+### Contact
+
+Email: <a href="mailto:vijay@whywatt.org">vijay@whywatt.org</a>
