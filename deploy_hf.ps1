@@ -34,7 +34,10 @@ param(
     [string[]] $ExcludePaths = @(
         "docs/presentations",
         "data/climate/sources",
-        "data/rates/sources"
+        "data/rates/sources",
+        # Legacy binary that HF (Git-Xet/LFS) rejects; superseded by rate_projection_curves.svg.
+        # It only ever existed in Phase 6 history, so strip it from every deployed commit.
+        "public/help/rate_projection_curves.png"
     )
 )
 
