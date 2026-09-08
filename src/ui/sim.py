@@ -11,6 +11,7 @@ from home_config import HomeConfig
 from journey import CapExOnlySlot, SolarBatteryConfig
 from social_cost import SocialCostConfig
 from panel_assessor import PanelAssessor
+from projected_rate_source import PROJECTION_LABELS
 from ui.theme import C_RATE_ELEC, C_RATE_GAS
 from ui.state import *  # noqa: F401,F403 — reactives read/written by _seed_eia_cagr
 
@@ -92,6 +93,10 @@ def _fuel_resolved_display(fuel: str, mode: str, cagr_pct: int, acc_cagr_pct: in
                            ri_auto, ri_ca) -> tuple[str, str, int]:
     """(name, provenance, cagr) for a fuel given its selected rate mode."""
     fr_auto = ri_auto.electricity if fuel == "electricity" else ri_auto.gas
+    if mode in PROJECTION_LABELS:
+        # Projection models carry a baked curve; no user CAGR (cagr=None hides the +%/yr tag).
+        # ACC shape is layered on in the core (Phase 6 WS1).
+        return PROJECTION_LABELS[mode], "acc", None
     if mode in ("acc_shaped", "acc_seasonal"):
         return "PG&E CPUC base", "acc", acc_cagr_pct
     if mode == "ca_average":

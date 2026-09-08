@@ -1,13 +1,22 @@
 # Phase 6 × Energy Rate Projection — Reconciliation Plan (for stakeholder review)
 
-**Status:** 🟡 DRAFT for review — not yet folded into `Phase6_Spec.md`.
-**Inputs reconciled:** `docs/Phase6_Spec.md` (planned) + `docs/Energy_Rate_Projection_Spec.md` (methodology v1.0).
-**Prepared:** 2026-07-07. **Rev:** 2026-07-08 — added §0 (resolved decisions) and §8 (spec clarity fixes).
+> **⛔ SUPERSEDED (2026-09-07) — kept as historical record only.** This reconciliation plan did its
+> job: it resolved how the rate-projection work relates to Phase 6. Outcomes:
+> - The **offline model** was built and closed — see `docs/OfflineRateProjection_Plan.md` (CLOSED)
+>   and the portable bundle `data/rates/projection/whywatt_rate_projection.json`.
+> - The **§8 methodology clarity fixes** were applied — `Energy_Rate_Projection_Spec.md` is at v1.1.
+> - The **§3.1 LSC/V1 blocker** was dissolved (V1 is now a derived internal check, not a fixture).
+> - The **interface** to consume the bundle now lives in `docs/Phase6_Spec.md` WS1 (a non-default
+>   `cec_projection` rate model + an end-of-phase difference evaluation).
+> - The **default rate switch + golden re-baseline** (this doc's §5 deferrals) remains **Phase 7**.
+>
+> Read this only for the methodology rationale (§0 decisions, §8 bridge/plug reasoning). Do not
+> implement from it — implement from `Phase6_Spec.md` WS1 (interface) and `Phase7_Spec.md` §5
+> (default switch + golden re-baseline).
 
-> **Note (2026-08-26):** the rate-projection work is now proceeding first as a **standalone offline
-> sub-project** — see `docs/OfflineRateProjection_Plan.md` for the active build plan. This document
-> remains the record of the eventual **live wire-in** (the Phase-7 golden re-baseline), which the
-> offline model feeds once reviewed.
+**Status:** ⛔ SUPERSEDED — historical record (was: 🟡 DRAFT for stakeholder review).
+**Inputs reconciled:** `docs/Phase6_Spec.md` (planned) + `docs/Energy_Rate_Projection_Spec.md` (methodology v1.0).
+**Prepared:** 2026-07-07. **Rev:** 2026-07-08 — added §0 (resolved decisions) and §8 (spec clarity fixes). **Superseded:** 2026-09-07.
 
 ---
 

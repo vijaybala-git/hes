@@ -1,7 +1,13 @@
 # WhyWatt — Spec 5.6 (Feedback Round)
 
-**Status:** 🟡 DRAFT — collecting & triaging user-testing feedback ahead of Phase 6.
-**Last updated:** 2026-08-20
+> **⛔ SUPERSEDED (2026-09-07) — folded into `docs/Phase6_Spec.md`.** The 5.6 items now live in
+> Phase 6 WS3: #2 (CO₂/CO₂e chart) → §3b, #3 (grid-mix Help table) → §3c, #4 (per-pane scenario
+> toggle) → §3d, #1 (HVAC tonnage, needs per-zone design temps) → §3e. #5 (match y-axis scales)
+> stays tabled; #6 (consolidate "Plan" buttons) stays deferred to Phase 7. This file is kept as the
+> feedback-triage record; do not implement from it — implement from Phase 6.
+
+**Status:** ⛔ SUPERSEDED by `docs/Phase6_Spec.md` (was: 🟡 DRAFT feedback triage ahead of Phase 6).
+**Last updated:** 2026-08-20 (superseded 2026-09-07)
 **Scope rule:** Minor update. **Do not touch the primary data pipeline** (climate DB, rate
 build, model simulation). If an item needs a pipeline change, it is pushed to **Phase 6**.
 

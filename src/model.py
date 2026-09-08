@@ -20,6 +20,7 @@ from climate_loader import ClimateLoader
 from social_cost import SocialCostConfig
 from journey import JourneyHome, DeviceSlot, CapExOnlySlot, CATEGORY_ORDER, CATEGORY_LABELS, SolarBatteryConfig
 from rate_loader import RateLoader, ACCRateLoader
+from projected_rate_source import ProjectedRateSource, PROJECTION_MODELS
 from rate_resolver import RateResolver
 from devices.physics  import GasFurnace, HeatPumpHVAC, GasWaterHeater, HeatPumpWaterHeater, CentralAC
 from devices.seasonal import GasDryer, HeatPumpDryer, GasCooktop, InductionCooktop, LightsAndPlugs
@@ -65,20 +66,37 @@ DEVICE_ACC_CATEGORY: dict[str, str] = {
 _ELEC_ACC_CATEGORIES = ["hpwh", "hvac_heat", "hvac_cool", "ev", "baseload", "flat"]
 
 
-def _make_loader(base_rl: RateLoader, rate_model: str, fuel: str, fuel_res) -> object:
-    """Phase 4 §2 — three rate modes (per fuel):
+def _make_loader(base_rl: RateLoader, rate_model: str, fuel: str, fuel_res,
+                 project_acc_shape: bool = True) -> object:
+    """Phase 4 §2 + Phase 6 WS1 — rate modes (per fuel):
       - "acc_shaped"/"acc_seasonal"  → ACCRateLoader (PG&E/CPUC base, unchanged)
       - "ca_average"                 → EIA statewide-average series
       - "cagr_flat" (= "My Utility") → EIA per-utility from ZIP, falling back to the state
                                        average when the ZIP didn't resolve to a priced utility
+      - a PROJECTION_MODELS key      → ProjectedRateSource (one standalone bundle series),
+                                       wrapped in ACCRateLoader so the monthly/seasonal shape
+                                       is layered on top (Phase 6 WS1). project_acc_shape=False
+                                       returns the bare source (flat months) for testing.
+
+    `fuel` uses the sim's names ("electricity" | "gas"); ProjectedRateSource wants the same.
     """
     if rate_model in ("acc_shaped", "acc_seasonal"):
         return ACCRateLoader(base_rl)
+    if rate_model in PROJECTION_MODELS:
+        src = ProjectedRateSource(rate_model, fuel)
+        return ACCRateLoader(src) if project_acc_shape else src
     if rate_model == "ca_average":
         return RateLoader.from_eia_state(_DEFAULT_RATE_STATE, fuel)
     if fuel_res.utility_id is not None:
         return RateLoader.from_eia_utility(fuel_res.utility_id, fuel)
     return RateLoader.from_eia_state(_DEFAULT_RATE_STATE, fuel)
+
+
+def _is_legacy_acc(loader: object) -> bool:
+    """True only for a real PG&E/CPUC-backed ACCRateLoader (RateLoader base). A projection
+    source wrapped in ACCRateLoader is NOT legacy — the NEM export path (which reaches into
+    the base's RateLoader internals) must fall back to a fresh legacy ACC loader for it."""
+    return isinstance(loader, ACCRateLoader) and isinstance(loader._base, RateLoader)
 
 
 def _cagr_for(rate_model: str, cagr: float) -> float | None:
@@ -329,7 +347,12 @@ class HESModel(mesa.Model):
                  acc_elec_cagr_a:   float = 0.07,
                  acc_gas_cagr_a:    float = 0.08,
                  acc_elec_cagr_b:   float = 0.07,
-                 acc_gas_cagr_b:    float = 0.08):
+                 acc_gas_cagr_b:    float = 0.08,
+                 # Phase 6 WS1 — layer the ACC monthly/seasonal shape on top of the
+                 # projection-backed rate models (always True in the app; tests/notebook
+                 # flip it to False to isolate the raw bundle levels). Not a config key,
+                 # so it can never affect the golden default path.
+                 project_acc_shape: bool = True):
         super().__init__()
         self.elec_rate_model_a = elec_rate_model_a
         self.gas_rate_model_a  = gas_rate_model_a
@@ -436,9 +459,9 @@ class HESModel(mesa.Model):
         # ── Rate arrays — Scenario A ──────────────────────────────────────────
         rl = RateLoader()
         elec_loader_a = _make_loader(rl, elec_rate_model_a, "electricity",
-                                     self.rate_resolution.electricity)
+                                     self.rate_resolution.electricity, project_acc_shape)
         gas_loader_a  = _make_loader(rl, gas_rate_model_a, "gas",
-                                     self.rate_resolution.gas)
+                                     self.rate_resolution.gas, project_acc_shape)
 
         # CAGR mode uses user slider; ACC mode uses acc_cagr slider (ignores CAGR slider)
         elec_cagr_a_eff = acc_elec_cagr_a if elec_rate_model_a == "acc_shaped"  else _cagr_for(elec_rate_model_a, elec_cagr_a)
@@ -456,7 +479,7 @@ class HESModel(mesa.Model):
 
         # ACC mode: pre-compute per-device-class effective rate arrays
         elec_by_cls_a = None
-        if elec_rate_model_a == "acc_shaped" and isinstance(elec_loader_a, ACCRateLoader):
+        if isinstance(elec_loader_a, ACCRateLoader):
             elec_by_cls_a = _build_elec_rates_by_class(
                 elec_loader_a, sim_start_year, n_years, scenario_a,
                 custom_cagr=elec_cagr_a_eff)
@@ -469,7 +492,11 @@ class HESModel(mesa.Model):
         solar_export_rates: np.ndarray | None = None
         if solar_config is not None:
             if solar_config.nem_mode == "nbt":
-                _acc_for_export = elec_loader_a if isinstance(elec_loader_a, ACCRateLoader) \
+                # Export credit is a grid property, always priced off a legacy PG&E/CPUC ACC
+                # loader. A projection-wrapped ACC loader has no RateLoader base, so reuse
+                # elec_loader_a only when it is a real legacy ACC loader (Phase 6 WS1: the
+                # NEM export path stays on the legacy source even under projection models).
+                _acc_for_export = elec_loader_a if _is_legacy_acc(elec_loader_a) \
                     else ACCRateLoader(rl)
                 solar_export_rates = _acc_for_export.get_nem3_export_rates(
                     sim_start_year, n_years,
@@ -497,9 +524,9 @@ class HESModel(mesa.Model):
         # ── Scenario B (lazy — only when comparison_mode=True) ────────────────
         if comparison_mode:
             elec_loader_b = _make_loader(rl, elec_rate_model_b, "electricity",
-                                         self.rate_resolution.electricity)
+                                         self.rate_resolution.electricity, project_acc_shape)
             gas_loader_b  = _make_loader(rl, gas_rate_model_b, "gas",
-                                         self.rate_resolution.gas)
+                                         self.rate_resolution.gas, project_acc_shape)
 
             elec_cagr_b_eff = acc_elec_cagr_b if elec_rate_model_b == "acc_shaped"  else _cagr_for(elec_rate_model_b, elec_cagr_b)
             gas_cagr_b_eff  = acc_gas_cagr_b  if gas_rate_model_b  == "acc_seasonal" else _cagr_for(gas_rate_model_b,  gas_cagr_b)
@@ -515,7 +542,7 @@ class HESModel(mesa.Model):
             self.current_gas_rates_b  = self.gas_rates_b[0]
 
             elec_by_cls_b = None
-            if elec_rate_model_b == "acc_shaped" and isinstance(elec_loader_b, ACCRateLoader):
+            if isinstance(elec_loader_b, ACCRateLoader):
                 elec_by_cls_b = _build_elec_rates_by_class(
                     elec_loader_b, sim_start_year, n_years, scenario_b,
                     custom_cagr=elec_cagr_b_eff)

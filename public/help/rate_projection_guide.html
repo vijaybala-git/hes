@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WhyWatt Help — Rate Projection Methodology</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+               max-width: 760px; margin: 2rem auto; padding: 0 1.5rem;
+               color: #222; background: #fff; color-scheme: light; line-height: 1.65; }
+        header { display: flex; align-items: center; gap: 1rem;
+                 border-bottom: 2px solid #E8EAF6; padding-bottom: 1rem; margin-bottom: 1rem; }
+        header img { height: 40px; }
+        header h1 { margin: 0; font-size: 1.4rem; color: #1A237E; }
+        nav { font-size: 0.88rem; margin-bottom: 1.5rem; }
+        nav a { color: #3F51B5; margin-right: 1.2rem; text-decoration: none; }
+        nav a:hover { text-decoration: underline; }
+        h2 { margin-top: 2rem; padding-bottom: 0.3rem;
+             border-bottom: 1px solid #E8EAF6; color: #283593; font-size: 1.1rem; }
+        p  { margin: 0.6rem 0; }
+        ul { margin: 0.4rem 0 0.8rem 0; padding-left: 1.5rem; }
+        li { margin: 0.3rem 0; }
+        .note { background: #FFF8E1; border-left: 4px solid #FFC107;
+                padding: 0.6rem 1rem; margin: 1rem 0; border-radius: 0 4px 4px 0; }
+        .formula { background: #F3F4F6; border-left: 4px solid #9FA8DA;
+                   padding: 0.6rem 1rem; margin: 1rem 0; font-family: monospace;
+                   font-size: 0.88em; border-radius: 0 4px 4px 0; white-space: pre-wrap; }
+        footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #E8EAF6;
+                 font-size: 0.78rem; color: #9E9E9E; display: flex;
+                 justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+        .section-tag { background: #E8EAF6; color: #5C6BC0; border-radius: 4px;
+                       padding: 2px 8px; font-size: 0.76rem; font-weight: 600;
+                       white-space: nowrap; }
+    table { border-collapse: collapse; margin: 1rem 0; font-size: 0.88rem; }
+    th, td { border: 1px solid #E0E0E0; padding: 4px 10px; text-align: left; }
+    th { background: #F5F6FF; color: #283593; }
+    h3 { color: #3949AB; font-size: 0.98rem; margin-top: 1.2rem; }
+    blockquote { border-left: 4px solid #9FA8DA; margin: 1rem 0; padding: 0.4rem 1rem;
+                  background: #F7F8FF; color: #444; }
+    main img { max-width: 100%; height: auto; display: block; margin: 1rem auto;
+                border: 1px solid #ECEFF1; border-radius: 4px; }
+    main img + em { display: block; text-align: center; font-size: 0.82rem; color: #607D8B; }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="../assets/whywatt_logo.svg" alt="WhyWatt"
+         onerror="this.style.display='none'">
+    <h1>Rate Projection — Methodology</h1>
+  </header>
+  <nav>
+    <a href="index.html">← Help Index</a>
+    <a href="rates.html">Energy &amp; Prices</a>
+  </nav>
+  <div class="note">
+    <strong>Draft methodology reference.</strong> This page explains how WhyWatt's projected
+    rate models (the WhyWatt / EIA / CEC options) are built and sourced. It is a living draft
+    for reviewers; it will be folded into the main help when the projection becomes the default
+    in a later phase.
+  </div>
+  <main>
+    <h2>§R1 · What the rate projection does</h2>
+    <p><em>The rate projection estimates what you'll pay per unit of energy over the next 25 years —</em>
+    not just today's price, but how it grows. It's a <em>projection under stated assumptions</em>, not a
+    prediction.</p>
+    <h3>In plain terms</h3>
+    <p>Your future energy bill depends on two things: how much energy you use (handled elsewhere in
+    WhyWatt) and the <em>price</em> of that energy each year. This part of the tool builds the <strong>price side</strong> —
+    a schedule of dollars-per-kWh and dollars-per-therm for every year and month out to 2050.</p>
+    <p>We say "project, not predict" deliberately. Nobody knows the exact 2045 rate. What we <em>can</em> do is
+    lay out honest scenarios — a low, a central, and a high path — each built from named, public data,
+    so you can see the range and the reasoning instead of a single mystery number.</p>
+    <h3>What you can trust</h3>
+    <p>Every scenario is anchored to today's real PG&amp;E rate and grown using published forecasts from
+    government and expert sources (below). We also plot our curves against three independent
+    institutions' projections so you can see we're not an outlier.</p>
+    <hr />
+    <h2>§R2 · A growing rate is a <em>function</em>, not a single percentage</h2>
+    <p><em>Older tools grow prices by one fixed percentage a year forever. We use a curve that bends —</em>
+    faster in the near term, different in the long term — because that's how the forecasts actually behave.</p>
+    <h3>In plain terms</h3>
+    <p>The simple approach picks one number — say "7% a year" — and applies it every year. That's easy but
+    wrong in a specific way: California's near-term rate pressure (wildfire costs, grid upgrades) is not
+    the same as its long-term picture (a cleaner, cheaper power supply). A single percentage can't show
+    both.</p>
+    <p>Instead we use a rate that grows in <strong>segments</strong>: a near-term growth rate, a mid-term one, and a
+    long-term one, with the curve bending at meaningful dates (around 2030 and 2045 — the horizons the
+    official forecasts themselves use). Same idea as before, just honest about the fact that the rate of
+    increase changes over time.</p>
+    <hr />
+    <h2>§R3 · How one year's rate is built</h2>
+    <p><em>A retail rate is the sum of two parts: the </em>marginal<em> cost of delivering one more unit</em>
+    (small) plus a <em>residual</em> that covers everything else on the bill (large) — not one number scaled up.</p>
+    <h3>In plain terms</h3>
+    <p>It's tempting to think the price you pay is the cost of the energy plus a markup. In California it
+    isn't. We build the rate by <strong>adding two pieces</strong>:</p>
+    <ul>
+    <li><strong>Marginal cost</strong> — the true cost of one more unit of energy at that hour (a few cents/kWh). This
+      comes from the state's official Avoided Cost Calculator.</li>
+    <li><strong>Residual</strong> — everything else the utility must recover: wildfire mitigation, poles and wires
+      already built, legacy contracts, public programs. This is the <em>majority</em> of your bill.</li>
+    </ul>
+    <p>We add them; we do <strong>not</strong> multiply the marginal cost by a markup. Why it matters: over time the
+    marginal piece flattens and even falls (the grid gets cleaner and cheaper), while the residual moves
+    on its own. A markup would drag your bill <em>down</em> with the marginal cost — backwards.</p>
+    <p><strong>How the residual moves: revenue requirement ÷ sales.</strong> The residual is a big pot of fixed cost (the
+    "revenue requirement") divided across all the energy sold. Two things move it:
+    - the <strong>revenue requirement</strong> rising (wildfire work, poles and wires), and
+    - the <strong>amount of energy sold</strong> — the part people forget.</p>
+    <p>For <strong>electricity</strong>, sales are <em>growing</em> (EVs and heat pumps sell more kWh), and that growth roughly
+    <strong>cancels out</strong> the rising revenue requirement — so electric rates stay about flat after inflation.
+    For <strong>gas</strong>, sales are <em>shrinking</em> (homes leave gas), so the same fixed cost lands on fewer therms
+    and the rate climbs. Same math, opposite direction. This is why electricity and gas pull apart.</p>
+    <p><em>(🚧 Fixed monthly charge is filled in when that input is harvested.)</em></p>
+    <hr />
+    <h2>§R4 · The three scenarios</h2>
+    <p><em>Conservative, Moderate, and Stress — a low, central, and high path. All three come from the</em>
+    California Energy Commission's own 2025 forecast; Moderate is the default.</p>
+    <p><img alt="Projected retail rates for every selectable rate model, electricity and gas, 2025–2050" src="rate_projection_curves.png" /></p>
+    <p><em>Figure: the projected retail rate for every selectable rate model — the three WhyWatt scenarios
+    plus the CEC and EIA reference lines — both fuels, 2025–2050 (gas on a log scale). Electricity stays
+    modest across all models; only gas spirals, and how far depends on the scenario. Generated from
+    <code>whywatt_rate_projection.json</code> by <code>scripts/build_guide_charts.py</code>.</em></p>
+    <h3>In plain terms</h3>
+    <p>The scenarios aren't made-up percentages — each is a real California Energy Commission (CEC) case,
+    applied to <em>your</em> current rate.</p>
+    <p><strong>Electricity.</strong> All three follow the CEC's official 2025 rate trajectory (including the 2026 dip
+    when wildfire cost recovery winds down); they differ only by a small band around it.
+    - <strong>Conservative</strong> — a bit below the CEC path; real rates drift <em>down</em>.
+    - <strong>Moderate (default)</strong> — the CEC's central electricity trajectory.
+    - <strong>Stress</strong> — a bit above; electricity rises modestly but does <strong>not</strong> spiral.</p>
+    <p><strong>Gas.</strong> All three are the CEC's own gas-study cases for the official ("Planning-Area") electrification
+    forecast; they differ by one policy choice — how the state recovers the cost of a shrinking gas system:
+    - <strong>Conservative</strong> — "pruning": the state <em>winds down</em> gas-system spending as customers leave.
+    - <strong>Moderate (default)</strong> — "front-load": costs recovered on a steadier schedule.
+    - <strong>Stress</strong> — "flat / business-as-usual": the state keeps spending as if nothing changed → the
+      <strong>death spiral</strong> (§R5). One subtlety: business-as-usual keeps gas rates <em>lowest</em> in the near term
+      (it delays the spending), then overtakes the managed cases and spirals — so the lines cross around
+      the early 2030s.</p>
+    <p><strong>Why our lines sit a little below the CEC's published lines.</strong> WhyWatt anchors to your actual tariff
+    (the standard PG&amp;E E-1 electric / G-1 gas rate) and grows it along the CEC trajectory. The CEC reports
+    the <em>blended residential average</em> across all rate plans, which runs a bit higher (electricity: our
+    $0.386 vs the CEC's ~$0.417) — so our curves move <em>with</em> the CEC but sit ~7% below its own line. Same
+    shape, slightly lower level.</p>
+    <p>A key correction (Aug 2026): earlier drafts had electricity rising much faster. Checking against the
+    CEC's published forecast showed electricity should stay roughly flat in real terms — because growing
+    electricity sales offset the rising revenue requirement. Only <strong>gas</strong> spirals.</p>
+    <hr />
+    <h2>§R5 · The gas "death spiral," plainly</h2>
+    <p><em>As neighbors switch off gas, the fixed cost of the gas pipes is split among fewer customers</em>
+    — so the per-therm rate for those who remain can climb steeply.</p>
+    <h3>In plain terms</h3>
+    <p>The gas distribution system costs roughly the same to run whether a million homes or half a million
+    use it. As homes electrify, that fixed cost is spread over fewer therms — so the <em>rate</em> per therm
+    rises even if total spending doesn't.</p>
+    <p>Using the CEC's own gas study (residential PG&amp;E, today ≈ $2.08/therm), our three scenarios reach
+    these 2050 rates:
+    - <strong>Conservative</strong> (state winds down gas spending) → ~<strong>$14/therm</strong>
+    - <strong>Moderate</strong> (steadier recovery) → ~<strong>$27/therm</strong>
+    - <strong>Stress</strong> (business-as-usual spending) → ~<strong>$68/therm</strong></p>
+    <p>And the CEC's <em>most extreme</em> published case (fast electrification <strong>and</strong> business-as-usual spending)
+    reaches <strong>~$103/therm</strong> by 2050 — a ~50× increase. The spread is the whole point: how bad the spiral
+    gets is mostly a <strong>policy choice</strong> about whether the state keeps investing in a shrinking gas system,
+    not physics.</p>
+    <p>Important: WhyWatt models <strong>one home</strong>. Whether the neighborhood-wide decline is mild or severe is a
+    <strong>scenario you choose</strong>, not something the tool derives from your house alone.</p>
+    <hr />
+    <h2>§R6 · Social cost overlay</h2>
+    <p><em>A per-unit cost of carbon, methane, and health impacts, added on top of the bill so you can</em>
+    see total cost to society, not just your out-of-pocket bill.</p>
+    <p>The <strong>gas social impact is modeled in the WhyWatt simulation itself</strong>, not in this offline rate
+    projection. The projection provides the <em>rates</em>; the simulation applies the carbon / methane / health
+    overlay on top when it computes total cost. (The gas combustion-CO₂ factor and methane-leak parameters
+    we harvested from the ACC gas model are available for it — see the Sources.)</p>
+    <hr />
+    <h2>§R7 · How our projection compares to others</h2>
+    <p><em>We don't ask you to take our curve on faith — we plot it against three independent</em>
+    projections: US EIA, the California Energy Commission, and E3.</p>
+    <h3>In plain terms</h3>
+    <p>A projection is only as trustworthy as what it's checked against. We compare ours to three
+    respected, independent sources (details in <strong>Sources</strong> below):
+    - <strong>US EIA</strong> — the <strong>neutral US national-average</strong> rate, and WhyWatt's recommended default anchor
+      (see the talking point below).
+    - <strong>California Energy Commission (CEC)</strong> — the state's own official forecast; it drives our
+      California electricity and gas curves directly.
+    - <strong>E3</strong> — an expert firm (they also build California's Avoided Cost Calculator); their gas
+      death-spiral study is a second, independent high case.</p>
+    <h3>The anchor thesis (why we default to the US EIA average)</h3>
+    <p>When a conversation turns to "but rates might do anything," anchor it: <strong>run your analysis at the
+    conservative US EIA national average</strong> (electricity ~18¢/kWh, gas ~$1.25/therm — about <strong>half</strong> of
+    California's rates). Even at those modest national rates, <strong>electrification + solar comes out ahead
+    in California</strong>. Your <em>actual</em> California dollar costs will be different — higher, because CA rates
+    run ~2× the national average — which only strengthens the case, not weakens it. Anchoring to the
+    neutral EIA number keeps the argument defensible and sidesteps "California is a special case"
+    skepticism, while the CA-specific curves (CEC) show the real magnitude.</p>
+    <h3>The gas death-spiral, benchmarked (residential PG&amp;E, by 2050 — nominal $/therm)</h3>
+    <p>The single most striking result: how far the gas <em>rate</em> could rise depends almost entirely on
+    whether the gas system keeps spending as customers leave. Today ≈ $2.08/therm.</p>
+    <table>
+    <thead>
+    <tr>
+    <th>Line on the chart</th>
+    <th>2050 gas rate</th>
+    <th>What it is</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+    <td><strong>US EIA national</strong></td>
+    <td>~$2.3</td>
+    <td>federal reference — no CA death spiral modeled</td>
+    </tr>
+    <tr>
+    <td><strong>EIA AEO Pacific</strong></td>
+    <td>~$3.4</td>
+    <td>federal reference, our region — still ~flat</td>
+    </tr>
+    <tr>
+    <td><strong>WhyWatt conservative</strong></td>
+    <td>~$14</td>
+    <td>CEC: managed decline ("pruning")</td>
+    </tr>
+    <tr>
+    <td><strong>E3 (2020)</strong></td>
+    <td>~$13.8</td>
+    <td>E3's managed high-electrification path</td>
+    </tr>
+    <tr>
+    <td><strong>WhyWatt moderate</strong></td>
+    <td>~$27</td>
+    <td>CEC: steadier recovery ("front-load")</td>
+    </tr>
+    <tr>
+    <td><strong>WhyWatt stress</strong></td>
+    <td>~$68</td>
+    <td>CEC: business-as-usual spending ("flat")</td>
+    </tr>
+    <tr>
+    <td><strong>CEC extreme</strong></td>
+    <td>~$103</td>
+    <td>CEC: fast electrification <strong>+</strong> business-as-usual spending</td>
+    </tr>
+    </tbody>
+    </table>
+    <p>The federal references (EIA) stay near today's rate because they don't assume California's gas
+    transition happens; the CEC cases show what <em>does</em> happen to remaining gas customers when it does.
+    Our three scenarios sit inside the CEC's own range, ordered conservative ≤ moderate ≤ stress in the
+    long run (they cross in the early 2030s, per §R4) — a check we enforce in testing.</p>
+    <p><strong>On electricity, our lines run ~7% below the CEC's own line</strong> — same trajectory, but anchored to the
+    E-1 tariff rather than the CEC's blended residential average (§R4). Not a disagreement, a base choice.</p>
+    <hr />
+    <h2>§R8 · Sources — what, why, and how we use each</h2>
+    <blockquote>
+    <p>The heart of the guide. For every input, three things: <strong>Source</strong> (what it is + where), <strong>Why</strong>
+    (why this source), <strong>How we use it</strong> (the exact number it sets). Kept in sync as we harvest.</p>
+    </blockquote>
+    <h3>CPUC Avoided Cost Calculator (ACC) 2024 — built by E3</h3>
+    <ul>
+    <li><strong>Source:</strong> California's official Avoided Cost Calculator, 2024 edition, published by Energy +
+      Environmental Economics (E3) for the CPUC.
+      <a href="https://www.ethree.com/public_proceedings/energy-efficiency-calculator/">https://www.ethree.com/public_proceedings/energy-efficiency-calculator/</a></li>
+    <li><strong>Why:</strong> It is the state-sanctioned measure of the <em>marginal</em> cost of energy by hour and year —
+      the correct, auditable basis for the "one more unit" piece of the rate, and for the within-year
+      (seasonal) shape.</li>
+    <li><strong>How we use it:</strong> Sets the <strong>marginal cost</strong> <code>mc</code> and its year-by-year path. We read the
+      "Detailed Output" sheet's per-year columns (2024–2054), average over all 8,760 hours to get an
+      annual path, and split it into the eleven ACC components. Crucially we separate them into two
+      buckets: <strong>bill</strong> (energy, generation/transmission/distribution capacity, losses, and cap-and-trade
+      compliance carbon the consumer actually pays) vs. <strong>social</strong> (damage carbon, methane, air quality —
+      these feed the social overlay, <strong>not</strong> the bill).</li>
+    <li><strong>Extraction:</strong> <code>scripts/build_rate_projection.py</code> → <code>data/rates/projection/acc_marginal_electric.json</code>
+        (with source sha256), harvested at <strong>CZ4</strong> (the South Bay default home).</li>
+    <li><strong>What it showed us (the important part):</strong> the <em>bill</em> marginal cost is nearly <strong>flat</strong> — about
+        8.6¢/kWh in 2024 rising to ~12¢/kWh by 2045 — while the raw ACC "Total" more than doubles. The
+        difference is almost entirely rising <strong>damage carbon</strong>, which we deliberately keep out of the
+        bill. This is why the growing part of your retail rate comes from the <em>residual</em> (§R3), not from
+        the marginal cost.</li>
+    </ul>
+    <h3>ACC 2024 Gas Model — gas marginal cost (built by E3)</h3>
+    <ul>
+    <li><strong>Source:</strong> CPUC 2024 ACC Gas Model — <code>Commodity</code>, <code>T&amp;D</code>, <code>Emissions</code>, <code>Methane Leakage</code> sheets.</li>
+    <li><strong>Why:</strong> The gas counterpart to the electric ACC; the auditable marginal cost of one therm, split
+      the same way into bill vs social. Gas is <strong>not</strong> climate-zone specific (system-wide commodity +
+      utility-level transport), so no CZ recalc is needed.</li>
+    <li><strong>How we use it:</strong> <code>bill_mc_gas(y) = commodity(y) + PG&amp;E-residential marginal T&amp;D(y)</code> →
+      <code>data/rates/projection/acc_marginal_gas.json</code>. The combustion CO₂ factor (flat 0.0053 tCO₂/therm)
+      and methane leak adders are stored for the social overlay (combined later with an external SCC
+      path). <strong>What it showed us:</strong> unlike electricity, the gas <em>bill</em> marginal <strong>rises</strong> (~$0.93 →
+      $1.44/therm, 2024→2045) — and the gas death-spiral residual stacks on top of that, a double
+      pressure the notebook will show against E3's curve.</li>
+    </ul>
+    <h3>CEC IEPR gas price forecast (embedded in the ACC gas model)</h3>
+    <ul>
+    <li><strong>Source:</strong> CEC Integrated Energy Policy Report gas price forecast — PG&amp;E burnertip price, monthly,
+      provided in both nominal and real dollars — carried inside the 2024 ACC Gas Model workbook.</li>
+    <li><strong>Why:</strong> An independent, official state forecast of the gas <em>commodity</em> cost, and a ready
+      benchmark for the gas side, available without a separate download.</li>
+    <li><strong>How we use it:</strong> Feeds the gas marginal cost and serves as a <strong>CEC benchmark</strong> curve; the
+      nominal and real versions also help validate our own nominal↔real conversion.</li>
+    </ul>
+    <h3>CEC 2023 IEPR GDP deflator (the nominal↔real bridge)</h3>
+    <ul>
+    <li><strong>Source:</strong> CEC 2023 IEPR GDP deflator series, embedded in the ACC gas workbook.</li>
+    <li><strong>Why:</strong> We report bills in <strong>nominal</strong> dollars by default, but some trusted sources (notably E3)
+      report in <strong>real</strong> dollars. We need one authoritative inflation series to convert between them.</li>
+    <li><strong>How we use it:</strong> <code>scripts/build_rate_projection.py</code> → <code>data/rates/projection/gdp_deflator.json</code>.
+      Powers the guide/notebook's "real dollars" toggle so every cross-source comparison is fair.</li>
+    </ul>
+    <h3>US EIA — national-average anchor (the default talking point)</h3>
+    <ul>
+    <li><strong>Source:</strong> EIA current data for the <strong>US national-average residential</strong> level — electricity
+      ~17.5¢/kWh (Electric Power Monthly, Table 5.6.A, mid-2025) and gas ~$12.4–13/Mcf ≈ $1.25/therm
+      (Natural Gas Monthly) — grown by the <strong>AEO Reference case</strong> (~+5% <em>real</em> through 2050 ≈ real-flat).</li>
+    <li><strong>Why:</strong> A neutral, independent, federal number that isn't CA-specific — the defensible anchor for
+      the thesis in §R7. It's the <em>US average</em>, deliberately <strong>not</strong> California (CA is ~2× higher).</li>
+    <li><strong>How we use it:</strong> Anchor line, both fuels. Nominal series built with the same CEC IEPR deflator
+      (~2.22%/yr) so real/nominal stays consistent with the other sources. By 2050: elec ~$0.318 nominal
+      (~18¢ real), gas ~$2.27 nominal (~$1.28 real) — essentially flat in real terms.
+      <code>benchmarks/eia_aeo.json</code>.</li>
+    <li><strong>Precise regional series (AEO 2026 Pacific):</strong> the file also carries the exact EIA AEO 2026
+      <strong>Pacific census-division</strong> residential prices (real 2025$/MMBtu from EIA, converted): electricity
+      ~24¢/kWh, gas ~$1.99/therm, both roughly flat to 2050. Key point for the story: <strong>the AEO reference
+      case keeps Pacific gas flat (~$2/therm) because it does not model California's electrification-driven
+      gas death spiral</strong> — so the federal reference and the CA (CEC) forecast diverge sharply on gas, which
+      is exactly the risk WhyWatt is surfacing. Source: EIA AEO 2026 Table 3 (region 1-9), via the AGA
+      compilation.</li>
+    </ul>
+    <h3>California Energy Commission (CEC) — 2025 IEPR</h3>
+    <ul>
+    <li><strong>Source:</strong> CEC 2025 Integrated Energy Policy Report — the "Gas Price Outlook" (fossil-gas end-use
+      rates 2025–2050) and the California Energy Demand (CED) 2025 forecast (residential electricity and
+      gas sales). CEC efiling docket 25-IEPR-03.</li>
+    <li><strong>Why:</strong> The state's own official rate and demand forecast — the natural <strong>central</strong> benchmark,
+      and the source for how total gas throughput declines over time.</li>
+    <li><strong>How we use it:</strong> Provides the <strong>throughput</strong> path (the death-spiral denominator, an input the
+      user's scenario selects) and an independent <strong>central</strong> gas-rate benchmark.</li>
+    </ul>
+    <h3>E3 — "The Challenge of Retail Gas in California's Low-Carbon Future" (2020)</h3>
+    <ul>
+    <li><strong>Source:</strong> E3 (Aas, Mahone, Subin, Price) for the CEC, April 2020, using E3's PATHWAYS model.</li>
+    <li><strong>Why:</strong> The foundational, high-quality analysis of the gas death spiral; widely cited, and E3 is
+      the same firm that builds the ACC. Trusted enough to anchor a high case as a benchmark.</li>
+    <li><strong>How we use it:</strong> A benchmark gas curve (residential gas ~+80% by 2030, ~+480% by 2050 in <em>real</em>
+      terms, with ~−60% demand) — a <em>managed</em> high-electrification path, ≈$13.8/therm nominal by 2050.
+      Stored in <code>data/rates/projection/benchmarks/e3_pathways_2020.json</code>.</li>
+    </ul>
+    <h3>CEC 2025 IEPR Electricity Rate Forecast — electricity central line</h3>
+    <ul>
+    <li><strong>Source:</strong> CEC 2025 IEPR Electricity Rate Forecast <strong>workbook</strong> (efiling docket 25-IEPR-03,
+      <strong>tn=268239</strong>, the newer 2024$ edition), PG&amp;E planning area, Residential sector — exact per-year
+      rates 2024–2050 (nominal + real 2024$), plus the rate-forecast deck's stated method and assumptions.</li>
+    <li><strong>Why:</strong> The CA authority's own electricity forecast, as the exact machine-readable table (not read
+      off the chart). It drives our electricity scenarios directly.</li>
+    <li><strong>How we use it:</strong> PG&amp;E residential <strong>real-flat ~36¢/kWh</strong> (real 2024$); nominal 41.7¢→61.9¢.
+      Confirms electricity does not spiral. Our <code>moderate</code> follows this same trajectory but ~7% below it
+      (we anchor to the E-1 tariff, the CEC to the blended residential average).
+      <code>data/rates/projection/benchmarks/cec_2025_iepr_electric.json</code>.</li>
+    </ul>
+    <h3>CEC 2025 IEPR Gas Rate Forecast — gas death-spiral (extreme case)</h3>
+    <ul>
+    <li><strong>Source:</strong> CEC 2025 IEPR gas rate workbook <strong>tn=264063</strong>, scenario "GT AAFS 2.5 Demand Flat RR"
+      (fast electrification <strong>+</strong> business-as-usual / flat cost recovery).</li>
+    <li><strong>Why:</strong> The most extreme published CEC case — the worst-case anchor for the chart.</li>
+    <li><strong>How we use it:</strong> Benchmark death-spiral curve — PG&amp;E residential gas <strong>$2.59/therm (2025) →
+      $103.37/therm (2050)</strong>, ~40×. (Confirms the earlier CPUC-cited ~$102.76 figure.) WhyWatt's own
+      scenarios use the milder CEC "Planning-Area" demand cases and sit below this line.
+      <code>data/rates/projection/benchmarks/cec_2025_iepr_gas.json</code>.</li>
+    </ul>
+    <h3>PG&amp;E published tariffs — historical actuals</h3>
+    <ul>
+    <li><strong>Source:</strong> CPUC Advice Letters / Cal Advocates rate reports. In repo: <code>data/rates/pge_elec_e1.json</code>,
+      <code>pge_gas_g1.json</code> (2018→2025).</li>
+    <li><strong>Why:</strong> Ground truth for the base rate and for checking our curve reproduces recent history.</li>
+    <li><strong>How we use it:</strong> Sets the base-year retail anchor and the <strong>backcast</strong> check (does our model
+      retrace 2019→2025?).</li>
+    </ul>
+    <h3>A note on nominal vs. real dollars — and where inflation comes from</h3>
+    <ul>
+    <li>Our default reporting is <strong>nominal</strong> (the dollars you'd actually see on a bill); a <strong>real</strong>
+      (inflation-adjusted) toggle removes inflation so long-run trends are comparable. E3 and the CEC
+      Figure 8 report in real dollars; EIA reports nominal — so both views are needed.</li>
+    <li><strong>We do not invent an inflation rate.</strong> We use the exact one E3 and the ACC use: the <strong>CEC IEPR
+      GDP deflator</strong> (the 2023-IEPR vintage embedded in the ACC gas workbook, base 2022), which runs
+      <strong>~2.2%/yr</strong>. The ACC itself works in real $2022 and converts to nominal with this deflator (it
+      also carries a flat 2.0% "inflation" parameter for escalating contract/IRP costs). The deflator
+      ultimately comes from the CEC's licensed macroeconomic forecast (IHS / S&amp;P Global). Using the same
+      index means our nominal↔real conversions are consistent with E3 by construction — no second,
+      conflicting inflation number. <code>data/rates/projection/gdp_deflator.json</code>.</li>
+    <li><strong>Worked example (PG&amp;E electricity, moderate):</strong> real-flat ~35¢/kWh (2024$) <em>is</em> ~62¢/kWh
+      <strong>nominal</strong> by 2050 — the difference is just ~2.2%/yr inflation compounding. Both match CEC.</li>
+    </ul>
+    <p><em>(🚧 Residual revenue-requirement, fixed-charge policy, and social-overlay sources added as those
+    inputs are harvested.)</em></p>
+    <hr />
+    <h2>§R9 · Terms you'll see</h2>
+    <p><em>(⬜ Short glossary of the handful of terms above — marginal cost, residual, ACC, throughput,
+    nominal/real — or a pointer into <code>docs/Glossary.md</code>. Written last, once wording is settled.)</em></p>
+  </main>
+  <footer>
+    <span>WhyWatt v3.0 &middot; <a href="about.html" style="color:#9E9E9E">About</a></span>
+    <span class="section-tag">source: docs/help/rate_projection_guide.md</span>
+  </footer>
+</body>
+</html>

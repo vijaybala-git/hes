@@ -1,9 +1,13 @@
 # Offline Rate-Projection Model — Build Plan
 
-**Status:** 🟢 ACTIVE build plan for a standalone, offline sub-project.
+**Status:** ✅ CLOSED (2026-09-07) — the offline sub-project is complete **for its purpose: feeding
+the simulation via the portable JSON bundle**. The remaining Step 5 work (residual breakdown, fixed
+charge, social overlay) is reclassified as **non-blocking enrichment** and deferred. See the
+**Closeout (§10)** for the go-decision and rationale. The active-build content below is preserved
+as the delivery record.
 **Type:** Python + Jupyter analysis effort. **No** changes to the live WhyWatt model; the golden
 is untouched by construction because none of this is imported by `src/`.
-**Prepared:** 2026-08-26.
+**Prepared:** 2026-08-26. **Closed:** 2026-09-07.
 **Relationship to other docs:**
 - Methodology (the math): `docs/Energy_Rate_Projection_Spec.md` (v1.1).
 - User guide (plain-language explainer, grown alongside the build):
@@ -353,12 +357,61 @@ The plan is for the two rate graphs (electricity + gas) to move into WhyWatt cor
       decomposition; 2050 gas death-spiral bar; elec social overlay), nominal + `BASIS="real"`
       toggle. Executed clean; HTML export alongside. Regenerated from a scratch generator, but the
       `.ipynb` is now the editable source of truth.
-- [ ] Residual/fixed/social harvest (Step 5) → full decomposition panels.
+- [~] Residual/fixed/social harvest (Step 5) → full decomposition panels. **DEFERRED — non-blocking
+      enrichment (see §10 Closeout).** Not required to import the projection into the simulation: the
+      JSON bundle already carries the per-scenario retail curves plus the `mc`/`residual`
+      decomposition. Would make the *offline* analysis richer, not the *hand-off* more correct.
 - [x] `tests/test_rate_projection.py` — V1 (plug + reconstruction), V2 (ordering; gas within
       EIA..CEC; electric moderate tracks CEC real-flat within 15%), V3 (base anchor), V4 (break-even
       COP falls 4.89→1.71, HP COP-3.5 favorable by 2035) + escalation-primitive checks. **33 pass.**
 - [x] **Portable hand-off bundle** — `scripts/export_rate_projection.py` →
-      `whywatt_rate_projection.json` (schema 1.0; scenarios + benchmarks + deflator + provenance);
-      guarded by `test_bundle_*` incl. a staleness check. Phase 6 designs the consuming interface.
-- [ ] Keep the isolation grep-gate green throughout.
-- [ ] For each step above: fill the matching `rate_projection_guide.md` section + Sources block.
+      `whywatt_rate_projection.json` (schema 2.0, market-keyed; scenarios + benchmarks + deflator +
+      provenance); guarded by `test_bundle_*` incl. a staleness check. Phase 6 designs the consuming interface.
+- [x] Keep the isolation grep-gate green throughout. (Verified zero leaks across all delivered steps.)
+- [x] For each delivered step: matching `rate_projection_guide.md` section + Sources block filled
+      (§R8). Residual/fixed/social Sources land with Step 5.
+
+---
+
+## 10. Closeout — ready to move to the simulation (2026-09-07)
+
+**Decision: the offline sub-project is closed and the projection is cleared for import into the
+simulation.** The gate for "ready" is *not* "every enrichment built" — it is "the hand-off contract
+the sim consumes is complete and correct." That contract is the single portable JSON bundle (§8b),
+and it is done:
+
+- `data/rates/projection/whywatt_rate_projection.json` — schema 2.0, market-keyed (`CA_PGE` built),
+  per-scenario retail curves (`conservative`/`moderate`/`stress`) for both fuels 2025–2050, plus the
+  `mc`/`residual` decomposition, benchmarks, and the nominal↔real deflator.
+- Base year anchored to the PG&E tariff; electricity CEC-driven (tn=268239), gas CEC-driven
+  (tn=264063); `test_bundle_*` guards schema completeness, base-year = tariff, decomposition
+  reconstructs retail, and **staleness** (committed bundle must equal the live model).
+- Isolation grep-gate green; **33 tests pass**. Core reads the JSON as plain data and imports **no**
+  `src/rate_projection/` code — so the import cannot disturb the golden until the deliberate wire-in.
+
+### Step 5 reclassified as enrichment (why it does not block import)
+
+All three Step 5 items make the *offline* model richer; none changes the retail curves the bundle
+hands to the sim, so none gates the import:
+
+1. **Residual breakdown (wildfire / T&D / public-purpose buckets)** — *interesting, not essential.*
+   The residual is already CEC-driven in aggregate and the base is the exact plug (`v_base − mc`).
+   Buckets would enable "scenario surgery" (e.g. drop the wildfire bucket) but change no bundled number.
+2. **Fixed charge `F` (AB 205 tiers)** — *not essential to import.* These are scenario **options**
+   layered on the CEC aggregate; the offline model *can* simulate them, but the sim does not need a
+   fixed-charge term to consume the volumetric retail curves. Revisit if/when the sim wants to expose
+   the fixed-charge lever to advocates.
+3. **Social overlay** — *adds little to the offline work.* Per §8c the social overlay belongs in the
+   **live simulation**, not this projection. The sim will need the **gas** social layer specifically;
+   the CO₂/methane params it requires are already harvested in `acc_marginal_gas.json`. So this is
+   sim-side work, not an offline gap.
+
+### What is explicitly NOT in scope here (lives elsewhere)
+
+The live wire-in — replacing EIA + single-CAGR in `RateLoader`, and where the sim applies the gas
+social overlay — is Phase 6 / Phase 7 and is tracked in `docs/Phase6_RateProjection_Plan.md`, not
+this doc. Also carried there: the URDB base-year refinement (closes the ~7% CEC offset) and the
+optional every-year AEO Pacific series.
+
+**Bottom line:** the JSON schema is designed and stable; the projection can be imported into the
+simulation now. Step 5 remains available as a later enrichment pass but is not a prerequisite.
