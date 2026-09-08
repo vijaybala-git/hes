@@ -67,3 +67,34 @@ def test_cec_deathspiral_beats_moderate(snapshot):
     runs = snapshot["scenarios"]["hvac2027_wh2029"]["runs"]
     assert (runs["cec_deathspiral"]["baseline_cumulative_opex"]
             > runs["whywatt_moderate"]["baseline_cumulative_opex"])
+
+
+def test_panel_trigger_is_red_only_on_small_service(snapshot):
+    """Panel status is rate-independent: the same full-electrification load trips RED on a 100 A
+    service but not on 200 A (case 07 trigger). Verify across every rate model."""
+    small = snapshot["scenarios"]["panel_upgrade_100A"]["runs"]
+    big = snapshot["scenarios"]["full_electrification_2027_29"]["runs"]
+    for key in small:
+        assert small[key]["peak_status"] == "red", key
+        assert big[key]["peak_status"] != "red", key
+
+
+def test_solar_lowers_journey_cost(snapshot):
+    """Adding rooftop solar to the full journey cuts the journey's cumulative opex under every
+    rate model (same load, self-supplied)."""
+    solar = snapshot["scenarios"]["full_electrification_solar"]["runs"]
+    nosolar = snapshot["scenarios"]["full_electrification_2027_29"]["runs"]
+    for key in solar:
+        assert solar[key]["journey_cumulative_opex"] < nosolar[key]["journey_cumulative_opex"], key
+
+
+def test_longer_horizon_amplifies_gas_gap(snapshot):
+    """The 30-year run widens the do-nothing gas gap vs the 20-year run for the CA gas spiral,
+    and preserves the conservative < moderate < stress ordering."""
+    long_ = snapshot["scenarios"]["hvac2027_wh2029_30yr"]["runs"]
+    short = snapshot["scenarios"]["hvac2027_wh2029"]["runs"]
+    for key in ("whywatt_moderate", "whywatt_stress", "cec_deathspiral"):
+        assert long_[key]["baseline_cumulative_opex"] > short[key]["baseline_cumulative_opex"], key
+    assert (long_["whywatt_conservative"]["baseline_cumulative_opex"]
+            < long_["whywatt_moderate"]["baseline_cumulative_opex"]
+            < long_["whywatt_stress"]["baseline_cumulative_opex"])

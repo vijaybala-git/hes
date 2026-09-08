@@ -51,6 +51,26 @@ SCENARIOS: dict[str, dict] = {
         "values": {**_HVAC_WH, "dryer_swap_planned": True, "cooktop_swap_planned": True,
                    "ev_swap_planned": True, "panel_amps": 200},
     },
+    # + rooftop solar (case 02): full journey + solar, so the report shows how solar self-supply
+    # interacts with each rate model (the NEM export credit stays on the legacy source in WS1).
+    "full_electrification_solar": {
+        "description": "Full electrification + rooftop solar (NEM3); 200 A panel (case 02 style).",
+        "values": {**_HVAC_WH, "dryer_swap_planned": True, "cooktop_swap_planned": True,
+                   "ev_swap_planned": True, "panel_amps": 200, "solar_planned": True},
+    },
+    # 100 A panel-trigger (case 07): the same full load on a small service forces a panel upgrade,
+    # so the report can see the upgrade capex sit alongside the rate-driven opex swing.
+    "panel_upgrade_100A": {
+        "description": "Full electrification on a 100 A service — forces a panel upgrade (case 07).",
+        "values": {**_HVAC_WH, "dryer_swap_planned": True, "cooktop_swap_planned": True,
+                   "ev_swap_planned": True, "panel_amps": 100},
+    },
+    # Longer horizon of the requested plan: 30-year run (app max). Projection curves hold flat
+    # past the bundle's 2050 horizon, so the last few years reflect the real app hold behavior.
+    "hvac2027_wh2029_30yr": {
+        "description": "HVAC 2027 + WH 2029 only, 30-year horizon (projection holds flat past 2050).",
+        "values": {**_HVAC_WH, "years": 30},
+    },
 }
 
 # ── Rate-model matrix (elec model, gas model) applied to each scenario ──────────
@@ -90,8 +110,9 @@ def build() -> dict:
         "generated_utc": datetime.datetime.now(datetime.timezone.utc)
                            .strftime("%Y-%m-%dT%H:%M:%SZ"),
         "note": ("Rate-model impact snapshot (Phase 6 WS1). Non-default projection paths are "
-                 "exercised deliberately — this is not the golden. sim_start_year=2025, "
-                 "20-year horizon (app default); HVAC swap 2027, WH swap 2029."),
+                 "exercised deliberately — this is not the golden. sim_start_year=2025; "
+                 "20-year horizon (app default) except where a scenario sets `years`; "
+                 "HVAC swap 2027, WH swap 2029."),
         "reference_run": _REF_RUN,
         "scenarios": {},
     }
@@ -108,6 +129,10 @@ def build() -> dict:
                 "opex_delta":               c["opex_delta"],          # baseline - journey
                 "payback_year":             c["payback_year"],
                 "net_social_cost_avoided":  c["net_social_cost_avoided"],
+                # Panel status is rate-independent (load, not price) — constant across the rate
+                # rows of a scenario, but it distinguishes the panel-trigger scenario.
+                "peak_amps":                c["peak_amps"],
+                "peak_status":              c["peak_status"],
             }
         # deltas vs the reference (legacy default) — the "impact of new rate modeling"
         ref = runs[_REF_RUN]
@@ -125,7 +150,10 @@ def to_markdown(out: dict) -> str:
          f"Deltas are vs the reference run **`{out['reference_run']}`** (current app default). "
          "`opex_delta` = do-nothing − journey (positive = the journey saves money).", ""]
     for sname, sdef in out["scenarios"].items():
-        L += [f"## {sname}", "", sdef["description"], "",
+        # Panel status is constant across the rate rows — surface it once in the header.
+        any_run = next(iter(sdef["runs"].values()))
+        panel = f"Peak load {any_run['peak_amps']} A → panel status **{any_run['peak_status']}**."
+        L += [f"## {sname}", "", sdef["description"], "", panel, "",
               "| Rate model | Journey $ | Do-nothing $ | Savings (Δopex) | Payback | "
               "Savings vs ref | Do-nothing vs ref |",
               "|---|--:|--:|--:|:--:|--:|--:|"]
