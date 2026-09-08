@@ -877,7 +877,7 @@ Both are added to the modeled gasoline cost only when their checkboxes are on.
 
 ## §14 · Charts Reference
 @file: charts.html
-@keys: chart_jc1, chart_jc2, chart_jc3, chart_jc4, chart_jc5, chart_jc6, chart_eu1, chart_eu2, chart_eu3, chart_eu4, chart_eu6, chart_eu7
+@keys: chart_jc1, chart_jc2, chart_jc3, chart_jc4, chart_jc5, chart_jc6, chart_eu1, chart_eu2, chart_eu3, chart_eu4, chart_eu6, chart_eu7, chart_eu8
 @popup: Charts are organized into three groups — Journey Costs (JC),
   Energy Use (EU), and Rates (R). Pick any chart from the dropdown above
   each chart panel; the code (JC.1, EU.7, R.3 …) appears in the chart's header.
@@ -945,6 +945,15 @@ The heat pump's energy across the twelve months of the HVAC-swap year, split int
 kilowatt-hour-equivalent (29.3 kWh per therm) so a gas furnace and a heat pump sit on the same
 axis; cooling is omitted for homes that have none. Switch the scenario toggle to contrast a gas
 furnace against a heat pump month by month.
+
+EU.8 · Direct Emissions (CO2 / CO2e)
+Direct combustion emissions — natural gas and gasoline — as stacked bars in metric tons per
+year, for Your Journey or Do Nothing. Toggle between CO2 (combustion only) and CO2e (adds
+methane leakage weighted by GWP100). Factors: gas 5.30 kg CO2/therm, CO2e 6.5 kg/therm
+(combustion + 2.3% leakage x GWP100 28); gasoline 8.89 kg/gal. Electricity is deliberately not
+counted — journey electricity that replaced gas or gasoline still carries a grid-carbon
+footprint, so the true net reduction is smaller than the drop shown here (grid-carbon modeling
+is a later phase).
 
 ### Rates (R)
 
