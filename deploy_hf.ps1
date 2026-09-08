@@ -18,8 +18,8 @@
 # into the image. Only those paths affect the running Space.
 #
 # Some repo paths are NOT part of the running Space and must not be uploaded to HF:
-#   - docs/presentations/  — slide decks + images (not served)
-#   - data/climate/sources/ and data/rates/sources/ — raw TMYx weather .zip and EIA .xlsx
+#   - docs/presentations/  - slide decks + images (not served)
+#   - data/climate/sources/ and data/rates/sources/ - raw TMYx weather .zip and EIA .xlsx
 #     snapshots (build-time inputs to scripts/build_*.py only; the app reads the processed JSON).
 #     HF's hub rejects large non-LFS blobs, so they must be stripped.
 # The script strips $ExcludePaths from history in a throwaway clone, then force-pushes that
@@ -71,7 +71,7 @@ $commit    = (git log -1 --format="%h  %s" $Branch).Trim()
 
 # --- Confirmation gate ------------------------------------------------------
 Write-Host ""
-Write-Host "================ HF DEPLOY — CONFIRM ================" -ForegroundColor Cyan
+Write-Host "================ HF DEPLOY - CONFIRM ================" -ForegroundColor Cyan
 Write-Host ("  Target :  {0}" -f $targetLabel)
 Write-Host ("  Space  :  {0}" -f $spaceUrl)
 Write-Host ("  Remote :  {0}" -f $Remote)
@@ -80,7 +80,7 @@ Write-Host ("  Commit :  {0}" -f $commit)
 Write-Host ("  Excl.  :  {0}" -f ($ExcludePaths -join ', ')) -ForegroundColor DarkGray
 Write-Host "  Action :  FORCE-PUSH cleaned history -> the Space's 'main' (replaces it)" -ForegroundColor Yellow
 
-# Warn about uncommitted changes — only committed $Branch is deployed.
+# Warn about uncommitted changes - only committed $Branch is deployed.
 $dirty = (git status --porcelain)
 if (-not [string]::IsNullOrWhiteSpace($dirty)) {
     Write-Host "  NOTE   :  You have uncommitted changes; they will NOT be deployed" -ForegroundColor Yellow
@@ -96,7 +96,7 @@ if ($isStable) {
     Write-Host "!! Deploying here changes what everyone sees. Do NOT push bleeding-edge work here." -ForegroundColor Red
     $typed = Read-Host "   To proceed, type the Space name exactly ('$spaceName')"
     if ($typed -ne $spaceName) {
-        Write-Host "Aborted — name did not match ('$typed' != '$spaceName')." -ForegroundColor Yellow
+        Write-Host "Aborted - name did not match ('$typed' != '$spaceName')." -ForegroundColor Yellow
         return
     }
 }
