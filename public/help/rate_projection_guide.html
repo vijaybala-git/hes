@@ -36,6 +36,9 @@
     h3 { color: #3949AB; font-size: 0.98rem; margin-top: 1.2rem; }
     blockquote { border-left: 4px solid #9FA8DA; margin: 1rem 0; padding: 0.4rem 1rem;
                   background: #F7F8FF; color: #444; }
+    main img { max-width: 100%; height: auto; display: block; margin: 1rem auto;
+                border: 1px solid #ECEFF1; border-radius: 4px; }
+    main img + em { display: block; text-align: center; font-size: 0.82rem; color: #607D8B; }
   </style>
 </head>
 <body>
@@ -112,6 +115,11 @@
     <h2>§R4 · The three scenarios</h2>
     <p><em>Conservative, Moderate, and Stress — a low, central, and high path. All three come from the</em>
     California Energy Commission's own 2025 forecast; Moderate is the default.</p>
+    <p><img alt="Projected retail rates for every selectable rate model, electricity and gas, 2025–2050" src="rate_projection_curves.png" /></p>
+    <p><em>Figure: the projected retail rate for every selectable rate model — the three WhyWatt scenarios
+    plus the CEC and EIA reference lines — both fuels, 2025–2050 (gas on a log scale). Electricity stays
+    modest across all models; only gas spirals, and how far depends on the scenario. Generated from
+    <code>whywatt_rate_projection.json</code> by <code>scripts/build_guide_charts.py</code>.</em></p>
     <h3>In plain terms</h3>
     <p>The scenarios aren't made-up percentages — each is a real California Energy Commission (CEC) case,
     applied to <em>your</em> current rate.</p>

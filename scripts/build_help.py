@@ -679,6 +679,9 @@ def render_guide(md_path: Path) -> str:
     h3 {{ color: #3949AB; font-size: 0.98rem; margin-top: 1.2rem; }}
     blockquote {{ border-left: 4px solid #9FA8DA; margin: 1rem 0; padding: 0.4rem 1rem;
                   background: #F7F8FF; color: #444; }}
+    main img {{ max-width: 100%; height: auto; display: block; margin: 1rem auto;
+                border: 1px solid #ECEFF1; border-radius: 4px; }}
+    main img + em {{ display: block; text-align: center; font-size: 0.82rem; color: #607D8B; }}
   </style>
 </head>
 <body>
