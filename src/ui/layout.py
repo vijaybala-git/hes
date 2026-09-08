@@ -104,7 +104,7 @@ _TOGGLE_CHART_NAMES = _DEVICE_CHART_NAMES | {
 
 
 def _toggle_buttons(active_rv):
-    """Render 'Your journey' / 'Do nothing' toggle row using device_chart_home reactive."""
+    """Render 'Your journey' / 'Do nothing' toggle row bound to the given scenario reactive."""
     home = active_rv.value
     with solara.Row(gap="6px", style="margin-bottom:4px"):
         for val, label in [("journey", "Your journey"), ("baseline", "Do nothing")]:
@@ -200,50 +200,80 @@ def _render_fig(fig, key=None):
 
 
 @solara.component
-def ChartPane(chart_name, model, df, n):
+def ChartPane(chart_name, model, df, n, home_rv=None):
+    # Phase 6 §3d — each pane passes its own scenario reactive (left/right); default to the
+    # left one so any caller that omits it behaves as before.
+    if home_rv is None:
+        home_rv = device_chart_home_left
     if chart_name in _DEVICE_CHART_NAMES:
         chart_type = "device_cost" if chart_name == "Home Energy Cost by Device" else "device_consumption"
-        home = device_chart_home.value
+        home = home_rv.value
         with solara.Column(gap="4px"):
-            _toggle_buttons(device_chart_home)
+            _toggle_buttons(home_rv)
             fig = render_device_chart(model, home=home, chart_type=chart_type)
             _render_fig(fig, key=f"{chart_name}:{home}")
     elif chart_name == "Cost Breakdown by Category":
-        home = device_chart_home.value
+        home = home_rv.value
         with solara.Column(gap="4px"):
-            _toggle_buttons(device_chart_home)
+            _toggle_buttons(home_rv)
             fig = make_cost_breakdown(df, model, n, home=home)
             _render_fig(fig, key=f"{chart_name}:{home}")
     elif chart_name == "Annual kWh by Device":
-        home = device_chart_home.value
+        home = home_rv.value
         with solara.Column(gap="4px"):
-            _toggle_buttons(device_chart_home)
+            _toggle_buttons(home_rv)
             fig = make_annual_kwh(df, model, n, home=home)
             _render_fig(fig, key=f"{chart_name}:{home}")
     elif chart_name == "Annual Gas by Device":
-        home = device_chart_home.value
+        home = home_rv.value
         with solara.Column(gap="4px"):
-            _toggle_buttons(device_chart_home)
+            _toggle_buttons(home_rv)
             fig = make_annual_gas(df, model, n, home=home)
             _render_fig(fig, key=f"{chart_name}:{home}")
     elif chart_name == "Annual Gasoline by Vehicle":
-        home = device_chart_home.value
+        home = home_rv.value
         with solara.Column(gap="4px"):
-            _toggle_buttons(device_chart_home)
+            _toggle_buttons(home_rv)
             fig = make_annual_gasoline(df, model, n, home=home)
             _render_fig(fig, key=f"{chart_name}:{home}")
     elif chart_name == "HVAC Monthly Energy":
-        home = device_chart_home.value
+        home = home_rv.value
         with solara.Column(gap="4px"):
-            _toggle_buttons(device_chart_home)
+            _toggle_buttons(home_rv)
             fig = make_hvac_monthly(df, model, n, home=home)
             _render_fig(fig, key=f"{chart_name}:{home}")
     elif chart_name == "Energy Mix Timeline":
-        home = device_chart_home.value
+        home = home_rv.value
         with solara.Column(gap="4px"):
-            _toggle_buttons(device_chart_home)
+            _toggle_buttons(home_rv)
             fig = make_energy_mix_timeline(df, model, n, home=home)
             _render_fig(fig, key=f"{chart_name}:{home}")
+    elif chart_name == "Direct Emissions (CO₂ / CO₂e)":
+        # §3b — display-only combustion emissions (gas + gasoline); electricity excluded.
+        home = home_rv.value
+        metric = emissions_metric.value
+        with solara.Column(gap="4px"):
+            with solara.Row(gap="10px", style="align-items:center; flex-wrap:wrap"):
+                _toggle_buttons(home_rv)
+                with solara.Row(gap="6px"):
+                    for val, label in [("co2", "CO₂"), ("co2e", "CO₂e")]:
+                        _on = metric == val
+                        solara.Button(
+                            label, on_click=lambda v=val: emissions_metric.set(v),
+                            style=(f"background:{C_SKY}; color:white; border:none;"
+                                   " border-radius:4px; padding:4px 12px; font-size:0.82em; cursor:pointer;"
+                                   if _on else
+                                   "background:#F5F5F5; color:#444; border:1px solid #CCCCCC;"
+                                   " border-radius:4px; padding:4px 12px; font-size:0.82em; cursor:pointer;"))
+            fig = make_direct_emissions(df, model, n, home=home, metric=metric)
+            _render_fig(fig, key=f"{chart_name}:{home}:{metric}")
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                "<div style='font-size:0.72em; color:#90A4AE; margin:2px 4px 0; line-height:1.5'>"
+                "⚠ Direct combustion only — <b>electricity is not counted</b>. Journey electricity "
+                "that replaced gas/gasoline still carries a grid-carbon footprint, so the true net "
+                "reduction is smaller than the drop shown here. Grid-carbon modeling is a later phase. "
+                "Factors: gas 5.30 kg CO₂/therm · CO₂e 6.5 (2.3% leak × GWP100 28) · gasoline "
+                "8.89 kg/gal (EPA/EIA).</div>"))
     elif chart_name == "ACC Electrical Rate Shape":
         # No reference-year control: the ACC shape is year-independent (single static
         # hour×month factor matrix), so R.5 renders bare — matching every other chart's
@@ -1476,7 +1506,8 @@ def Page():
                                 solara.Select("", value=chart_left, values=CHART_OPTIONS)
                                 ChartHelpButton(chart_left.value)
                             with solara.Column(style="padding:0 2px 2px"):
-                                ChartPane(chart_left.value, model, df, n)
+                                ChartPane(chart_left.value, model, df, n,
+                                          home_rv=device_chart_home_left)
                         with solara.Column(classes=["card"],
                                            style="flex:1; min-width:300px; overflow:hidden"):
                             with solara.Row(classes=["card-hd", "chart-header-sel"]):
@@ -1492,7 +1523,8 @@ def Page():
                                 solara.Select("", value=chart_right, values=CHART_OPTIONS)
                                 ChartHelpButton(chart_right.value)
                             with solara.Column(style="padding:0 2px 2px"):
-                                ChartPane(chart_right.value, model, df, n)
+                                ChartPane(chart_right.value, model, df, n,
+                                          home_rv=device_chart_home_right)
 
         # ── Series key strip removed (§3.1): the migrated Plotly comparison charts
         #    (JC.1/JC.2/JC.6) now carry the A/B legend in-plot, so the standalone

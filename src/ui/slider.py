@@ -54,6 +54,9 @@ class SliderSpec:
     base_year: int = 2026          # for dtype="year"; pass the live sim_start_year
     gate_label: Optional[str] = None
     layout: str = "stack"          # "stack" | "inline"  (gated auto when gate_label)
+    # Phase 6 §3a — optional labelled reference marks on the track. Each is (value, tooltip);
+    # the value positions a tick, the tooltip (hover) names the anchor + its source citation.
+    anchors: Optional[list] = None
 
 
 # ── small format helpers ────────────────────────────────────────────────────────
@@ -172,6 +175,11 @@ _CSS = f"""
 .ww-slider .ww-tick {{ position:absolute; top:50%; transform:translate(-50%,-50%);
         width:2px; height:12px; background:var({_T['tick']}); border-radius:1px;
         pointer-events:none; }}
+/* §3a labelled reference anchors: hoverable tick carrying a source tooltip */
+.ww-slider .ww-anchor {{ position:absolute; top:50%; transform:translate(-50%,-50%);
+        width:3px; height:16px; background:#5C7CB8; border-radius:1px;
+        pointer-events:auto; cursor:help; z-index:2; }}
+.ww-slider .ww-anchor.ww-anchor-default {{ background:#3B6FD4; width:4px; }}
 """
 
 
@@ -301,6 +309,14 @@ def WhyWattSlider(
             solara.HTML(tag="div", classes=["ww-tick"], unsafe_innerHTML="",
                         style=f"left:calc({_T['thumb_px']//2}px + "
                               f"{_pct(spec, spec.default):.4f}*(100% - {_T['thumb_px']}px))")
+            # §3a — labelled reference anchors, each with a hover tooltip citing its source.
+            for _av, _atip in (spec.anchors or []):
+                _is_def = abs(_av - spec.default) < (spec.step / 2 or 1e-9)
+                _cls = ["ww-anchor", "ww-anchor-default"] if _is_def else ["ww-anchor"]
+                solara.HTML(tag="div", classes=_cls, attributes={"title": _atip},
+                            unsafe_innerHTML="",
+                            style=f"left:calc({_T['thumb_px']//2}px + "
+                                  f"{_pct(spec, _av):.4f}*(100% - {_T['thumb_px']}px))")
 
     with solara.Div(classes=["ww-slider"]):
         if is_gated:

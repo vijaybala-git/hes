@@ -13,6 +13,11 @@
     "insulation_quality": "average",
     "panel_amps": 100,
     "panel_calc_method": "optional",
+    "roof_tilt": 20,
+    "roof_azimuth": 180,
+    "array_type": "fixed_roof",
+    "module_type": "standard",
+    "system_losses": 14.0,
     "hvac_tonnage": 3.0,
     "ev_charger_amps": 32,
     "induction_amps": 40,
@@ -143,7 +148,9 @@
     "social_health_rate": 1.23,
     "chart_left": "Cumulative Energy Costs",
     "chart_right": "Journey Timeline",
-    "device_chart_home": "journey",
+    "device_chart_home_left": "journey",
+    "device_chart_home_right": "baseline",
+    "emissions_metric": "co2e",
     "detail_open": null
   }
 }

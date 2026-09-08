@@ -61,6 +61,7 @@ CHART_OPTIONS = [
     "Annual Gas by Device",
     "HVAC Monthly Energy",
     "Energy Mix Timeline",
+    "Direct Emissions (CO₂ / CO₂e)",
 ]
 
 # Reference codes shown in chart titles and headers — used in help files
@@ -77,6 +78,7 @@ CHART_CODES = {
     "Annual Gas by Device":           "EU.4",
     "HVAC Monthly Energy":            "EU.7",
     "Energy Mix Timeline":            "EU.6",
+    "Direct Emissions (CO₂ / CO₂e)":  "EU.8",
     "Electric CAGR Projection":       "R.1",
     "Gas CAGR Projection":            "R.2",
     "ACC Electrical Rate Projection": "R.3",

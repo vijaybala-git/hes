@@ -52,6 +52,12 @@ class ClimateData:
     inlet: np.ndarray              # (12,) static
     avg_temp: np.ndarray           # (12,) static base-year monthly avg dry-bulb (reserved for §4)
     current_year: int = 0
+    # Phase 6 display-only passthrough (inert — no sim math): PVWatts site geometry (§2b) and
+    # ASHRAE design temps for the HVAC tonnage label (§3e). None on legacy zones without them.
+    latitude: float | None = None
+    longitude: float | None = None
+    heating_design_temp_f: float | None = None
+    cooling_design_temp_f: float | None = None
 
     @property
     def n_years(self) -> int:
@@ -133,4 +139,8 @@ class ClimateLoader:
             cdd_traj=cdd_traj,
             inlet=np.asarray(rec["monthly_inlet_water_f"], dtype=float),
             avg_temp=np.asarray(rec["monthly_avg_temp_f"], dtype=float),
+            latitude=rec.get("latitude"),
+            longitude=rec.get("longitude"),
+            heating_design_temp_f=rec.get("heating_design_temp_f"),
+            cooling_design_temp_f=rec.get("cooling_design_temp_f"),
         )

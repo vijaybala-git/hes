@@ -9,20 +9,20 @@ import numpy as np
 
 
 @dataclass
-class SolarBatteryConfig:
-    """Physics model for a solar + optional battery system (§8).
+class SolarConfig:
+    """Solar array physics (Phase 6 WS2 §2a — split from SolarBatteryConfig).
 
-    System size drives production; battery determines self-consumption split;
-    NEM mode determines the export credit rate used in model.py.
+    Owns everything the sim prices off: size → production, the self-consumption fraction,
+    and the NEM export-credit rule. Generation is physically distinct from storage, so it is
+    its own config; the JourneyHome solar step reads only this.
+    (Phase 7: specific_yield → a per-zone monthly yield vector from pvwatts_zones.json.)
     """
     panels:          int   = 15       # number of panels (primary sizing input)
     kw_per_panel:    float = 0.42     # kW per panel (standard = 0.42, premium = 0.50)
     specific_yield:  float = 1500.0   # kWh/kW/yr — CA PVWatts typical; ~1,400 coast, ~1,650 inland
-    battery_enabled: bool  = True     # On by default — NEM 3.0 + battery is the new-install norm
-    battery_kwh:     float = 13.5     # usable battery capacity (one Powerwall-class unit)
+    scf:             float = 0.80     # self-consumption fraction (0–1); user-controlled slider
     nem_mode:        str   = "nbt"    # "nbt" (NEM 3.0, default) | "nem2" (existing pre-2023)
     nbc:             float = 0.025    # $/kWh non-bypassable charge (NEM 2.0 only)
-    scf:             float = 0.80     # self-consumption fraction (0–1); user-controlled slider
 
     @property
     def system_kw(self) -> float:
@@ -31,6 +31,64 @@ class SolarBatteryConfig:
     @property
     def self_consumption_fraction(self) -> float:
         return self.scf
+
+
+@dataclass
+class BatteryConfig:
+    """Battery storage (Phase 6 WS2 §2a). In Phase 6 it only labels/sizes the 'Solar + Battery'
+    capex slot and drives the UI self-use default-snap — the sim reads NOTHING from it (battery
+    presence affects self-consumption only through the UI, which sets SolarConfig.scf).
+    (Phase 7: battery_kwh + round-trip efficiency → dispatch physics that COMPUTES self-use.)
+    """
+    battery_enabled: bool  = True     # On by default — NEM 3.0 + battery is the new-install norm
+    battery_kwh:     float = 13.5     # usable battery capacity (one Powerwall-class unit)
+
+
+@dataclass
+class SolarBatteryConfig:
+    """Back-compat composition shim over SolarConfig + BatteryConfig (Phase 6 WS2 §2a).
+
+    Keeps the original flat constructor and attributes so model.py / ui/sim.py wiring and every
+    existing test are unchanged and numerically identical. The `.solar` / `.battery` accessors
+    expose the two split configs; the JourneyHome solar step now reads `.solar`. In Phase 7 the
+    wiring migrates to pass the two configs directly and this shim can be retired.
+    """
+    panels:          int   = 15
+    kw_per_panel:    float = 0.42
+    specific_yield:  float = 1500.0
+    battery_enabled: bool  = True
+    battery_kwh:     float = 13.5
+    nem_mode:        str   = "nbt"
+    nbc:             float = 0.025
+    scf:             float = 0.80
+
+    @property
+    def system_kw(self) -> float:
+        return self.panels * self.kw_per_panel
+
+    @property
+    def self_consumption_fraction(self) -> float:
+        return self.scf
+
+    @property
+    def solar(self) -> SolarConfig:
+        """The solar half — the only part the sim prices off."""
+        return SolarConfig(panels=self.panels, kw_per_panel=self.kw_per_panel,
+                           specific_yield=self.specific_yield, scf=self.scf,
+                           nem_mode=self.nem_mode, nbc=self.nbc)
+
+    @property
+    def battery(self) -> BatteryConfig:
+        """The battery half — capex/label only in Phase 6."""
+        return BatteryConfig(battery_enabled=self.battery_enabled, battery_kwh=self.battery_kwh)
+
+    @classmethod
+    def from_parts(cls, solar: SolarConfig, battery: BatteryConfig) -> "SolarBatteryConfig":
+        """Compose the shim from the two split configs (round-trips with .solar/.battery)."""
+        return cls(panels=solar.panels, kw_per_panel=solar.kw_per_panel,
+                   specific_yield=solar.specific_yield, battery_enabled=battery.battery_enabled,
+                   battery_kwh=battery.battery_kwh, nem_mode=solar.nem_mode, nbc=solar.nbc,
+                   scf=solar.scf)
 
 # Category constants shared across journey and model layers
 CATEGORY_ORDER  = ["Baseload", "WaterHeating", "HVAC_Cooling", "HVAC_Heating", "Transportation"]
@@ -379,9 +437,11 @@ class JourneyHome(mesa.Agent):
         if (self._solar_config is not None
                 and solar_install_yr is not None
                 and current_year >= solar_install_yr):
-            cfg = self._solar_config
-            annual_production_kwh = cfg.system_kw * cfg.specific_yield
-            scf = cfg.self_consumption_fraction   # 0.80 battery, 0.35 solar-only
+            # Read the solar half only (Phase 6 WS2 §2a). Battery presence never enters the
+            # sim — it affects self-consumption solely through the UI, which sets solar.scf.
+            solar = self._solar_config.solar
+            annual_production_kwh = solar.system_kw * solar.specific_yield
+            scf = solar.self_consumption_fraction   # 0.80 battery, 0.35 solar-only
 
             self_consumed_kwh = annual_production_kwh * scf
             exported_kwh      = annual_production_kwh * (1.0 - scf)

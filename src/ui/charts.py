@@ -970,6 +970,49 @@ def make_energy_mix_timeline(df, model, n, home="journey"):
     return fig
 
 
+# ── EU.8 — Direct Emissions (CO2 / CO2e), Phase 6 WS3 §3b ─────────────────────
+# Named emission factors (display only; no sim math). Electricity is deliberately EXCLUDED —
+# see the caveat rendered under the chart in layout.py.
+GAS_KG_CO2_PER_THERM      = 5.30   # EPA combustion factor
+GAS_KG_CO2E_PER_THERM     = 6.5    # combustion + ~2.3% upstream leakage × GWP100 28
+GASOLINE_KG_CO2_PER_GAL   = 8.89   # EPA tailpipe combustion factor (used for CO2 and CO2e)
+
+
+def make_direct_emissions(df, model, n, home="journey", metric="co2e"):
+    """EU.8 · Direct combustion emissions (metric tons CO2 or CO2e per year) as stacked bars by
+    source — natural gas + gasoline — for the selected scenario. Electricity is EXCLUDED (the
+    caveat footnote in the UI explains why). Display-only over gas_therms/gasoline_gallons."""
+    hobj = model.journey_home if home == "journey" else model.baseline_home
+
+    def _arr(hist):
+        a = np.zeros(n)
+        if hist:
+            v = np.array(hist[:n], dtype=float)
+            a[:len(v)] = v
+        return a
+
+    gas_f = GAS_KG_CO2E_PER_THERM if metric == "co2e" else GAS_KG_CO2_PER_THERM
+    gas_t = _arr(hobj.gas_therms_history) * gas_f / 1000.0            # metric tons/yr
+    gasoline_t = _arr(hobj.gasoline_gallons_history) * GASOLINE_KG_CO2_PER_GAL / 1000.0
+
+    if gas_t.sum() + gasoline_t.sum() <= 0:
+        return _pl_empty("No direct combustion emissions in this scenario")
+
+    yrs = list(range(1, n + 1))
+    unit = "t CO₂e" if metric == "co2e" else "t CO₂"
+    fig = go.Figure()
+    for label, data, color in [("Natural gas", gas_t, "#FB8C00"),
+                               ("Gasoline", gasoline_t, "#6D4C41")]:
+        fig.add_trace(go.Bar(x=yrs, y=list(data), name=label, marker=dict(color=color),
+                             hovertemplate="Yr %{x}<br>%{y:,.2f} " + unit +
+                                           "<extra>" + label + "</extra>"))
+    lay = _stacked_legend(_pl_layout(height=300, ytitle=f"{unit} / year", xtitle="Year",
+                                     money_y=False, xdtick=1))
+    lay["barmode"] = "stack"
+    fig.update_layout(**lay)
+    return fig
+
+
 # Chart JC.6 — Estimated Electrical Load (NEC panel load over the journey)
 def make_panel_load_timeline(df, model, n):
     hc = model.home_config

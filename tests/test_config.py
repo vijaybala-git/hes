@@ -108,6 +108,38 @@ def test_projection_rate_model_is_fuel_aware():
     assert any("elec_rate_model_a" in w for w in warns)
 
 
+def test_roof_geometry_round_trips():
+    """Phase 6 §2b — the inert roof/array fields persist through apply_config."""
+    S.apply_config({"roof_tilt": 35, "roof_azimuth": 205,
+                    "array_type": "tracking_1ax", "module_type": "premium",
+                    "system_losses": 9.5})
+    assert S.roof_tilt.value == 35 and S.roof_azimuth.value == 205
+    assert S.array_type.value == "tracking_1ax" and S.module_type.value == "premium"
+    assert S.system_losses.value == 9.5
+
+
+def test_roof_geometry_bad_values_rejected():
+    """Out-of-range clamps, bad enums drop to factory (sanitize boundary)."""
+    S.apply_config({"roof_azimuth": 999, "array_type": "spaceship"})
+    assert S.roof_azimuth.value == 359                       # clamped to range
+    assert S.array_type.value == S._DEFAULTS["array_type"]   # bad enum → factory
+
+
+@pytest.mark.parametrize("field,value", [
+    ("roof_tilt", 45), ("roof_azimuth", 90), ("array_type", "tracking_2ax"),
+    ("module_type", "thin_film"), ("system_losses", 5.0),
+])
+def test_roof_geometry_is_inert(field, value):
+    """Phase 6 §2b invariant — changing any roof/array field leaves the simulation output
+    byte-identical (no device or rate code reads them)."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+    from run_regression import run_values
+    base = run_values({})
+    changed = run_values({field: value})
+    assert changed == base, f"{field}={value} perturbed the simulation output"
+
+
 def test_export_round_trips():
     S.zip_code.set("90001")
     S.num_bedrooms.set(4)

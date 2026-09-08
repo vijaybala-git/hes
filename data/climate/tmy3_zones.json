@@ -9,7 +9,17 @@
     "trend_note": "hdd/cdd_cagr_by_scenario fitted by log-linear regression of Cal-Adapt ens32avg annual degree-days over 2025-2054 at each station's lat/lon.",
     "invariants": "monthly arrays length 12 (Jan..Dec); monthly HDD/CDD sum to annual.",
     "trend_source": "Cal-Adapt (cal-adapt.org), LOCA 32-model ensemble avg, RCP 4.5 / 8.5",
-    "trend_built": "2026-06-17"
+    "trend_built": "2026-06-17",
+    "geo_augmentation": {
+      "added_keys": [
+        "latitude",
+        "longitude",
+        "heating_design_temp_f",
+        "cooling_design_temp_f"
+      ],
+      "source": "TMYx EPW LOCATION + DESIGN CONDITIONS headers (ASHRAE 99% heating / 1% cooling DB)",
+      "note": "Inert display-only fields (Phase 6 WS2 \u00a72b lat/lon for PVWatts; WS3 \u00a73e design temps for the HVAC tonnage label). No device reads them; HDD/CDD untouched."
+    }
   },
   "CA_CZ1": {
     "state": "CA",
@@ -89,7 +99,11 @@
       "rcp45": 0.02887,
       "rcp85": 0.03988
     },
-    "note": ""
+    "note": "",
+    "latitude": 40.978,
+    "longitude": -124.109,
+    "heating_design_temp_f": 33.4,
+    "cooling_design_temp_f": 67.8
   },
   "CA_CZ2": {
     "state": "CA",
@@ -169,7 +183,11 @@
       "rcp45": 0.01088,
       "rcp85": 0.01425
     },
-    "note": ""
+    "note": "",
+    "latitude": 38.504,
+    "longitude": -122.81,
+    "heating_design_temp_f": 31.6,
+    "cooling_design_temp_f": 91.2
   },
   "CA_CZ3": {
     "state": "CA",
@@ -249,7 +267,11 @@
       "rcp45": 0.01694,
       "rcp85": 0.0237
     },
-    "note": ""
+    "note": "",
+    "latitude": 37.74445,
+    "longitude": -122.2236,
+    "heating_design_temp_f": 39.0,
+    "cooling_design_temp_f": 79.9
   },
   "CA_CZ4": {
     "state": "CA",
@@ -329,7 +351,11 @@
       "rcp45": 0.00909,
       "rcp85": 0.01245
     },
-    "note": ""
+    "note": "",
+    "latitude": 37.359,
+    "longitude": -121.924,
+    "heating_design_temp_f": 38.3,
+    "cooling_design_temp_f": 87.6
   },
   "CA_CZ5": {
     "state": "CA",
@@ -409,7 +435,11 @@
       "rcp45": 0.01799,
       "rcp85": 0.02389
     },
-    "note": ""
+    "note": "",
+    "latitude": 34.899,
+    "longitude": -120.449,
+    "heating_design_temp_f": 36.0,
+    "cooling_design_temp_f": 81.3
   },
   "CA_CZ6": {
     "state": "CA",
@@ -489,7 +519,11 @@
       "rcp45": 0.01096,
       "rcp85": 0.0149
     },
-    "note": "LAX (coastal) for south-coast zone"
+    "note": "LAX (coastal) for south-coast zone",
+    "latitude": 33.938,
+    "longitude": -118.389,
+    "heating_design_temp_f": 46.9,
+    "cooling_design_temp_f": 81.3
   },
   "CA_CZ7": {
     "state": "CA",
@@ -569,7 +603,11 @@
       "rcp45": 0.01034,
       "rcp85": 0.01421
     },
-    "note": ""
+    "note": "",
+    "latitude": 32.734,
+    "longitude": -117.183,
+    "heating_design_temp_f": 46.8,
+    "cooling_design_temp_f": 81.9
   },
   "CA_CZ8": {
     "state": "CA",
@@ -649,7 +687,11 @@
       "rcp45": 0.00839,
       "rcp85": 0.01127
     },
-    "note": "Fullerton \u2014 El Toro MCAS closed 1999"
+    "note": "Fullerton \u2014 El Toro MCAS closed 1999",
+    "latitude": 33.872,
+    "longitude": -117.979,
+    "heating_design_temp_f": 43.0,
+    "cooling_design_temp_f": 91.9
   },
   "CA_CZ9": {
     "state": "CA",
@@ -729,7 +771,11 @@
       "rcp45": 0.00877,
       "rcp85": 0.01238
     },
-    "note": "Burbank \u2014 no Pasadena station"
+    "note": "Burbank \u2014 no Pasadena station",
+    "latitude": 34.20056,
+    "longitude": -118.3575,
+    "heating_design_temp_f": 41.4,
+    "cooling_design_temp_f": 94.3
   },
   "CA_CZ10": {
     "state": "CA",
@@ -809,7 +855,11 @@
       "rcp45": 0.00614,
       "rcp85": 0.00865
     },
-    "note": "Riverside Muni"
+    "note": "Riverside Muni",
+    "latitude": 33.952,
+    "longitude": -117.439,
+    "heating_design_temp_f": 39.2,
+    "cooling_design_temp_f": 98.4
   },
   "CA_CZ11": {
     "state": "CA",
@@ -889,7 +939,11 @@
       "rcp45": 0.00463,
       "rcp85": 0.00673
     },
-    "note": ""
+    "note": "",
+    "latitude": 40.152,
+    "longitude": -122.254,
+    "heating_design_temp_f": 33.4,
+    "cooling_design_temp_f": 102.2
   },
   "CA_CZ12": {
     "state": "CA",
@@ -969,7 +1023,11 @@
       "rcp45": 0.00605,
       "rcp85": 0.0086
     },
-    "note": "Sacramento Exec"
+    "note": "Sacramento Exec",
+    "latitude": 38.507,
+    "longitude": -121.495,
+    "heating_design_temp_f": 34.0,
+    "cooling_design_temp_f": 97.0
   },
   "CA_CZ13": {
     "state": "CA",
@@ -1049,7 +1107,11 @@
       "rcp45": 0.00457,
       "rcp85": 0.00699
     },
-    "note": ""
+    "note": "",
+    "latitude": 36.78,
+    "longitude": -119.719,
+    "heating_design_temp_f": 35.4,
+    "cooling_design_temp_f": 101.8
   },
   "CA_CZ14": {
     "state": "CA",
@@ -1129,7 +1191,11 @@
       "rcp45": 0.00405,
       "rcp85": 0.00654
     },
-    "note": ""
+    "note": "",
+    "latitude": 35.686,
+    "longitude": -117.691,
+    "heating_design_temp_f": 27.0,
+    "cooling_design_temp_f": 106.5
   },
   "CA_CZ15": {
     "state": "CA",
@@ -1209,7 +1275,11 @@
       "rcp45": 0.00356,
       "rcp85": 0.00522
     },
-    "note": ""
+    "note": "",
+    "latitude": 32.81667,
+    "longitude": -115.6833,
+    "heating_design_temp_f": 38.7,
+    "cooling_design_temp_f": 110.1
   },
   "CA_CZ16": {
     "state": "CA",
@@ -1289,6 +1359,10 @@
       "rcp45": 0.00839,
       "rcp85": 0.01424
     },
-    "note": ""
+    "note": "",
+    "latitude": 39.277,
+    "longitude": -120.71,
+    "heating_design_temp_f": 23.7,
+    "cooling_design_temp_f": 82.0
   }
 }

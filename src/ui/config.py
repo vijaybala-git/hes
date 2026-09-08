@@ -99,7 +99,8 @@ import math
 SHARE_EXCLUDE = {
     "home_profile_details_expanded", "panel_expanded", "hvac_expanded", "wh_expanded",
     "dryer_expanded", "cooktop_expanded", "ev_expanded", "baseload_expanded",
-    "chart_left", "chart_right", "device_chart_home", "detail_open",
+    "chart_left", "chart_right", "device_chart_home_left", "device_chart_home_right",
+    "emissions_metric", "detail_open",
 }
 
 # Reactives excluded from the SHARE delta beyond SHARE_EXCLUDE. Empty since Phase 5.5 Fix 6:
@@ -126,6 +127,7 @@ INT_KEYS = {
     "hvac_baseline_lifespan", "wh_baseline_lifespan", "dryer_baseline_lifespan",
     "cooktop_baseline_lifespan", "dryer_loads_per_week", "cooktop_meals_per_week",
     "solar_panels",
+    "roof_tilt", "roof_azimuth",          # Phase 6 §2b — inert PVWatts geometry
 }
 
 _STATES = {"gas", "electric", "none"}
@@ -145,6 +147,9 @@ ENUMS = {
     "panel_calc_method": {"optional", "standard"},
     "hpwh_ambient_location": {"conditioned", "unconditioned"},
     "solar_nem_mode": {"nbt", "nem2"},
+    # Phase 6 §2b — inert PVWatts geometry enums
+    "array_type": {"fixed_roof", "fixed_open", "tracking_1ax", "tracking_2ax"},
+    "module_type": {"standard", "premium", "thin_film"},
     "hvac_starting_state": _STATES, "wh_starting_state": _STATES,
     "dryer_starting_state": _STATES, "cooktop_starting_state": _STATES,
     "ev_starting_state": _STATES,
@@ -166,6 +171,7 @@ _MILES = (0, 1_000_000)
 RANGES = {
     "years": (1, 30), "sim_start_year": (2000, 2100),
     "num_bedrooms": (1, 5), "square_footage": (100, 25000), "year_built": (1850, 2030),
+    "roof_tilt": (0, 60), "roof_azimuth": (0, 359), "system_losses": (0.0, 99.0),
     "panel_amps": (30, 600), "ev_charger_amps": _AMPS, "induction_amps": _AMPS,
     "hpwh_amps": _AMPS, "dryer_amps": _AMPS, "hvac_tonnage": (0.5, 20.0),
     "furnace_afue": (0.3, 1.0), "gas_wh_uef": (0.3, 1.0), "hpwh_uef": (1.0, 6.0),

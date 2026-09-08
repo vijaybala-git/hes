@@ -811,6 +811,24 @@ upstream methane leakage at a 2% pipeline leakage rate.
 
 Slider range: $1.00 (EPA SC-CO2 only, no leakage) to $2.00 (high leakage + high scenario).
 
+The default $1.07 is two cited sub-components: SC-CO2 combustion $0.97/therm (EIA
+5.306 kg CO2/therm x EPA 2023 central $190/tonne CO2) plus an SC-CH4 leakage adder of
+$0.10/therm (EPA SC-CH4 2023 ~$1,600/short ton x ~2% pipeline leakage).
+
+### The four climate-rate anchor models
+
+The climate-rate slider marks four reference points — hover each tick on the slider for its
+source citation:
+
+    Rate       Model                          Basis / source
+    ------------------------------------------------------------------------------
+    $1.00      EPA SC-CO2 only                EIA 5.306 kgCO2/therm x EPA 2023 $190/tCO2
+    $1.07 (*)  EPA SC-CO2 + SC-CH4 (default)  + $0.10 at ~2% pipeline methane leakage
+    $1.15      Higher CH4 leakage (3.7%)      Alvarez et al. 2018, Science
+    $1.80      High-urgency                   EPA 2023 SC-GHG Tech Report App. 3B (1.5% disc.)
+    ------------------------------------------------------------------------------
+    (*) default. SC-CO2 combustion = $0.97/therm; SC-CH4 leakage adder = $0.10/therm.
+
 ### Natural gas — health cost ($1.23/therm default)
 
 Based on CPUC Decision D.24-07-015 (July 2024), using E3's "Quantifying
