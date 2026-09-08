@@ -129,7 +129,14 @@ INT_KEYS = {
 }
 
 _STATES = {"gas", "electric", "none"}
-_RATE_MODELS = {"cagr_flat", "ca_average", "acc_shaped", "acc_seasonal"}
+# Legacy (Phase 4) rate models — valid for both fuels; removed in Phase 7.
+_LEGACY_RATE_MODELS = {"cagr_flat", "ca_average", "acc_shaped", "acc_seasonal"}
+# Phase 6 WS1 — projection-backed rate models are fuel-aware (an elec-only model like
+# cec_iepr must not be accepted on a gas slot from a shared link, and vice versa).
+from projected_rate_source import PROJECTION_ELEC_MODELS, PROJECTION_GAS_MODELS
+_ELEC_RATE_MODELS = _LEGACY_RATE_MODELS | set(PROJECTION_ELEC_MODELS)
+_GAS_RATE_MODELS = _LEGACY_RATE_MODELS | set(PROJECTION_GAS_MODELS)
+_RATE_MODELS = _ELEC_RATE_MODELS | _GAS_RATE_MODELS   # kept for back-compat imports
 # Allowed values for string enums. A value outside the set is dropped (reverts to factory).
 ENUMS = {
     "climate_zone": {f"CZ{i}" for i in range(1, 17)},
@@ -141,8 +148,8 @@ ENUMS = {
     "hvac_starting_state": _STATES, "wh_starting_state": _STATES,
     "dryer_starting_state": _STATES, "cooktop_starting_state": _STATES,
     "ev_starting_state": _STATES,
-    "elec_rate_model_a": _RATE_MODELS, "elec_rate_model_b": _RATE_MODELS,
-    "gas_rate_model_a": _RATE_MODELS, "gas_rate_model_b": _RATE_MODELS,
+    "elec_rate_model_a": _ELEC_RATE_MODELS, "elec_rate_model_b": _ELEC_RATE_MODELS,
+    "gas_rate_model_a": _GAS_RATE_MODELS, "gas_rate_model_b": _GAS_RATE_MODELS,
 }
 
 # Inclusive numeric bounds [lo, hi]. Out-of-range values are CLAMPED (keeps near-miss

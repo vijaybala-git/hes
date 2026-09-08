@@ -25,6 +25,8 @@ from journey import CATEGORY_ORDER, CATEGORY_LABELS, CapExOnlySlot, SolarBattery
 from home_config import HomeConfig, compute_baseload_kwh, compute_ua
 from model import HESModel
 from panel_assessor import PanelAssessor
+from projected_rate_source import (
+    PROJECTION_LABELS, PROJECTION_PRIMARY, PROJECTION_ELEC_MODELS, PROJECTION_GAS_MODELS)
 from social_cost import SocialCostConfig
 
 # ── §25 Unified Summary + Detail UI ──────────────────────────────────────────
@@ -1706,26 +1708,49 @@ def SolarDetail(model):
 def _fuel_model_block(fuel: str, heading: str, color: str,
                        model_rv, cagr_rv, acc_cagr_rv,
                        model_options: list, cagr_max: int, ri_auto, ri_ca):
-    """Fuel rate model section: 3-way mode toggle + resolved name line + the editable CAGR
-    slider (EIA modes, seeded from JSON) or the ACC base-escalation slider."""
+    """Fuel rate model section: legacy toggle + WhyWatt projection scenarios (primary row) +
+    reference/testing projection models (expander) + resolved name line + the editable CAGR
+    slider (EIA modes) / ACC base-escalation slider / baked-curve note (projection models).
+
+    Phase 6 WS1: projection models (whywatt_*, eia_*, cec_*, e3_gas) are non-default. Each is a
+    standalone baked curve — no escalation slider; the ACC monthly shape is layered on in core.
+    """
     solara.HTML(tag="div", unsafe_innerHTML=(
         f"<div style='font-weight:600; font-size:0.84em; color:{color};"
         " margin:8px 0 4px'>" + heading + "</div>"
     ))
+
+    def _btn(key: str, display: str):
+        is_active = model_rv.value == key
+        solara.Button(
+            display,
+            on_click=lambda k=key: model_rv.set(k),
+            style=(
+                f"background:{color}; color:white; border:none;"
+                " border-radius:4px; padding:3px 10px; font-size:0.80em; cursor:pointer;"
+                if is_active else
+                "background:#F5F5F5; color:#444; border:1px solid #CCC;"
+                " border-radius:4px; padding:3px 10px; font-size:0.80em; cursor:pointer;"
+            ),
+        )
+
+    # Primary row: legacy models (My Utility / CA Average / ACC) + the 3 WhyWatt scenarios.
     with solara.Row(gap="6px", style="flex-wrap:wrap"):
         for key, display in model_options:
-            is_active = model_rv.value == key
-            solara.Button(
-                display,
-                on_click=lambda k=key: model_rv.set(k),
-                style=(
-                    f"background:{color}; color:white; border:none;"
-                    " border-radius:4px; padding:3px 10px; font-size:0.80em; cursor:pointer;"
-                    if is_active else
-                    "background:#F5F5F5; color:#444; border:1px solid #CCC;"
-                    " border-radius:4px; padding:3px 10px; font-size:0.80em; cursor:pointer;"
-                ),
-            )
+            _btn(key, display)
+        for key in PROJECTION_PRIMARY:
+            _btn(key, PROJECTION_LABELS[key])
+
+    # Expander: reference / testing projection models for this fuel (excluding the primary 3).
+    _proj_for_fuel = PROJECTION_ELEC_MODELS if fuel == "electricity" else PROJECTION_GAS_MODELS
+    _extra = [k for k in PROJECTION_LABELS
+              if k in _proj_for_fuel and k not in PROJECTION_PRIMARY]
+    if _extra:
+        with solara.Details(summary="Reference / testing models", expand=False):
+            with solara.Row(gap="6px", style="flex-wrap:wrap"):
+                for key in _extra:
+                    _btn(key, PROJECTION_LABELS[key])
+
     # Resolved utility for this fuel + mode (name + provenance badge).
     _name, _prov, _ = _fuel_resolved_display(
         fuel, model_rv.value, cagr_rv.value, acc_cagr_rv.value, ri_auto, ri_ca)
@@ -1733,7 +1758,15 @@ def _fuel_model_block(fuel: str, heading: str, color: str,
     _fkey = "elec" if fuel == "electricity" else "gas"
     _cagr_def = _DEFAULTS[f"{_fkey}_cagr_pct_a"]            # A/B share factory default
     _acc_def = _DEFAULTS[f"acc_{_fkey}_cagr_a"]
-    if model_rv.value in ("cagr_flat", "ca_average"):
+    if model_rv.value in PROJECTION_LABELS:
+        _upper = ("<br>Upper-bound / most-extreme published case — not a central forecast."
+                  if model_rv.value in ("cec_bau",) else "")
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            "<div style='font-size:0.75em; color:#546E7A; margin:1px 0 4px'>"
+            "Baked CEC/EIA projection curve · ACC monthly shape applied. "
+            "No escalation slider — the trajectory is fixed by the model." + _upper + "</div>"
+        ))
+    elif model_rv.value in ("cagr_flat", "ca_average"):
         WhyWattSlider(
             SliderSpec(key=f"{fuel}_cagr", title="Escalation",
                        minimum=0, maximum=cagr_max, step=1, default=_cagr_def,

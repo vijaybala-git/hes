@@ -91,6 +91,23 @@ def test_apply_config_ignores_unknown_keys():
     assert not hasattr(S, "bogus_key")
 
 
+def test_projection_rate_model_round_trips():
+    """Phase 6 WS1 — a projection rate model persists through apply_config (it's a valid enum)."""
+    S.apply_config({"elec_rate_model_a": "whywatt_stress", "gas_rate_model_a": "cec_bau"})
+    assert S.elec_rate_model_a.value == "whywatt_stress"
+    assert S.gas_rate_model_a.value == "cec_bau"
+
+
+def test_projection_rate_model_is_fuel_aware():
+    """An elec-only model on a gas slot (or vice versa) is dropped → reverts to factory."""
+    warns = S.apply_config({"gas_rate_model_a": "cec_iepr",       # elec-only
+                            "elec_rate_model_a": "cec_bau"})       # gas-only
+    assert S.gas_rate_model_a.value == S._DEFAULTS["gas_rate_model_a"]
+    assert S.elec_rate_model_a.value == S._DEFAULTS["elec_rate_model_a"]
+    assert any("gas_rate_model_a" in w for w in warns)
+    assert any("elec_rate_model_a" in w for w in warns)
+
+
 def test_export_round_trips():
     S.zip_code.set("90001")
     S.num_bedrooms.set(4)
