@@ -86,6 +86,13 @@ def _load(name):
     return json.loads((BENCH / name).read_text())
 
 
+def _real2024_to_nominal(filled, m, base=2024):
+    """Inflate a real-2024$ per-year series to the bundle's nominal basis via the GDP deflator."""
+    d0 = m._deflator[base]
+    return {y: round(v * m._deflator[int(y)] / d0, 6)
+            for y, v in filled.items() if int(y) in m._deflator}
+
+
 def main():
     m = ProjectedRateModel()
     years = m.years
@@ -123,7 +130,8 @@ def main():
         "cec_electric": {"label": "CEC 2025 (PG&E residential avg)", "role": "CA electricity authority",
                          "elec": _fill(cec_e["pge_residential_nominal"], years)},
         "cec_gas_extreme": {"label": "CEC extreme (GT AAFS, Flat RR)", "role": "gas death-spiral upper bound",
-                            "gas": _fill(cec_g["gas"]["series"], years)},
+                            # cec_2025_iepr_gas.json (tn=264063) is REAL 2024$; inflate to the bundle's nominal basis
+                            "gas": _real2024_to_nominal(_fill(cec_g["gas"]["series"], years), m)},
         "e3_gas": {"label": "E3 2020 (managed high-electrification)", "role": "independent gas high case",
                    "gas": _fill(e3["gas"]["nominal_therm_approx"], years)},
     }

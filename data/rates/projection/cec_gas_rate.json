@@ -4,9 +4,21 @@
   "source": "2025 IEPR Gas Rate Forecast workbook, efiling tn=264063, sheet 'PG&E Res'",
   "note": "CEC PG&E residential gas DELIVERED price ($/therm) by scenario (Demand x RR-recovery), 2025-2050, with commodity/transportation split + Demand (=Sales) and Revenue Requirement. The 'GT AAFS 2.5 Demand Flat RR' scenario = the ~$103/therm death-spiral figure. 'Pruning RR' = curtailed gas investment (managed decline); 'Flat/Constant RR' = BAU.",
   "unit_delivered": "$/therm",
+  "basis": "real 2024$ (see citation.basis_note)",
   "citation": {
     "workbook_url": "https://efiling.energy.ca.gov/GetDocument.aspx?tn=264063",
-    "accessed": "2026-08-26"
+    "accessed": "2026-08-26",
+    "sheet": "PG&E Res",
+    "column_map": {
+      "delivered": "col H 'Delivered Price'",
+      "commodity": "col F 'Commodity Price'",
+      "transportation": "col G 'Transportation Rate'",
+      "demand": "col I 'Demand'",
+      "revenue_requirement": "col J 'Revenue Requirement'",
+      "scenario": "col B 'Scenario' (18 blocks x 26 yrs 2025-2050)"
+    },
+    "basis_note": "Delivered/commodity/transportation are REAL 2024$ — the workbook's 'Commodity Prices' sheet is headed '2024$/Therm', and its values equal 'PG&E Res' col F. projected_rate_model._cec_gas_index() inflates to nominal (GDP deflator) so gas shares the nominal internal basis; the canonical reporting basis is real 2024$ via to_real().",
+    "verified": "2026-09-09 — values match the source workbook to +/-0.00005 $/therm (see docs/rate_projection_gas_provenance.md)"
   },
   "scenarios": {
     "Base Demand Constant Growth RR": {

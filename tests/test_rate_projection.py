@@ -106,13 +106,20 @@ def test_v2_gas_scenarios_cross_near_term(m):
 
 
 def test_v2_gas_within_eia_floor_and_cec_ceiling(m):
-    """Gas: EIA floor < our scenarios; our stress stays below the CEC BAU extreme."""
-    eia_gas_2050 = _interp(_bench("eia_aeo.json")["gas"]["series"], 2050)         # ~3.59
-    cec_gas_2050 = _interp(_bench("cec_2025_iepr_gas.json")["gas"]["series"], 2050)  # ~102.76
-    assert m.retail("gas", "conservative")[2050] > eia_gas_2050
-    assert m.retail("gas", "stress")[2050] < cec_gas_2050
+    """Gas: EIA floor < our scenarios; our stress stays below the CEC BAU extreme.
+
+    Compared in REAL 2024$ (the canonical basis): both the EIA floor and the CEC ceiling
+    (tn=264063, GT AAFS 2.5 Flat RR) are published in real 2024$, so our nominal retail is
+    converted with to_real() before the comparison.
+    """
+    eia_gas_2050 = _interp(_bench("eia_aeo.json")["gas"]["series_real_2024"], 2050)   # ~1.3
+    cec_gas_2050 = _interp(_bench("cec_2025_iepr_gas.json")["gas"]["series"], 2050)   # ~102.76 real 2024$
+    cons_real = m.to_real(m.retail("gas", "conservative"), base_year=2024)[2050]
+    stress_real = m.to_real(m.retail("gas", "stress"), base_year=2024)[2050]
+    assert cons_real > eia_gas_2050
+    assert stress_real < cec_gas_2050
     # stress should be a genuine spiral — well above the floor
-    assert m.retail("gas", "stress")[2050] > 5 * eia_gas_2050
+    assert stress_real > 5 * eia_gas_2050
 
 
 @pytest.mark.parametrize("year", [2030, 2040, 2050])
