@@ -46,6 +46,15 @@ _ASSETS       = os.path.normpath(os.path.join(_HERE, "..", "..", "docs", "assets
 _WHYWATT_LOGO = os.path.join(_ASSETS, "whywatt_logo.svg")
 _ECHO_LOGO    = os.path.join(_ASSETS, "echo_logo.svg")
 _ECHO_ICON    = os.path.join(_ASSETS, "echo_icon.svg")
+_BETA_BADGE   = os.path.join(_ASSETS, "beta_badge.svg")
+
+# BETA badge — shown on the prototype Space (bleeding edge), hidden on the stable Space.
+# Automatic per-Space: set env var WHYWATT_BETA=1 in the prototype Space's Variables
+# (HF → Settings → Variables), leave it unset on the stable Space. Same repo, clean break.
+# To force it regardless of the env var, set _BETA_OVERRIDE = True (or False); None = use env.
+_BETA_OVERRIDE: bool | None = None
+_BETA = (_BETA_OVERRIDE if _BETA_OVERRIDE is not None
+         else os.environ.get("WHYWATT_BETA", "").strip().lower() in ("1", "true", "yes", "on"))
 
 def _read_svg(path: str, height_px: int | None = None) -> str | None:
     """Return SVG content as a string, or None if file is missing.
@@ -822,6 +831,7 @@ def Masthead():
         f"<span class='spec'>Baseload <b class='mono'>{bl_kwh:,.0f}</b> kWh/yr</span>"
         "</div>"
     )
+    beta_badge = (_read_svg(_BETA_BADGE, height_px=22) or "") if _BETA else ""
     brand_inner = (
         f"<div class='brand-mark'>{_WHYWATT_ICON_SVG}</div>"
         "<div style='display:flex;flex-direction:column;line-height:1.1'>"
@@ -831,6 +841,8 @@ def Masthead():
         "<span class='hex'>E</span>lectrification "
         "e<span class='hex'>X</span>plorer</div>"
         "</div>"
+        + (f"<div style='display:flex;align-items:center;margin-left:6px'>{beta_badge}</div>"
+           if beta_badge else "")
     )
     with solara.Row(classes=["masthead"], style="gap:16px"):
         solara.HTML(tag="div", unsafe_innerHTML=brand_inner, classes=["brand"],
@@ -1568,6 +1580,11 @@ def Page():
                 "Supported by the <strong>Electrification Collaboration</strong>."
                 "</span>"
             ))
+            if _BETA:
+                _beta_foot = _read_svg(_BETA_BADGE, height_px=20)
+                if _beta_foot:
+                    solara.HTML(tag="div", unsafe_innerHTML=_beta_foot,
+                                style="display:flex; align-items:center; flex-shrink:0")
             solara.HTML(tag="div", unsafe_innerHTML=(
                 "<span style='background:#0D47A1;color:#fff;border-radius:6px;"
                 "padding:3px 10px;font-size:.74em;font-weight:700;"

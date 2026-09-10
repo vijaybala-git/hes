@@ -37,7 +37,12 @@ param(
         "data/rates/sources",
         # Legacy binary that HF (Git-Xet/LFS) rejects; superseded by rate_projection_curves.svg.
         # It only ever existed in Phase 6 history, so strip it from every deployed commit.
-        "public/help/rate_projection_curves.png"
+        "public/help/rate_projection_curves.png",
+        # Impact-report deliverables (.docx + chart .png/.svg). NOT part of the running Space
+        # (the Dockerfile copies only src/ data/ docs/assets/ public/ templates/; the served
+        # report is the self-contained public/help/RateModel_Impact_Report.html). Their binary
+        # blobs (the .docx and the chart PNGs) trip HF's Git-Xet/LFS gate, so strip the tree.
+        "docs/reports"
     )
 )
 
