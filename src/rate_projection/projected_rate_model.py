@@ -25,8 +25,15 @@ TWO residual drivers, one per fuel (docs/OfflineRateProjection_Plan.md §2.1 + t
     Retail follows the CEC delivered-price shape rebased to WhyWatt's base; the residual is implied.
     The CEC scenario's own Revenue Requirement and Demand columns feed rr_index()/sales_index() —
     so the gas death spiral (RR ÷ FALLING demand) is real CEC data, not a preset.
+    NOTE the tn=264063 delivered price is published in REAL 2024$ (its 'Commodity Prices' sheet is
+    headed "2024$/Therm"); _cec_gas_index() inflates it to nominal with the GDP deflator before
+    indexing, so gas shares the same NOMINAL internal footing as electricity and mc.
 
-Everything is nominal; to_real() converts via the CEC IEPR GDP deflator (the same index E3/ACC use).
+BASIS — everything is computed in NOMINAL $ (mc and the retail anchors are nominal), because the
+additive v = mc + r reconstruction needs one consistent basis. The CANONICAL REPORTING basis is
+REAL 2024$: callers wrap retail()/decompose() in to_real(series, base_year=2024). The CEC anchors
+(electric tn=268239, gas tn=264063) are themselves real 2024$, so the real-reported curves track
+them directly. to_nominal() is the inverse, for an explicit nominal view.
 Imported by NO live sim code — analysis only.
 """
 
@@ -134,10 +141,17 @@ class ProjectedRateModel:
         return {y: dem[y] / b for y in self.years}
 
     def _cec_gas_index(self, scenario: str) -> dict:
-        """CEC gas delivered price as an index (base year = 1.0)."""
-        deliv = self._gas_scn(scenario, "delivered")
-        b = deliv[self.base_year]
-        return {y: deliv[y] / b for y in self.years}
+        """CEC gas delivered price as a NOMINAL index (base year = 1.0).
+
+        tn=264063 delivered price is REAL 2024$, so inflate to nominal with the GDP
+        deflator (base 2024) before indexing — this keeps gas on the same nominal
+        internal basis as electricity and mc. to_real() reports it back in real 2024$.
+        """
+        deliv = self._gas_scn(scenario, "delivered")            # real 2024$
+        d24 = self._deflator[2024]
+        nominal = {y: deliv[y] * self._deflator[y] / d24 for y in self.years}
+        b = nominal[self.base_year]
+        return {y: nominal[y] / b for y in self.years}
 
     def residual(self, fuel: str, scenario: str) -> dict:
         # Both fuels: central retail follows the CEC rate shape, rebased to WhyWatt's base.
@@ -160,9 +174,17 @@ class ProjectedRateModel:
 
     # ── reporting helpers ────────────────────────────────────────────────────
     def to_real(self, series: dict, base_year: int | None = None) -> dict:
+        """Nominal → real: express a nominal series in constant `base_year` dollars."""
         b = base_year or self.base_year
         d0 = self._deflator[b]
         return {y: round(v * d0 / self._deflator[y], 6) for y, v in series.items()
+                if y in self._deflator}
+
+    def to_nominal(self, series: dict, base_year: int | None = None) -> dict:
+        """Real → nominal: inverse of to_real(), for an explicit nominal view of a real series."""
+        b = base_year or self.base_year
+        d0 = self._deflator[b]
+        return {y: round(v * self._deflator[y] / d0, 6) for y, v in series.items()
                 if y in self._deflator}
 
     def cec_electric_retail(self) -> dict:

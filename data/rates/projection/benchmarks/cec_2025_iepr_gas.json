@@ -3,9 +3,10 @@
   "role": "gas death-spiral (BAU investment, slow electrification) \u00e2\u20ac\u201d upper bound",
   "publisher": "California Energy Commission (CEC)",
   "source_dataset": "2025 IEPR Gas Rate Forecast workbook tn=264063, scenario 'GT AAFS 2.5 Demand Flat RR' (aggressive electrification + BAU/Flat revenue recovery)",
-  "basis": "nominal",
+  "basis": "real 2024$",
+  "basis_note": "REAL 2024$ (tn=264063 delivered price; the workbook's 'Commodity Prices' sheet is headed '2024$/Therm'). Previously mislabeled 'nominal'; corrected 2026-09-09. The export bundle inflates this to nominal via the GDP deflator to match the nominal-basis bundle; the notebook plots it with native='real_2024'.",
   "scenario": "GT AAFS 2.5 (Additional Achievable Fuel Substitution) demand decline + Flat RR recovery (business-as-usual gas investment). The most extreme published PG&E residential death-spiral case.",
-  "note": "This is the most extreme, and most current, official state death-spiral figure \u00e2\u20ac\u201d driven by the assumption that gas-system INVESTMENT is NOT curtailed as demand falls (contrast E3 2020's managed high-electrification path, ~$13.8/therm nominal by 2050). Applies to PG&E residential.",
+  "note": "The most extreme, and most current, official state death-spiral figure -- driven by the assumption that gas-system INVESTMENT is NOT curtailed as demand falls (contrast E3 2020's managed high-electrification path, ~$13.8/therm nominal by 2050 / ~$7.8 real 2024$). Applies to PG&E residential.",
   "citation": {
     "workbook_url": "https://efiling.energy.ca.gov/GetDocument.aspx?tn=264063",
     "accessed": "2026-08-26",
