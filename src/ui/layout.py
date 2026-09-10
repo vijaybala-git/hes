@@ -858,6 +858,13 @@ def Masthead():
                     HelpLink("WhyWatt Help", "index.html", style=_hm_item)
                     HelpLink("Release Notes", "release_notes.html", style=_hm_item)
                     HelpLink("Support", "support.html", style=_hm_item)
+                    # Technical Reports — long-form analyses served from public/help/.
+                    solara.HTML(tag="div", unsafe_innerHTML="Technical Reports",
+                                style="margin:6px 8px 2px; padding-top:6px;"
+                                      " border-top:1px solid #e0e0e0; font-size:0.72em;"
+                                      " font-weight:700; letter-spacing:.04em;"
+                                      " text-transform:uppercase; color:#78909c;")
+                    HelpLink("Rate-Model Impact", "RateModel_Impact_Report.html", style=_hm_item)
         _ShareDialog(_share_open)
         _SettingsLoadDialog(_settings_load_open, _settings_load_err)
         _SettingsExportDialog(_settings_export_open)

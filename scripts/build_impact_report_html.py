@@ -18,6 +18,10 @@ import markdown
 REPO = Path(__file__).resolve().parent.parent
 SRC = REPO / "docs" / "reports" / "RateModel_Impact_Report.md"
 OUT = REPO / "docs" / "reports" / "RateModel_Impact_Report.html"
+# Served copy the in-app Help → Technical Reports link opens (Solara serves public/ at
+# /static/public/; help_utils._HELP_URL_BASE = /static/public/help/). Self-contained, so a
+# single-file copy is all that's needed.
+PUBLIC_OUT = REPO / "public" / "help" / "RateModel_Impact_Report.html"
 
 CSS = """
 :root { color-scheme: light dark; }
@@ -88,6 +92,9 @@ def main():
            f"</head>\n<body>\n{html_body}\n</body>\n</html>\n")
     OUT.write_text(doc, encoding="utf-8")
     print(f"wrote {OUT.relative_to(REPO)}  ({len(doc)/1024:.0f} KB, self-contained)")
+    PUBLIC_OUT.parent.mkdir(parents=True, exist_ok=True)
+    PUBLIC_OUT.write_text(doc, encoding="utf-8")
+    print(f"wrote {PUBLIC_OUT.relative_to(REPO)}  (served copy)")
 
 
 if __name__ == "__main__":
