@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 24" role="img" aria-label="BETA">
+  <rect x="0.75" y="0.75" width="58.5" height="22.5" rx="6.5" fill="#F9A825" stroke="#B26A00" stroke-width="1.5"/>
+  <text x="30.5" y="16.6" text-anchor="middle" fill="#3E2723"
+        font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+        font-size="12.5" font-weight="800" letter-spacing="1.5">BETA</text>
+</svg>
