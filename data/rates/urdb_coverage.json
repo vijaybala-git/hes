@@ -1,0 +1,467 @@
+{
+ "_meta": {
+  "status": "URDB annually-maintained utilities (~70% of US load); 114 listed.",
+  "source_url": "https://openei.org/wiki/Utility_Rate_Database/Data",
+  "fetched": "2026-09-21",
+  "note": "Utilities on this list have URDB rates updated annually. Per OpenEI, rates for utilities NOT on this list should not be assumed current -> use EIA fallback. Keyed by EIA-861 utility id (joins to RateResolver / eia_rates_by_utility.json).",
+  "wikitext_sha256": "bc8ebf43f7abf9c085a185af706fd8c38e90b8c3680fff508220d50837575e2d"
+ },
+ "utilities": {
+  "195": {
+   "name": "Alabama Power Co",
+   "alias": null
+  },
+  "733": {
+   "name": "Appalachian Power Co",
+   "alias": null
+  },
+  "803": {
+   "name": "Arizona Public Service Co",
+   "alias": null
+  },
+  "814": {
+   "name": "Entergy Arkansas Inc",
+   "alias": null
+  },
+  "963": {
+   "name": "Atlantic City Electric Co",
+   "alias": null
+  },
+  "1015": {
+   "name": "Austin Energy",
+   "alias": null
+  },
+  "1167": {
+   "name": "Baltimore Gas & Electric Co",
+   "alias": null
+  },
+  "3046": {
+   "name": "Progress Energy Carolinas Inc (South Carolina)",
+   "alias": null
+  },
+  "3249": {
+   "name": "Central Hudson Gas & Elec Corp",
+   "alias": null
+  },
+  "3265": {
+   "name": "Cleco Power LLC",
+   "alias": null
+  },
+  "3266": {
+   "name": "Central Maine Power Co",
+   "alias": null
+  },
+  "3542": {
+   "name": "Duke Energy Ohio Inc",
+   "alias": null
+  },
+  "3755": {
+   "name": "Cleveland Electric Illum Co",
+   "alias": null
+  },
+  "4110": {
+   "name": "Commonwealth Edison Co",
+   "alias": null
+  },
+  "4176": {
+   "name": "Connecticut Light & Power Co",
+   "alias": "Eversource of Connecticut"
+  },
+  "4226": {
+   "name": "Consolidated Edison Co-NY Inc",
+   "alias": null
+  },
+  "4254": {
+   "name": "Consumers Energy Co",
+   "alias": null
+  },
+  "4442": {
+   "name": "PUD No 1 of Cowlitz County",
+   "alias": null
+  },
+  "4922": {
+   "name": "Dayton Power & Light Co",
+   "alias": "AES Ohio"
+  },
+  "5027": {
+   "name": "Delmarva Power",
+   "alias": null
+  },
+  "5078": {
+   "name": "Denton County Elec Coop, Inc",
+   "alias": null
+  },
+  "5109": {
+   "name": "DTE Electric",
+   "alias": null
+  },
+  "5416": {
+   "name": "Duke Energy Carolinas, LLC",
+   "alias": null
+  },
+  "5487": {
+   "name": "Duquesne Light Co",
+   "alias": null
+  },
+  "5701": {
+   "name": "El Paso Electric Co",
+   "alias": null
+  },
+  "6452": {
+   "name": "Florida Power & Light Co",
+   "alias": null
+  },
+  "6455": {
+   "name": "Progress Energy Florida Inc",
+   "alias": "Progress Energy Florida"
+  },
+  "7140": {
+   "name": "Georgia Power Co",
+   "alias": null
+  },
+  "7801": {
+   "name": "Gulf Power Co",
+   "alias": "Gulf Power Co - Now part of FPL"
+  },
+  "9094": {
+   "name": "City of Huntsville, Alabama (Utility Company)",
+   "alias": null
+  },
+  "9191": {
+   "name": "Idaho Power Co",
+   "alias": null
+  },
+  "9273": {
+   "name": "Indianapolis Power & Light Co",
+   "alias": null
+  },
+  "9324": {
+   "name": "Indiana Michigan Power Co (Michigan)",
+   "alias": null
+  },
+  "9417": {
+   "name": "Interstate Power and Light Co",
+   "alias": null
+  },
+  "9601": {
+   "name": "Jackson Electric Member Corp",
+   "alias": null
+  },
+  "9617": {
+   "name": "JEA",
+   "alias": null
+  },
+  "9726": {
+   "name": "Jersey Central Power & Lt Co (New Jersey)",
+   "alias": null
+  },
+  "9964": {
+   "name": "Kenergy Corp",
+   "alias": null
+  },
+  "10000": {
+   "name": "Kansas City Power & Light Co",
+   "alias": "Evergy Kansas Metro"
+  },
+  "10171": {
+   "name": "Kentucky Utilities Co",
+   "alias": null
+  },
+  "11171": {
+   "name": "Long Island Power Authority",
+   "alias": null
+  },
+  "11208": {
+   "name": "Los Angeles Department of Water & Power",
+   "alias": null
+  },
+  "11241": {
+   "name": "Entergy Louisiana",
+   "alias": null
+  },
+  "11249": {
+   "name": "Louisville Gas & Electric Co",
+   "alias": null
+  },
+  "11804": {
+   "name": "Massachusetts Electric Co",
+   "alias": "National Grid of Massachusetts"
+  },
+  "12293": {
+   "name": "City of Memphis, Tennessee (Utility Company)",
+   "alias": null
+  },
+  "12341": {
+   "name": "MidAmerican Energy Co",
+   "alias": null
+  },
+  "12390": {
+   "name": "Metropolitan Edison Co (Pennsylvania)",
+   "alias": null
+  },
+  "12470": {
+   "name": "Middle Tennessee E M C",
+   "alias": null
+  },
+  "12647": {
+   "name": "ALLETE, Inc.",
+   "alias": "Minnesota Power, Inc"
+  },
+  "12685": {
+   "name": "Entergy Mississippi Inc",
+   "alias": null
+  },
+  "12686": {
+   "name": "Mississippi Power Co",
+   "alias": null
+  },
+  "12698": {
+   "name": "KCP&L Greater Missouri Operations",
+   "alias": null
+  },
+  "12796": {
+   "name": "Monongahela Power Co (West Virginia)",
+   "alias": null
+  },
+  "12825": {
+   "name": "NorthWestern Corporation",
+   "alias": null
+  },
+  "13214": {
+   "name": "The Narragansett Electric Co",
+   "alias": null
+  },
+  "13216": {
+   "name": "Nashville Electric Service",
+   "alias": null
+  },
+  "13407": {
+   "name": "Nevada Power Co",
+   "alias": null
+  },
+  "13478": {
+   "name": "Entergy New Orleans Inc",
+   "alias": null
+  },
+  "13511": {
+   "name": "New York State Elec & Gas Corp",
+   "alias": null
+  },
+  "13573": {
+   "name": "Niagara Mohawk Power Corp.",
+   "alias": null
+  },
+  "13756": {
+   "name": "Northern Indiana Pub Serv Co",
+   "alias": null
+  },
+  "13780": {
+   "name": "Northern States Power Co",
+   "alias": null
+  },
+  "13781": {
+   "name": "Northern States Power Co - Minnesota",
+   "alias": "Xcel Energy of Minnesota"
+  },
+  "13998": {
+   "name": "Ohio Edison Co",
+   "alias": null
+  },
+  "14006": {
+   "name": "Ohio Power Co",
+   "alias": null
+  },
+  "14063": {
+   "name": "Oklahoma Gas & Electric Co",
+   "alias": null
+  },
+  "14127": {
+   "name": "Omaha Public Power District",
+   "alias": null
+  },
+  "14328": {
+   "name": "Pacific Gas & Electric Co",
+   "alias": null
+  },
+  "14354": {
+   "name": "PacifiCorp",
+   "alias": null
+  },
+  "14610": {
+   "name": "Orlando Utilities Comm",
+   "alias": null
+  },
+  "14711": {
+   "name": "Pennsylvania Electric Co",
+   "alias": null
+  },
+  "14715": {
+   "name": "PPL Electric Utilities Corp",
+   "alias": null
+  },
+  "14940": {
+   "name": "PECO Energy Co",
+   "alias": null
+  },
+  "15248": {
+   "name": "Portland General Electric Co",
+   "alias": null
+  },
+  "15270": {
+   "name": "Potomac Electric Power Co",
+   "alias": null
+  },
+  "15466": {
+   "name": "Public Service Co of Colorado",
+   "alias": "Xcel Energy of Colorado"
+  },
+  "15470": {
+   "name": "Duke Energy Indiana Inc",
+   "alias": null
+  },
+  "15472": {
+   "name": "Public Service Co of NH",
+   "alias": null
+  },
+  "15473": {
+   "name": "Public Service Co of NM",
+   "alias": null
+  },
+  "15474": {
+   "name": "Public Service Co of Oklahoma",
+   "alias": null
+  },
+  "15477": {
+   "name": "Public Service Elec & Gas Co",
+   "alias": null
+  },
+  "15500": {
+   "name": "Puget Sound Energy Inc",
+   "alias": null
+  },
+  "16183": {
+   "name": "Rochester Gas & Electric Corp",
+   "alias": null
+  },
+  "16534": {
+   "name": "Sacramento Municipal Util Dist",
+   "alias": null
+  },
+  "16572": {
+   "name": "Salt River Project",
+   "alias": null
+  },
+  "16604": {
+   "name": "City of San Antonio, Texas (Utility Company)",
+   "alias": null
+  },
+  "16609": {
+   "name": "San Diego Gas & Electric Co",
+   "alias": null
+  },
+  "16868": {
+   "name": "City of Seattle, Washington (Utility Company)",
+   "alias": null
+  },
+  "17166": {
+   "name": "Sierra Pacific Power Co",
+   "alias": "NV Energy of Northern Nevada"
+  },
+  "17470": {
+   "name": "Snohomish County PUD No 1",
+   "alias": null
+  },
+  "17539": {
+   "name": "South Carolina Electric&Gas Co",
+   "alias": "Dominion Energy South Carolina"
+  },
+  "17543": {
+   "name": "South Carolina Pub Serv Auth",
+   "alias": null
+  },
+  "17609": {
+   "name": "Southern California Edison Co",
+   "alias": null
+  },
+  "17698": {
+   "name": "Southwestern Electric Power Co",
+   "alias": null
+  },
+  "17718": {
+   "name": "Southwestern Public Service Co",
+   "alias": null
+  },
+  "18429": {
+   "name": "City of Tacoma, Washington (Utility Company)",
+   "alias": null
+  },
+  "18454": {
+   "name": "Tampa Electric Co",
+   "alias": null
+  },
+  "18997": {
+   "name": "The Toledo Edison Co",
+   "alias": null
+  },
+  "19436": {
+   "name": "Union Electric Co",
+   "alias": "Ameren Missouri"
+  },
+  "19497": {
+   "name": "United Illuminating Co",
+   "alias": null
+  },
+  "19547": {
+   "name": "Hawaiian Electric Co Inc",
+   "alias": null
+  },
+  "19876": {
+   "name": "Virginia Electric & Power Co",
+   "alias": "Dominion Virginia"
+  },
+  "20169": {
+   "name": "Avista Corp",
+   "alias": null
+  },
+  "20387": {
+   "name": "West Penn Power Co",
+   "alias": null
+  },
+  "20847": {
+   "name": "Wisconsin Electric Power Co",
+   "alias": "We Energies"
+  },
+  "20856": {
+   "name": "Wisconsin Power & Light Co",
+   "alias": "Alliant Energy of Wisconsin"
+  },
+  "20860": {
+   "name": "Wisconsin Public Service Corp",
+   "alias": null
+  },
+  "22053": {
+   "name": "Kentucky Power Co",
+   "alias": null
+  },
+  "22500": {
+   "name": "Westar Energy Inc",
+   "alias": "Evergy Kansas Central"
+  },
+  "24211": {
+   "name": "Tucson Electric Power Co",
+   "alias": null
+  },
+  "54913": {
+   "name": "NSTAR Electric Company",
+   "alias": "Eversource of Massachusetts"
+  },
+  "55937": {
+   "name": "Entergy Texas Inc.",
+   "alias": null
+  },
+  "56697": {
+   "name": "Ameren Illinois Company",
+   "alias": null
+  }
+ }
+}

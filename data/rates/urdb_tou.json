@@ -1,0 +1,5582 @@
+{
+ "_meta": {
+  "status": "URDB residential electric TOU + tiered; utilities ['14328', '16609', '17609'].",
+  "urdb_version": "8",
+  "built": "2026-09-22",
+  "sector": "Residential",
+  "approved_only": true,
+  "peak_hours": [
+   16,
+   17,
+   18,
+   19,
+   20
+  ],
+  "rep_kwh_month": 500,
+  "note": "Electric only \u2014 gas stays on the EIA path. effective_level is cross-check/headline only; the bill uses the by_month tier ladders at the home's real usage (approach B).",
+  "sources_sha256": {
+   "pge_14328_flagship_raw.json": "3a5ee81911907cd26d07136df1e892eebd0b94f150acf4425f31b5f350675516",
+   "eia_17609_flagship_raw.json": "92bde9715b6d44fb9e9047dcc511b491ed433698f8cd91a84b96330b3cbaba2c",
+   "eia_16609_flagship_raw.json": "d1914724330f137bebae1e3d23a4ce31d15172da81367450f5afa18935fd28be"
+  }
+ },
+ "utilities": {
+  "14328": {
+   "utility": "Pacific Gas & Electric",
+   "state": "CA",
+   "default_label": "69de71a5406310365e0f080d",
+   "tariffs": {
+    "69d93778e617cdda9b02c73c": {
+     "label": "69d93778e617cdda9b02c73c",
+     "name": "E-1 -Residential Service Baseline Region X",
+     "family": "E-1",
+     "plan_kind": "tiered_legacy",
+     "baseline_region": "X",
+     "all_electric": false,
+     "closed_to_enrollment": false,
+     "whywatt_default": false,
+     "is_urdb_default": false,
+     "approved": true,
+     "startdate": "2026-03-27",
+     "n_variants": 20,
+     "variant_baseline_regions": [
+      "P",
+      "Q",
+      "R",
+      "S",
+      "T",
+      "V",
+      "W",
+      "X",
+      "Y",
+      "Z"
+     ],
+     "region_baselines": {
+      "V": {
+       "summer_kwh_day": 7.1,
+       "winter_kwh_day": 8.1
+      },
+      "T": {
+       "summer_kwh_day": 6.5,
+       "winter_kwh_day": 7.5
+      },
+      "Z": {
+       "summer_kwh_day": 5.9,
+       "winter_kwh_day": 7.8
+      },
+      "P": {
+       "summer_kwh_day": 13.5,
+       "winter_kwh_day": 11
+      },
+      "Q": {
+       "summer_kwh_day": 9.8,
+       "winter_kwh_day": 11
+      },
+      "S": {
+       "summer_kwh_day": 15,
+       "winter_kwh_day": 10.2
+      },
+      "W": {
+       "summer_kwh_day": 19.2,
+       "winter_kwh_day": 9.8
+      },
+      "Y": {
+       "summer_kwh_day": 10.5,
+       "winter_kwh_day": 11.1
+      },
+      "R": {
+       "summer_kwh_day": 17.7,
+       "winter_kwh_day": 10.4
+      },
+      "X": {
+       "summer_kwh_day": 9.8,
+       "winter_kwh_day": 9.7
+      }
+     },
+     "effective_level": 0.3739,
+     "rep_kwh_month": 500,
+     "peak_hours": [],
+     "is_tou": false,
+     "fixed_charge": {
+      "value": 0.79343,
+      "unit": "$/day"
+     },
+     "by_month": [
+      {
+       "peak_period": 1,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 38.8,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 38.8,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 38.8,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 38.8,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 38.8,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 38.8,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 38.8,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 38.8,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 38.8,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 38.8,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 9.8,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 39.2,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.8,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 39.2,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 9.8,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 39.2,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.8,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 39.2,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 9.8,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 39.2,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.8,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 39.2,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 9.8,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 39.2,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.8,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 39.2,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 38.8,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 38.8,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 38.8,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 38.8,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 38.8,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.32561
+        },
+        {
+         "max_kwh_day": 38.8,
+         "rate": 0.40702
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.40702
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "label": "69d93778e617cdda9b02c73c",
+      "uri": "https://apps.openei.org/IURDB/rate/view/69d93778e617cdda9b02c73c",
+      "eiaid": 14328
+     }
+    },
+    "69de71a5406310365e0f080d": {
+     "label": "69de71a5406310365e0f080d",
+     "name": "E-TOU-C Residential Time of Use Baseline Region X",
+     "family": "E-TOU-C",
+     "plan_kind": "tou",
+     "baseline_region": "X",
+     "all_electric": false,
+     "closed_to_enrollment": false,
+     "whywatt_default": true,
+     "is_urdb_default": false,
+     "approved": true,
+     "startdate": "2026-03-27",
+     "n_variants": 20,
+     "variant_baseline_regions": [
+      "P",
+      "Q",
+      "R",
+      "S",
+      "T",
+      "V",
+      "W",
+      "X",
+      "Y",
+      "Z"
+     ],
+     "region_baselines": {
+      "Z": {
+       "summer_kwh_day": 5.9,
+       "winter_kwh_day": 7.8
+      },
+      "T": {
+       "summer_kwh_day": 6.5,
+       "winter_kwh_day": 7.5
+      },
+      "X": {
+       "summer_kwh_day": 9.8,
+       "winter_kwh_day": 9.7
+      },
+      "W": {
+       "summer_kwh_day": 19.2,
+       "winter_kwh_day": 9.8
+      },
+      "R": {
+       "summer_kwh_day": 17.7,
+       "winter_kwh_day": 10.4
+      },
+      "Q": {
+       "summer_kwh_day": 9.8,
+       "winter_kwh_day": 11
+      },
+      "S": {
+       "summer_kwh_day": 15,
+       "winter_kwh_day": 10.2
+      },
+      "V": {
+       "summer_kwh_day": 7.1,
+       "winter_kwh_day": 8.1
+      },
+      "P": {
+       "summer_kwh_day": 13.5,
+       "winter_kwh_day": 11
+      },
+      "Y": {
+       "summer_kwh_day": 10.5,
+       "winter_kwh_day": 11.1
+      }
+     },
+     "effective_level": 0.3541,
+     "rep_kwh_month": 500,
+     "peak_hours": [
+      16,
+      17,
+      18,
+      19,
+      20
+     ],
+     "is_tou": true,
+     "fixed_charge": {
+      "value": 0.79343,
+      "unit": "$/day"
+     },
+     "by_month": [
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.31617
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.39757
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.28617
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.36757
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.31617
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.39757
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.28617
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.36757
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.31617
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.39757
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.28617
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.36757
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.31617
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.39757
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.28617
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.36757
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.31617
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.39757
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.28617
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.36757
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 9.8,
+         "rate": 0.441
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.5224
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.8,
+         "rate": 0.318
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.3994
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 9.8,
+         "rate": 0.441
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.5224
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.8,
+         "rate": 0.318
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.3994
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 9.8,
+         "rate": 0.441
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.5224
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.8,
+         "rate": 0.318
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.3994
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 9.8,
+         "rate": 0.441
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.5224
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.8,
+         "rate": 0.318
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.3994
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.31617
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.39757
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.28617
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.36757
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.31617
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.39757
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.28617
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.36757
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.31617
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.39757
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.7,
+         "rate": 0.28617
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.36757
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "label": "69de71a5406310365e0f080d",
+      "uri": "https://apps.openei.org/IURDB/rate/view/69de71a5406310365e0f080d",
+      "eiaid": 14328
+     }
+    },
+    "69de76b2e547dde41109edfd": {
+     "label": "69de76b2e547dde41109edfd",
+     "name": "Electric Vehicle EV (Sch)",
+     "family": "EV",
+     "plan_kind": "ev_tou",
+     "baseline_region": null,
+     "all_electric": false,
+     "closed_to_enrollment": false,
+     "whywatt_default": false,
+     "is_urdb_default": false,
+     "approved": true,
+     "startdate": "2026-03-27",
+     "n_variants": 1,
+     "variant_baseline_regions": [],
+     "region_baselines": {},
+     "effective_level": 0.2945,
+     "rep_kwh_month": 500,
+     "peak_hours": [
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20
+     ],
+     "is_tou": true,
+     "fixed_charge": {
+      "value": 0.04928,
+      "unit": "$/day"
+     },
+     "by_month": [
+      {
+       "peak_period": 5,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.43878
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.23504
+        }
+       ]
+      },
+      {
+       "peak_period": 5,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.43878
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.23504
+        }
+       ]
+      },
+      {
+       "peak_period": 5,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.43878
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.23504
+        }
+       ]
+      },
+      {
+       "peak_period": 5,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.43878
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.23504
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.62131
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26465
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.62131
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26465
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.62131
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26465
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.62131
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26465
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.62131
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26465
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.62131
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26465
+        }
+       ]
+      },
+      {
+       "peak_period": 5,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.43878
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.23504
+        }
+       ]
+      },
+      {
+       "peak_period": 5,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.43878
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.23504
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "label": "69de76b2e547dde41109edfd",
+      "uri": "https://apps.openei.org/IURDB/rate/view/69de76b2e547dde41109edfd",
+      "eiaid": 14328
+     }
+    },
+    "69de78ffe547dde41109edfe": {
+     "label": "69de78ffe547dde41109edfe",
+     "name": "Electric Vehicle EV2 (Sch)",
+     "family": "EV2",
+     "plan_kind": "ev_tou",
+     "baseline_region": null,
+     "all_electric": false,
+     "closed_to_enrollment": false,
+     "whywatt_default": false,
+     "is_urdb_default": false,
+     "approved": true,
+     "startdate": "2026-03-27",
+     "n_variants": 1,
+     "variant_baseline_regions": [],
+     "region_baselines": {},
+     "effective_level": 0.3077,
+     "rep_kwh_month": 500,
+     "peak_hours": [
+      16,
+      17,
+      18,
+      19,
+      20
+     ],
+     "is_tou": true,
+     "fixed_charge": {
+      "value": 0.79343,
+      "unit": "$/day"
+     },
+     "by_month": [
+      {
+       "peak_period": 5,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.41099
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.22558
+        }
+       ]
+      },
+      {
+       "peak_period": 5,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.41099
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.22558
+        }
+       ]
+      },
+      {
+       "peak_period": 5,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.41099
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.22558
+        }
+       ]
+      },
+      {
+       "peak_period": 5,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.41099
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.22558
+        }
+       ]
+      },
+      {
+       "peak_period": 5,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.41099
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.22558
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.53809
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.22558
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.53809
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.22558
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.53809
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.22558
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.53809
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.22558
+        }
+       ]
+      },
+      {
+       "peak_period": 5,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.41099
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.22558
+        }
+       ]
+      },
+      {
+       "peak_period": 5,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.41099
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.22558
+        }
+       ]
+      },
+      {
+       "peak_period": 5,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.41099
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.22558
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "label": "69de78ffe547dde41109edfe",
+      "uri": "https://apps.openei.org/IURDB/rate/view/69de78ffe547dde41109edfe",
+      "eiaid": 14328
+     }
+    },
+    "69de75bd6c6b1b3352045e3c": {
+     "label": "69de75bd6c6b1b3352045e3c",
+     "name": "E-TOU-D Residential Time of Use",
+     "family": "E-TOU-D",
+     "plan_kind": "tou",
+     "baseline_region": null,
+     "all_electric": false,
+     "closed_to_enrollment": false,
+     "whywatt_default": false,
+     "is_urdb_default": false,
+     "approved": true,
+     "startdate": "2026-03-27",
+     "n_variants": 1,
+     "variant_baseline_regions": [],
+     "region_baselines": {},
+     "effective_level": 0.4054,
+     "rep_kwh_month": 500,
+     "peak_hours": [
+      17,
+      18,
+      19
+     ],
+     "is_tou": true,
+     "fixed_charge": {
+      "value": 0.79343,
+      "unit": "$/day"
+     },
+     "by_month": [
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.38747
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.34886
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.38747
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.34886
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.38747
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.34886
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.38747
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.34886
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.38747
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.34886
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.47708
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.34212
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.47708
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.34212
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.47708
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.34212
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.47708
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.34212
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.38747
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.34886
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.38747
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.34886
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.38747
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.34886
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "label": "69de75bd6c6b1b3352045e3c",
+      "uri": "https://apps.openei.org/IURDB/rate/view/69de75bd6c6b1b3352045e3c",
+      "eiaid": 14328
+     }
+    },
+    "69d939b18b82e69d8a03878a": {
+     "label": "69d939b18b82e69d8a03878a",
+     "name": "E-ELEC Residential Time of Use (Electric Home)",
+     "family": "E-ELEC",
+     "plan_kind": "tou",
+     "baseline_region": null,
+     "all_electric": false,
+     "closed_to_enrollment": false,
+     "whywatt_default": false,
+     "is_urdb_default": false,
+     "approved": true,
+     "startdate": "2026-03-27",
+     "n_variants": 1,
+     "variant_baseline_regions": [],
+     "region_baselines": {},
+     "effective_level": 0.3641,
+     "rep_kwh_month": 500,
+     "peak_hours": [
+      16,
+      17,
+      18,
+      19,
+      20
+     ],
+     "is_tou": true,
+     "fixed_charge": {
+      "value": 0.79343,
+      "unit": "$/day"
+     },
+     "by_month": [
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.32063
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28468
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.32063
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28468
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.32063
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28468
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.32063
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28468
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.32063
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28468
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.55214
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33358
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.55214
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33358
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.55214
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33358
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.55214
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33358
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33358
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28468
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33358
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28468
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33358
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28468
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "label": "69d939b18b82e69d8a03878a",
+      "uri": "https://apps.openei.org/IURDB/rate/view/69d939b18b82e69d8a03878a",
+      "eiaid": 14328
+     }
+    }
+   },
+   "dropped_count": 366
+  },
+  "17609": {
+   "utility": "Southern California Edison",
+   "state": "CA",
+   "default_label": "66ccb7ae0a0eb5212a062238",
+   "tariffs": {
+    "66cc9e270d535cf5c3058518": {
+     "label": "66cc9e270d535cf5c3058518",
+     "name": "Domestic Service: D - Baseline Region 5",
+     "family": "SCE-D",
+     "plan_kind": "tiered_legacy",
+     "baseline_region": "5",
+     "all_electric": false,
+     "closed_to_enrollment": false,
+     "whywatt_default": false,
+     "is_urdb_default": false,
+     "approved": true,
+     "startdate": "2024-06-01",
+     "n_variants": 9,
+     "variant_baseline_regions": [
+      "10",
+      "13",
+      "14",
+      "15",
+      "16",
+      "5",
+      "6",
+      "8",
+      "9"
+     ],
+     "region_baselines": {
+      "5": {
+       "summer_kwh_day": 17,
+       "winter_kwh_day": 18.4
+      },
+      "6": {
+       "summer_kwh_day": 11.4,
+       "winter_kwh_day": 11
+      },
+      "8": {
+       "summer_kwh_day": 12.8,
+       "winter_kwh_day": 10.3
+      },
+      "9": {
+       "summer_kwh_day": 16.9,
+       "winter_kwh_day": 12
+      },
+      "10": {
+       "summer_kwh_day": 19.3,
+       "winter_kwh_day": 12.1
+      },
+      "13": {
+       "summer_kwh_day": 22.2,
+       "winter_kwh_day": 12.2
+      },
+      "14": {
+       "summer_kwh_day": 19.2,
+       "winter_kwh_day": 11.9
+      },
+      "15": {
+       "summer_kwh_day": 45,
+       "winter_kwh_day": 9.7
+      },
+      "16": {
+       "summer_kwh_day": 14.7,
+       "winter_kwh_day": 12.4
+      }
+     },
+     "effective_level": 0.3377,
+     "rep_kwh_month": 500,
+     "peak_hours": [],
+     "is_tou": false,
+     "fixed_charge": {
+      "value": 0.031,
+      "unit": "$/day"
+     },
+     "by_month": [
+      {
+       "peak_period": 0,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 18.4,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 73.6,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 18.4,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 73.6,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 18.4,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 73.6,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 18.4,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 73.6,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 18.4,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 73.6,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 18.4,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 73.6,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 18.4,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 73.6,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 18.4,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 73.6,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 18.4,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 73.6,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 18.4,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 73.6,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 17,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 68,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 17,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 68,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 17,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 68,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 17,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 68,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 17,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 68,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 17,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 68,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 17,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 68,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 17,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 68,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 18.4,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 73.6,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 18.4,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 73.6,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 18.4,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 73.6,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 18.4,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 73.6,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 18.4,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 73.6,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 18.4,
+         "rate": 0.33586
+        },
+        {
+         "max_kwh_day": 73.6,
+         "rate": 0.43178
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43178
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "label": "66cc9e270d535cf5c3058518",
+      "uri": "https://apps.openei.org/IURDB/rate/view/66cc9e270d535cf5c3058518",
+      "eiaid": 17609
+     }
+    },
+    "66ccb7ae0a0eb5212a062238": {
+     "label": "66ccb7ae0a0eb5212a062238",
+     "name": "TOU-D-4-9PM",
+     "family": "TOU-D-4-9PM",
+     "plan_kind": "tou",
+     "baseline_region": null,
+     "all_electric": false,
+     "closed_to_enrollment": false,
+     "whywatt_default": true,
+     "is_urdb_default": false,
+     "approved": true,
+     "startdate": "2024-06-01",
+     "n_variants": 2,
+     "variant_baseline_regions": [],
+     "region_baselines": {},
+     "effective_level": 0.291,
+     "rep_kwh_month": 500,
+     "peak_hours": [
+      16,
+      17,
+      18,
+      19,
+      20
+     ],
+     "is_tou": true,
+     "fixed_charge": {
+      "value": 0.031,
+      "unit": "$/day"
+     },
+     "by_month": [
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33207
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28166
+        }
+       ]
+      },
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33207
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28166
+        }
+       ]
+      },
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33207
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28166
+        }
+       ]
+      },
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33207
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28166
+        }
+       ]
+      },
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33207
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28166
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33207
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28166
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33207
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28166
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33207
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28166
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33207
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28166
+        }
+       ]
+      },
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33207
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28166
+        }
+       ]
+      },
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33207
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28166
+        }
+       ]
+      },
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33207
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28166
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "label": "66ccb7ae0a0eb5212a062238",
+      "uri": "https://apps.openei.org/IURDB/rate/view/66ccb7ae0a0eb5212a062238",
+      "eiaid": 17609
+     }
+    },
+    "66cdef4a39f88aa55a0168cf": {
+     "label": "66cdef4a39f88aa55a0168cf",
+     "name": "TOU-D-5-8PM",
+     "family": "TOU-D-5-8PM",
+     "plan_kind": "tou",
+     "baseline_region": null,
+     "all_electric": false,
+     "closed_to_enrollment": false,
+     "whywatt_default": false,
+     "is_urdb_default": false,
+     "approved": true,
+     "startdate": "2024-06-01",
+     "n_variants": 2,
+     "variant_baseline_regions": [],
+     "region_baselines": {},
+     "effective_level": 0.2985,
+     "rep_kwh_month": 500,
+     "peak_hours": [
+      17,
+      18,
+      19
+     ],
+     "is_tou": true,
+     "fixed_charge": {
+      "value": 0.031,
+      "unit": "$/day"
+     },
+     "by_month": [
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.3372
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28954
+        }
+       ]
+      },
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.3372
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28954
+        }
+       ]
+      },
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.3372
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28954
+        }
+       ]
+      },
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.3372
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28954
+        }
+       ]
+      },
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.3372
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28954
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.3372
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28954
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.3372
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28954
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.3372
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28954
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.3372
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28954
+        }
+       ]
+      },
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.3372
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28954
+        }
+       ]
+      },
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.3372
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28954
+        }
+       ]
+      },
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.3372
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.28954
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "label": "66cdef4a39f88aa55a0168cf",
+      "uri": "https://apps.openei.org/IURDB/rate/view/66cdef4a39f88aa55a0168cf",
+      "eiaid": 17609
+     }
+    },
+    "66cdf20a0f78ba14bd0796fe": {
+     "label": "66cdf20a0f78ba14bd0796fe",
+     "name": "TOU-D-PRIME",
+     "family": "TOU-D-PRIME",
+     "plan_kind": "tou",
+     "baseline_region": null,
+     "all_electric": false,
+     "closed_to_enrollment": false,
+     "whywatt_default": false,
+     "is_urdb_default": false,
+     "approved": true,
+     "startdate": "2024-06-01",
+     "n_variants": 2,
+     "variant_baseline_regions": [],
+     "region_baselines": {},
+     "effective_level": 0.243,
+     "rep_kwh_month": 500,
+     "peak_hours": [
+      16,
+      17,
+      18,
+      19,
+      20
+     ],
+     "is_tou": true,
+     "fixed_charge": {
+      "value": 0.52,
+      "unit": "$/day"
+     },
+     "by_month": [
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26386
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.17127
+        }
+       ]
+      },
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26386
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.17127
+        }
+       ]
+      },
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26386
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.17127
+        }
+       ]
+      },
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26386
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.17127
+        }
+       ]
+      },
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26386
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.17127
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26386
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26386
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26386
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26386
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26386
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26386
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26386
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26386
+        }
+       ]
+      },
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26386
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.17127
+        }
+       ]
+      },
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26386
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.17127
+        }
+       ]
+      },
+      {
+       "peak_period": 4,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.26386
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.17127
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "label": "66cdf20a0f78ba14bd0796fe",
+      "uri": "https://apps.openei.org/IURDB/rate/view/66cdf20a0f78ba14bd0796fe",
+      "eiaid": 17609
+     }
+    },
+    "56b27c2a5457a3c65fc2db57": {
+     "label": "56b27c2a5457a3c65fc2db57",
+     "name": "Time-Of-Use Domestic Tiered Electric Vehicle Charging -TOU-D-TEV, Region 16",
+     "family": "TOU-D-TEV",
+     "plan_kind": "ev_tou",
+     "baseline_region": null,
+     "all_electric": false,
+     "closed_to_enrollment": false,
+     "whywatt_default": false,
+     "is_urdb_default": false,
+     "approved": true,
+     "startdate": "2015-12-31",
+     "n_variants": 9,
+     "variant_baseline_regions": [],
+     "region_baselines": {},
+     "effective_level": 0.1238,
+     "rep_kwh_month": 500,
+     "peak_hours": [
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17
+     ],
+     "is_tou": true,
+     "fixed_charge": {
+      "value": 0.9435625,
+      "unit": "$/month"
+     },
+     "by_month": [
+      {
+       "peak_period": 2,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 14.43,
+         "rate": 0.19318
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.34592
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 14.43,
+         "rate": 0.10507
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.10299
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 14.43,
+         "rate": 0.19318
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.34592
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 14.43,
+         "rate": 0.10507
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.10299
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 14.43,
+         "rate": 0.19318
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.34592
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 14.43,
+         "rate": 0.10507
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.10299
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 14.43,
+         "rate": 0.19318
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.34592
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 14.43,
+         "rate": 0.10507
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.10299
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 14.43,
+         "rate": 0.19318
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.34592
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 14.43,
+         "rate": 0.10507
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.10299
+        }
+       ]
+      },
+      {
+       "peak_period": 5,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": 15.34,
+         "rate": 0.31318
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.46592
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 15.34,
+         "rate": 0.09707
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.09499
+        }
+       ]
+      },
+      {
+       "peak_period": 5,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": 15.34,
+         "rate": 0.31318
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.46592
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 15.34,
+         "rate": 0.09707
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.09499
+        }
+       ]
+      },
+      {
+       "peak_period": 5,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": 15.34,
+         "rate": 0.31318
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.46592
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 15.34,
+         "rate": 0.09707
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.09499
+        }
+       ]
+      },
+      {
+       "peak_period": 5,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": 15.34,
+         "rate": 0.31318
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.46592
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 15.34,
+         "rate": 0.09707
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.09499
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 14.43,
+         "rate": 0.19318
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.34592
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 14.43,
+         "rate": 0.10507
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.10299
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 14.43,
+         "rate": 0.19318
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.34592
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 14.43,
+         "rate": 0.10507
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.10299
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 14.43,
+         "rate": 0.19318
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.34592
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 14.43,
+         "rate": 0.10507
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.10299
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "label": "56b27c2a5457a3c65fc2db57",
+      "uri": "https://apps.openei.org/IURDB/rate/view/56b27c2a5457a3c65fc2db57",
+      "eiaid": 17609
+     }
+    }
+   },
+   "dropped_count": 59
+  },
+  "16609": {
+   "utility": "San Diego Gas & Electric",
+   "state": "CA",
+   "default_label": "6a4579b5ca2c8b0bc00e6b6b",
+   "tariffs": {
+    "6a455a6ac47c56adba05d30c": {
+     "label": "6a455a6ac47c56adba05d30c",
+     "name": "DR - Coastal Baseline Region",
+     "family": "SDGE-DR",
+     "plan_kind": "tiered_legacy",
+     "baseline_region": "Coastal",
+     "all_electric": false,
+     "closed_to_enrollment": false,
+     "whywatt_default": false,
+     "is_urdb_default": true,
+     "approved": true,
+     "startdate": "2026-06-01",
+     "n_variants": 4,
+     "variant_baseline_regions": [
+      "Coastal",
+      "Desert",
+      "Inland",
+      "Mountain"
+     ],
+     "region_baselines": {
+      "Coastal": {
+       "summer_kwh_day": 11.7,
+       "winter_kwh_day": 11.96
+      },
+      "Inland": {
+       "summer_kwh_day": 13.52,
+       "winter_kwh_day": 12.48
+      },
+      "Mountain": {
+       "summer_kwh_day": 17.68,
+       "winter_kwh_day": 16.77
+      },
+      "Desert": {
+       "summer_kwh_day": 20.67,
+       "winter_kwh_day": 14.17
+      }
+     },
+     "effective_level": 0.4598,
+     "rep_kwh_month": 500,
+     "peak_hours": [],
+     "is_tou": false,
+     "fixed_charge": {
+      "value": 0.79343,
+      "unit": "$/day"
+     },
+     "by_month": [
+      {
+       "peak_period": 1,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 11.96,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 11.96,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 11.96,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 11.96,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 11.96,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 11.96,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 11.96,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 11.96,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 11.96,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 11.96,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 11.7,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 11.7,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 11.7,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 11.7,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 11.7,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 11.7,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 11.7,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 11.7,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 0,
+       "peak": [
+        {
+         "max_kwh_day": 11.7,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 11.7,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 11.96,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 11.96,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ]
+      },
+      {
+       "peak_period": 1,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 11.96,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 11.96,
+         "rate": 0.4115
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.51813
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "label": "6a455a6ac47c56adba05d30c",
+      "uri": "https://apps.openei.org/IURDB/rate/view/6a455a6ac47c56adba05d30c",
+      "eiaid": 16609
+     }
+    },
+    "6a457555e42ed4afbd0ab57d": {
+     "label": "6a457555e42ed4afbd0ab57d",
+     "name": "TOU-DR Coastal Baseline Region",
+     "family": "TOU-DR",
+     "plan_kind": "tou",
+     "baseline_region": "Coastal",
+     "all_electric": false,
+     "closed_to_enrollment": false,
+     "whywatt_default": false,
+     "is_urdb_default": false,
+     "approved": true,
+     "startdate": "2026-06-01",
+     "n_variants": 4,
+     "variant_baseline_regions": [
+      "Coastal",
+      "Desert",
+      "Inland",
+      "Mountain"
+     ],
+     "region_baselines": {
+      "Coastal": {
+       "summer_kwh_day": 9,
+       "winter_kwh_day": 9.2
+      },
+      "Inland": {
+       "summer_kwh_day": 10.4,
+       "winter_kwh_day": 9.6
+      },
+      "Mountain": {
+       "summer_kwh_day": 13.6,
+       "winter_kwh_day": 12.9
+      },
+      "Desert": {
+       "summer_kwh_day": 15.9,
+       "winter_kwh_day": 10.9
+      }
+     },
+     "effective_level": 0.4064,
+     "rep_kwh_month": 500,
+     "peak_hours": [
+      16,
+      17,
+      18,
+      19,
+      20
+     ],
+     "is_tou": true,
+     "fixed_charge": {
+      "value": 0.79343,
+      "unit": "$/day"
+     },
+     "by_month": [
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.50329
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.60992
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.33096
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43759
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.50329
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.60992
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.33096
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43759
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.50329
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.60992
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.33096
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43759
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.50329
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.60992
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.33096
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43759
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.50329
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.60992
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.33096
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43759
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.45771
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.56434
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.34333
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.44996
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.45771
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.56434
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.34333
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.44996
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.45771
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.56434
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.34333
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.44996
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.45771
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.56434
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.34333
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.44996
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.45771
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.56434
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.34333
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.44996
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.50329
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.60992
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.33096
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43759
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.50329
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.60992
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.33096
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43759
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "label": "6a457555e42ed4afbd0ab57d",
+      "uri": "https://apps.openei.org/IURDB/rate/view/6a457555e42ed4afbd0ab57d",
+      "eiaid": 16609
+     }
+    },
+    "6a4579b5ca2c8b0bc00e6b6b": {
+     "label": "6a4579b5ca2c8b0bc00e6b6b",
+     "name": "TOU-DR-1 Coastal Baseline Region",
+     "family": "TOU-DR-1",
+     "plan_kind": "tou",
+     "baseline_region": "Coastal",
+     "all_electric": false,
+     "closed_to_enrollment": false,
+     "whywatt_default": true,
+     "is_urdb_default": false,
+     "approved": true,
+     "startdate": "2026-06-01",
+     "n_variants": 4,
+     "variant_baseline_regions": [
+      "Coastal",
+      "Desert",
+      "Inland",
+      "Mountain"
+     ],
+     "region_baselines": {
+      "Coastal": {
+       "summer_kwh_day": 9,
+       "winter_kwh_day": 9.2
+      },
+      "Inland": {
+       "summer_kwh_day": 10.4,
+       "winter_kwh_day": 9.6
+      },
+      "Mountain": {
+       "summer_kwh_day": 13.6,
+       "winter_kwh_day": 12.9
+      },
+      "Desert": {
+       "summer_kwh_day": 15.9,
+       "winter_kwh_day": 10.9
+      }
+     },
+     "effective_level": 0.3383,
+     "rep_kwh_month": 500,
+     "peak_hours": [
+      16,
+      17,
+      18,
+      19,
+      20
+     ],
+     "is_tou": true,
+     "fixed_charge": {
+      "value": 0.79343,
+      "unit": "$/month"
+     },
+     "by_month": [
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.50351
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.61014
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.32513
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43176
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.50351
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.61014
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.32513
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43176
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.50351
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.61014
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.32513
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43176
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.50351
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.61014
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.32513
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43176
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.50351
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.61014
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.32513
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43176
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.57796
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.68459
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.26997
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.3766
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.57796
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.68459
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.26997
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.3766
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.57796
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.68459
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.26997
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.3766
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.57796
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.68459
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.26997
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.3766
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.57796
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.68459
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.26997
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.3766
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.50351
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.61014
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.32513
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43176
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.50351
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.61014
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.32513
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.43176
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "label": "6a4579b5ca2c8b0bc00e6b6b",
+      "uri": "https://apps.openei.org/IURDB/rate/view/6a4579b5ca2c8b0bc00e6b6b",
+      "eiaid": 16609
+     }
+    },
+    "6a457ccdca2c8b0bc00e6b6c": {
+     "label": "6a457ccdca2c8b0bc00e6b6c",
+     "name": "TOU-DR-2 Coastal Baseline Region",
+     "family": "TOU-DR-2",
+     "plan_kind": "tou",
+     "baseline_region": "Coastal",
+     "all_electric": false,
+     "closed_to_enrollment": false,
+     "whywatt_default": false,
+     "is_urdb_default": false,
+     "approved": true,
+     "startdate": "2026-06-01",
+     "n_variants": 4,
+     "variant_baseline_regions": [
+      "Coastal",
+      "Desert",
+      "Inland",
+      "Mountain"
+     ],
+     "region_baselines": {
+      "Coastal": {
+       "summer_kwh_day": 9,
+       "winter_kwh_day": 9.2
+      },
+      "Inland": {
+       "summer_kwh_day": 10.4,
+       "winter_kwh_day": 9.6
+      },
+      "Mountain": {
+       "summer_kwh_day": 13.6,
+       "winter_kwh_day": 12.9
+      },
+      "Desert": {
+       "summer_kwh_day": 15.9,
+       "winter_kwh_day": 10.9
+      }
+     },
+     "effective_level": 0.4204,
+     "rep_kwh_month": 500,
+     "peak_hours": [
+      16,
+      17,
+      18,
+      19,
+      20
+     ],
+     "is_tou": true,
+     "fixed_charge": {
+      "value": 0.79343,
+      "unit": "$/day"
+     },
+     "by_month": [
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.50351
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.61014
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.36653
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.47316
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.50351
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.61014
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.36653
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.47316
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.50351
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.61014
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.36653
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.47316
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.50351
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.61014
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.36653
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.47316
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.50351
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.61014
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.36653
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.47316
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.58244
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.68907
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.3111
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.41773
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.58244
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.68907
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.3111
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.41773
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.58244
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.68907
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.3111
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.41773
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.58244
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.68907
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.3111
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.41773
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 1,
+       "peak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.58244
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.68907
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9,
+         "rate": 0.3111
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.41773
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.50351
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.61014
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.36653
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.47316
+        }
+       ]
+      },
+      {
+       "peak_period": 2,
+       "offpeak_period": 3,
+       "peak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.50351
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.61014
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": 9.2,
+         "rate": 0.36653
+        },
+        {
+         "max_kwh_day": null,
+         "rate": 0.47316
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "label": "6a457ccdca2c8b0bc00e6b6c",
+      "uri": "https://apps.openei.org/IURDB/rate/view/6a457ccdca2c8b0bc00e6b6c",
+      "eiaid": 16609
+     }
+    },
+    "6a45801330fd9de05b09f2fc": {
+     "label": "6a45801330fd9de05b09f2fc",
+     "name": "EV-TOU",
+     "family": "EV-TOU",
+     "plan_kind": "ev_tou",
+     "baseline_region": null,
+     "all_electric": false,
+     "closed_to_enrollment": false,
+     "whywatt_default": false,
+     "is_urdb_default": false,
+     "approved": true,
+     "startdate": "2026-06-01",
+     "n_variants": 1,
+     "variant_baseline_regions": [],
+     "region_baselines": {},
+     "effective_level": 0.362,
+     "rep_kwh_month": 500,
+     "peak_hours": [
+      16,
+      17,
+      18,
+      19,
+      20
+     ],
+     "is_tou": true,
+     "fixed_charge": {
+      "value": null,
+      "unit": "$/month"
+     },
+     "by_month": [
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.58302
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.30057
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.58302
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.30057
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.58302
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.30057
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.58302
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.30057
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.58302
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.30057
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.85331
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.30794
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.85331
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.30794
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.85331
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.30794
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.85331
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.30794
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.85331
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.30794
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.58302
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.30057
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.58302
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.30057
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "label": "6a45801330fd9de05b09f2fc",
+      "uri": "https://apps.openei.org/IURDB/rate/view/6a45801330fd9de05b09f2fc",
+      "eiaid": 16609
+     }
+    },
+    "6a4580a2666a6ad1d40b4d0d": {
+     "label": "6a4580a2666a6ad1d40b4d0d",
+     "name": "EV-TOU-2",
+     "family": "EV-TOU-2",
+     "plan_kind": "ev_tou",
+     "baseline_region": null,
+     "all_electric": false,
+     "closed_to_enrollment": false,
+     "whywatt_default": false,
+     "is_urdb_default": false,
+     "approved": true,
+     "startdate": "2026-06-01",
+     "n_variants": 1,
+     "variant_baseline_regions": [],
+     "region_baselines": {},
+     "effective_level": 0.3501,
+     "rep_kwh_month": 500,
+     "peak_hours": [
+      16,
+      17,
+      18,
+      19,
+      20
+     ],
+     "is_tou": true,
+     "fixed_charge": {
+      "value": 0.79343,
+      "unit": "$/day"
+     },
+     "by_month": [
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.50953
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.24276
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.50953
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.24276
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.50953
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.24276
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.50953
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.24276
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.50953
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.24276
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.77982
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.25013
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.77982
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.25013
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.77982
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.25013
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.77982
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.25013
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.77982
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.25013
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.50953
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.24276
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.50953
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.24276
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "label": "6a4580a2666a6ad1d40b4d0d",
+      "uri": "https://apps.openei.org/IURDB/rate/view/6a4580a2666a6ad1d40b4d0d",
+      "eiaid": 16609
+     }
+    },
+    "6a4581285eb2306b2706702c": {
+     "label": "6a4581285eb2306b2706702c",
+     "name": "EV-TOU-5",
+     "family": "EV-TOU-5",
+     "plan_kind": "ev_tou",
+     "baseline_region": null,
+     "all_electric": false,
+     "closed_to_enrollment": false,
+     "whywatt_default": false,
+     "is_urdb_default": false,
+     "approved": true,
+     "startdate": "2026-06-01",
+     "n_variants": 1,
+     "variant_baseline_regions": [],
+     "region_baselines": {},
+     "effective_level": 0.2486,
+     "rep_kwh_month": 500,
+     "peak_hours": [
+      16,
+      17,
+      18,
+      19,
+      20
+     ],
+     "is_tou": true,
+     "fixed_charge": {
+      "value": 0.79343,
+      "unit": "$/day"
+     },
+     "by_month": [
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.52292
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.12115
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.52292
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.12115
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.52292
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.12115
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.52292
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.12115
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.52292
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.12115
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.79321
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.12852
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.79321
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.12852
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.79321
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.12852
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.79321
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.12852
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.79321
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.12852
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.52292
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.12115
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.52292
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.12115
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "label": "6a4581285eb2306b2706702c",
+      "uri": "https://apps.openei.org/IURDB/rate/view/6a4581285eb2306b2706702c",
+      "eiaid": 16609
+     }
+    },
+    "6a45822d666a6ad1d40b4d0e": {
+     "label": "6a45822d666a6ad1d40b4d0e",
+     "name": "TOU-ELEC (DOMESTIC TIME-OF-USE FOR HOUSEHOLDS WITH ELECTRIC VEHICLES, ENERGY STORAGE, OR ELECTRIC HEAT PUMPS)",
+     "family": "TOU-ELEC",
+     "plan_kind": "tou",
+     "baseline_region": null,
+     "all_electric": false,
+     "closed_to_enrollment": false,
+     "whywatt_default": false,
+     "is_urdb_default": false,
+     "approved": true,
+     "startdate": "2026-06-01",
+     "n_variants": 1,
+     "variant_baseline_regions": [],
+     "region_baselines": {},
+     "effective_level": 0.4264,
+     "rep_kwh_month": 500,
+     "peak_hours": [
+      16,
+      17,
+      18,
+      19,
+      20
+     ],
+     "is_tou": true,
+     "fixed_charge": {
+      "value": 0.79343,
+      "unit": "$/day"
+     },
+     "by_month": [
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.50219
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33764
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.50219
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33764
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.50219
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33764
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.50219
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33764
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.50219
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33764
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.71598
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.34545
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.71598
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.34545
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.71598
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.34545
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.71598
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.34545
+        }
+       ]
+      },
+      {
+       "peak_period": 0,
+       "offpeak_period": 2,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.71598
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.34545
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.50219
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33764
+        }
+       ]
+      },
+      {
+       "peak_period": 3,
+       "offpeak_period": 5,
+       "peak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.50219
+        }
+       ],
+       "offpeak": [
+        {
+         "max_kwh_day": null,
+         "rate": 0.33764
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "label": "6a45822d666a6ad1d40b4d0e",
+      "uri": "https://apps.openei.org/IURDB/rate/view/6a45822d666a6ad1d40b4d0e",
+      "eiaid": 16609
+     }
+    }
+   },
+   "dropped_count": 137
+  }
+ }
+}

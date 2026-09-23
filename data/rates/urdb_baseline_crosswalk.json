@@ -1,0 +1,69 @@
+{
+ "_meta": {
+  "status": "ZIP -> baseline territory via CEC climate zone (proxy). CA IOUs.",
+  "built": "2026-09-22",
+  "backbone": "data/climate/zip_to_zone.json (CEC Building Climate Zone by ZIP)",
+  "note": "No public ZIP->territory dataset exists; territories are climate-defined and we key off the authoritative CEC zone. Rates are territory-invariant; only the baseline allowance (kWh/day tier threshold) changes. See per-utility confidence."
+ },
+ "utilities": {
+  "14328": {
+   "utility": "Pacific Gas & Electric",
+   "confidence": "approximate",
+   "method": "CEC climate zone -> PG&E territory, matched by climate character and verified against harvested per-territory baselines. PG&E territories are defined by county/elevation, not ZIP; treat as a proxy. Unmapped zones -> representative.",
+   "representative_region": "X",
+   "cec_zone_to_region": {
+    "1": "V",
+    "2": "Y",
+    "3": "T",
+    "4": "X",
+    "5": "Z",
+    "11": "P",
+    "12": "S",
+    "13": "W",
+    "16": "Q"
+   },
+   "baselines_present": [
+    "P",
+    "Q",
+    "R",
+    "S",
+    "T",
+    "V",
+    "W",
+    "X",
+    "Y",
+    "Z"
+   ],
+   "mapped_regions_without_baseline": []
+  },
+  "16609": {
+   "utility": "San Diego Gas & Electric",
+   "confidence": "high",
+   "method": "SDG&E defines Coastal/Inland/Mountain/Desert ON the CEC climate-zone boundaries (its inland boundary follows CEC CZ7). Direct CEC-zone map.",
+   "representative_region": "Coastal",
+   "cec_zone_to_region": {
+    "7": "Coastal",
+    "10": "Inland",
+    "14": "Desert",
+    "15": "Desert",
+    "16": "Mountain"
+   },
+   "baselines_present": [
+    "Coastal",
+    "Desert",
+    "Inland",
+    "Mountain"
+   ],
+   "mapped_regions_without_baseline": []
+  },
+  "17609": {
+   "utility": "Southern California Edison",
+   "confidence": "not_applicable",
+   "method": "SCE's TOU default (TOU-D-4-9PM) is a FLAT rate with no baseline tier, so no territory crosswalk is needed. (Only SCE's legacy tiered Domestic plan is region-split \u2014 deferred with the tiered legacy plans.)",
+   "representative_region": null,
+   "cec_zone_to_region": {},
+   "baselines_present": [],
+   "mapped_regions_without_baseline": []
+  }
+ }
+}

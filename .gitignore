@@ -31,3 +31,11 @@ tests/regression/report.md
 
 # Jupyter checkpoints
 .ipynb_checkpoints/
+
+# Secrets — API keys never committed (see secrets/README.md). Only the *.example template is tracked.
+.env
+.env.*
+secrets/*
+!secrets/README.md
+!secrets/*.example
+*.key
