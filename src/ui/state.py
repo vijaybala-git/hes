@@ -178,7 +178,6 @@ solar_planned          = solara.reactive(_DEFAULTS["solar_planned"])
 solar_install_year     = solara.reactive(_DEFAULTS["solar_install_year"])
 solar_panels           = solara.reactive(_DEFAULTS["solar_panels"])       # primary sizing control
 solar_kw_per_panel     = solara.reactive(_DEFAULTS["solar_kw_per_panel"])     # detail: standard=0.42, premium=0.50
-solar_specific_yield   = solara.reactive(_DEFAULTS["solar_specific_yield"])     # detail: kWh/kW/yr (PVWatts typical CA)
 solar_battery_enabled  = solara.reactive(_DEFAULTS["solar_battery_enabled"])     # On = NEM 3.0 default
 solar_battery_kwh      = solara.reactive(_DEFAULTS["solar_battery_kwh"])     # detail: one Powerwall-class unit
 solar_scf              = solara.reactive(_DEFAULTS["solar_scf"])       # self-consumption %; 80 w/battery, 35 solar-only
@@ -365,7 +364,6 @@ def reset_to_defaults():
     solar_install_year.set(_DEFAULTS["solar_install_year"])
     solar_panels.set(_DEFAULTS["solar_panels"])
     solar_kw_per_panel.set(_DEFAULTS["solar_kw_per_panel"])
-    solar_specific_yield.set(_DEFAULTS["solar_specific_yield"])
     solar_battery_enabled.set(_DEFAULTS["solar_battery_enabled"])
     solar_battery_kwh.set(_DEFAULTS["solar_battery_kwh"])
     solar_scf.set(_DEFAULTS["solar_scf"])

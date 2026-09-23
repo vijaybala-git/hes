@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "name": "Sunnier site (Mt. Hamilton ZIP, +6.6% PVWatts yield)",
+  "base": "02_pge_solar",
+  "description": "Trend offset on 02_pge_solar: move 95112 (CZ4 zone table, 1,644 kWh/kW/yr) to 95140 (ZIP-level table, 1,752) — same PG&E utility and CZ4 climate, so only the solar yield changes",
+  "values": {
+    "zip_code": "95140"
+  },
+  "expect": {
+    "cockpit.journey_cumulative_opex": "-"
+  }
+}

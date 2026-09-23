@@ -49,7 +49,8 @@
 
     <h2 id="how-we-calculate-it">How we calculate it</h2>
     <p>System production:</p>
-<p>annual production kWh = system_kW × specific_yield system_kW = number_of_panels × kW_per_panel</p>
+<p>annual production kWh = system_kW × yield for your ZIP system_kW = number_of_panels × kW_per_panel</p>
+<p>The yield (kWh per kW per year, month by month) comes from NREL's PVWatts calculator, pre-computed for your ZIP code — or, where your ZIP hasn't been added yet, for the reference weather station of your California climate zone. It is shown read-only under Advanced (PVWatts), with where it came from.</p>
 <p>Self-consumption split:</p>
 <p>self-used kWh = production × self_consumption_fraction exported  kWh = production × (1 − self_consumption_fraction)</p>
 <p>Yearly savings:</p>
@@ -73,9 +74,9 @@
 </ul>
 <p>adjust it directly. The battery default suggests 80% when enabled.</p>
 <ul>
-<li>Degradation, shading, and panel orientation are not separately modeled; specific</li>
+<li>Yield assumes a typical roof system: fixed roof mount, 20° tilt, facing south, 14%</li>
 </ul>
-<p>yield (kWh per kW per year) captures local production — roughly 1,400 on the foggy coast to 1,650 inland.</p>
+<p>losses. Across California it ranges from about 1,350 kWh per kW per year on the foggy north coast to about 1,840 in the desert; San José is about 1,640. Degradation, shading, and your roof's actual tilt and direction are not modeled yet.</p>
 <ul>
 <li>You enter the total installed system cost from a contractor quote, minus any rebate.</li>
 </ul>
@@ -86,7 +87,10 @@
 <li>Install year — 1</li>
 <li>Number of panels — 15</li>
 <li>Kilowatts per panel — 0.42 (about a 6.3 kW system)</li>
-<li>Specific yield — 1,500 kWh per kW per year (about 9,450 kWh/yr)</li>
+<li>Yield — from your ZIP (San José area about 1,640 kWh per kW per year, so about</li>
+</ul>
+<p>10,350 kWh/yr for the default 6.3 kW system)</p>
+<ul>
 <li>Battery storage — on, 13.5 kWh</li>
 <li>Self-consumption — 80%</li>
 <li>Net-metering mode — NEM 3.0 / NBT</li>
@@ -97,7 +101,10 @@
 
     <h2 id="data-sources">Data sources</h2>
     <ul>
-<li>Typical residential solar sizing and yield: NREL PVWatts tool</li>
+<li>Solar yield: NREL PVWatts v8 (NSRDB typical-year weather), pre-computed per ZIP /</li>
+</ul>
+<p>climate zone</p>
+<ul>
 <li>NEM 3.0 avoided-cost export values: CPUC Avoided Cost Calculator (2024)</li>
 <li>Non-bypassable charge: PG&E NEM 2.0 tariff</li>
 </ul>

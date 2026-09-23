@@ -203,7 +203,7 @@ RANGES = {
     "dryer_gas_therms_per_cycle": (0.0, 5.0), "dryer_hp_kwh_per_cycle": (0.0, 20.0),
     "dryer_loads_per_week": (0, 50), "cooktop_gas_therms_per_meal": (0.0, 5.0),
     "cooktop_induction_kwh_per_meal": (0.0, 20.0), "cooktop_meals_per_week": (0, 100),
-    "solar_panels": (0, 200), "solar_kw_per_panel": (0.05, 2.0), "solar_specific_yield": (300, 3000),
+    "solar_panels": (0, 200), "solar_kw_per_panel": (0.05, 2.0),
     "solar_battery_kwh": (0.0, 200.0), "solar_scf": (0, 100), "solar_nbc": (0.0, 1.0),
     "elec_cagr_pct_a": _PCT, "acc_elec_cagr_a": _PCT, "gas_cagr_pct_a": _PCT, "acc_gas_cagr_a": _PCT,
     "elec_cagr_pct_b": _PCT, "acc_elec_cagr_b": _PCT, "gas_cagr_pct_b": _PCT, "acc_gas_cagr_b": _PCT,

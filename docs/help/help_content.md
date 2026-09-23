@@ -567,8 +567,13 @@ selling it back cheaply — raising the share of your own solar you actually con
 
 System production:
 
-  annual production kWh = system_kW × specific_yield
+  annual production kWh = system_kW × yield for your ZIP
   system_kW = number_of_panels × kW_per_panel
+
+The yield (kWh per kW per year, month by month) comes from NREL's PVWatts calculator,
+pre-computed for your ZIP code — or, where your ZIP hasn't been added yet, for the
+reference weather station of your California climate zone. It is shown read-only under
+Advanced (PVWatts), with where it came from.
 
 Self-consumption split:
 
@@ -596,9 +601,10 @@ The export rate depends on your net-metering era:
 
 - Self-consumption fraction defaults to 80% with a battery and 35% without — you can
   adjust it directly. The battery default suggests 80% when enabled.
-- Degradation, shading, and panel orientation are not separately modeled; specific
-  yield (kWh per kW per year) captures local production — roughly 1,400 on the foggy
-  coast to 1,650 inland.
+- Yield assumes a typical roof system: fixed roof mount, 20° tilt, facing south, 14%
+  losses. Across California it ranges from about 1,350 kWh per kW per year on the foggy
+  north coast to about 1,840 in the desert; San José is about 1,640. Degradation,
+  shading, and your roof's actual tilt and direction are not modeled yet.
 - You enter the total installed system cost from a contractor quote, minus any rebate.
 
 ### Default values
@@ -607,7 +613,8 @@ The export rate depends on your net-metering era:
 - Install year — 1
 - Number of panels — 15
 - Kilowatts per panel — 0.42 (about a 6.3 kW system)
-- Specific yield — 1,500 kWh per kW per year (about 9,450 kWh/yr)
+- Yield — from your ZIP (San José area about 1,640 kWh per kW per year, so about
+  10,350 kWh/yr for the default 6.3 kW system)
 - Battery storage — on, 13.5 kWh
 - Self-consumption — 80%
 - Net-metering mode — NEM 3.0 / NBT
@@ -617,7 +624,8 @@ The export rate depends on your net-metering era:
 
 ### Data sources
 
-- Typical residential solar sizing and yield: NREL PVWatts tool
+- Solar yield: NREL PVWatts v8 (NSRDB typical-year weather), pre-computed per ZIP /
+  climate zone
 - NEM 3.0 avoided-cost export values: CPUC Avoided Cost Calculator (2024)
 - Non-bypassable charge: PG&E NEM 2.0 tariff
 

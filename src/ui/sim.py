@@ -388,7 +388,6 @@ def run_simulation():
     solar_cfg = SolarBatteryConfig(
         panels=solar_panels.value,
         kw_per_panel=solar_kw_per_panel.value,
-        specific_yield=float(solar_specific_yield.value),
         battery_enabled=solar_battery_enabled.value,
         battery_kwh=solar_battery_kwh.value,
         scf=solar_scf.value / 100.0,

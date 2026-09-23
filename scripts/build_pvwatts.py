@@ -55,6 +55,7 @@ DEFAULT_PARAMS = {
 }
 HOURS_PER_MONTH = [d * 24 for d in (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)]  # 8760 TMY
 SHAPE_DP = 5
+SCHEMA_VERSION = 1            # bump on any breaking change; src/solar_loader.py checks it
 MIN_INTERVAL_S = 4.0          # ≤ 900 req/hr — under NREL's default 1,000/hr
 
 
@@ -232,8 +233,9 @@ def main() -> None:
 
     meta = doc["_meta"]
     meta.update({
+        "schema_version": SCHEMA_VERSION,
         "status": "Offline-baked PVWatts v8 solar yield, per 1 kW DC, single default orientation. "
-                  "Review-only until Phase 7 (docs/OfflineSolarData_Plan.md).",
+                  "Read at runtime by src/solar_loader.py (Phase 7 §1).",
         "source": "NREL PVWatts v8 API", "source_url": PVWATTS_URL,
         "request_params": {k: v for k, v in DEFAULT_PARAMS.items()},
         "units": {"ac_monthly": "kWh AC per kW DC per month", "ac_annual": "kWh/kW/yr",

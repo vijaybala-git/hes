@@ -119,7 +119,6 @@
     "solar_install_year": 1,
     "solar_panels": 15,
     "solar_kw_per_panel": 0.42,
-    "solar_specific_yield": 1500,
     "solar_battery_enabled": true,
     "solar_battery_kwh": 13.5,
     "solar_scf": 80,

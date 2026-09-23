@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated": "2026-08-04",
-  "app_commit": "273d0f3",
+  "generated": "2026-09-22",
+  "app_commit": "66ef164",
   "cases": {
     "01_pge_no_solar": {
       "cockpit": {
@@ -84,9 +84,9 @@
     },
     "02_pge_solar": {
       "cockpit": {
-        "journey_cumulative_opex": 38852,
+        "journey_cumulative_opex": 27186,
         "baseline_cumulative_opex": 132000,
-        "opex_delta": 93148,
+        "opex_delta": 104814,
         "payback_year": 1,
         "net_social_cost_avoided": 42433,
         "current_load_amps": 41,
@@ -242,9 +242,9 @@
     },
     "04_sce_solar": {
       "cockpit": {
-        "journey_cumulative_opex": 20416,
+        "journey_cumulative_opex": 10366,
         "baseline_cumulative_opex": 92312,
-        "opex_delta": 71896,
+        "opex_delta": 81946,
         "payback_year": 1,
         "net_social_cost_avoided": 34480,
         "current_load_amps": 41,
@@ -400,9 +400,9 @@
     },
     "06_ca_average_solar": {
       "cockpit": {
-        "journey_cumulative_opex": 31568,
+        "journey_cumulative_opex": 22075,
         "baseline_cumulative_opex": 113391,
-        "opex_delta": 81823,
+        "opex_delta": 91317,
         "payback_year": 1,
         "net_social_cost_avoided": 42433,
         "current_load_amps": 41,

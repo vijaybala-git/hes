@@ -1521,7 +1521,8 @@ def SolarDetail(model):
     # Derived quantities
     panels     = solar_panels.value
     kw_panel   = solar_kw_per_panel.value
-    yield_kwh  = solar_specific_yield.value
+    solar_res  = HomeConfig(zip_code=zip_code.value).solar_resource   # Phase 7 §1: per-ZIP PVWatts
+    yield_kwh  = solar_res.ac_annual
     system_kw  = panels * kw_panel
     annual_kwh = system_kw * yield_kwh
     scf_pct    = solar_scf.value
@@ -1645,11 +1646,11 @@ def SolarDetail(model):
                 with solara.Row(gap="6px", style="align-items:center"):
                     solara.HTML(tag="span", unsafe_innerHTML=(
                         f"<span style='{_LBL}'>Yield (kWh/kW/yr)</span>"
+                        f"<span style='font-size:0.9em; font-weight:600;'>{yield_kwh:,.0f}</span>"
                     ))
-                    solara.InputInt("", value=solar_specific_yield)
                 solara.HTML(tag="div", unsafe_innerHTML=(
                     "<div style='font-size:0.74em; color:#888; padding-left:2px;"
-                    " margin-top:2px;'>CA: ~1,400 fog coast · ~1,650 inland</div>"
+                    f" margin-top:2px;'>{solar_res.label} · from your ZIP</div>"
                 ))
                 # Spacer rows to match home-need rows on the right when model has run
                 if home_need_kwh is not None:

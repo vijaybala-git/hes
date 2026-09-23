@@ -15,11 +15,11 @@ class SolarConfig:
     Owns everything the sim prices off: size → production, the self-consumption fraction,
     and the NEM export-credit rule. Generation is physically distinct from storage, so it is
     its own config; the JourneyHome solar step reads only this.
-    (Phase 7: specific_yield → a per-zone monthly yield vector from pvwatts_zones.json.)
+    User choices only (Phase 7 §1): production per kW comes from the home's location —
+    HomeConfig.solar_resource (PVWatts per-ZIP table) — never from a field here.
     """
     panels:          int   = 15       # number of panels (primary sizing input)
     kw_per_panel:    float = 0.42     # kW per panel (standard = 0.42, premium = 0.50)
-    specific_yield:  float = 1500.0   # kWh/kW/yr — CA PVWatts typical; ~1,400 coast, ~1,650 inland
     scf:             float = 0.80     # self-consumption fraction (0–1); user-controlled slider
     nem_mode:        str   = "nbt"    # "nbt" (NEM 3.0, default) | "nem2" (existing pre-2023)
     nbc:             float = 0.025    # $/kWh non-bypassable charge (NEM 2.0 only)
@@ -55,7 +55,6 @@ class SolarBatteryConfig:
     """
     panels:          int   = 15
     kw_per_panel:    float = 0.42
-    specific_yield:  float = 1500.0
     battery_enabled: bool  = True
     battery_kwh:     float = 13.5
     nem_mode:        str   = "nbt"
@@ -73,8 +72,7 @@ class SolarBatteryConfig:
     @property
     def solar(self) -> SolarConfig:
         """The solar half — the only part the sim prices off."""
-        return SolarConfig(panels=self.panels, kw_per_panel=self.kw_per_panel,
-                           specific_yield=self.specific_yield, scf=self.scf,
+        return SolarConfig(panels=self.panels, kw_per_panel=self.kw_per_panel, scf=self.scf,
                            nem_mode=self.nem_mode, nbc=self.nbc)
 
     @property
@@ -86,7 +84,7 @@ class SolarBatteryConfig:
     def from_parts(cls, solar: SolarConfig, battery: BatteryConfig) -> "SolarBatteryConfig":
         """Compose the shim from the two split configs (round-trips with .solar/.battery)."""
         return cls(panels=solar.panels, kw_per_panel=solar.kw_per_panel,
-                   specific_yield=solar.specific_yield, battery_enabled=battery.battery_enabled,
+                   battery_enabled=battery.battery_enabled,
                    battery_kwh=battery.battery_kwh, nem_mode=solar.nem_mode, nbc=solar.nbc,
                    scf=solar.scf)
 
@@ -281,11 +279,14 @@ class JourneyHome(mesa.Agent):
                  capex_only_slots: list | None = None,
                  solar_config: SolarBatteryConfig | None = None,
                  solar_export_rates: np.ndarray | None = None,
+                 solar_resource=None,
                  elec_rates_by_category: dict | None = None,
                  gasoline_rates: np.ndarray | None = None,
                  external_ev_rates: np.ndarray | None = None):
         """
         solar_config: SolarBatteryConfig for the journey home; None for baseline.
+        solar_resource: SolarResource (HomeConfig.solar_resource) — per-kW PVWatts yield for the
+          home's ZIP. Required whenever solar_config is given.
         solar_export_rates: (n_years, 12) $/kWh export credit rates. For NEM 3.0 these
           are the ACC avoided-cost values; for NEM 2.0, retail minus NBC. Built in
           HESModel and passed in so JourneyHome.step() needs no rate-loader access.
@@ -302,6 +303,9 @@ class JourneyHome(mesa.Agent):
         self._elec_rates_by_category = elec_rates_by_category  # dict | None
         self._solar_config       = solar_config        # SolarBatteryConfig | None
         self._solar_export_rates = solar_export_rates  # (n_years, 12) | None
+        self._solar_resource     = solar_resource      # SolarResource | None (Phase 7 §1)
+        if solar_config is not None and solar_resource is None:
+            raise ValueError("solar_config requires solar_resource (HomeConfig.solar_resource)")
         self.is_baseline_home = is_baseline_home
         self.capex_only_slots: list = capex_only_slots or []
 
@@ -440,7 +444,9 @@ class JourneyHome(mesa.Agent):
             # Read the solar half only (Phase 6 WS2 §2a). Battery presence never enters the
             # sim — it affects self-consumption solely through the UI, which sets solar.scf.
             solar = self._solar_config.solar
-            annual_production_kwh = solar.system_kw * solar.specific_yield
+            # Phase 7 §1 commit A: per-ZIP PVWatts table, still summed to an annual figure and
+            # priced at the annual-average rate below (monthly pricing is commit B).
+            annual_production_kwh = solar.system_kw * self._solar_resource.ac_annual
             scf = solar.self_consumption_fraction   # 0.80 battery, 0.35 solar-only
 
             self_consumed_kwh = annual_production_kwh * scf

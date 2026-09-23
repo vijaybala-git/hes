@@ -904,10 +904,10 @@ def test_solar_saving_zero_before_install_year():
 def test_solar_battery_split_decomposes_and_round_trips():
     """The shim exposes the two split configs, and from_parts round-trips them."""
     from journey import SolarConfig, BatteryConfig, SolarBatteryConfig
-    sbc = SolarBatteryConfig(panels=12, kw_per_panel=0.50, specific_yield=1650.0,
+    sbc = SolarBatteryConfig(panels=12, kw_per_panel=0.50,
                              battery_enabled=False, battery_kwh=10.0,
                              nem_mode="nem2", nbc=0.03, scf=0.35)
-    assert sbc.solar == SolarConfig(panels=12, kw_per_panel=0.50, specific_yield=1650.0,
+    assert sbc.solar == SolarConfig(panels=12, kw_per_panel=0.50,
                                     scf=0.35, nem_mode="nem2", nbc=0.03)
     assert sbc.battery == BatteryConfig(battery_enabled=False, battery_kwh=10.0)
     assert sbc.solar.system_kw == 12 * 0.50
@@ -919,7 +919,7 @@ def test_solar_battery_split_decomposes_and_round_trips():
 @pytest.mark.parametrize("kwargs", [
     dict(panels=15, battery_enabled=True, nem_mode="nbt"),        # default battery config
     dict(panels=15, battery_enabled=False, scf=0.35, nem_mode="nbt"),  # solar-only
-    dict(panels=20, kw_per_panel=0.50, specific_yield=1650.0, nem_mode="nem2", nbc=0.03),
+    dict(panels=20, kw_per_panel=0.50, nem_mode="nem2", nbc=0.03),
 ])
 def test_split_reproduces_solar_battery_numerics(kwargs):
     """A config composed from SolarConfig+BatteryConfig via from_parts yields byte-identical

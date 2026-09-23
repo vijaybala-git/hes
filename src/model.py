@@ -407,6 +407,9 @@ class HESModel(mesa.Model):
         self.climate.advance_to(0)
         self.climate_trend = climate_trend
 
+        # ── Solar resource (Phase 7 §1) — ZIP → PVWatts per-kW table, clock time ──
+        self.solar_resource = home_config.solar_resource
+
         # UA is building physics, not climate-zone data (§1.9.5). Scales with conditioned
         # floor area so furnace/AC energy tracks home size (Phase 5.5 Fix 1).
         ua = float(compute_ua(home_config.insulation_quality, home_config.square_footage))
@@ -512,6 +515,7 @@ class HESModel(mesa.Model):
                                          is_baseline_home=False, capex_only_slots=capex_only_slots,
                                          solar_config=solar_config,
                                          solar_export_rates=solar_export_rates,
+                                         solar_resource=self.solar_resource,
                                          elec_rates_by_category=elec_by_cls_a,
                                          gasoline_rates=_gasoline_rates,
                                          external_ev_rates=_external_ev_rates)
@@ -554,6 +558,7 @@ class HESModel(mesa.Model):
                                                is_baseline_home=False,
                                                solar_config=solar_config,
                                                solar_export_rates=solar_export_rates,
+                                               solar_resource=self.solar_resource,
                                                elec_rates_by_category=elec_by_cls_b,
                                                gasoline_rates=_gasoline_rates,
                                                external_ev_rates=_external_ev_rates)
