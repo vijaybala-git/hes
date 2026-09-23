@@ -5,9 +5,11 @@ through the model, and adopt the CEC projected-rate escalation as the default.
 **Follows:** Phase 6 (`docs/Phase6_Spec.md`) — Solar/Battery split, inert roof-geometry inputs, and
 the **non-default `cec_projection` rate hand-off interface** (evaluated but not switched). Offline
 PVWatts/URDB data is harvested and validated separately in `docs/OfflineSolarData_Plan.md`.
-**Last updated:** 2026-09-07 — reconciled with the Phase 6 collapse: added §5 (adopt the projected-
-rate escalation as default) and repointed the data references from "Phase 6 §3a/§3b" to the offline
-solar-data plan. Original plan: 2026-06-23.
+**Last updated:** 2026-09-22 — folded the URDB interface contract into §3 (`RateStructure` +
+`period_fractions`/`price_month`, coverage gate, ZIP→baseline crosswalk; offline half DONE per
+`OfflineURDB_Plan.md`) and added §5.1 (projection scoped to PG&E; SCE/SDG&E escalate on EIA Pacific
+until their projection markets are harvested post-P7). Prior: 2026-09-07 reconciled with the Phase 6
+collapse (added §5). Original plan: 2026-06-23.
 
 ---
 
@@ -188,20 +190,62 @@ to devices — **this changes no total, dispatch, or physics**. Convention:
 
 ### §3 — Peak / non-peak consumption split + URDB TOU rates
 
-- **Data:** the curated residential TOU tariffs (PG&E E-TOU-C / E-ELEC, SCE TOU-D, SDG&E …)
-  were fetched, parsed into the simplified `{peak_rate, offpeak_rate, peak_hours, tiers}`
-  schema, and validated in `OfflineSolarData_Plan.md` §4b (`data/rates/urdb_tou.json`). Phase 7
-  consumes it; expand the curated list (toward full US) as needed.
-- **Consumption split:** reuse `data/rates/device_load_shapes.json` 24h profiles —
-  `peak_fraction[device] = Σ(profile over peak hours)`; `peak_kWh = monthly_kWh × peak_fraction`,
-  `offpeak_kWh = remainder`. This is the existing ACC hourly machinery repurposed (already does
-  `dot(profile_24h, shape_24h)`), so no new per-device data is needed.
-- **Pricing:** introduce `get_peak_offpeak_rates()` on the rate layer, returning real split
-  rates from URDB; apply tiered slabs against the split kWh. Utilities/loaders without TOU data
-  implement it as a single-period passthrough (peak == offpeak). Solar generation (§1) and
-  battery discharge (§2) reduce the **peak** load first.
-- **Coverage fallback:** utilities without a curated TOU tariff use a single-period
-  (peak == offpeak) URDB or the existing EIA flat rate — keeps full-US coverage working.
+> **The offline half is DONE** and committed (`docs/OfflineURDB_Plan.md`, branch
+> `feat/urdb-offline-harvest`). CA's three IOUs (PG&E, SCE, SDG&E) are harvested — 19 flagship
+> plans, TOU defaults, real per-tariff peak windows, per-territory baselines — plus the coverage
+> gate and the ZIP→baseline crosswalk. Phase 7 is now **only the sim-side wiring** against the
+> interface below (folded here from `OfflineURDB_Plan.md` §5). **URDB is electricity only — gas
+> stays on the EIA path** (`therms × single gas_rate`, no TOU, §0).
+
+**The interface — a source-agnostic `RateStructure`, two methods (§0.1 seam).** The sim codes
+against Layer 2 (the normalized structure), never against raw URDB. URDB is the first producer; the
+EIA-flat fallback emits the *same* object.
+
+```python
+class URDBRateStructure:                       # rate_loader.py
+    @classmethod
+    def for_utility(cls, eiaid, tariff_label=None) -> "URDBRateStructure":
+        # tariff_label=None -> utilities[eiaid].default_label (the whywatt_default, a TOU plan)
+
+    def period_fractions(self, month, load_shape_24h) -> dict:   # per-device, pure geometry, no $
+        # {"peak": Σ shape over THIS tariff's peak_hours, "offpeak": remainder}
+
+    def price_month(self, month, peak_kwh, offpeak_kwh) -> float:  # called ONCE on the home aggregate
+        # walk daily-baseline tiers on the monthly total (max_kwh_day × days_in_month), split each
+        # tier's kWh peak/off-peak in proportion, price at that tier's peak/off-peak rate, + fixed charge
+```
+- **Consumption split** uses each tariff's **real `peak_hours`** (4–9pm, 5–8pm, EV windows all
+  differ — baked per tariff) dotted with `data/rates/device_load_shapes.json` — the existing ACC
+  hourly machinery. Per device, no dollars, so tiers/solar can't leak into a device.
+- **Pricing** (`price_month`) is the only place tiers apply, and runs **once on the home aggregate**
+  (the marginal tier depends on total home import, §0.1). Solar (§1) + battery (§2) reduce the
+  **peak** bucket first. Per-device $ for charts comes from the §0.2 allocation helper.
+- A **flat tariff** (`is_tou:false` — e.g. tiered legacy E-1) has empty `peak_hours` and
+  `peak==offpeak`, so it collapses to the revenue-neutral flat case (Invariant 4).
+
+**Level + daily + seasonality all come from URDB; ACC is NOT applied on this path.** The URDB
+`by_month` structure already carries seasonal (summer/winter) rates, so multiplying by the ACC
+monthly shape would double-count. ACC is **retained** as its own selectable rate mode and for the
+flat-EIA fallback + NEM export, but the URDB retail path uses `urdb_rate × escalation(year)` only
+(escalation from §5). Tier **thresholds (kWh) do not escalate**; only $/kWh does.
+
+**Baseline territory (per-ZIP tier threshold).** `price_month`'s tier cutoff is the utility's
+baseline allowance, which varies by climate territory (PG&E 5.9–19.2 kWh/day). Resolve it
+`ZIP → CEC climate zone → territory → kWh/day` via `data/rates/urdb_baseline_crosswalk.json` +
+`region_baselines` in `urdb_tou.json` (SDG&E exact, PG&E approximate; SCE's TOU default is flat, no
+baseline). Rates are territory-invariant; only the allowance moves.
+
+**Coverage gate + fallback ladder ("can we USE a URDB rate?").** `for_utility(eiaid)` consults
+`data/rates/urdb_coverage.json` (OpenEI's ~114 annually-maintained utilities):
+- maintained **and** harvested → the URDB TOU structure (`whywatt_default` or the chosen label);
+- maintained but not harvested (`harvest_candidate`) → **flat** structure from the EIA per-utility rate;
+- not maintained, or ZIP unresolved → **flat** structure (EIA per-utility, else CA average).
+Flat = `peak==offpeak`, one tier, with ACC restoring seasonality. No path throws.
+
+**ZIP → tariff picker.** Entering a ZIP resolves the utility and offers its `tariffs{}` set (grouped
+by `plan_kind`, legacy plans flagged) with the TOU default pre-selected; the sim rebuilds the
+`URDBRateStructure` for the chosen label. Both scenarios ("do nothing"/"your journey") price on the
+selected tariff.
 
 ### §4 — UI / charts / outputs
 
@@ -240,8 +284,32 @@ Sequence them independently so each golden diff is attributable to one cause.
   the live sim (`OfflineRateProjection_Plan.md` §8c) is applied here; the CO₂/methane params are
   already harvested in `data/rates/projection/acc_marginal_gas.json`.
 
-**Acceptance (§5):** `cec_projection` is the default; the golden is re-baselined in a dedicated
-commit whose diff matches the Phase 6 evaluation; NEM/social extension decisions are recorded.
+#### §5.1 — Projection coverage: PG&E full at end of P7; SCE/SDG&E projection deferred (DECIDED)
+
+The rate *structure* (§3, URDB) covers all three CA IOUs, but the rate *projection* bundle
+(`whywatt_rate_projection.json`) currently has **only the `CA_PGE` market** — and building a market
+requires the offline "Rate Projections" harvest, which includes a **manual spreadsheet edit** step.
+So Phase 7 scopes projection to PG&E and defers SCE/SDG&E:
+
+- **PG&E area:** full pipeline — URDB starting rate (§3) escalated by the `cec_projection`/Moderate
+  trajectory (the `CA_PGE` market). This is the "fully working" end-state for Phase 7.
+- **SCE / SDG&E (and any non-PG&E CA ZIP):** the URDB **starting rate still applies** (structure works
+  CA-wide), but there is no per-utility projection yet, so the escalation **falls back to the
+  `EIA AEO Pacific` trajectory** (already in the bundle's benchmarks). Utility-specific starting
+  level, generic Pacific escalation.
+- **Post-Phase-7 effort (separate validation):** extend the offline rate-projection harvest with
+  `CA_SCE` and `CA_SDGE` markets (the manual-spreadsheet flow), then flip those ZIPs off the EIA
+  Pacific fallback. Tracked as its own validation task, not gating Phase 7 close.
+
+**Design for whole-CA now.** The projection hand-off is **market-keyed** (the bundle already is;
+`ProjectedRateSource` selects a market): resolve `eiaid → market` (`14328→CA_PGE`,
+`17609→CA_SCE`, `16609→CA_SDGE`), and when the market is absent, use the `eia_pacific` benchmark as
+the escalation. Adding SCE/SDG&E later is then a **data drop** (new markets), no code change — the
+selector and the EIA-Pacific fallback are built once, now.
+
+**Acceptance (§5):** `cec_projection` is the PG&E default; non-PG&E CA ZIPs escalate on EIA Pacific
+via the market selector; the golden is re-baselined in a dedicated commit whose diff matches the
+Phase 6 evaluation; NEM/social extension decisions are recorded.
 
 ---
 
@@ -250,22 +318,26 @@ commit whose diff matches the Phase 6 evaluation; NEM/social extension decisions
 ```
 src/
   journey.py            SolarConfig → monthly yield; BatteryConfig → dispatch physics
-  rate_loader.py        URDBRateLoader (peak/non-peak + slabs); get_peak_offpeak_rates real
-  model.py              wire peak/non-peak split + solar/battery reduction order
-  ui/sim.py, panels.py  roof geometry live; URDB TOU rate-model option
+  rate_loader.py        URDBRateStructure.for_utility / period_fractions / price_month (§3);
+                        coverage gate (urdb/harvest_candidate/eia_fallback) + baseline resolver
+  projected_rate_source.py  market selector: eiaid → market, EIA-Pacific fallback for non-PG&E (§5.1)
+  model.py              wire peak/non-peak split + solar/battery reduction order; home-level bill
+  ui/sim.py, panels.py  roof geometry live; URDB TOU rate-model option + per-utility tariff picker
   ui/charts.py          solar-monthly / peak-offpeak / battery-dispatch charts
   data/config/whywatt_default.json   default rate model cagr_flat → cec_projection (§5)
 data/
   solar/pvwatts_zones.json     (from OfflineSolarData_Plan) now CONSUMED by SolarConfig
-  rates/urdb_tou.json          (from OfflineSolarData_Plan) now CONSUMED by URDBRateLoader
-  rates/projection/whywatt_rate_projection.json  (from Phase 6 interface) now the DEFAULT rate source (§5)
-  (curated solar/TOU lists may expand toward full-US coverage; re-run the offline build scripts)
+  rates/urdb_tou.json          (from OfflineURDB_Plan, DONE) now CONSUMED by URDBRateStructure
+  rates/urdb_coverage.json     (from OfflineURDB_Plan, DONE) the "can we use URDB?" gate
+  rates/urdb_baseline_crosswalk.json (from OfflineURDB_Plan, DONE) ZIP→territory baselines
+  rates/projection/whywatt_rate_projection.json  now the DEFAULT rate source (§5); CA_PGE only —
+                        add CA_SCE/CA_SDGE markets post-P7 (§5.1)
 scripts/
-  build_pvwatts.py / build_urdb.py   (from Phase 6; re-run only to add zones/tariffs)
+  build_urdb*.py / build_baseline_crosswalk.py  (OfflineURDB, DONE; re-run to add utilities)
 tests/
   test_solar_pvwatts.py (NEW) monthly yield, orientation correction, coverage
   test_battery.py       (NEW) dispatch physics, self-consumption vs export
-  test_urdb_rates.py    (NEW) schedule parse, slab pricing, peak/offpeak split
+  test_urdb_rates.py    (NEW) URDBRateStructure: period_fractions + price_month + tier slabs + fallback
   regression/golden.json  re-baselined (output changes intentionally)
 ```
 
@@ -276,20 +348,33 @@ tests/
 - ✅ Tiered slabs → apply on the **monthly grid-import total** (billing-accurate).
 - ✅ Solar placement into periods → **offline intra-day shape** (PVWatts hourly, `OfflineSolarData_Plan.md` §4a).
 - ✅ Per-device $ allocation for charts → **gross period-priced grid-cost share** (§0.2).
+- ✅ URDB interface → **`RateStructure` + `period_fractions`/`price_month`**, coverage gate + baseline
+  crosswalk (offline DONE, §3); rate-model selector maps ZIP → utility → tariff picker.
+- ✅ Projection coverage → **PG&E full; SCE/SDG&E escalate on EIA Pacific** via the market selector
+  until their projection markets are harvested post-P7 (§5.1).
 
 ## Still open (resolve during Phase 7)
 
-- URDB tariff curation list beyond CA, and how the rate-model selector maps ZIP → tariff.
 - Orientation correction: analytical factor vs a small baked tilt/azimuth adjustment table.
 - Round-trip efficiency value + whether a battery charge-rate (kW) cap matters at this grain.
+- Mid-day "super-off-peak" period (SCE/SDG&E) is folded into off-peak by the 2-rate model — confirm
+  acceptable, or extend to 3 billing periods later.
+
+## Post-Phase-7 (separate efforts, not gating close)
+
+- **SCE/SDG&E rate-projection markets** — extend the offline "Rate Projections" harvest (manual
+  spreadsheet step) with `CA_SCE`/`CA_SDGE`, then flip those ZIPs off the EIA-Pacific fallback (§5.1).
+- URDB coverage beyond CA (national ZIP crosswalk + harvest of maintained utilities).
 
 ## Definition of done
 
 - [ ] PVWatts per-zone monthly yields baked + committed with provenance; Solar device emits (12,).
 - [ ] Battery dispatch physics produce self-consumption/export from real load.
-- [ ] URDB TOU peak/non-peak + slabs baked; consumption split via 24h shapes; pricing applied.
-- [ ] CA validated first; out-of-CA degrades gracefully to flat pricing.
-- [ ] `cec_projection` promoted to the default rate model (§5); NEM/social extension decisions recorded.
+- [ ] URDB `RateStructure` consumed: `period_fractions` split via real per-tariff peak hours,
+      `price_month` slabs on the home aggregate, coverage gate + ZIP→baseline resolved (offline DONE).
+- [ ] **PG&E area fully working** end-to-end (URDB rate × `cec_projection`); SCE/SDG&E use URDB rates
+      with **EIA-Pacific escalation** via the market selector (§5.1); all CA ZIPs degrade gracefully.
+- [ ] `cec_projection` promoted to the default rate model for PG&E (§5); NEM/social extension recorded.
 - [ ] Golden re-baselined with documented diff — escalation switch (§5) and TOU structure (§3) as
       separate, attributable commits; full `pytest` green.
 - [ ] Charts + Help updated; roof geometry live.

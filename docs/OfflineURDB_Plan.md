@@ -556,8 +556,9 @@ Phase 7 proper against the §5 interface.
 - [x] **SoCal harvested live** (user's `URDB_API_KEY`): SCE `17609` → 5 plans (TOU-D-4-9PM default,
       eff $0.291); SDG&E `16609` → 8 plans (TOU-DR-1 Coastal default, eff $0.338). All 3 CA IOUs now
       in `urdb_tou.json` (19 plans total). Robust evening-peak detection handles 4-9pm vs 5-8pm windows.
-- [ ] Interface hand-off: fold the §5 `RateStructure`/`price_month` naming + ACC-seasonality
-      correction into `Phase7_Spec.md` §3 for the wiring phase.
+- [x] Interface hand-off: `RateStructure`/`period_fractions`/`price_month` + ACC-seasonality
+      correction + coverage gate + baseline crosswalk folded into `Phase7_Spec.md` §3; projection
+      scope (PG&E full, SCE/SDG&E → EIA Pacific until harvested) recorded in `Phase7_Spec.md` §5.1.
 
 ---
 
