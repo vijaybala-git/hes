@@ -5,7 +5,8 @@ through the model, and adopt the CEC projected-rate escalation as the default.
 **Follows:** Phase 6 (`docs/Phase6_Spec.md`) — Solar/Battery split, inert roof-geometry inputs, and
 the **non-default `cec_projection` rate hand-off interface** (evaluated but not switched). Offline
 PVWatts/URDB data is harvested and validated separately in `docs/OfflineSolarData_Plan.md`.
-**Last updated:** 2026-09-22 — solar **simulation interface** decided: `SolarResourceLoader` →
+**Last updated:** 2026-09-23 — added §6 **NREL End-Use Load Profiles** (planned, separate branch
+after this one; no interim fix to today's hourly load shapes). 2026-09-22 — solar **simulation interface** decided: `SolarResourceLoader` →
 `SolarResource` (clock time) as `HomeConfig.solar_resource`, `SolarConfig` = user choices only (§1);
 `scf` retired for an **hourly energy balance with two battery modes** (Self-powered /
 Cost-saving, grid charging on by default) where **each month the cheaper mode wins** (§0, §2 —
@@ -476,6 +477,68 @@ Phase 6 evaluation; NEM/social extension decisions are recorded.
 
 ---
 
+### §6 — NREL End-Use Load Profiles (planned feature — separate branch)
+
+**Status:** 📋 PLANNED (added 2026-09-23). Built on its own branch (`feat/nrel-end-use-load-profiles`)
+**after** `feat/urdb-offline-harvest` is done. **No interim fix** to the current profiles in the
+meantime — the next change to hourly load shapes is this one.
+
+**Why.** The §0 energy balance spreads each electric device's monthly kWh over a 24-h profile from
+`data/rates/device_load_shapes.json`. That file was built in Phase 2 as a rough *rate-weighting*
+aid for the ACC model, not as a load model, and it is now on the critical path for solar
+self-use, battery value, and (with §3) the peak / off-peak bill split:
+
+| Gap in today's profiles | Effect on results |
+|---|---|
+| Everyday use (lights, plugs, cooking, dishwasher, dryer) is **flat, 1/24 per hour** | Too much load at midday (solar covers it directly), too little at 4–9pm → understates battery value and the TOU peak |
+| A heat pump uses the **heating** shape all year | Summer cooling is placed at night/morning instead of the afternoon |
+| **One shape for every month** (and every day type) | No winter vs summer difference in *when* energy is used |
+| **No raw-source snapshot / checksum**; values hand-shaped from cited sources; time basis (clock vs standard) undocumented | Weaker provenance than the PVWatts / URDB data it now sits beside |
+
+**Source.** NREL **End-Use Load Profiles for the U.S. Building Stock** (the residential set is built
+from ResStock), published as open data on OEDI: hourly (sub-hourly) electricity by end use —
+heating, cooling, water heating, lighting, plug loads, cooking, clothes drying, dishwashing,
+refrigeration, … — aggregated by geography. *Verify at planning:* release/version, the geography
+we can aggregate to (and how it maps to CEC Building Climate Zones), the exact end-use column
+names, whether EV charging is included (if not, keep NREL EVI-Pro for EV), and the timestamp
+convention.
+
+**Approach — same offline pattern as PVWatts (§1).**
+- `scripts/build_load_profiles.py` (run offline, never at runtime) → `data/loads/end_use_profiles.json`:
+  per **CEC zone × end use × month (12) × 24 clock hours**, each row normalised to sum to 1;
+  `_meta.schema_version`, source URLs + sha256, build date; trimmed source snapshots committed.
+- End use → device class mapping replaces `DEVICE_ACC_CATEGORY`'s role for load shapes: HPWH →
+  water heating; heat pump → heating **and** cooling (see below); central AC → cooling; induction /
+  oven → cooking; dryer → clothes drying; dishwasher → dishwashing; lights & plugs → a
+  lighting + plugs + refrigeration composite weighted by the source's own energy shares; EV → EV
+  profile (source TBD above).
+- **Heat pump split:** its monthly kWh is divided into heating and cooling parts (from the device's
+  own heating/cooling energy if it reports them, else by the month's HDD/CDD share), each spread by
+  its own profile.
+- **Loader + interface:** `LoadProfileLoader` → a frozen `LoadProfiles` for the home's zone (clock
+  time applied once, like `SolarResource`), exposed as a derived `HomeConfig.load_profiles`
+  property. `JourneyHome` receives `{device class: (12, 24)}` instead of today's single `(24,)` per
+  class and uses row *m* for month *m*. `dispatch.py` is unchanged — it already takes `L[h]`.
+
+**Consumers.** The §0 energy balance (home load `L[h]`) and §3 `period_fractions` (peak share per
+device). *Open question:* whether the ACC rate weighting in `rate_loader.py` (the file's original
+consumer) also switches, or keeps `device_load_shapes.json` until ACC is revisited.
+
+**Validation.** Tests: every row sums to 1, every device class resolves to a profile in every zone,
+peak (4–9pm) share of the lighting/plugs composite > the flat 21%, summer cooling peaks in the
+afternoon, the energy balance still closes. Review notebook `notebooks/load_profiles_review.ipynb`:
+old vs new profile per device, and the change in self-use / battery discharge / peak import for
+the regression cases.
+
+**Golden.** One dedicated re-baseline commit. Expected direction: an evening-peaked everyday load
+lowers *direct* solar self-use and raises battery discharge and peak-hour grid import.
+
+**Done when:** profiles harvested with provenance; `device_load_shapes.json` no longer drives the
+energy balance; heat pump heating/cooling split live; tests + notebook green; golden re-baselined
+with the diff explained.
+
+---
+
 ## Module / data deltas (Phase 7 target state)
 
 ```
@@ -499,6 +562,9 @@ data/
   rates/urdb_baseline_crosswalk.json (from OfflineURDB_Plan, DONE) ZIP→territory baselines
   rates/projection/whywatt_rate_projection.json  now the DEFAULT rate source (§5); CA_PGE only —
                         add CA_SCE/CA_SDGE markets post-P7 (§5.1)
+  loads/end_use_profiles.json  (§6, separate branch) NREL End-Use Load Profiles per CEC zone ×
+                        end use × month × 24 clock hours — replaces device_load_shapes.json in the
+                        energy balance
 scripts/
   build_urdb*.py / build_baseline_crosswalk.py  (OfflineURDB, DONE; re-run to add utilities)
 tests/
@@ -543,6 +609,9 @@ tests/
   hourly grain makes the power cap meaningful, so it stays in the model.
 - Mid-day "super-off-peak" period (SCE/SDG&E) is folded into off-peak by the 2-rate model — confirm
   acceptable, or extend to 3 billing periods later.
+- §6 load profiles: does the ACC rate weighting also switch to the NREL profiles, or keep
+  `device_load_shapes.json`? NREL source details (version, geography → CEC zone, EV coverage,
+  timestamps) to verify at planning.
 
 ## Post-Phase-7 (separate efforts, not gating close)
 
@@ -554,10 +623,11 @@ tests/
 
 ## Definition of done
 
-- [ ] PVWatts tables consumed (ZIP → zone → default, never a scalar); `specific_yield` removed from model/UI/config; Solar device emits (12,).
-- [ ] Hourly energy balance with two battery modes and a per-month cheaper-mode picker produces
+- [x] PVWatts tables consumed (ZIP → zone → default, never a scalar); `specific_yield` removed from model/UI/config; Solar device emits (12,). *(commits A/B, 2026-09-22)*
+- [x] Hourly energy balance with two battery modes and a per-month cheaper-mode picker produces
       self-consumption/export from real load; balance identities close in every mode; per-mode
       log generated; two-mode picker within a few % of the offline LP benchmark; `scf` removed.
+      *(commit C, 2026-09-22 — matched the LP optimum on all battery cases)*
 - [ ] URDB `RateStructure` consumed: `period_fractions` split via real per-tariff peak hours,
       `price_month` slabs on the home aggregate, coverage gate + ZIP→baseline resolved (offline DONE).
 - [ ] **PG&E area fully working** end-to-end (URDB rate × `cec_projection`); SCE/SDG&E use URDB rates
@@ -566,4 +636,5 @@ tests/
 - [ ] Golden re-baselined with documented diff — escalation switch (§5) and TOU structure (§3) as
       separate, attributable commits; full `pytest` green.
 - [ ] Charts + Help updated (roof geometry remains inert — default orientation).
+- [ ] §6 NREL End-Use Load Profiles drive the energy balance (separate branch; own golden re-baseline).
 - [ ] CLAUDE.md updated: Phase 7 closed.
