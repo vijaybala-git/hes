@@ -39,3 +39,6 @@ secrets/*
 !secrets/README.md
 !secrets/*.example
 *.key
+
+# PVWatts per-site full raw responses — resumable harvest cache (see docs/OfflineSolarData_Plan.md §4c)
+data/solar/sources/cache/

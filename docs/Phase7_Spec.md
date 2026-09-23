@@ -191,8 +191,9 @@ to devices — **this changes no total, dispatch, or physics**. Convention:
 - **Roof geometry:** stays **inert** (single default orientation: fixed roof, tilt 20°,
   azimuth 180°, 14% losses). Orientation correction is deferred past Phase 7 — the advocacy
   message ("even ~4 kW + battery is a big win") does not depend on it.
-- **Validation:** CZ4 default table annual within ±10% of the retired 1,500 (continuity check);
-  coastal vs inland differ as expected (~1,400 vs ~1,650 kWh/kW/yr); `grep -rn specific_yield
+- **Validation:** CZ4 default table annual in 1,500–1,750 (wave 0 measured **1,644** — the retired
+  1,500 under-stated San José by ~10%, so expect solar savings to rise in the golden re-baseline);
+  zone range 1,350 (Arcata) – 1,840 (China Lake) kWh/kW/yr; `grep -rn specific_yield
   src/ data/ tests/` returns zero.
 
 ### §2 — Battery charge/discharge physics

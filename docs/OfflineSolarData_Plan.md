@@ -169,7 +169,8 @@ grouping*; yield is pure location physics (a CCA boundary changes nothing).
   (~1,250–1,850 kWh/kW/yr).
 - `intraday_shape` is 12×24, each month sums to 1 (±1e-6), ~zero at night hours.
 - Σ `ac_monthly` ≈ Σ hourly-derived total (the reduction is consistent).
-- CZ4 zone-station annual within ±10% of `specific_yield=1500` (sanity bridge).
+- CZ4 zone-station annual in 1,500–1,750 (continuity with the retired `specific_yield=1500`).
+- Geographic ordering: Arcata (CZ1) lowest, the desert stations (CZ14, CZ15) the top two.
 - File size within budget.
 
 ---
@@ -207,8 +208,8 @@ tests/
 ## 8. Task checklist (build order)
 
 - [ ] Download 2020 ZCTA Gazetteer (centroids).
-- [ ] `build_pvwatts.py`: resumable hourly harvest → reduce → additive merge + zone-station snapshots.
-- [ ] **Wave 0** — 16 zone stations + CZ4 default (the table fallback for all CA).
+- [x] `build_pvwatts.py`: resumable hourly harvest → reduce → additive merge + zone-station snapshots.
+- [x] **Wave 0** — 16 zone stations + CZ4 default (the table fallback for all CA). Done 2026-09-22 (§10).
 - [ ] `solar_regions.py` — `svce` ZIP list from SVCE's member communities.
 - [ ] **Wave 1 — SVCE**; notebook review + tests green before moving on.
 - [ ] **Wave 2 — PCE + SJCE.**
@@ -222,3 +223,43 @@ tests/
 - Tests green; the review notebook runs and records the ZIP-vs-zone delta and the 4 kW finding.
 - `git grep` confirms no `src/` code reads `data/solar/`.
 - Phase 7 §1 consumes what survives review.
+
+## 10. Results log
+
+### Wave 0 — CEC zone stations (2026-09-22)
+
+16/16 stations harvested (PVWatts v8, `developer.nlr.gov` — NREL was renamed the National
+Laboratory of the Rockies and `developer.nrel.gov` no longer resolves; key from
+`secrets/nrel_api_key`, see `secrets/README.md`). `pvwatts_zip.json` 36 KB; trimmed raw snapshots
+836 KB under `data/solar/sources/zone_stations/`. `test_pvwatts_data.py` 11/11 green; API key
+verified absent from every harvested file.
+
+| Zone | Station | kWh/kW/yr | Jun/Dec | 4 kW system kWh/yr | Jul output in 4–9pm |
+|---|---|---:|---:|---:|---:|
+| CZ1 | Arcata | 1,350 | 2.8 | 5,400 | 21.8% |
+| CZ2 | Santa Rosa | 1,558 | 2.6 | 6,232 | 19.7% |
+| CZ3 | Oakland | 1,624 | 2.2 | 6,497 | 19.8% |
+| **CZ4** | **San José (default)** | **1,644** | 2.2 | 6,576 | 18.5% |
+| CZ5 | Santa Maria | 1,692 | 1.7 | 6,767 | 18.1% |
+| CZ6 | Los Angeles | 1,673 | 1.4 | 6,690 | 16.8% |
+| CZ7 | San Diego | 1,599 | 1.4 | 6,397 | 15.5% |
+| CZ8 | El Toro | 1,680 | 1.6 | 6,719 | 16.5% |
+| CZ9 | Pasadena | 1,719 | 1.6 | 6,877 | 16.5% |
+| CZ10 | Riverside | 1,694 | 1.6 | 6,777 | 14.9% |
+| CZ11 | Red Bluff | 1,518 | 2.6 | 6,070 | 18.8% |
+| CZ12 | Sacramento | 1,621 | 2.4 | 6,484 | 18.0% |
+| CZ13 | Fresno | 1,667 | 2.2 | 6,667 | 16.3% |
+| CZ14 | China Lake | 1,840 | 1.6 | 7,359 | 15.2% |
+| CZ15 | El Centro | 1,778 | 1.5 | 7,111 | 13.6% |
+| CZ16 | Blue Canyon | 1,546 | 2.2 | 6,184 | 17.8% |
+
+(4–9pm is clock time — PDT in July, i.e. local-standard hours 15–19. January peak share is 1.5–3%.)
+
+**Findings.**
+- **The retired scalar under-stated solar:** CZ4 is 1,644 vs `specific_yield=1500` (+9.6%) at the
+  default orientation. Expect solar savings to rise in the Phase 7 golden re-baseline.
+- **Spread is narrower than the old "coast ~1,400 / inland ~1,650" rule of thumb:** only the north
+  coast (Arcata) is truly low; Oakland ≈ Sacramento (tule fog). Coastal-vs-inland *within* the Bay
+  Area is a wave 1+ question (ZIP level), not answerable from one station per zone.
+- **Only ~15–22% of summer output lands in the 4–9pm peak** (and ~2–3% in winter) — the battery is
+  what moves solar value into the peak, which is the "4 kW + battery" message.
