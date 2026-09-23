@@ -150,10 +150,14 @@ def reduce_hourly(raw: dict) -> dict:
     shape = [[round(float(x), SHAPE_DP) for x in row] for row in shape]
     for row in shape:                                        # re-normalize after rounding
         row[int(np.argmax(row))] = round(row[int(np.argmax(row))] + 1.0 - sum(row), SHAPE_DP)
+    out = raw["outputs"]
     return {
         "ac_monthly": [round(float(x), 3) for x in ac_monthly],
         "ac_annual": round(float(sum(ac_monthly)), 2),
         "intraday_shape": shape,
+        # plane-of-array irradiation (the sunlight the panel face receives) — for review charts
+        "poa_monthly": [round(float(x), 2) for x in out["poa_monthly"]],
+        "solrad_monthly": [round(float(x), 3) for x in out["solrad_monthly"]],
     }
 
 
@@ -212,7 +216,7 @@ def main() -> None:
         doc["sites"][s["site_key"]] = {
             "label": s["label"], "lat": s["lat"], "lon": s["lon"], "zone": s["zone"],
             "nsrdb_station": {k: st.get(k) for k in ("lat", "lon", "elev", "tz", "distance",
-                                                      "solar_resource_file")},
+                                                      "solar_resource_file", "weather_data_source")},
             **red, "raw_sha256": raw_sha,
         }
         if region.tag == SR.ZONE_STATIONS_REGION:
@@ -234,15 +238,19 @@ def main() -> None:
         "request_params": {k: v for k, v in DEFAULT_PARAMS.items()},
         "units": {"ac_monthly": "kWh AC per kW DC per month", "ac_annual": "kWh/kW/yr",
                   "intraday_shape": "fraction of the month's AC energy in each local-standard-time "
-                                    "hour 0-23; each month's 24 values sum to 1"},
+                                    "hour 0-23; each month's 24 values sum to 1",
+                  "poa_monthly": "plane-of-array irradiation, kWh/m2 per month",
+                  "solrad_monthly": "plane-of-array irradiation, kWh/m2/day (monthly average)"},
         "hour_convention": "PVWatts hourly TMY output, local standard time (no DST), non-leap 8760",
         "fallback": "zips[zip] -> zones[zip_to_zone[zip]] -> default; every level is a full table",
         "built": date.today().isoformat(),
     })
+    prev = {r["tag"]: r for r in meta.get("regions", [])}.get(region.tag, {})
     regions_meta = [r for r in meta.get("regions", []) if r["tag"] != region.tag]
+    harvested = (prev.get("harvested") if fetched == 0 and prev else     # cache-only rebuild keeps
+                 datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"))       # the real harvest time
     regions_meta.append({"tag": region.tag, "name": region.name, "wave": region.wave,
-                         "sites": len(sites), "source": region.source_url,
-                         "harvested": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")})
+                         "sites": len(sites), "source": region.source_url, "harvested": harvested})
     meta["regions"] = sorted(regions_meta, key=lambda r: (r["wave"], r["tag"]))
     meta["site_count"] = len(doc["sites"])
     write(doc)
