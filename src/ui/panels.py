@@ -788,6 +788,27 @@ def SolarSummaryCard():
             ))
 
 
+@solara.component
+def TariffPicker(eiaid):
+    """URDB tariff dropdown for the home's utility (Phase 7 §3). "" = the utility default (a TOU
+    plan); closed-to-enrollment plans are flagged. Falls back to a note when not covered."""
+    from urdb_rates import get_urdb
+    urdb = get_urdb()
+    opts = urdb.tariff_options(eiaid)
+    if urdb.decision(eiaid) != "urdb" or not opts:
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            "<div style='font-size:0.72em; color:#9A4D00; margin:2px 0 0 4px'>"
+            + (urdb.fallback_reason(eiaid) or "No URDB tariff for this utility.") + "</div>"))
+        return
+    labels = {o["label"]: (o["family"] + (" (default)" if o["is_default"] else "")
+                           + (" — closed" if o["closed"] else "")) for o in opts}
+    by_text = {v: k for k, v in labels.items()}
+    current = elec_tariff_label.value if elec_tariff_label.value in labels else opts[0]["label"]
+    solara.Select(label="Tariff", values=list(labels.values()), value=labels[current],
+                  on_value=lambda txt: elec_tariff_label.set(
+                      "" if by_text[txt] == opts[0]["label"] else by_text[txt]))
+
+
 def _model_toggle(label: str, rv, options: list, color: str):
     """Inline model selector — two buttons + optional CAGR badge."""
     with solara.Row(gap="4px", style="align-items:center; flex-wrap:wrap"):
@@ -860,8 +881,10 @@ def RatesSummaryCard():
             solara.HTML(tag="div", unsafe_innerHTML=_rate_line_html(fuel, name, prov, cagr))
 
         _picker("electricity", "⚡ Electricity Rate Model", C_RATE_ELEC, elec_rate_model_a,
-                [("cagr_flat", "My Utility"), ("ca_average", "CA Average"), ("acc_shaped", "ACC")],
+                [("cagr_flat", "My Utility"), ("ca_average", "CA Average"), ("acc_shaped", "ACC"), ("urdb_tou", "TOU (URDB)")],
                 elec_cagr_pct_a.value, acc_elec_cagr_a.value)
+        if elec_rate_model_a.value == "urdb_tou":
+            TariffPicker(_ri_auto.electricity.utility_id)
         _picker("gas", "🔥 Gas Rate Model", C_RATE_GAS, gas_rate_model_a,
                 [("cagr_flat", "My Utility"), ("ca_average", "CA Average"), ("acc_seasonal", "ACC")],
                 gas_cagr_pct_a.value, acc_gas_cagr_a.value)
@@ -1851,7 +1874,9 @@ def RatesDetail():
     _fuel_model_block("electricity", "⚡ Electricity Rate Model", C_RATE_ELEC,
                        elec_rate_model_a, elec_cagr_pct_a, acc_elec_cagr_a,
                        [("cagr_flat", "My Utility"), ("ca_average", "CA Average"),
-                        ("acc_shaped", "ACC")], 15, _ri_auto, _ri_ca)
+                        ("acc_shaped", "ACC"), ("urdb_tou", "TOU (URDB)")], 15, _ri_auto, _ri_ca)
+    if elec_rate_model_a.value == "urdb_tou":
+        TariffPicker(_ri_auto.electricity.utility_id)
     _fuel_model_block("gas", "🔥 Gas Rate Model", C_RATE_GAS,
                        gas_rate_model_a, gas_cagr_pct_a, acc_gas_cagr_a,
                        [("cagr_flat", "My Utility"), ("ca_average", "CA Average"),
@@ -1896,7 +1921,7 @@ def RatesDetail():
         _fuel_model_block("electricity", "⚡ Electricity Rate Model", C_RATE_ELEC,
                            elec_rate_model_b, elec_cagr_pct_b, acc_elec_cagr_b,
                            [("cagr_flat", "My Utility"), ("ca_average", "CA Average"),
-                            ("acc_shaped", "ACC")], 15, _ri_auto, _ri_ca)
+                            ("acc_shaped", "ACC"), ("urdb_tou", "TOU (URDB)")], 15, _ri_auto, _ri_ca)
         _fuel_model_block("gas", "🔥 Gas Rate Model", C_RATE_GAS,
                            gas_rate_model_b, gas_cagr_pct_b, acc_gas_cagr_b,
                            [("cagr_flat", "My Utility"), ("ca_average", "CA Average"),

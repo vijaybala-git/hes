@@ -200,6 +200,7 @@ emissions_metric = solara.reactive(_DEFAULTS["emissions_metric"])
 # "ca_average" (EIA statewide) | "acc_shaped"/"acc_seasonal" (ACC). The CAGR slider applies
 # to both EIA modes and is seeded from each utility's EIA historical CAGR (see EnergyPrices).
 elec_rate_model_a = solara.reactive(_DEFAULTS["elec_rate_model_a"])
+elec_tariff_label = solara.reactive(_DEFAULTS["elec_tariff_label"])   # URDB tariff; "" = utility default
 elec_cagr_pct_a   = solara.reactive(_DEFAULTS["elec_cagr_pct_a"])
 acc_elec_cagr_a   = solara.reactive(_DEFAULTS["acc_elec_cagr_a"])            # base escalation used when acc_shaped
 gas_rate_model_a  = solara.reactive(_DEFAULTS["gas_rate_model_a"])
@@ -376,6 +377,7 @@ def reset_to_defaults():
     solar_system_cost.set(_DEFAULTS["solar_system_cost"])
     solar_rebate.set(_DEFAULTS["solar_rebate"])
     elec_rate_model_a.set(_DEFAULTS["elec_rate_model_a"])
+    elec_tariff_label.set(_DEFAULTS["elec_tariff_label"])
     elec_cagr_pct_a.set(_DEFAULTS["elec_cagr_pct_a"])
     acc_elec_cagr_a.set(_DEFAULTS["acc_elec_cagr_a"])
     gas_rate_model_a.set(_DEFAULTS["gas_rate_model_a"])

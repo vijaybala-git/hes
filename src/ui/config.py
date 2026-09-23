@@ -136,7 +136,7 @@ _LEGACY_RATE_MODELS = {"cagr_flat", "ca_average", "acc_shaped", "acc_seasonal"}
 # Phase 6 WS1 — projection-backed rate models are fuel-aware (an elec-only model like
 # cec_iepr must not be accepted on a gas slot from a shared link, and vice versa).
 from projected_rate_source import PROJECTION_ELEC_MODELS, PROJECTION_GAS_MODELS
-_ELEC_RATE_MODELS = _LEGACY_RATE_MODELS | set(PROJECTION_ELEC_MODELS)
+_ELEC_RATE_MODELS = _LEGACY_RATE_MODELS | set(PROJECTION_ELEC_MODELS) | {"urdb_tou"}  # §3
 _GAS_RATE_MODELS = _LEGACY_RATE_MODELS | set(PROJECTION_GAS_MODELS)
 _RATE_MODELS = _ELEC_RATE_MODELS | _GAS_RATE_MODELS   # kept for back-compat imports
 # Allowed values for string enums. A value outside the set is dropped (reverts to factory).

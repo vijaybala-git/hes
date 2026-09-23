@@ -201,6 +201,14 @@ Each fuel offers three rate models:
 - California average: the statewide blended rate, used automatically when a ZIP can't be
   matched to a utility.
 - ACC-shaped (electricity) or ACC-seasonal (gas): the CPUC Avoided Cost Calculator rate shape.
+- TOU (URDB), electricity only: your utility's actual time-of-use plan from the OpenEI Utility
+  Rate Database — a higher price in the evening peak (for example 4–9pm), summer/winter
+  prices, the baseline tiers for your area, and the daily fixed charge. Pick the plan from the
+  Tariff list (your utility's default time-of-use plan is pre-selected; EV and all-electric
+  plans are there too). Solar and the battery are priced hour by hour against this plan, so
+  the battery can choose its Cost-saving mode in months where that pays. Available for PG&E
+  and SDG&E; SCE uses its EIA rate until its URDB data is corrected; other utilities use My
+  Utility automatically. Prices grow at the same yearly rate as My Utility.
 
 WhyWatt currently prices the three large California investor-owned utilities — PG&E, Southern
 California Edison (SCE), and San Diego Gas & Electric (SDG&E). The Electricity & Gas Rates

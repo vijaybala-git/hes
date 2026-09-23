@@ -282,6 +282,8 @@ class JourneyHome(mesa.Agent):
                  solar_export_rates: np.ndarray | None = None,
                  solar_resource=None,
                  hourly_load_shapes: dict | None = None,
+                 rate_structure=None,
+                 rate_escalation: np.ndarray | None = None,
                  elec_rates_by_category: dict | None = None,
                  gasoline_rates: np.ndarray | None = None,
                  external_ev_rates: np.ndarray | None = None):
@@ -309,6 +311,10 @@ class JourneyHome(mesa.Agent):
         # {device class name: (24,) clock-hour shape summing to 1, "_default": flat} — spreads
         # each electric device's monthly kWh over the representative day (Phase 7 §0.1).
         self._hourly_load_shapes = hourly_load_shapes or {}
+        # URDB TOU tariff (Phase 7 §3): tiers + fixed charge applied on the home aggregate;
+        # None → today's per-device flat/ACC pricing only.
+        self._rate_structure  = rate_structure
+        self._rate_escalation = rate_escalation      # (n_years,) $ multiplier | None
         if solar_config is not None and solar_resource is None:
             raise ValueError("solar_config requires solar_resource (HomeConfig.solar_resource)")
         self.is_baseline_home = is_baseline_home
@@ -330,6 +336,8 @@ class JourneyHome(mesa.Agent):
         self.grid_import_kwh_history:      list = []  # utility → home + battery (with solar)
         self.battery_mode_history:         list = []  # per year: 12 × "self" | "cost"
         self.solar_monthly_bills_history:  list = []  # per year: 12 × {mode: $} (each mode run)
+        self.home_elec_bill_history:       list = []  # $/yr home-meter electricity before solar
+        self.home_load_hourly_history:     list = []  # per year: (12, 24) kWh representative days | None
         self.gasoline_gallons_history: list = []  # annual gallons (transportation slot)
         self.external_ev_kwh_history:  list = []  # annual external (public) EV charging kWh
         self.external_ev_cost_history: list = []  # annual external EV charging cost ($)
@@ -341,6 +349,17 @@ class JourneyHome(mesa.Agent):
         # (12,) per year for seasonal end-use charts (HVAC) — Phase 4 §1.
         self.monthly_consumption_history_by_slot: dict = {s.name: [] for s in slots}
         self.monthly_cost_history_by_slot:        dict = {s.name: [] for s in slots}
+
+    def _month_loads(self, load_by_class: dict) -> list:
+        """12 representative-day home loads (24,) from monthly kWh per device class."""
+        default_shape = self._hourly_load_shapes.get("_default", np.full(24, 1.0 / 24))
+        out = []
+        for m in range(12):
+            L = np.zeros(24)
+            for cls, kwh in load_by_class.items():
+                L = L + kwh[m] / _DAYS_IN_MONTH[m] * self._hourly_load_shapes.get(cls, default_shape)
+            out.append(L)
+        return out
 
     def step(self):
         year_idx     = self.model.steps - 1   # 0-based array index
@@ -370,6 +389,7 @@ class JourneyHome(mesa.Agent):
         year_external_ev_cost  = 0.0
         # (12, 24)-ready: monthly home-meter electric kWh per device class (Phase 7 §0.1)
         year_elec_load_by_class: dict = {}
+        year_category_elec_costs = {cat: 0.0 for cat in CATEGORY_ORDER}   # home-meter $ only
 
         for slot in self.slots:
             cost = slot.step(current_year, elec_r, gas_r, self.is_baseline_home,
@@ -411,6 +431,7 @@ class JourneyHome(mesa.Agent):
                     # §3.13 — external EV charging is NOT on the home meter; exclude it
                     # from elec opex so the §8 solar cap can't offset public charging.
                     year_elec_opex += cost - slot_ext_cost
+                    year_category_elec_costs[cat] += cost - slot_ext_cost
             else:
                 self.consumption_history_by_slot[slot.name].append(0.0)
                 self.fuel_history_by_slot[slot.name].append("electricity")
@@ -433,6 +454,35 @@ class JourneyHome(mesa.Agent):
                     key = cslot.style_key
                     yr_map = self.capex_by_device.setdefault(key, {})
                     yr_map[current_year] = yr_map.get(current_year, 0.0) + event_cost
+
+        # ── URDB TOU home-level bill (Phase 7 §0.1/§0.2/§3) ──────────────────────
+        # Devices were priced at their own tier-1 peak-weighted rate. The real bill walks the
+        # baseline tiers on the HOME's monthly total and adds the fixed charge; the difference
+        # is spread over categories in proportion to their electric cost (presentation only —
+        # the home total is exact).
+        home_bill_no_solar = None
+        month_loads = None
+        if self._rate_structure is not None:
+            rs = self._rate_structure
+            esc = float(self._rate_escalation[year_idx]) if self._rate_escalation is not None else 1.0
+            peak = rs.peak_mask()
+            month_loads = self._month_loads(year_elec_load_by_class)
+            home_bill_no_solar = np.array([
+                rs.price_month(m, float(month_loads[m][peak].sum()) * _DAYS_IN_MONTH[m],
+                               float(month_loads[m][~peak].sum()) * _DAYS_IN_MONTH[m],
+                               _DAYS_IN_MONTH[m], esc)
+                for m in range(12)])
+            adjustment = float(home_bill_no_solar.sum()) - year_elec_opex
+            elec_total = sum(year_category_elec_costs.values())
+            for cat in CATEGORY_ORDER:
+                share = (year_category_elec_costs[cat] / elec_total if elec_total > 0
+                         else (1.0 if cat == "Baseload" else 0.0))
+                year_category_costs[cat] += adjustment * share
+            year_opex += adjustment
+            year_elec_opex = float(home_bill_no_solar.sum())
+        self.home_elec_bill_history.append(year_elec_opex)
+        self.home_load_hourly_history.append(
+            np.array(month_loads) if month_loads is not None else None)
 
         # Append exactly once per category per step (sum-then-append fix)
         for cat in CATEGORY_ORDER:
@@ -476,24 +526,40 @@ class JourneyHome(mesa.Agent):
             direct = discharge = charge_grid = losses = grid_import = exported = 0.0
             retail_savings = export_credit = 0.0
             modes, bills = [], []
-            default_shape = self._hourly_load_shapes.get("_default", np.full(24, 1.0 / 24))
+            if month_loads is None:
+                month_loads = self._month_loads(year_elec_load_by_class)
+            rs = self._rate_structure
+            esc = (float(self._rate_escalation[year_idx])
+                   if rs is not None and self._rate_escalation is not None else 1.0)
             for m in range(12):
                 days = _DAYS_IN_MONTH[m]
                 G = monthly_production[m] / days * res.intraday_shape[m]
-                L = np.zeros(24)
-                for cls, kwh in year_elec_load_by_class.items():
-                    L = L + kwh[m] / days * self._hourly_load_shapes.get(cls, default_shape)
-                r = float(retail_by_month[m])
-                # Flat retail until URDB TOU pricing (§3) supplies peak windows → Self-powered.
-                mr = dispatch_month(G, L, battery, days=days, mode="auto", peak_hours=(),
-                                    r_peak=r, r_offpeak=r, export_rate=float(export_by_month[m]))
-                d = mr.day
-                exp_m = float(d.export.sum()) * days
-                grid_m = float(d.grid_import.sum()) * days
-                # Saving vs the same month with no solar/battery: load − grid import at retail
-                # (grid charging adds import) plus the export credit.
-                retail_savings += (float(L.sum()) * days - grid_m) * r
-                export_credit  += exp_m * float(export_by_month[m])
+                L = month_loads[m]
+                x = float(export_by_month[m])
+                if rs is not None:
+                    # URDB TOU: real peak window; the bill (tiers + fixed) decides the mode.
+                    rp, ro = rs.tier1_rates(m)
+                    mr = dispatch_month(
+                        G, L, battery, days=days, mode="auto", peak_hours=rs.peak_hours,
+                        r_peak=rp * esc, r_offpeak=ro * esc, export_rate=x,
+                        price_fn=lambda pk, op, _m=m, _d=days: rs.price_month(_m, pk, op, _d, esc))
+                    d = mr.day
+                    exp_m = float(d.export.sum()) * days
+                    grid_m = float(d.grid_import.sum()) * days
+                    # Saving = bill with no solar/battery − bill after dispatch (net of export).
+                    retail_savings += home_bill_no_solar[m] - (mr.bills[mr.mode] + exp_m * x)
+                else:
+                    r = float(retail_by_month[m])
+                    # Flat retail (no peak window) → Self-powered.
+                    mr = dispatch_month(G, L, battery, days=days, mode="auto", peak_hours=(),
+                                        r_peak=r, r_offpeak=r, export_rate=x)
+                    d = mr.day
+                    exp_m = float(d.export.sum()) * days
+                    grid_m = float(d.grid_import.sum()) * days
+                    # Saving vs the same month with no solar/battery: load − grid import at
+                    # retail (grid charging adds import) plus the export credit.
+                    retail_savings += (float(L.sum()) * days - grid_m) * r
+                export_credit += exp_m * x
                 direct      += float(d.solar_direct.sum()) * days
                 discharge   += float(d.discharge.sum()) * days
                 charge_grid += float(d.charge_grid.sum()) * days

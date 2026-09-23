@@ -5,7 +5,8 @@ through the model, and adopt the CEC projected-rate escalation as the default.
 **Follows:** Phase 6 (`docs/Phase6_Spec.md`) — Solar/Battery split, inert roof-geometry inputs, and
 the **non-default `cec_projection` rate hand-off interface** (evaluated but not switched). Offline
 PVWatts/URDB data is harvested and validated separately in `docs/OfflineSolarData_Plan.md`.
-**Last updated:** 2026-09-23 — added §6 **NREL End-Use Load Profiles** (planned, separate branch
+**Last updated:** 2026-09-23 — §3 URDB TOU pricing landed as an option (`urdb_tou`; SCE
+quarantined to EIA; golden unchanged). Earlier 2026-09-23 — added §6 **NREL End-Use Load Profiles** (planned, separate branch
 after this one; no interim fix to today's hourly load shapes). 2026-09-22 — solar **simulation interface** decided: `SolarResourceLoader` →
 `SolarResource` (clock time) as `HomeConfig.solar_resource`, `SolarConfig` = user choices only (§1);
 `scf` retired for an **hourly energy balance with two battery modes** (Self-powered /
@@ -344,6 +345,10 @@ pricing of `grid[h]`) and §5 (escalation) land after C as their own commits.
 
 ### §3 — Peak / non-peak consumption split + URDB TOU rates
 
+> **Runtime half LANDED 2026-09-23 as an option (`urdb_tou`), not yet the default** — see
+> "Landed" at the end of this section. The golden did not move; flipping the default is its own
+> commit.
+>
 > **The offline half is DONE** and committed (`docs/OfflineURDB_Plan.md`, branch
 > `feat/urdb-offline-harvest`). CA's three IOUs (PG&E, SCE, SDG&E) are harvested — 19 flagship
 > plans, TOU defaults, real per-tariff peak windows, per-territory baselines — plus the coverage
@@ -402,6 +407,37 @@ Flat = `peak==offpeak`, one tier, with ACC restoring seasonality. No path throws
 by `plan_kind`, legacy plans flagged) with the TOU default pre-selected; the sim rebuilds the
 `URDBRateStructure` for the chosen label. Both scenarios ("do nothing"/"your journey") price on the
 selected tariff.
+
+**Landed 2026-09-23 (§3 runtime, as an option):**
+- `src/urdb_rates.py` (not `rate_loader.py` — kept separate from the EIA/ACC loaders):
+  `URDBRates` (coverage gate + tariff options + `resolve(zip, eiaid, label)`) and a frozen
+  `RateStructure` with `period_fractions`, `tier1_rates`, `effective_rate` and `price_month`.
+- **Quarantine:** SCE (17609) is harvested but routed to EIA. Its URDB TOU-D-4-9PM record shows a
+  $0.33/kWh summer on-peak rate (same as winter); SCE publishes ~$0.58. Re-harvest and verify
+  against SCE's tariff sheets before lifting it. PG&E and SDG&E price from URDB.
+- **Baseline tiers:** the record's thresholds are scaled per month by (home territory baseline ÷
+  record territory baseline) for the matching season, so tier 1 = the ZIP's allowance and higher
+  tiers keep their ratio (e.g. Fresno summer 19.2 kWh/day vs San José 9.8).
+- **Fixed charge:** taken from URDB as-is (PG&E / SDG&E $0.79343/day ≈ $24/month). It raises both
+  homes equally and cancels out of savings. *Data note:* SDG&E TOU-DR-1's unit is recorded as
+  `$/month` in URDB (almost certainly `$/day`); left as published.
+- **Pricing wiring:** each device class is priced at its tier-1 peak-weighted rate (exact without
+  tiers); the home-level bill (`price_month` on the aggregate hourly load, tiers + fixed) replaces
+  the device sum, and the difference is spread over categories by electric cost (§0.2). Solar /
+  battery dispatch uses the tariff's peak window, and the monthly mode picker compares full bills
+  via `price_fn`.
+- **Escalation (interim):** tariff = start-year level × (1 + EIA CAGR)^year, like My Utility; §5
+  swaps in the projection trajectory.
+- **UI:** "TOU (URDB)" electricity button (card + detail, scenarios A/B), a Tariff dropdown
+  (default first, closed plans flagged), resolved line "E-TOU-C · peak 4pm–9pm" or the fallback
+  reason. New config keys: `elec_tariff_label` ("" = default); `urdb_tou` accepted for
+  electricity only.
+- **Case 02 on URDB** (20 yr, electrified, 6.3 kW + 13.5 kWh): E-TOU-C → Self-powered all year;
+  E-ELEC and EV2 → Cost-saving Jan and Dec, Self-powered Feb–Nov.
+- Tests: `tests/test_urdb_rates.py` (coverage, quarantine, baselines by ZIP, price_month hand
+  check, revenue-neutral flat case, home bill = Σ price_month on the home's own load, EV2 winter
+  Cost-saving on case 02). Golden unchanged; 485 tests pass.
+- **Not yet:** URDB as the default rate model (next, own golden diff); SCE re-harvest.
 
 ### §4 — UI / charts / outputs
 
@@ -548,8 +584,8 @@ src/
   journey.py            SolarConfig = user choices only (no specific_yield, no scf);
                         BatteryConfig live (round_trip_eff, power_kw); SolarBatteryConfig retired;
                         hourly representative-day energy balance (§0)
-  rate_loader.py        URDBRateStructure.for_utility / period_fractions / price_month (§3);
-                        coverage gate (urdb/harvest_candidate/eia_fallback) + baseline resolver
+  urdb_rates.py         (NEW, landed) URDBRates + RateStructure: coverage gate (+ SCE quarantine),
+                        baseline-scaled tiers, period_fractions / price_month, tariff options (§3)
   projected_rate_source.py  market selector: eiaid → market, EIA-Pacific fallback for non-PG&E (§5.1)
   model.py              wire peak/non-peak split + solar/battery reduction order; home-level bill
   ui/sim.py, panels.py  roof geometry live; URDB TOU rate-model option + per-utility tariff picker

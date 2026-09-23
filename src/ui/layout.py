@@ -1243,7 +1243,7 @@ def Page():
         solar_panels.value, solar_kw_per_panel.value,
         solar_battery_enabled.value, solar_battery_kwh.value,
         solar_battery_rte_pct.value, solar_battery_power_kw.value,
-        solar_battery_grid_charging.value,
+        solar_battery_grid_charging.value, elec_tariff_label.value,
         solar_nem_mode.value, solar_nbc.value,
         solar_system_cost.value, solar_rebate.value,
         elec_rate_model_a.value, elec_cagr_pct_a.value, acc_elec_cagr_a.value,

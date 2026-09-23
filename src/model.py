@@ -17,6 +17,7 @@ import numpy as np
 
 from home_config import HomeConfig, compute_baseload_kwh, HOT_WATER_GAL_PER_DAY, compute_ua
 from climate_loader import ClimateLoader
+from urdb_rates import get_urdb
 from social_cost import SocialCostConfig
 from journey import JourneyHome, DeviceSlot, CapExOnlySlot, CATEGORY_ORDER, CATEGORY_LABELS, SolarBatteryConfig
 from rate_loader import RateLoader, ACCRateLoader
@@ -127,7 +128,29 @@ def _is_legacy_acc(loader: object) -> bool:
 
 def _cagr_for(rate_model: str, cagr: float) -> float | None:
     """Return cagr when CAGR model selected; None for ACC (ignores user CAGR)."""
-    return cagr if rate_model in ("cagr_flat", "ca_average") else None
+    return cagr if rate_model in ("cagr_flat", "ca_average", "urdb_tou") else None
+
+
+def _urdb_arrays(rs, n_years: int, cagr: float | None):
+    """URDB TOU (Phase 7 §3): escalation index + the per-device-class tier-1 effective rates.
+
+    Each device class gets its own peak-weighted $/kWh per month (its 24-h shape against this
+    tariff's peak hours), so device costs stay exact without tiers; tiers + fixed charge are
+    applied once on the home aggregate in JourneyHome. Escalation: the tariff is taken as the
+    start-year level and grows at the chosen CAGR (the §5 projection replaces this later).
+    Returns (escalation (n_years,), elec_rates (n_years,12), rates_by_class {cls: (n_years,12)}).
+    """
+    esc = (1.0 + (cagr or 0.0)) ** np.arange(n_years)
+    shapes = hourly_load_shapes()
+    by_cls = {}
+    for cls in DEVICE_ACC_CATEGORY:
+        if cls in ("GasWaterHeater", "GasFurnace", "GasDryer", "GasCooktop"):
+            continue
+        month = np.array([rs.effective_rate(m, shapes.get(cls, shapes["_default"]))
+                          for m in range(12)])
+        by_cls[cls] = esc[:, None] * month[None, :]
+    base = np.array([rs.effective_rate(m, shapes["LightsAndPlugs"]) for m in range(12)])
+    return esc, esc[:, None] * base[None, :], by_cls
 
 
 def _build_elec_rates_by_class(acc_loader: ACCRateLoader,
@@ -353,6 +376,7 @@ class HESModel(mesa.Model):
                  slot_configs:     list | None = None,
                  capex_only_slots: list | None = None,
                  solar_config: SolarBatteryConfig | None = None,
+                 elec_tariff_label: str | None = None,   # URDB tariff (None = utility default)
                  social_cost_config: SocialCostConfig | None = None,
                  # §3 Transportation — gasoline price model
                  gasoline_price_per_gallon:        float = 4.50,
@@ -513,6 +537,20 @@ class HESModel(mesa.Model):
                 elec_loader_a, sim_start_year, n_years, scenario_a,
                 custom_cagr=elec_cagr_a_eff)
 
+        # ── URDB TOU (Phase 7 §3) — replaces the EIA arrays when the utility is covered ──
+        _urdb = get_urdb()
+        _eiaid = self.rate_resolution.electricity.utility_id
+        self.urdb_decision = _urdb.decision(_eiaid)
+        self.urdb_reason = _urdb.fallback_reason(_eiaid)
+        self.rate_structure_a = self.rate_structure_b = None
+        self.rate_escalation_a = self.rate_escalation_b = None
+        if elec_rate_model_a == "urdb_tou":
+            self.rate_structure_a = _urdb.resolve(home_config.zip_code, _eiaid, elec_tariff_label)
+            if self.rate_structure_a is not None:
+                self.rate_escalation_a, self.elec_rates, elec_by_cls_a = _urdb_arrays(
+                    self.rate_structure_a, n_years, elec_cagr_a_eff)
+                self.current_elec_rates = self.elec_rates[0]
+
         # ── Solar export rates (§8) — built once, used by journey_home only ──
         # NEM 3.0 (nbt): ACC avoided-cost $/kWh from ACCRateLoader.
         #   We always build an ACCRateLoader for this regardless of the consumption
@@ -543,11 +581,16 @@ class HESModel(mesa.Model):
                                          solar_export_rates=solar_export_rates,
                                          solar_resource=self.solar_resource,
                                          hourly_load_shapes=hourly_load_shapes(),
+                                         rate_structure=self.rate_structure_a,
+                                         rate_escalation=self.rate_escalation_a,
                                          elec_rates_by_category=elec_by_cls_a,
                                          gasoline_rates=_gasoline_rates,
                                          external_ev_rates=_external_ev_rates)
         self.baseline_home = JourneyHome(self, baseline_slots, self.elec_rates, self.gas_rates,
                                          is_baseline_home=True,
+                                         hourly_load_shapes=hourly_load_shapes(),
+                                         rate_structure=self.rate_structure_a,
+                                         rate_escalation=self.rate_escalation_a,
                                          elec_rates_by_category=elec_by_cls_a,
                                          gasoline_rates=_gasoline_rates,
                                          external_ev_rates=_external_ev_rates)
@@ -577,6 +620,13 @@ class HESModel(mesa.Model):
                 elec_by_cls_b = _build_elec_rates_by_class(
                     elec_loader_b, sim_start_year, n_years, scenario_b,
                     custom_cagr=elec_cagr_b_eff)
+            if elec_rate_model_b == "urdb_tou":
+                self.rate_structure_b = _urdb.resolve(home_config.zip_code, _eiaid,
+                                                      elec_tariff_label)
+                if self.rate_structure_b is not None:
+                    self.rate_escalation_b, self.elec_rates_b, elec_by_cls_b = _urdb_arrays(
+                        self.rate_structure_b, n_years, elec_cagr_b_eff)
+                    self.current_elec_rates_b = self.elec_rates_b[0]
 
             journey_slots_b  = _build_slots(slot_configs, False, self, **device_kw)
             baseline_slots_b = _build_slots(slot_configs, True,  self, **device_kw)
@@ -587,6 +637,8 @@ class HESModel(mesa.Model):
                                                solar_export_rates=solar_export_rates,
                                                solar_resource=self.solar_resource,
                                                hourly_load_shapes=hourly_load_shapes(),
+                                               rate_structure=self.rate_structure_b,
+                                               rate_escalation=self.rate_escalation_b,
                                                elec_rates_by_category=elec_by_cls_b,
                                                gasoline_rates=_gasoline_rates,
                                                external_ev_rates=_external_ev_rates)

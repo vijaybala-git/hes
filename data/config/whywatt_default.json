@@ -129,6 +129,7 @@
     "solar_system_cost": 30000,
     "solar_rebate": 0,
     "elec_rate_model_a": "cagr_flat",
+    "elec_tariff_label": "",
     "elec_cagr_pct_a": 7,
     "acc_elec_cagr_a": 7,
     "gas_rate_model_a": "cagr_flat",

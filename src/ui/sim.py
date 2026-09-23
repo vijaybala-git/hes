@@ -69,6 +69,8 @@ _PROV_BADGE = {  # provenance -> (text, fg, bg)
     "fallback": ("⚠ utility not found — CA avg", "#9A4D00", "#FFE0B2"),
     "selected": ("statewide", "#546E7A", "#ECEFF1"),
     "acc":      ("ACC shape", "#546E7A", "#ECEFF1"),
+    "urdb":     ("URDB tariff", "#1B5E20", "#E8F5E9"),
+    "tou_fallback": ("⚠ no URDB tariff — EIA", "#9A4D00", "#FFE0B2"),
 }
 
 
@@ -101,6 +103,13 @@ def _fuel_resolved_display(fuel: str, mode: str, cagr_pct: int, acc_cagr_pct: in
         return "PG&E CPUC base", "acc", acc_cagr_pct
     if mode == "ca_average":
         return "California average", "selected", cagr_pct
+    if mode == "urdb_tou" and fuel == "electricity":
+        from urdb_rates import get_urdb, peak_hours_label
+        rs = get_urdb().resolve(zip_code.value, fr_auto.utility_id, elec_tariff_label.value or None)
+        if rs is None:
+            return f"{fr_auto.name} — EIA rate (TOU not available)", "tou_fallback", cagr_pct
+        peak = peak_hours_label(rs.peak_hours) if rs.is_tou else "tiered, no peak window"
+        return f"{rs.family} · peak {peak}", "urdb", cagr_pct
     return fr_auto.name, fr_auto.provenance, cagr_pct          # cagr_flat = My Utility
 
 
@@ -119,7 +128,7 @@ def _seed_eia_cagr():
              (elec_rate_model_b, elec_cagr_pct_b, "electricity"),
              (gas_rate_model_b,  gas_cagr_pct_b,  "gas")]
     for mode_rv, cagr_rv, fuel in pairs:
-        if mode_rv.value in ("cagr_flat", "ca_average"):
+        if mode_rv.value in ("cagr_flat", "ca_average", "urdb_tou"):   # urdb_tou escalates at the EIA CAGR
             src = "ca_average" if mode_rv.value == "ca_average" else "auto"
             fr = getattr(_rate_info(zip_code.value, src), fuel)
             cagr_rv.set(round(fr.cagr * 100))
@@ -411,6 +420,7 @@ def run_simulation():
         capex_only_slots=capex_slots or None,
         solar_config=solar_cfg,
         elec_rate_model_a=elec_rate_model_a.value,
+        elec_tariff_label=elec_tariff_label.value or None,
         gas_rate_model_a=gas_rate_model_a.value,
         elec_rate_model_b=elec_rate_model_b.value,
         gas_rate_model_b=gas_rate_model_b.value,
