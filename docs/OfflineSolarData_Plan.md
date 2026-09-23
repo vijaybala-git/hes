@@ -80,10 +80,16 @@ grouping*; yield is pure location physics (a CCA boundary changes nothing).
 | **2** | `pce`, `sjce` | **Peninsula Clean Energy** (San Mateo County) · **San José Clean Energy** (City of San José) | |
 | 3+ | e.g. `ava`, `mce`, `cleanpowersf`, `scp` | other Bay Area CCAs (Ava Community Energy, MCE, CleanPowerSF, Sonoma Clean Power …) | then the rest of CA, on request |
 
-- **Region table:** `scripts/solar_regions.py` maps `region tag → {name, member jurisdictions,
-  zips[], source_url}`. ZIP lists are **curated from each CCA's published member list** (re-verify
-  membership at harvest time — CCAs add cities). ZIPs straddling a boundary are included; an extra
-  ZIP costs one API call and can't be physically wrong. Adding a region is a data edit, not code.
+- **Region table:** `scripts/solar_regions.py` holds each region's **membership rules** — county,
+  member places (from the CCA's published member list; re-verify at harvest time), enclave places,
+  whether unincorporated county land is served, and places left to another wave.
+  `scripts/build_solar_regions.py` applies them to the Census 2020 ZCTA↔place and ZCTA↔county
+  relationship files (land-area shares) → `data/solar/regions.json`, the ZIP list + ZCTA centroid +
+  the *reason* each ZIP was selected. Rules, not hand-typed lists: reproducible and reviewable.
+  A ZIP is harvested once, by the first wave that selects it — a harvest tag, not a service claim.
+- **Selection rule (SVCE):** ZCTA ≥ 45% in Santa Clara County, and either a member/enclave place
+  covers ≥ 10% of its land, or it is ≥ 50% unincorporated with San José < 5% (San José-majority hill
+  ZIPs — 95120, 95135, 95138 … — are left for `sjce`).
 - **Enclaves:** Palo Alto (CPAU) and the City of Santa Clara (Silicon Valley Power) sit inside
   SVCE's footprint but are municipal utilities. Their ZIPs still get the same sun — harvest them
   with the wave that covers them geographically.
@@ -190,10 +196,12 @@ git grep -nE "data/solar/|pvwatts_zip" -- src/ ':!src/**/*.md'
 
 ```
 scripts/
-  solar_regions.py        (NEW) region tag → CCA member jurisdictions → ZIP list (+ source URL)
+  solar_regions.py        (NEW) region tag → membership rules (county + member/enclave places)
+  build_solar_regions.py  (NEW, run offline) Census ZCTA relationships → data/solar/regions.json
   build_pvwatts.py        (NEW, run offline) --region → sites → PVWatts hourly → reduce → merge into pvwatts_zip.json
 data/
   solar/pvwatts_zip.json  (NEW, baked) per-site monthly yield + 12×24 shape; ZIP + zone index
+  solar/regions.json      (NEW, derived) per-region ZIP list + ZCTA centroid + selection reason
   solar/sources/          (NEW) raw PVWatts JSON for the 16 zone stations (committed)
   solar/sources/cache/    (NEW, gitignored) per-ZIP raw responses — resumable harvest cache
 notebooks/
@@ -207,11 +215,11 @@ tests/
 
 ## 8. Task checklist (build order)
 
-- [ ] Download 2020 ZCTA Gazetteer (centroids).
+- [x] Download 2020 ZCTA Gazetteer + ZCTA↔place / ZCTA↔county relationship files (Census).
 - [x] `build_pvwatts.py`: resumable hourly harvest → reduce → additive merge + zone-station snapshots.
 - [x] **Wave 0** — 16 zone stations + CZ4 default (the table fallback for all CA). Done 2026-09-22 (§10).
-- [ ] `solar_regions.py` — `svce` ZIP list from SVCE's member communities.
-- [ ] **Wave 1 — SVCE**; notebook review + tests green before moving on.
+- [x] `solar_regions.py` membership rules + `build_solar_regions.py` → `data/solar/regions.json` (derived `svce` ZIP list, per-ZIP reason).
+- [x] **Wave 1 — SVCE** (29 ZIPs) harvested, tests green. Done 2026-09-22 (§10). Notebook review still to do.
 - [ ] **Wave 2 — PCE + SJCE.**
 - [ ] `pvwatts_review.ipynb` runs top-to-bottom; `test_pvwatts_data.py` green; isolation grep-gate green.
 - [ ] Later waves (other Bay Area CCAs, rest of CA) as advocates request them.
@@ -263,3 +271,23 @@ verified absent from every harvested file.
   Area is a wave 1+ question (ZIP level), not answerable from one station per zone.
 - **Only ~15–22% of summer output lands in the 4–9pm peak** (and ~2–3% in winter) — the battery is
   what moves solar value into the peak, which is the "4 kW + battery" message.
+
+### Wave 1 — SVCE (2026-09-22)
+
+29 ZIPs (all CZ4): 12 member cities, the Palo Alto (94301/03/04/06) and Santa Clara
+(95050/51/53/54) enclaves, and unincorporated Stanford (94305), Lexington Hills (95033),
+San Martin (95046) and Mt. Hamilton (95140). 26 distinct NSRDB weather cells (a ZIP centroid is
+≤ 2.5 km from its cell). `pvwatts_zip.json` now 101 KB; 12/12 tests green; key absent from every
+harvested file. PO-box ZIPs (no ZCTA) are not listed — they resolve to the CZ4 zone table.
+
+| vs CZ4 zone table (1,644) | Result |
+|---|---|
+| SVCE ZIP range | 1,596 – 1,752 kWh/kW/yr (mean +0.4%) |
+| Within ±2% of the zone table | **24 of 29** |
+| Outliers | Mt. Hamilton 95140 **+6.6%** (above the inversion); Cupertino 95014 +4.0%; Saratoga 95070 +2.2%; Gilroy 95020 −2.1%; San Martin 95046 −2.9% |
+| July output in 4–9pm | 18.0 – 19.4% (zone 18.5%) |
+
+**Finding.** In SVCE the ZIP-level tables barely move the answer from the CZ4 zone table — annual
+yield within ±2% for 24/29 ZIPs and near-identical peak-window timing. The zone fallback is a good
+default for flat valley territory; ZIP level matters mainly for hills/ridges (Mt. Hamilton) and
+probably for coast-vs-inland splits (PCE's coastside, wave 2) — worth checking there.

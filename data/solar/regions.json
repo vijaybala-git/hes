@@ -1,0 +1,204 @@
+{
+ "_meta": {
+  "status": "Derived solar harvest regions (ZIP lists + ZCTA centroids). A region is a harvest grouping, not a statement of service territory. See docs/OfflineSolarData_Plan.md \u00a72b.",
+  "sources": {
+   "gazetteer": {
+    "file": "2020_Gaz_zcta_national.txt",
+    "url": "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2020_Gazetteer/2020_Gaz_zcta_national.zip",
+    "sha256": "036421adec9bdd8fdbf51dd39a6464617246547f32a32936a7b9ddb45bbfb3c9"
+   },
+   "zcta_place": {
+    "file": "tab20_zcta520_place20_natl.txt",
+    "url": "https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_place20_natl.txt",
+    "sha256": "698a5dad71ed419411677d0ffd8ecd9331067f59c472cdd239b92c12f698285d"
+   },
+   "zcta_county": {
+    "file": "tab20_zcta520_county20_natl.txt",
+    "url": "https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_county20_natl.txt",
+    "sha256": "3ed41278d637dc249e0323306f68be8a6c234e3090f4de88ef328dee71aeaaaf"
+   }
+  },
+  "built": "2026-09-22"
+ },
+ "svce": {
+  "name": "Silicon Valley Clean Energy",
+  "wave": 1,
+  "source_url": "https://svcleanenergy.org/faqs/ (13 member communities, verified 2026-09-22)",
+  "rules": {
+   "county_geoid": "06085",
+   "member_places": [
+    "Campbell city",
+    "Cupertino city",
+    "Gilroy city",
+    "Los Altos city",
+    "Los Altos Hills town",
+    "Los Gatos town",
+    "Milpitas city",
+    "Monte Sereno city",
+    "Morgan Hill city",
+    "Mountain View city",
+    "Saratoga city",
+    "Sunnyvale city"
+   ],
+   "enclave_places": [
+    "Palo Alto city",
+    "Santa Clara city"
+   ],
+   "include_unincorporated": true,
+   "exclude_places": [
+    "San Jose city"
+   ],
+   "min_in_county": 0.45,
+   "min_place_share": 0.1,
+   "min_unincorporated": 0.5,
+   "max_excluded_share": 0.05
+  },
+  "zips": {
+   "94022": {
+    "lat": 37.357461,
+    "lon": -122.14439,
+    "reason": "member: Los Altos Hills town 42%"
+   },
+   "94024": {
+    "lat": 37.352293,
+    "lon": -122.094291,
+    "reason": "member: Los Altos city 46%"
+   },
+   "94040": {
+    "lat": 37.380563,
+    "lon": -122.085259,
+    "reason": "member: Mountain View city 100%"
+   },
+   "94041": {
+    "lat": 37.38852,
+    "lon": -122.075726,
+    "reason": "member: Mountain View city 100%"
+   },
+   "94043": {
+    "lat": 37.414028,
+    "lon": -122.070679,
+    "reason": "member: Mountain View city 72%"
+   },
+   "94085": {
+    "lat": 37.388571,
+    "lon": -122.017764,
+    "reason": "member: Sunnyvale city 98%"
+   },
+   "94086": {
+    "lat": 37.371644,
+    "lon": -122.02312,
+    "reason": "member: Sunnyvale city 100%"
+   },
+   "94087": {
+    "lat": 37.351533,
+    "lon": -122.03694,
+    "reason": "member: Sunnyvale city 100%"
+   },
+   "94089": {
+    "lat": 37.412402,
+    "lon": -122.015605,
+    "reason": "member: Sunnyvale city 100%"
+   },
+   "94301": {
+    "lat": 37.444136,
+    "lon": -122.149914,
+    "reason": "enclave: Palo Alto city 100%"
+   },
+   "94303": {
+    "lat": 37.457883,
+    "lon": -122.115097,
+    "reason": "enclave: Palo Alto city 61%"
+   },
+   "94304": {
+    "lat": 37.374694,
+    "lon": -122.181851,
+    "reason": "enclave: Palo Alto city 80%"
+   },
+   "94305": {
+    "lat": 37.418256,
+    "lon": -122.170871,
+    "reason": "unincorporated 100%"
+   },
+   "94306": {
+    "lat": 37.415713,
+    "lon": -122.130761,
+    "reason": "enclave: Palo Alto city 100%"
+   },
+   "95008": {
+    "lat": 37.279173,
+    "lon": -121.955565,
+    "reason": "member: Campbell city 88%"
+   },
+   "95014": {
+    "lat": 37.306612,
+    "lon": -122.080624,
+    "reason": "member: Cupertino city 44%"
+   },
+   "95020": {
+    "lat": 37.018537,
+    "lon": -121.554202,
+    "reason": "member: Gilroy city 11%"
+   },
+   "95030": {
+    "lat": 37.223035,
+    "lon": -121.983607,
+    "reason": "member: Los Gatos town 29%"
+   },
+   "95032": {
+    "lat": 37.217262,
+    "lon": -121.924338,
+    "reason": "member: Los Gatos town 46%"
+   },
+   "95033": {
+    "lat": 37.160846,
+    "lon": -121.983966,
+    "reason": "unincorporated 98%"
+   },
+   "95035": {
+    "lat": 37.443638,
+    "lon": -121.874953,
+    "reason": "member: Milpitas city 60%"
+   },
+   "95037": {
+    "lat": 37.173636,
+    "lon": -121.598435,
+    "reason": "member: Morgan Hill city 10%"
+   },
+   "95046": {
+    "lat": 37.099308,
+    "lon": -121.59924,
+    "reason": "unincorporated 98%"
+   },
+   "95050": {
+    "lat": 37.351143,
+    "lon": -121.95231,
+    "reason": "enclave: Santa Clara city 96%"
+   },
+   "95051": {
+    "lat": 37.348637,
+    "lon": -121.984368,
+    "reason": "enclave: Santa Clara city 98%"
+   },
+   "95053": {
+    "lat": 37.348723,
+    "lon": -121.937557,
+    "reason": "enclave: Santa Clara city 100%"
+   },
+   "95054": {
+    "lat": 37.39341,
+    "lon": -121.964701,
+    "reason": "enclave: Santa Clara city 99%"
+   },
+   "95070": {
+    "lat": 37.260475,
+    "lon": -122.046174,
+    "reason": "member: Saratoga city 45%"
+   },
+   "95140": {
+    "lat": 37.393503,
+    "lon": -121.620009,
+    "reason": "unincorporated 100%"
+   }
+  }
+ }
+}

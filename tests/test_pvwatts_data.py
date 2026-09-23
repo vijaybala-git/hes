@@ -13,6 +13,7 @@ ROOT = Path(__file__).parent.parent
 PV_JSON = ROOT / "data" / "solar" / "pvwatts_zip.json"
 ZIP_TO_ZONE = ROOT / "data" / "climate" / "zip_to_zone.json"
 ZONES_JSON = ROOT / "data" / "climate" / "tmy3_zones.json"
+REGIONS_JSON = ROOT / "data" / "solar" / "regions.json"
 SIZE_BUDGET_BYTES = 3 * 1024 * 1024
 NIGHT_HOURS = [0, 1, 2, 3, 22, 23]          # local standard time; no CA sun at these hours
 
@@ -54,10 +55,23 @@ def test_every_ca_zip_resolves_to_a_table(pv):
 
 
 def test_harvested_regions_are_complete(pv):
+    """Every ZIP a harvested region lists (data/solar/regions.json) has a direct ZIP-level table."""
+    regions = json.loads(REGIONS_JSON.read_text(encoding="utf-8")) if REGIONS_JSON.exists() else {}
     for r in pv["_meta"]["regions"]:
-        region = SR.REGIONS[r["tag"]]
-        for z in region.zips:
+        if r["tag"] == SR.ZONE_STATIONS_REGION:
+            continue
+        listed = regions[r["tag"]]["zips"]
+        assert listed, r["tag"]
+        for z in listed:
             assert z in pv["zips"], f"{r['tag']}: ZIP {z} missing"
+            assert pv["zips"][z]["region"] == r["tag"]
+
+
+def test_zip_entries_consistent(pv):
+    zip_to_zone = json.loads(ZIP_TO_ZONE.read_text(encoding="utf-8"))
+    for z, e in pv["zips"].items():
+        assert e["zone"] == zip_to_zone[z], z
+        assert e["site"] in pv["sites"], z
 
 
 @pytest.mark.parametrize("field", ["ac_monthly", "intraday_shape"])

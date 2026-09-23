@@ -43,6 +43,8 @@ CACHE = SOLAR / "sources" / "cache"                  # git-ignored full raw resp
 SNAPSHOTS = SOLAR / "sources" / "zone_stations"      # committed, trimmed raw (wave 0 only)
 ZONES_JSON = ROOT / "data" / "climate" / "tmy3_zones.json"
 NREL_KEY_FILE = ROOT / "secrets" / "nrel_api_key"    # git-ignored; see secrets/README.md
+REGIONS_JSON = SOLAR / "regions.json"                # ZIP regions, from build_solar_regions.py
+ZIP_TO_ZONE = ROOT / "data" / "climate" / "zip_to_zone.json"
 
 # NREL is now the National Laboratory of the Rockies; developer.nrel.gov no longer resolves (2026-09).
 PVWATTS_URL = "https://developer.nlr.gov/api/pvwatts/v8.json"
@@ -79,7 +81,14 @@ def region_sites(tag: str) -> list[dict]:
         return [{"site_key": f"zone:{z}", "lat": float(v["latitude"]), "lon": float(v["longitude"]),
                  "zone": z, "zip": None, "label": f"{v['reference_city']} ({v['tmy3_station']})"}
                 for z, v in zones.items() if not z.startswith("_")]
-    raise SystemExit(f"region {tag!r}: ZIP regions need the ZCTA centroid step (wave 1) — not built yet")
+    regions = json.loads(REGIONS_JSON.read_text(encoding="utf-8")) if REGIONS_JSON.exists() else {}
+    if tag not in regions:
+        raise SystemExit(f"region {tag!r} not in {REGIONS_JSON.relative_to(ROOT)} — run "
+                         f"scripts/build_solar_regions.py --region {tag} first")
+    zip_to_zone = json.loads(ZIP_TO_ZONE.read_text(encoding="utf-8"))
+    return [{"site_key": f"zip:{z}", "lat": v["lat"], "lon": v["lon"], "zone": zip_to_zone[z],
+             "zip": z, "label": f"ZIP {z} ({v['reason']})"}
+            for z, v in regions[tag]["zips"].items()]
 
 
 # ── Fetch (cached) ───────────────────────────────────────────────────────────────
@@ -180,6 +189,7 @@ def write(doc: dict) -> None:
 
 
 def main() -> None:
+    sys.stdout.reconfigure(encoding="utf-8")          # Windows console: allow → in help/labels
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--region", required=True, choices=sorted(SR.REGIONS))
     ap.add_argument("--api-key", default=None)
