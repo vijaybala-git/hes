@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "name": "No battery (self-consumption 80% -> 35%)",
+  "base": "04_sce_solar",
+  "description": "Trend offset on 04_sce_solar: battery off. Self-use is no longer a slider; until the Phase 7 energy balance it follows the battery switch (80% with, 35% without), so less solar offsets retail and journey opex rises.",
+  "values": {
+    "solar_battery_enabled": false
+  },
+  "expect": {
+    "cockpit.journey_cumulative_opex": "+"
+  }
+}

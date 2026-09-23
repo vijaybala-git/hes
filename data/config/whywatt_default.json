@@ -121,7 +121,6 @@
     "solar_kw_per_panel": 0.42,
     "solar_battery_enabled": true,
     "solar_battery_kwh": 13.5,
-    "solar_scf": 80,
     "solar_nem_mode": "nbt",
     "solar_nbc": 0.025,
     "solar_system_cost": 30000,

@@ -21,7 +21,7 @@ from ui.estimators import (
 from ui.device_style import DEVICE_STYLE, DEVICE_ORDER, dstyle, device_legend_handles
 from ui.slider import WhyWattSlider, SliderSpec
 from help_utils import HelpButton, ChartHelpButton, HelpPopupOverlay, HelpLink
-from journey import CATEGORY_ORDER, CATEGORY_LABELS, CapExOnlySlot, SolarBatteryConfig
+from journey import CATEGORY_ORDER, CATEGORY_LABELS, CapExOnlySlot, SolarBatteryConfig, interim_scf
 from home_config import HomeConfig, compute_baseload_kwh, compute_ua, suggest_hvac_tons
 from model import HESModel
 from panel_assessor import PanelAssessor
@@ -1525,8 +1525,7 @@ def SolarDetail(model):
     yield_kwh  = solar_res.ac_annual
     system_kw  = panels * kw_panel
     annual_kwh = system_kw * yield_kwh
-    scf_pct    = solar_scf.value
-    scf        = scf_pct / 100.0
+    scf        = interim_scf(solar_battery_enabled.value)   # fixed until the Phase 7 energy balance
     self_kwh   = annual_kwh * scf
     export_kwh = annual_kwh * (1.0 - scf)
     nem        = solar_nem_mode.value
@@ -1559,14 +1558,9 @@ def SolarDetail(model):
             with solara.Column(style=_BOX):
                 _DS("Battery &amp; Net Metering")
 
-                def _on_battery(enabled):
-                    solar_battery_enabled.set(enabled)
-                    solar_scf.set(80 if enabled else 35)
-
                 # Single line: [x] Battery  [13.5 kWh]  |  ⦿ NEM 3.0/NBT  ○ NEM 2.0
                 with solara.Row(gap="4px", style="align-items:center; flex-wrap:wrap"):
-                    _Check(label="Battery", value=solar_battery_enabled,
-                                    on_value=_on_battery)
+                    _Check(label="Battery", value=solar_battery_enabled)
                     if battery_on:
                         with solara.Column(style="width:80px; flex-shrink:0"):
                             solara.InputFloat("kWh", value=solar_battery_kwh)
@@ -1596,17 +1590,6 @@ def SolarDetail(model):
                        else f"Export: retail − ${solar_nbc.value:.3f}/kWh NBC")
                     + "</div>"
                 ))
-
-    # ── Row 3: Self-Consumption slider — full-width box ───────────────────────
-    with solara.Column(style=_BOX):
-        with solara.Row(gap="8px", style="align-items:center; flex-wrap:wrap"):
-            with solara.Column(style="flex:1; min-width:160px"):
-                _DSl("Self-use", solar_scf, _DEFAULTS["solar_scf"],
-                     10, 98, 1, unit="%")
-            solara.HTML(tag="div", unsafe_innerHTML=(
-                "<div style='font-size:0.73em; color:#888; min-width:120px;'>"
-                "Default: 80% with battery · 35% solar-only</div>"
-            ))
 
     # ── Row 4: Advanced (PVWatts) — 2 panels: [label+input | stat] with divider ─
     # Compute home need from final simulation year (fully-electrified state).

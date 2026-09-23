@@ -8,6 +8,18 @@ import mesa
 import numpy as np
 
 
+# Interim self-consumption (Phase 7 landing A/B): no longer user-editable — fixed by battery
+# presence, the values the retired UI "Self-use" slider snapped to. Replaced in commit C by the
+# hourly energy balance (docs/Phase7_Spec.md §0/§2), which COMPUTES self-use.
+INTERIM_SCF_WITH_BATTERY = 0.80
+INTERIM_SCF_SOLAR_ONLY   = 0.35
+
+
+def interim_scf(battery_enabled: bool) -> float:
+    """Self-consumption fraction until commit C: 0.80 with a battery, 0.35 solar-only."""
+    return INTERIM_SCF_WITH_BATTERY if battery_enabled else INTERIM_SCF_SOLAR_ONLY
+
+
 @dataclass
 class SolarConfig:
     """Solar array physics (Phase 6 WS2 §2a — split from SolarBatteryConfig).
@@ -20,7 +32,7 @@ class SolarConfig:
     """
     panels:          int   = 15       # number of panels (primary sizing input)
     kw_per_panel:    float = 0.42     # kW per panel (standard = 0.42, premium = 0.50)
-    scf:             float = 0.80     # self-consumption fraction (0–1); user-controlled slider
+    scf:             float = 0.80     # self-consumption fraction (0–1); interim_scf() until commit C
     nem_mode:        str   = "nbt"    # "nbt" (NEM 3.0, default) | "nem2" (existing pre-2023)
     nbc:             float = 0.025    # $/kWh non-bypassable charge (NEM 2.0 only)
 
@@ -36,8 +48,8 @@ class SolarConfig:
 @dataclass
 class BatteryConfig:
     """Battery storage (Phase 6 WS2 §2a). In Phase 6 it only labels/sizes the 'Solar + Battery'
-    capex slot and drives the UI self-use default-snap — the sim reads NOTHING from it (battery
-    presence affects self-consumption only through the UI, which sets SolarConfig.scf).
+    capex slot — the sim reads NOTHING from it directly (battery presence sets
+    SolarConfig.scf via interim_scf() in the UI wiring, until commit C).
     (Phase 7: battery_kwh + round-trip efficiency → dispatch physics that COMPUTES self-use.)
     """
     battery_enabled: bool  = True     # On by default — NEM 3.0 + battery is the new-install norm
@@ -442,7 +454,7 @@ class JourneyHome(mesa.Agent):
                 and solar_install_yr is not None
                 and current_year >= solar_install_yr):
             # Read the solar half only (Phase 6 WS2 §2a). Battery presence never enters the
-            # sim — it affects self-consumption solely through the UI, which sets solar.scf.
+            # sim — it sets solar.scf via interim_scf() (0.80 / 0.35) until commit C.
             solar = self._solar_config.solar
             # Phase 7 §1 commit A: per-ZIP PVWatts table, still summed to an annual figure and
             # priced at the annual-average rate below (monthly pricing is commit B).

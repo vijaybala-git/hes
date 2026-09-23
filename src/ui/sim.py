@@ -8,7 +8,7 @@ from climate_loader import ClimateLoader
 from rate_resolver import RateResolver
 from model import HESModel
 from home_config import HomeConfig
-from journey import CapExOnlySlot, SolarBatteryConfig
+from journey import CapExOnlySlot, SolarBatteryConfig, interim_scf
 from social_cost import SocialCostConfig
 from panel_assessor import PanelAssessor
 from projected_rate_source import PROJECTION_LABELS
@@ -390,7 +390,7 @@ def run_simulation():
         kw_per_panel=solar_kw_per_panel.value,
         battery_enabled=solar_battery_enabled.value,
         battery_kwh=solar_battery_kwh.value,
-        scf=solar_scf.value / 100.0,
+        scf=interim_scf(solar_battery_enabled.value),   # not user-editable (Phase 7)
         nem_mode=solar_nem_mode.value,
         nbc=solar_nbc.value,
     ) if solar_planned.value else None

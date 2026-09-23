@@ -599,8 +599,9 @@ The export rate depends on your net-metering era:
 
 ### Key assumptions
 
-- Self-consumption fraction defaults to 80% with a battery and 35% without — you can
-  adjust it directly. The battery default suggests 80% when enabled.
+- Self-consumption is set by the battery switch: 80% with a battery, 35% without. It is
+  not adjustable — an upcoming update calculates it hour by hour from your home's use,
+  your solar and your battery.
 - Yield assumes a typical roof system: fixed roof mount, 20° tilt, facing south, 14%
   losses. Across California it ranges from about 1,350 kWh per kW per year on the foggy
   north coast to about 1,840 in the desert; San José is about 1,640. Degradation,
@@ -616,7 +617,7 @@ The export rate depends on your net-metering era:
 - Yield — from your ZIP (San José area about 1,640 kWh per kW per year, so about
   10,350 kWh/yr for the default 6.3 kW system)
 - Battery storage — on, 13.5 kWh
-- Self-consumption — 80%
+- Self-consumption — 80% with battery, 35% without (not adjustable)
 - Net-metering mode — NEM 3.0 / NBT
 - Non-bypassable charge (NEM 2.0) — $0.025/kWh
 - Total installed cost — $30,000

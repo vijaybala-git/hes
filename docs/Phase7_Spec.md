@@ -334,7 +334,11 @@ to devices — **this changes no total, dispatch, or physics**. Convention:
 | **B — monthly pricing** | production `(12,)` × monthly retail / export rates; `scf` still applied per month | seasonal alignment (summer-heavy solar × summer rates) |
 | **C — energy balance** | §0 hourly energy balance, two battery modes + monthly picker; `scf` retired; battery physics live | self-consumption from physics + battery (all months Self-powered until §3 adds peak windows) |
 
-`scf` survives A and B *on purpose*, so neither diff mixes in the dispatch change. §3 (URDB TOU
+`scf` survives A and B *on purpose*, so neither diff mixes in the dispatch change — but **not as a
+user input**: the UI "Self-use" slider was removed with commit A (2026-09-22). Until C, `scf` is
+fixed by the battery switch via `journey.interim_scf()` — 0.80 with a battery, 0.35 without, the
+values the slider used to snap to — so the golden did not move; the `04__self_consumption_down`
+trend offset became `04__no_battery`. §3 (URDB TOU
 pricing of `grid[h]`) and §5 (escalation) land after C as their own commits.
 
 ### §3 — Peak / non-peak consumption split + URDB TOU rates
