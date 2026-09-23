@@ -5,7 +5,7 @@ through the model, and adopt the CEC projected-rate escalation as the default.
 **Follows:** Phase 6 (`docs/Phase6_Spec.md`) — Solar/Battery split, inert roof-geometry inputs, and
 the **non-default `cec_projection` rate hand-off interface** (evaluated but not switched). Offline
 PVWatts/URDB data is harvested and validated separately in `docs/OfflineSolarData_Plan.md`.
-**Last updated:** 2026-09-23 — §3 URDB TOU pricing landed as an option (`urdb_tou`; SCE
+**Last updated:** 2026-09-23 — added §4.1 UI rework review (utilities in Home Profile; current prices vs projection method; 15 issues incl. municipal-utility ZIP mis-resolution). Earlier 2026-09-23 — §3 URDB TOU pricing landed as an option (`urdb_tou`; SCE
 quarantined to EIA; golden unchanged). Earlier 2026-09-23 — added §6 **NREL End-Use Load Profiles** (planned, separate branch
 after this one; no interim fix to today's hourly load shapes). 2026-09-22 — solar **simulation interface** decided: `SolarResourceLoader` →
 `SolarResource` (clock time) as `HomeConfig.solar_resource`, `SolarConfig` = user choices only (§1);
@@ -459,6 +459,67 @@ selected tariff.
   work, when a unified plan-row can be coherent (it was deferred from 5.6 for exactly this moment).
 
 ---
+
+### §4.1 — UI rework: your utilities, current prices vs projection method (PLANNED — review 2026-09-23)
+
+**Requested (2026-09-23):**
+1. **Home Profile** shows, next to the climate-zone line, *your electricity utility* and *your gas
+   utility*. A ZIP we don't cover shows the fallback.
+2. **Home Energy Prices** splits into two things that today are one "rate model":
+   - **Current energy prices** (the *starting* price, per fuel). If we know the utility: a button
+     with its name + default plan, e.g. **"PG&E · E-TOU-C"**; clicking it offers the other plans.
+     If we don't: an EIA-based price.
+   - **Projection method** (how prices *grow*). Primary buttons: **WhyWatt Conservative / Moderate
+     / Stress** plus **EIA — Pacific**. **"My Utility" is removed.** **CA Average** and **ACC** move
+     to a dropdown under Details, and selecting either shows its escalation slider.
+3. EIA — Pacific curves for other regions are a **TODO** for beyond-CA.
+
+**Target model — two independent axes (the core change).** Today one enum (`elec_rate_model_a`
+= `cagr_flat` | `ca_average` | `acc_shaped` | `urdb_tou` | projection keys) sets *both* the starting
+price and its growth. The rework separates them:
+
+```
+StartingRate (per fuel, a HOME fact — shared by scenarios A and B)
+  electricity: URDB tariff (utility covered)  → RateStructure (tiers, peak window, fixed charge)
+               else EIA per-utility rate      → flat monthly level
+               else fallback (see issue 5)
+  gas:         EIA-176 per-LDC rate, else fallback            (no URDB for gas)
+Projection (per fuel, per scenario)  → escalation index idx[y], idx[0] = 1
+  whywatt_{conservative,moderate,stress} | eia_pacific      → series[y] / series[start year]
+  ca_average | acc (Details dropdown)                        → (1 + slider CAGR)^y
+Price in year y = StartingRate × idx[y]
+```
+
+**Issues we will run into (review 2026-09-23):**
+
+| # | Issue | Proposed handling |
+|---|---|---|
+| 1 | **No starting-rate abstraction.** Loaders (`RateLoader`, `ACCRateLoader`, `ProjectedRateSource`) each return a full `(n_years, 12)` array — level and growth fused. | New `StartingRate` + `Projection` objects; the model multiplies them. Refactor first with numbers unchanged. |
+| 2 | **Projection curves are price levels, not growth.** The bundle stores absolute $/kWh (PG&E Moderate starts at $0.386; EIA Pacific at $0.242 — a Pacific-wide average incl. WA/OR). Phase 6 used the level directly. | Use only the *shape*: `idx[y] = series[y] / series[sim start]`. The level comes from the home's own starting rate. Behaviour change vs Phase 6 — document it. |
+| 3 | **WhyWatt scenarios exist only for `CA_PGE`.** For SDG&E / SCE / others there is no curve. This conflicts with §5.1 (non-PG&E escalate on EIA Pacific). | **Decision needed:** (a) apply the PG&E index everywhere with a "PG&E-based" badge, or (b) keep §5.1 — WhyWatt buttons enabled for PG&E only, EIA Pacific the default elsewhere. |
+| 4 | **EIA Pacific is a single copy inside the `CA_PGE` market** (AEO Pacific census division). Beyond CA needs one curve per EIA region. Gas EIA Pacific *drops* 10% 2025→2026 before rising. | Treat as region-level data (`benchmarks` keyed by EIA region); **TODO beyond CA:** harvest AEO curves for all census divisions. Flag the first-year gas dip in help. |
+| 5 | **"EIA — Pacific (default)" mixes a price with a projection.** Today an uncovered ZIP starts from the **California-average EIA price ($0.32/kWh)**, and *out-of-state* ZIPs (e.g. 10001 NYC, 97201 Portland) also get the CA average — wrong outside CA. | Utility label: "Not covered — California average (EIA)"; projection defaults to EIA — Pacific. **TODO beyond CA:** EIA state (or division) average starting prices. |
+| 6 | **Municipal utilities resolve to PG&E.** `zip_to_electric_utility.json` holds only the three IOUs; a ZIP with *any* PG&E customers maps to PG&E. SMUD (95814), Silicon Valley Power (95050), Palo Alto CPAU (94301) all show **PG&E** (SMUD's rate is roughly half of PG&E's); LADWP ZIPs fall back to CA average. Becomes very visible once the UI says "Your utility". | Separate fix before/with the UI: add the non-IOU file, resolve multi-utility ZIPs by service share, show "Municipal utility — EIA rate" for munis; flag ambiguous ZIPs. |
+| 7 | **CA Average and ACC aren't projections today.** CA Average = CA-average *price* × CAGR; ACC = PG&E CPUC *base level* + ACC *monthly shape* + ACC CAGR. | In the new model both become "constant CAGR" projections (slider shown). ACC's monthly shape must **not** stack on a URDB starting rate (double-counts seasonality, §3) — with URDB, ACC is just a CAGR; with an EIA flat start it may keep its seasonal shape. **Decision needed:** keep the ACC shape at all, or drop it for simplicity? |
+| 8 | **Removing "My Utility" moves the default** — the current default is `cagr_flat` (EIA utility price × EIA historical CAGR, +7%/yr). The golden baseline, 12 regression cases, trend offsets (`01__elec_cagr_up`, `08__acc_*`), tests and **share links** all use the old keys. | Keep an internal `eia_historical` projection (not shown) so the refactor is golden-neutral; add a config migration map (old key → start + projection); make the default change its own commit (= §5's default flip). |
+| 9 | **Horizon & start year.** Bundle covers 2025–2050; a 30-year run from 2025 reaches 2054 and holds 2050 flat. `sim_start_year` can differ from 2025. | Index relative to `sim_start_year`; after 2050 continue at the last 5-year CAGR (not flat) — or keep flat and say so in help. |
+| 10 | **Base-year mismatch.** EIA per-utility prices are 2024; URDB tariffs are 2024–26 vintage; projections start 2025. | Treat the starting rate as the sim-start level; note ±1 year of vintage in help. |
+| 11 | **Gas has no URDB and one market.** The gas "button" is just the LDC (PG&E, SoCalGas, SDG&E) with no plan choices; WhyWatt gas scenarios (the gas-spiral curves) are PG&E-market. | Gas button shows the LDC name (no dropdown); same decision as issue 3 for non-PG&E gas. |
+| 12 | **NEM export credit escalation.** Today NEM 3.0 export = ACC avoided cost × CAGR, independent of the chosen projection. | Follow the electricity projection index (ties to §5's open "does the projection drive NEM export?"). |
+| 13 | **Scenario A/B.** The starting rate / tariff is a fact about the home; only the projection is a what-if. | One tariff picker (shared); projection chosen per scenario. |
+| 14 | **Labels.** Data has long names ("Pacific Gas & Electric"); URDB plan names are long. | Short-name map (PG&E, SCE, SDG&E, SoCalGas) + URDB `family` → "PG&E · E-TOU-C". |
+| 15 | **SCE is quarantined** (§3). | Button "SCE · EIA rate" (no plan dropdown) with the quarantine note until the re-harvest. |
+
+**Proposed sequence (each its own commit / golden story):**
+- **U1 — refactor to two axes, numbers identical** (internal `eia_historical` projection = today's
+  My Utility; old config keys migrated). Golden unchanged.
+- **U2 — UI rework** (Home Profile utilities; "Current energy prices" card with the utility/plan
+  button; "Projection method" card with WhyWatt ×3 + EIA — Pacific, CA Average / ACC in Details
+  with slider). Golden unchanged (defaults still map to today's behaviour).
+- **U3 — default starting rate → URDB tariff where covered** (golden diff).
+- **U4 — default projection → WhyWatt Moderate** (golden diff; this *is* §5's default flip).
+- **Separately:** municipal-utility ZIP resolution (issue 6) — ideally before U2 ships; SCE
+  re-harvest (§3); EIA regional curves + state starting prices (**TODO beyond CA**, issues 4–5).
 
 ### §5 — Adopt the CEC projected-rate escalation as the default (Phase 6 WS1 → live)
 
