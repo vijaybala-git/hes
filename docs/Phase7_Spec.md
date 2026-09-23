@@ -5,7 +5,9 @@ through the model, and adopt the CEC projected-rate escalation as the default.
 **Follows:** Phase 6 (`docs/Phase6_Spec.md`) — Solar/Battery split, inert roof-geometry inputs, and
 the **non-default `cec_projection` rate hand-off interface** (evaluated but not switched). Offline
 PVWatts/URDB data is harvested and validated separately in `docs/OfflineSolarData_Plan.md`.
-**Last updated:** 2026-09-22 — folded the URDB interface contract into §3 (`RateStructure` +
+**Last updated:** 2026-09-22 — §1 re-scoped to **per-ZIP** PVWatts yield at a single default
+orientation, harvested by CCA region; scalar `specific_yield` retired (roof geometry stays inert) per the revised
+`OfflineSolarData_Plan.md`. Earlier 2026-09-22: folded the URDB interface contract into §3 (`RateStructure` +
 `period_fractions`/`price_month`, coverage gate, ZIP→baseline crosswalk; offline half DONE per
 `OfflineURDB_Plan.md`) and added §5.1 (projection scoped to PG&E; SCE/SDG&E escalate on EIA Pacific
 until their projection markets are harvested post-P7). Prior: 2026-09-07 reconciled with the Phase 6
@@ -19,8 +21,8 @@ Replace the simplified placeholders Phase 6 left in place with **real, offline-b
 simulation data** from two new sources, and add a **peak / non-peak** dimension to consumption
 and pricing:
 
-1. **Solar generation from PVWatts** — per-CEC-zone monthly per-kW yield vectors replace the
-   scalar `specific_yield`. The Solar device emits a **(12,) monthly generation array**.
+1. **Solar generation from PVWatts** — per-ZIP monthly per-kW yield vectors (zone fallback)
+   replace the scalar `specific_yield`. The Solar device emits a **(12,) monthly generation array**.
 2. **Battery charge physics** — a real charge/discharge model self-consumes generation against
    the home's load instead of a flat `scf` fraction.
 3. **URDB peak / non-peak TOU rates with tiered slabs** — each device's monthly kWh is split
@@ -36,8 +38,8 @@ full US footprint of PVWatts + URDB; CA zones/tariffs are simply baked and valid
 
 | Concern | Phase 6 (placeholder) | Phase 7 (real data) |
 |---|---|---|
-| Solar production | `system_kw × specific_yield` (scalar/yr) | `system_kw × pvwatts_monthly_yield[12]` (per zone) |
-| Roof geometry | carried, inert | applied as orientation correction to the per-zone yield |
+| Solar production | `system_kw × specific_yield` (scalar/yr) | `system_kw × pvwatts_monthly_yield[12]` (per ZIP, zone fallback) |
+| Roof geometry | carried, inert | **still inert** — default orientation (tilt 20°, south); correction deferred |
 | Self-consumption | flat `scf` fraction | battery charge/discharge dispatch vs hourly/monthly load |
 | Rates | EIA flat / ACC effective monthly | URDB peak + non-peak, tiered slabs |
 | Consumption shape | one monthly stream `(12,)` | peak + non-peak split via 24h device shapes |
@@ -86,7 +88,7 @@ window that is mostly *off*-peak, which is what makes the battery valuable):
 - **HDD/CDD** (monthly) ÷ days-in-month → representative-day HVAC energy, distributed across
   hours by the `hvac_heat` / `hvac_cool` shapes.
 - **Solar**: `daily_gen[m] = ac_monthly[m] / days`, placed into periods by the
-  **intra-day solar shape** harvested in `OfflineSolarData_Plan.md` §4a.
+  **intra-day solar shape** harvested in `OfflineSolarData_Plan.md` §4b (per ZIP).
 
 **Dispatch waterfall** (locked decisions in brackets):
 ```
@@ -101,8 +103,8 @@ OFF-PEAK:      grid → load @ off-peak;  [grid→battery arbitrage OFF by defau
    path); revisit only for battery-without-solar cases.
 2. **3-period representative-day granularity** — not 24-h or 8760-h. Transparent and cheap;
    loses within-period timing detail (acceptable for an advocacy simulator).
-3. **Solar placement uses the offline intra-day shape** (`OfflineSolarData_Plan.md` §4a) —
-   accurate solar-window vs peak-tail split per zone/month.
+3. **Solar placement uses the offline intra-day shape** (`OfflineSolarData_Plan.md` §4b) —
+   accurate solar-window vs peak-tail split per ZIP/month.
 
 **Net cost assembly (electricity):**
 ```
@@ -160,19 +162,38 @@ to devices — **this changes no total, dispatch, or physics**. Convention:
 - Implementation: a single presentation helper, downstream of the model — never inside the
   dispatch or the bill.
 
-### §1 — PVWatts solar generation (offline-baked monthly yield)
+### §1 — PVWatts solar generation (offline-baked per-ZIP yield)
 
-- **Data:** already harvested, validated, and committed in `OfflineSolarData_Plan.md` §4a
-  (`data/solar/pvwatts_zones.json` — per-zone per-kW monthly yield + provenance). Phase 7
-  *consumes* it; no re-harvest unless the curated zone list expands.
-- **Model:** `SolarConfig.monthly_production_kwh()` = `system_kw × zone_yield[12]`. The Solar
-  device now emits a real seasonal generation curve (summer-peaked).
-- **Roof geometry:** apply `roof_tilt`/`roof_azimuth`/`array_type`/`module_type` as a
-  correction on the default-orientation per-zone vector (analytical factor or a small baked
-  orientation-adjustment table). `system_losses` scales output.
-- **Validation:** annual sum of monthly yields ≈ today's `specific_yield` for CZ4 default
-  orientation (sanity); CA coastal vs inland zones differ as expected (~1,400 vs ~1,650
-  kWh/kW/yr).
+- **Data:** harvested, validated, and committed per `OfflineSolarData_Plan.md`
+  (`data/solar/pvwatts_zip.json` — per-site per-kW `ac_monthly[12]` + 12×24 `intraday_shape`,
+  default orientation, provenance). Built up region by region (SVCE → PCE + SJCE → …); Phase 7
+  *consumes* whatever waves exist. No runtime network.
+- **Resolution — always a table, never a scalar:** `zips[zip].site` (harvested region), else the
+  ZIP's CEC-zone station table (`zones[zone].site`, all 16 baked in wave 0), else the CZ4 default
+  table. Never throws; the resolved level (`zip` / `zone` / `default`) is surfaced for display.
+  **No address is ever collected.** Loaded by the model from `HomeConfig.zip_code` and **injected**
+  into `SolarConfig` (Hard rule 2 — devices never read data files).
+- **Model:** `SolarConfig.monthly_production_kwh()` = `system_kw × ac_monthly[12]` (**monthly
+  variation**), with `system_kw = panels × kw_per_panel` (existing tunables). `intraday_shape`
+  (**daily variation**) places each month's generation into the §0 periods.
+- **Retire `specific_yield` / `solar_specific_yield` entirely** — no scalar default, no per-home
+  override. Remove it from `SolarConfig` + `SolarBatteryConfig` (`src/journey.py`, incl. the
+  `system_kw × specific_yield` production line), `src/ui/state.py`, `config.py` bounds,
+  `panels.py` (the yield input + the "annual kWh" estimate, which now reads Σ `ac_monthly`),
+  `layout.py`, `sim.py`, and `data/config/whywatt_default.json`. Old share links / saved configs
+  carrying `solar_specific_yield` are **ignored** (dropped on load, not an error). The UI shows the
+  resolved yield read-only: *"≈ 1,5xx kWh/kW/yr — PVWatts, ZIP 95014"* (or *"… zone CZ4
+  estimate"* when on fallback).
+- **Tests to rework:** `tests/test_journey.py` (`SolarBatteryConfig` round-trips that pass
+  `specific_yield=1650.0`) and regression offset `tests/regression/offsets/04__sunnier_site.json`
+  (`solar_specific_yield: 1700`) — re-express "sunnier site" as a **ZIP change** to a sunnier
+  zone (e.g., an inland/desert ZIP resolving to its zone-station table).
+- **Roof geometry:** stays **inert** (single default orientation: fixed roof, tilt 20°,
+  azimuth 180°, 14% losses). Orientation correction is deferred past Phase 7 — the advocacy
+  message ("even ~4 kW + battery is a big win") does not depend on it.
+- **Validation:** CZ4 default table annual within ±10% of the retired 1,500 (continuity check);
+  coastal vs inland differ as expected (~1,400 vs ~1,650 kWh/kW/yr); `grep -rn specific_yield
+  src/ data/ tests/` returns zero.
 
 ### §2 — Battery charge/discharge physics
 
@@ -252,7 +273,8 @@ selected tariff.
 - New/updated charts: monthly solar generation curve; peak vs non-peak consumption + cost
   split; battery self-consumption vs export. Update Help (`solar.html`, rate help) to describe
   the new model.
-- Home Profile roof-geometry inputs (inert in P6) become **live**.
+- Home Profile roof-geometry inputs **remain inert** (default orientation, §1). The yield field
+  shows the ZIP's PVWatts annual and its source (ZIP / zone fallback).
 - Rate-model selector gains a **URDB TOU** option alongside today's EIA/ACC/CAGR modes and the
   `cec_projection` option added (non-default) in Phase 6 — which §5 now promotes to the default.
 - **Plan-button consolidation (Spec 5.6 #6)** lands here, alongside the Solar/Battery/Panel UI
@@ -326,7 +348,7 @@ src/
   ui/charts.py          solar-monthly / peak-offpeak / battery-dispatch charts
   data/config/whywatt_default.json   default rate model cagr_flat → cec_projection (§5)
 data/
-  solar/pvwatts_zones.json     (from OfflineSolarData_Plan) now CONSUMED by SolarConfig
+  solar/pvwatts_zip.json       (from OfflineSolarData_Plan) now CONSUMED by SolarConfig
   rates/urdb_tou.json          (from OfflineURDB_Plan, DONE) now CONSUMED by URDBRateStructure
   rates/urdb_coverage.json     (from OfflineURDB_Plan, DONE) the "can we use URDB?" gate
   rates/urdb_baseline_crosswalk.json (from OfflineURDB_Plan, DONE) ZIP→territory baselines
@@ -335,7 +357,7 @@ data/
 scripts/
   build_urdb*.py / build_baseline_crosswalk.py  (OfflineURDB, DONE; re-run to add utilities)
 tests/
-  test_solar_pvwatts.py (NEW) monthly yield, orientation correction, coverage
+  test_solar_pvwatts.py (NEW) ZIP→zone→default table resolution, monthly yield, no-scalar gate
   test_battery.py       (NEW) dispatch physics, self-consumption vs export
   test_urdb_rates.py    (NEW) URDBRateStructure: period_fractions + price_month + tier slabs + fallback
   regression/golden.json  re-baselined (output changes intentionally)
@@ -346,7 +368,9 @@ tests/
 - ✅ Battery dispatch fidelity → **3-period representative-day**, scaled by days-in-month.
 - ✅ Battery charge source → **solar only**; stored energy reserved for peak.
 - ✅ Tiered slabs → apply on the **monthly grid-import total** (billing-accurate).
-- ✅ Solar placement into periods → **offline intra-day shape** (PVWatts hourly, `OfflineSolarData_Plan.md` §4a).
+- ✅ Solar placement into periods → **offline intra-day shape** (PVWatts hourly, `OfflineSolarData_Plan.md` §4b).
+- ✅ Solar geo granularity → **per ZIP** (ZCTA centroid), zone-station fallback; no address, no
+  live API. Orientation correction → **deferred** (default orientation). Scalar `specific_yield` → **retired**.
 - ✅ Per-device $ allocation for charts → **gross period-priced grid-cost share** (§0.2).
 - ✅ URDB interface → **`RateStructure` + `period_fractions`/`price_month`**, coverage gate + baseline
   crosswalk (offline DONE, §3); rate-model selector maps ZIP → utility → tariff picker.
@@ -355,7 +379,6 @@ tests/
 
 ## Still open (resolve during Phase 7)
 
-- Orientation correction: analytical factor vs a small baked tilt/azimuth adjustment table.
 - Round-trip efficiency value + whether a battery charge-rate (kW) cap matters at this grain.
 - Mid-day "super-off-peak" period (SCE/SDG&E) is folded into off-peak by the 2-rate model — confirm
   acceptable, or extend to 3 billing periods later.
@@ -365,10 +388,12 @@ tests/
 - **SCE/SDG&E rate-projection markets** — extend the offline "Rate Projections" harvest (manual
   spreadsheet step) with `CA_SCE`/`CA_SDGE`, then flip those ZIPs off the EIA-Pacific fallback (§5.1).
 - URDB coverage beyond CA (national ZIP crosswalk + harvest of maintained utilities).
+- **Solar orientation correction** — make roof tilt/azimuth live (baked per-zone orientation
+  factors + orientation-specific intra-day shapes; west-facing shifts output toward peak).
 
 ## Definition of done
 
-- [ ] PVWatts per-zone monthly yields baked + committed with provenance; Solar device emits (12,).
+- [ ] PVWatts tables consumed (ZIP → zone → default, never a scalar); `specific_yield` removed from model/UI/config; Solar device emits (12,).
 - [ ] Battery dispatch physics produce self-consumption/export from real load.
 - [ ] URDB `RateStructure` consumed: `period_fractions` split via real per-tariff peak hours,
       `price_month` slabs on the home aggregate, coverage gate + ZIP→baseline resolved (offline DONE).
@@ -377,5 +402,5 @@ tests/
 - [ ] `cec_projection` promoted to the default rate model for PG&E (§5); NEM/social extension recorded.
 - [ ] Golden re-baselined with documented diff — escalation switch (§5) and TOU structure (§3) as
       separate, attributable commits; full `pytest` green.
-- [ ] Charts + Help updated; roof geometry live.
+- [ ] Charts + Help updated (roof geometry remains inert — default orientation).
 - [ ] CLAUDE.md updated: Phase 7 closed.
