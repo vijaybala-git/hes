@@ -180,6 +180,9 @@ solar_panels           = solara.reactive(_DEFAULTS["solar_panels"])       # prim
 solar_kw_per_panel     = solara.reactive(_DEFAULTS["solar_kw_per_panel"])     # detail: standard=0.42, premium=0.50
 solar_battery_enabled  = solara.reactive(_DEFAULTS["solar_battery_enabled"])     # On = NEM 3.0 default
 solar_battery_kwh      = solara.reactive(_DEFAULTS["solar_battery_kwh"])     # detail: one Powerwall-class unit
+solar_battery_rte_pct  = solara.reactive(_DEFAULTS["solar_battery_rte_pct"])      # round-trip efficiency %
+solar_battery_power_kw = solara.reactive(_DEFAULTS["solar_battery_power_kw"])     # charge/discharge limit kW
+solar_battery_grid_charging = solara.reactive(_DEFAULTS["solar_battery_grid_charging"])  # Cost-saving top-up
 solar_nem_mode         = solara.reactive(_DEFAULTS["solar_nem_mode"])    # "nbt" (NEM 3.0) | "nem2" (existing)
 solar_nbc              = solara.reactive(_DEFAULTS["solar_nbc"])    # $/kWh NBC for NEM 2.0 only
 solar_system_cost      = solara.reactive(_DEFAULTS["solar_system_cost"])    # total installed cost from contractor quote
@@ -365,6 +368,9 @@ def reset_to_defaults():
     solar_kw_per_panel.set(_DEFAULTS["solar_kw_per_panel"])
     solar_battery_enabled.set(_DEFAULTS["solar_battery_enabled"])
     solar_battery_kwh.set(_DEFAULTS["solar_battery_kwh"])
+    solar_battery_rte_pct.set(_DEFAULTS["solar_battery_rte_pct"])
+    solar_battery_power_kw.set(_DEFAULTS["solar_battery_power_kw"])
+    solar_battery_grid_charging.set(_DEFAULTS["solar_battery_grid_charging"])
     solar_nem_mode.set(_DEFAULTS["solar_nem_mode"])
     solar_nbc.set(_DEFAULTS["solar_nbc"])
     solar_system_cost.set(_DEFAULTS["solar_system_cost"])

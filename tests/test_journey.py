@@ -906,10 +906,12 @@ def test_solar_battery_split_decomposes_and_round_trips():
     from journey import SolarConfig, BatteryConfig, SolarBatteryConfig
     sbc = SolarBatteryConfig(panels=12, kw_per_panel=0.50,
                              battery_enabled=False, battery_kwh=10.0,
-                             nem_mode="nem2", nbc=0.03, scf=0.35)
-    assert sbc.solar == SolarConfig(panels=12, kw_per_panel=0.50,
-                                    scf=0.35, nem_mode="nem2", nbc=0.03)
-    assert sbc.battery == BatteryConfig(battery_enabled=False, battery_kwh=10.0)
+                             nem_mode="nem2", nbc=0.03, round_trip_eff=0.85,
+                             power_kw=7.0, grid_charging=False)
+    assert sbc.solar == SolarConfig(panels=12, kw_per_panel=0.50, nem_mode="nem2", nbc=0.03)
+    assert sbc.battery == BatteryConfig(battery_enabled=False, battery_kwh=10.0,
+                                        round_trip_eff=0.85, power_kw=7.0, grid_charging=False)
+    assert sbc.battery.params().cap_kwh == 0.0          # switched off → no capacity
     assert sbc.solar.system_kw == 12 * 0.50
     # from_parts rebuilds an equal shim
     rebuilt = SolarBatteryConfig.from_parts(sbc.solar, sbc.battery)
@@ -918,7 +920,7 @@ def test_solar_battery_split_decomposes_and_round_trips():
 
 @pytest.mark.parametrize("kwargs", [
     dict(panels=15, battery_enabled=True, nem_mode="nbt"),        # default battery config
-    dict(panels=15, battery_enabled=False, scf=0.35, nem_mode="nbt"),  # solar-only
+    dict(panels=15, battery_enabled=False, nem_mode="nbt"),            # solar-only
     dict(panels=20, kw_per_panel=0.50, nem_mode="nem2", nbc=0.03),
 ])
 def test_split_reproduces_solar_battery_numerics(kwargs):

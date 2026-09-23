@@ -575,10 +575,26 @@ pre-computed for your ZIP code — or, where your ZIP hasn't been added yet, for
 reference weather station of your California climate zone. It is shown read-only under
 Advanced (PVWatts), with where it came from.
 
-Self-consumption split:
+Hour by hour, on a typical day for each month:
 
-  self-used kWh = production × self_consumption_fraction
-  exported  kWh = production × (1 − self_consumption_fraction)
+- Your solar supplies the home first.
+- Leftover solar charges the battery; anything the battery can't take is exported.
+- The battery covers the home when solar falls short; the utility covers the rest.
+
+The home's hourly use comes from each appliance's monthly electricity spread over its
+typical daily pattern (EV charging overnight, heating mornings and evenings, and so on), so
+the share of your solar you use yourself is calculated — it grows as you electrify.
+
+A battery can run in two standard modes. Each month WhyWatt uses whichever saves more:
+
+- Self-powered — use your own solar first; the battery covers the home whenever solar
+  falls short.
+- Cost-saving — keep the battery for the evening peak; if solar hasn't filled it, top it
+  up from the grid when the price gap makes that worthwhile (you can switch grid charging
+  off).
+
+With today's single-rate electricity prices the battery always runs Self-powered; the
+Cost-saving mode comes into play with time-of-use rates.
 
 Yearly savings:
 
@@ -599,9 +615,10 @@ The export rate depends on your net-metering era:
 
 ### Key assumptions
 
-- Self-consumption is set by the battery switch: 80% with a battery, 35% without. It is
-  not adjustable — an upcoming update calculates it hour by hour from your home's use,
-  your solar and your battery.
+- Self-consumption is calculated, not entered. A gas home with little electric use
+  exports most of its solar at first; as you electrify, more of it is used at home.
+- The battery loses about 10% of what it stores (90% round-trip efficiency) and charges or
+  discharges at up to 5 kW; both are adjustable under the battery settings.
 - Yield assumes a typical roof system: fixed roof mount, 20° tilt, facing south, 14%
   losses. Across California it ranges from about 1,350 kWh per kW per year on the foggy
   north coast to about 1,840 in the desert; San José is about 1,640. Degradation,
@@ -617,7 +634,8 @@ The export rate depends on your net-metering era:
 - Yield — from your ZIP (San José area about 1,640 kWh per kW per year, so about
   10,350 kWh/yr for the default 6.3 kW system)
 - Battery storage — on, 13.5 kWh
-- Self-consumption — 80% with battery, 35% without (not adjustable)
+- Battery efficiency — 90% round trip; power — 5 kW; grid charging — on (used only when
+  it saves money)
 - Net-metering mode — NEM 3.0 / NBT
 - Non-bypassable charge (NEM 2.0) — $0.025/kWh
 - Total installed cost — $30,000

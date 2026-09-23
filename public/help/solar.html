@@ -51,8 +51,23 @@
     <p>System production:</p>
 <p>annual production kWh = system_kW × yield for your ZIP system_kW = number_of_panels × kW_per_panel</p>
 <p>The yield (kWh per kW per year, month by month) comes from NREL's PVWatts calculator, pre-computed for your ZIP code — or, where your ZIP hasn't been added yet, for the reference weather station of your California climate zone. It is shown read-only under Advanced (PVWatts), with where it came from.</p>
-<p>Self-consumption split:</p>
-<p>self-used kWh = production × self_consumption_fraction exported  kWh = production × (1 − self_consumption_fraction)</p>
+<p>Hour by hour, on a typical day for each month:</p>
+<ul>
+<li>Your solar supplies the home first.</li>
+<li>Leftover solar charges the battery; anything the battery can't take is exported.</li>
+<li>The battery covers the home when solar falls short; the utility covers the rest.</li>
+</ul>
+<p>The home's hourly use comes from each appliance's monthly electricity spread over its typical daily pattern (EV charging overnight, heating mornings and evenings, and so on), so the share of your solar you use yourself is calculated — it grows as you electrify.</p>
+<p>A battery can run in two standard modes. Each month WhyWatt uses whichever saves more:</p>
+<ul>
+<li>Self-powered — use your own solar first; the battery covers the home whenever solar</li>
+</ul>
+<p>falls short.</p>
+<ul>
+<li>Cost-saving — keep the battery for the evening peak; if solar hasn't filled it, top it</li>
+</ul>
+<p>up from the grid when the price gap makes that worthwhile (you can switch grid charging off).</p>
+<p>With today's single-rate electricity prices the battery always runs Self-powered; the Cost-saving mode comes into play with time-of-use rates.</p>
 <p>Yearly savings:</p>
 <p>savings = (self-used kWh × retail_rate) + (exported kWh × export_rate)</p>
 <p>Savings are capped at your actual electricity spending that year — solar cannot reduce your bill below zero.</p>
@@ -70,9 +85,13 @@
 
     <h2 id="key-assumptions">Key assumptions</h2>
     <ul>
-<li>Self-consumption is set by the battery switch: 80% with a battery, 35% without. It is</li>
+<li>Self-consumption is calculated, not entered. A gas home with little electric use</li>
 </ul>
-<p>not adjustable — an upcoming update calculates it hour by hour from your home's use, your solar and your battery.</p>
+<p>exports most of its solar at first; as you electrify, more of it is used at home.</p>
+<ul>
+<li>The battery loses about 10% of what it stores (90% round-trip efficiency) and charges or</li>
+</ul>
+<p>discharges at up to 5 kW; both are adjustable under the battery settings.</p>
 <ul>
 <li>Yield assumes a typical roof system: fixed roof mount, 20° tilt, facing south, 14%</li>
 </ul>
@@ -92,7 +111,10 @@
 <p>10,350 kWh/yr for the default 6.3 kW system)</p>
 <ul>
 <li>Battery storage — on, 13.5 kWh</li>
-<li>Self-consumption — 80% with battery, 35% without (not adjustable)</li>
+<li>Battery efficiency — 90% round trip; power — 5 kW; grid charging — on (used only when</li>
+</ul>
+<p>it saves money)</p>
+<ul>
 <li>Net-metering mode — NEM 3.0 / NBT</li>
 <li>Non-bypassable charge (NEM 2.0) — $0.025/kWh</li>
 <li>Total installed cost — $30,000</li>

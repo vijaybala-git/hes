@@ -62,6 +62,32 @@ DEVICE_ACC_CATEGORY: dict[str, str] = {
     "Dishwasher":          "baseload",
 }
 
+def _hourly_load_shapes() -> dict:
+    """{device class: (24,) clock-hour shape summing to 1} for the Phase 7 energy balance.
+
+    Same 24-h profiles the ACC rate weighting uses (data/rates/device_load_shapes.json), but
+    normalised: there they are relative weights (some sum to ~1.26); here they spread a
+    device's monthly kWh over the representative day, so each must sum to exactly 1.
+    """
+    raw = json.loads((_DATA / "rates" / "device_load_shapes.json").read_text(encoding="utf-8"))
+    prof = {k: np.asarray(v, dtype=float) for k, v in raw["profiles"].items()}
+    norm = {k: v / v.sum() for k, v in prof.items()}
+    shapes = {cls: norm.get(cat, norm["flat"]) for cls, cat in DEVICE_ACC_CATEGORY.items()}
+    shapes["_default"] = norm["flat"]
+    return shapes
+
+
+_HOURLY_LOAD_SHAPES: dict | None = None
+
+
+def hourly_load_shapes() -> dict:
+    """Process-wide cache of _hourly_load_shapes()."""
+    global _HOURLY_LOAD_SHAPES
+    if _HOURLY_LOAD_SHAPES is None:
+        _HOURLY_LOAD_SHAPES = _hourly_load_shapes()
+    return _HOURLY_LOAD_SHAPES
+
+
 # All electric ACC categories that need pre-computed rate arrays
 _ELEC_ACC_CATEGORIES = ["hpwh", "hvac_heat", "hvac_cool", "ev", "baseload", "flat"]
 
@@ -516,6 +542,7 @@ class HESModel(mesa.Model):
                                          solar_config=solar_config,
                                          solar_export_rates=solar_export_rates,
                                          solar_resource=self.solar_resource,
+                                         hourly_load_shapes=hourly_load_shapes(),
                                          elec_rates_by_category=elec_by_cls_a,
                                          gasoline_rates=_gasoline_rates,
                                          external_ev_rates=_external_ev_rates)
@@ -559,6 +586,7 @@ class HESModel(mesa.Model):
                                                solar_config=solar_config,
                                                solar_export_rates=solar_export_rates,
                                                solar_resource=self.solar_resource,
+                                               hourly_load_shapes=hourly_load_shapes(),
                                                elec_rates_by_category=elec_by_cls_b,
                                                gasoline_rates=_gasoline_rates,
                                                external_ev_rates=_external_ev_rates)

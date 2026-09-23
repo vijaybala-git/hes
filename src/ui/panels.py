@@ -21,7 +21,8 @@ from ui.estimators import (
 from ui.device_style import DEVICE_STYLE, DEVICE_ORDER, dstyle, device_legend_handles
 from ui.slider import WhyWattSlider, SliderSpec
 from help_utils import HelpButton, ChartHelpButton, HelpPopupOverlay, HelpLink
-from journey import CATEGORY_ORDER, CATEGORY_LABELS, CapExOnlySlot, SolarBatteryConfig, interim_scf
+from journey import CATEGORY_ORDER, CATEGORY_LABELS, CapExOnlySlot, SolarBatteryConfig
+from dispatch import battery_mode_summary
 from home_config import HomeConfig, compute_baseload_kwh, compute_ua, suggest_hvac_tons
 from model import HESModel
 from panel_assessor import PanelAssessor
@@ -1525,9 +1526,10 @@ def SolarDetail(model):
     yield_kwh  = solar_res.ac_annual
     system_kw  = panels * kw_panel
     annual_kwh = system_kw * yield_kwh
-    scf        = interim_scf(solar_battery_enabled.value)   # fixed until the Phase 7 energy balance
-    self_kwh   = annual_kwh * scf
-    export_kwh = annual_kwh * (1.0 - scf)
+    # Self-use is an OUTPUT of the hourly energy balance (Phase 7 §0/§2) — read from the model's
+    # final simulated year once it has run; "—" before that.
+    self_kwh = export_kwh = batt_kwh = grid_chg_kwh = None
+    battery_modes = []
     nem        = solar_nem_mode.value
     battery_on = solar_battery_enabled.value
     credit_label = "ACC credit" if nem == "nbt" else "NEM 2.0 credit"
@@ -1564,6 +1566,10 @@ def SolarDetail(model):
                     if battery_on:
                         with solara.Column(style="width:80px; flex-shrink:0"):
                             solara.InputFloat("kWh", value=solar_battery_kwh)
+                        with solara.Column(style="width:70px; flex-shrink:0"):
+                            solara.InputFloat("kW", value=solar_battery_power_kw)
+                        with solara.Column(style="width:70px; flex-shrink:0"):
+                            solara.InputInt("Eff. %", value=solar_battery_rte_pct)
                     # Thin separator
                     solara.HTML(tag="span", unsafe_innerHTML=(
                         "<span style='color:#C5CAE9; margin:0 4px;'>|</span>"
@@ -1584,6 +1590,9 @@ def SolarDetail(model):
                             ),
                         )
 
+                if battery_on:
+                    _Check(label="Charge from grid when it saves money",
+                           value=solar_battery_grid_charging)
                 solara.HTML(tag="div", unsafe_innerHTML=(
                     "<div style='font-size:0.73em; color:#888; margin-top:2px;'>"
                     + ("Export: ACC avoided cost (~$0.06/kWh avg)" if nem == "nbt"
@@ -1608,9 +1617,17 @@ def SolarDetail(model):
                 if final_idx < len(cons_h) and final_idx < len(fuel_h):
                     if fuel_h[final_idx] == "electricity":
                         total_elec += cons_h[final_idx]
+            if (final_idx < len(jh.solar_production_kwh_history)
+                    and jh.solar_production_kwh_history[final_idx] > 0):
+                self_kwh      = jh.solar_self_consumed_history[final_idx]
+                export_kwh    = jh.solar_exported_kwh_history[final_idx]
+                batt_kwh      = jh.battery_discharge_history[final_idx]
+                grid_chg_kwh  = jh.battery_charge_grid_history[final_idx]
+                battery_modes = jh.battery_mode_history[final_idx]
             if total_elec > 0:
                 home_need_kwh = total_elec
-                solar_coverage_pct = min(100, int(self_kwh / total_elec * 100))
+                if self_kwh is not None:
+                    solar_coverage_pct = min(100, int(self_kwh / total_elec * 100))
 
     with solara.Column(style=_BOX):
         _DS("Advanced (PVWatts)")
@@ -1656,7 +1673,7 @@ def SolarDetail(model):
 
             # Build optional home-need rows
             need_rows = ""
-            if home_need_kwh is not None:
+            if home_need_kwh is not None and solar_coverage_pct is not None:
                 cov_color = "#1D9E75" if solar_coverage_pct >= 80 else (
                     "#F57C00" if solar_coverage_pct >= 50 else "#C62828")
                 need_rows = (
@@ -1671,6 +1688,12 @@ def SolarDetail(model):
                     f"</tr>"
                 )
 
+            _kwh = lambda v: "—" if v is None else f"{v:,.0f}"          # noqa: E731
+            _yr_note = f" (yr {final_sim_yr})" if self_kwh is not None else " (run the model)"
+            _batt_row = (
+                f"<tr><td style='{_td_l}'>&nbsp;&nbsp;…via battery</td>"
+                f"<td style='{_td_r}'>{_kwh(batt_kwh)} kWh</td></tr>"
+                if battery_on and batt_kwh is not None else "")
             with solara.Column(style="flex:1; min-width:140px"):
                 solara.HTML(tag="div", unsafe_innerHTML=(
                     f"<table style='width:100%; border-collapse:collapse;'>"
@@ -1678,14 +1701,19 @@ def SolarDetail(model):
                     f"  <td style='{_td_l}'>Gross production</td>"
                     f"  <td style='{_td_r}'><b>{annual_kwh:,.0f}</b> kWh</td>"
                     f"</tr><tr>"
-                    f"  <td style='{_td_l}'>Self-consumed</td>"
-                    f"  <td style='{_td_r}'><b>{self_kwh:,.0f}</b> kWh"
+                    f"  <td style='{_td_l}'>Self-consumed{_yr_note}</td>"
+                    f"  <td style='{_td_r}'><b>{_kwh(self_kwh)}</b> kWh"
                     f"  <span style='color:#888; font-size:0.9em'>&nbsp;→ retail</span></td>"
-                    f"</tr><tr>"
+                    f"</tr>{_batt_row}<tr>"
                     f"  <td style='{_td_l}'>Exported</td>"
-                    f"  <td style='{_td_r}'><b>{export_kwh:,.0f}</b> kWh"
+                    f"  <td style='{_td_r}'><b>{_kwh(export_kwh)}</b> kWh"
                     f"  <span style='color:#888; font-size:0.9em'>&nbsp;→ {credit_label}</span></td>"
                     f"</tr>{need_rows}</table>"
+                    + (f"<div style='font-size:0.74em; color:#888; margin-top:4px;'>"
+                       f"Battery: {battery_mode_summary(battery_modes)}"
+                       + (f" · {grid_chg_kwh:,.0f} kWh/yr charged from grid"
+                          if grid_chg_kwh else "") + "</div>"
+                       if battery_on and battery_modes else "")
                 ))
 
         # Payback line (only once model has run)

@@ -205,6 +205,7 @@ RANGES = {
     "cooktop_induction_kwh_per_meal": (0.0, 20.0), "cooktop_meals_per_week": (0, 100),
     "solar_panels": (0, 200), "solar_kw_per_panel": (0.05, 2.0),
     "solar_battery_kwh": (0.0, 200.0), "solar_nbc": (0.0, 1.0),
+    "solar_battery_rte_pct": (50, 100), "solar_battery_power_kw": (0.5, 50.0),
     "elec_cagr_pct_a": _PCT, "acc_elec_cagr_a": _PCT, "gas_cagr_pct_a": _PCT, "acc_gas_cagr_a": _PCT,
     "elec_cagr_pct_b": _PCT, "acc_elec_cagr_b": _PCT, "gas_cagr_pct_b": _PCT, "acc_gas_cagr_b": _PCT,
     "social_climate_rate": (0.0, 100.0), "social_health_rate": (0.0, 100.0),

@@ -7,32 +7,21 @@ from typing import Optional
 import mesa
 import numpy as np
 
+from dispatch import dispatch_month
 
-# Interim self-consumption (Phase 7 landing A/B): no longer user-editable — fixed by battery
-# presence, the values the retired UI "Self-use" slider snapped to. Replaced in commit C by the
-# hourly energy balance (docs/Phase7_Spec.md §0/§2), which COMPUTES self-use.
-INTERIM_SCF_WITH_BATTERY = 0.80
-INTERIM_SCF_SOLAR_ONLY   = 0.35
-
-
-def interim_scf(battery_enabled: bool) -> float:
-    """Self-consumption fraction until commit C: 0.80 with a battery, 0.35 solar-only."""
-    return INTERIM_SCF_WITH_BATTERY if battery_enabled else INTERIM_SCF_SOLAR_ONLY
+_DAYS_IN_MONTH = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 
 
 @dataclass
 class SolarConfig:
-    """Solar array physics (Phase 6 WS2 §2a — split from SolarBatteryConfig).
+    """Solar array (Phase 6 WS2 §2a — split from SolarBatteryConfig). User choices only.
 
-    Owns everything the sim prices off: size → production, the self-consumption fraction,
-    and the NEM export-credit rule. Generation is physically distinct from storage, so it is
-    its own config; the JourneyHome solar step reads only this.
-    User choices only (Phase 7 §1): production per kW comes from the home's location —
-    HomeConfig.solar_resource (PVWatts per-ZIP table) — never from a field here.
+    Production per kW comes from the home's location — HomeConfig.solar_resource (PVWatts
+    per-ZIP table) — and self-consumption is an OUTPUT of the hourly energy balance
+    (dispatch.py, Phase 7 §0/§2), never a field here.
     """
     panels:          int   = 15       # number of panels (primary sizing input)
     kw_per_panel:    float = 0.42     # kW per panel (standard = 0.42, premium = 0.50)
-    scf:             float = 0.80     # self-consumption fraction (0–1); interim_scf() until commit C
     nem_mode:        str   = "nbt"    # "nbt" (NEM 3.0, default) | "nem2" (existing pre-2023)
     nbc:             float = 0.025    # $/kWh non-bypassable charge (NEM 2.0 only)
 
@@ -40,30 +29,31 @@ class SolarConfig:
     def system_kw(self) -> float:
         return self.panels * self.kw_per_panel
 
-    @property
-    def self_consumption_fraction(self) -> float:
-        return self.scf
-
 
 @dataclass
 class BatteryConfig:
-    """Battery storage (Phase 6 WS2 §2a). In Phase 6 it only labels/sizes the 'Solar + Battery'
-    capex slot — the sim reads NOTHING from it directly (battery presence sets
-    SolarConfig.scf via interim_scf() in the UI wiring, until commit C).
-    (Phase 7: battery_kwh + round-trip efficiency → dispatch physics that COMPUTES self-use.)
-    """
+    """Home battery — live physics in the hourly energy balance (Phase 7 §2)."""
     battery_enabled: bool  = True     # On by default — NEM 3.0 + battery is the new-install norm
-    battery_kwh:     float = 13.5     # usable battery capacity (one Powerwall-class unit)
+    battery_kwh:     float = 13.5     # usable capacity (one Powerwall-class unit)
+    round_trip_eff:  float = 0.90     # energy out / energy in (√η on charge and on discharge)
+    power_kw:        float = 5.0      # charge / discharge limit
+    grid_charging:   bool  = True     # Cost-saving mode may top up from the grid when it pays
+
+    def params(self):
+        """dispatch.BatteryParams for this battery (capacity 0 when switched off)."""
+        from dispatch import BatteryParams
+        return BatteryParams(cap_kwh=self.battery_kwh if self.battery_enabled else 0.0,
+                             round_trip_eff=self.round_trip_eff, power_kw=self.power_kw,
+                             grid_charging=self.grid_charging)
 
 
 @dataclass
 class SolarBatteryConfig:
     """Back-compat composition shim over SolarConfig + BatteryConfig (Phase 6 WS2 §2a).
 
-    Keeps the original flat constructor and attributes so model.py / ui/sim.py wiring and every
-    existing test are unchanged and numerically identical. The `.solar` / `.battery` accessors
-    expose the two split configs; the JourneyHome solar step now reads `.solar`. In Phase 7 the
-    wiring migrates to pass the two configs directly and this shim can be retired.
+    Keeps the flat constructor used by model.py / ui/sim.py wiring and tests. `.solar` /
+    `.battery` expose the two split configs. Retiring the shim is a pure refactor (no numbers
+    change), deferred to its own commit after Phase 7 commit C.
     """
     panels:          int   = 15
     kw_per_panel:    float = 0.42
@@ -71,34 +61,33 @@ class SolarBatteryConfig:
     battery_kwh:     float = 13.5
     nem_mode:        str   = "nbt"
     nbc:             float = 0.025
-    scf:             float = 0.80
+    round_trip_eff:  float = 0.90
+    power_kw:        float = 5.0
+    grid_charging:   bool  = True
 
     @property
     def system_kw(self) -> float:
         return self.panels * self.kw_per_panel
 
     @property
-    def self_consumption_fraction(self) -> float:
-        return self.scf
-
-    @property
     def solar(self) -> SolarConfig:
-        """The solar half — the only part the sim prices off."""
-        return SolarConfig(panels=self.panels, kw_per_panel=self.kw_per_panel, scf=self.scf,
+        return SolarConfig(panels=self.panels, kw_per_panel=self.kw_per_panel,
                            nem_mode=self.nem_mode, nbc=self.nbc)
 
     @property
     def battery(self) -> BatteryConfig:
-        """The battery half — capex/label only in Phase 6."""
-        return BatteryConfig(battery_enabled=self.battery_enabled, battery_kwh=self.battery_kwh)
+        return BatteryConfig(battery_enabled=self.battery_enabled, battery_kwh=self.battery_kwh,
+                             round_trip_eff=self.round_trip_eff, power_kw=self.power_kw,
+                             grid_charging=self.grid_charging)
 
     @classmethod
     def from_parts(cls, solar: SolarConfig, battery: BatteryConfig) -> "SolarBatteryConfig":
         """Compose the shim from the two split configs (round-trips with .solar/.battery)."""
         return cls(panels=solar.panels, kw_per_panel=solar.kw_per_panel,
-                   battery_enabled=battery.battery_enabled,
-                   battery_kwh=battery.battery_kwh, nem_mode=solar.nem_mode, nbc=solar.nbc,
-                   scf=solar.scf)
+                   battery_enabled=battery.battery_enabled, battery_kwh=battery.battery_kwh,
+                   nem_mode=solar.nem_mode, nbc=solar.nbc,
+                   round_trip_eff=battery.round_trip_eff, power_kw=battery.power_kw,
+                   grid_charging=battery.grid_charging)
 
 # Category constants shared across journey and model layers
 CATEGORY_ORDER  = ["Baseload", "WaterHeating", "HVAC_Cooling", "HVAC_Heating", "Transportation"]
@@ -292,6 +281,7 @@ class JourneyHome(mesa.Agent):
                  solar_config: SolarBatteryConfig | None = None,
                  solar_export_rates: np.ndarray | None = None,
                  solar_resource=None,
+                 hourly_load_shapes: dict | None = None,
                  elec_rates_by_category: dict | None = None,
                  gasoline_rates: np.ndarray | None = None,
                  external_ev_rates: np.ndarray | None = None):
@@ -316,6 +306,9 @@ class JourneyHome(mesa.Agent):
         self._solar_config       = solar_config        # SolarBatteryConfig | None
         self._solar_export_rates = solar_export_rates  # (n_years, 12) | None
         self._solar_resource     = solar_resource      # SolarResource | None (Phase 7 §1)
+        # {device class name: (24,) clock-hour shape summing to 1, "_default": flat} — spreads
+        # each electric device's monthly kWh over the representative day (Phase 7 §0.1).
+        self._hourly_load_shapes = hourly_load_shapes or {}
         if solar_config is not None and solar_resource is None:
             raise ValueError("solar_config requires solar_resource (HomeConfig.solar_resource)")
         self.is_baseline_home = is_baseline_home
@@ -329,6 +322,14 @@ class JourneyHome(mesa.Agent):
         self.solar_production_kwh_history: list = []  # kWh/yr gross production
         self.solar_self_consumed_history:  list = []  # kWh/yr self-consumed
         self.solar_exported_kwh_history:   list = []  # kWh/yr exported
+        # Phase 7 §0/§2 energy balance (kWh/yr unless noted)
+        self.solar_direct_history:         list = []  # solar → home, same hour
+        self.battery_discharge_history:    list = []  # battery → home
+        self.battery_charge_grid_history:  list = []  # grid → battery (Cost-saving top-up)
+        self.battery_losses_history:       list = []  # round-trip losses
+        self.grid_import_kwh_history:      list = []  # utility → home + battery (with solar)
+        self.battery_mode_history:         list = []  # per year: 12 × "self" | "cost"
+        self.solar_monthly_bills_history:  list = []  # per year: 12 × {mode: $} (each mode run)
         self.gasoline_gallons_history: list = []  # annual gallons (transportation slot)
         self.external_ev_kwh_history:  list = []  # annual external (public) EV charging kWh
         self.external_ev_cost_history: list = []  # annual external EV charging cost ($)
@@ -367,6 +368,8 @@ class JourneyHome(mesa.Agent):
         year_gasoline_gallons  = 0.0
         year_external_ev_kwh   = 0.0
         year_external_ev_cost  = 0.0
+        # (12, 24)-ready: monthly home-meter electric kWh per device class (Phase 7 §0.1)
+        year_elec_load_by_class: dict = {}
 
         for slot in self.slots:
             cost = slot.step(current_year, elec_r, gas_r, self.is_baseline_home,
@@ -400,6 +403,11 @@ class JourneyHome(mesa.Agent):
                     self.monthly_consumption_history_by_slot[slot.name].append(np.zeros(12))
                     self.monthly_cost_history_by_slot[slot.name].append(np.zeros(12))
                 if active_dev.fuel_type == "electricity":
+                    home_monthly = (np.asarray(mc[-1], dtype=float) if mc else
+                                    np.full(12, active_dev.history["consumption"][-1] / 12.0))
+                    cls = type(active_dev).__name__
+                    year_elec_load_by_class[cls] = (year_elec_load_by_class.get(cls, 0.0)
+                                                    + home_monthly)
                     # §3.13 — external EV charging is NOT on the home meter; exclude it
                     # from elec opex so the §8 solar cap can't offset public charging.
                     year_elec_opex += cost - slot_ext_cost
@@ -453,31 +461,51 @@ class JourneyHome(mesa.Agent):
         if (self._solar_config is not None
                 and solar_install_yr is not None
                 and current_year >= solar_install_yr):
-            # Read the solar half only (Phase 6 WS2 §2a). Battery presence never enters the
-            # sim — it sets solar.scf via interim_scf() (0.80 / 0.35) until commit C.
+            # Phase 7 §0/§2 — hourly energy balance on a representative day per month.
+            # Solar: per-ZIP PVWatts (clock time). Load: each electric device's monthly
+            # home-meter kWh spread by its 24-h shape. Battery: two modes, cheaper per month.
             solar = self._solar_config.solar
-            # Phase 7 §1 — per-ZIP PVWatts table, priced MONTH BY MONTH (landing step B):
-            # summer-heavy production meets that month's retail and export rates instead of
-            # the year's average. Self-use is still interim_scf() until the energy balance (C).
-            monthly_production = solar.system_kw * self._solar_resource.ac_monthly   # (12,) kWh
-            scf = solar.self_consumption_fraction   # 0.80 battery, 0.35 solar-only
-
-            monthly_self   = monthly_production * scf
-            monthly_export = monthly_production * (1.0 - scf)
-
-            # Retail: this year's (12,) monthly rates. In ACC mode self._elec_rates is the flat
-            # profile → equals retail.
+            battery = self._solar_config.battery.params()
+            res = self._solar_resource
+            monthly_production = solar.system_kw * res.ac_monthly                  # (12,) kWh
             retail_by_month = self._elec_rates[year_idx]
-            # Export credit from the pre-built (n_years,12) array.
             # NEM 3.0: ACC avoided-cost $/kWh.  NEM 2.0: retail minus NBC.
             export_by_month = (self._solar_export_rates[year_idx]
                                if self._solar_export_rates is not None else np.zeros(12))
 
-            retail_savings = float(monthly_self   @ retail_by_month)
-            export_credit  = float(monthly_export @ export_by_month)
+            direct = discharge = charge_grid = losses = grid_import = exported = 0.0
+            retail_savings = export_credit = 0.0
+            modes, bills = [], []
+            default_shape = self._hourly_load_shapes.get("_default", np.full(24, 1.0 / 24))
+            for m in range(12):
+                days = _DAYS_IN_MONTH[m]
+                G = monthly_production[m] / days * res.intraday_shape[m]
+                L = np.zeros(24)
+                for cls, kwh in year_elec_load_by_class.items():
+                    L = L + kwh[m] / days * self._hourly_load_shapes.get(cls, default_shape)
+                r = float(retail_by_month[m])
+                # Flat retail until URDB TOU pricing (§3) supplies peak windows → Self-powered.
+                mr = dispatch_month(G, L, battery, days=days, mode="auto", peak_hours=(),
+                                    r_peak=r, r_offpeak=r, export_rate=float(export_by_month[m]))
+                d = mr.day
+                exp_m = float(d.export.sum()) * days
+                grid_m = float(d.grid_import.sum()) * days
+                # Saving vs the same month with no solar/battery: load − grid import at retail
+                # (grid charging adds import) plus the export credit.
+                retail_savings += (float(L.sum()) * days - grid_m) * r
+                export_credit  += exp_m * float(export_by_month[m])
+                direct      += float(d.solar_direct.sum()) * days
+                discharge   += float(d.discharge.sum()) * days
+                charge_grid += float(d.charge_grid.sum()) * days
+                losses      += d.losses * days
+                grid_import += grid_m
+                exported    += exp_m
+                modes.append(mr.mode)
+                bills.append(mr.bills)
+
             annual_production_kwh = float(monthly_production.sum())
-            self_consumed_kwh     = float(monthly_self.sum())
-            exported_kwh          = float(monthly_export.sum())
+            self_consumed_kwh     = direct + discharge
+            exported_kwh          = exported
             # Cap at the year's actual electricity spend — solar can't take the bill below zero
             # (annual, like a NEM true-up: summer credits carry to winter within the year).
             solar_saving = min(retail_savings + export_credit, year_elec_opex)
@@ -486,12 +514,21 @@ class JourneyHome(mesa.Agent):
             self_consumed_kwh     = 0.0
             exported_kwh          = 0.0
             solar_saving          = 0.0
+            direct = discharge = charge_grid = losses = grid_import = 0.0
+            modes, bills = [], []
 
         year_opex -= solar_saving
         self.solar_savings_history.append(solar_saving)
         self.solar_production_kwh_history.append(annual_production_kwh)
         self.solar_self_consumed_history.append(self_consumed_kwh)
         self.solar_exported_kwh_history.append(exported_kwh)
+        self.solar_direct_history.append(direct)
+        self.battery_discharge_history.append(discharge)
+        self.battery_charge_grid_history.append(charge_grid)
+        self.battery_losses_history.append(losses)
+        self.grid_import_kwh_history.append(grid_import)
+        self.battery_mode_history.append(modes)
+        self.solar_monthly_bills_history.append(bills)
 
         self.annual_opex      = year_opex
         self.cumulative_opex += year_opex
