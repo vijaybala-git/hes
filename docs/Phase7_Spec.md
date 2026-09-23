@@ -5,7 +5,11 @@ through the model, and adopt the CEC projected-rate escalation as the default.
 **Follows:** Phase 6 (`docs/Phase6_Spec.md`) — Solar/Battery split, inert roof-geometry inputs, and
 the **non-default `cec_projection` rate hand-off interface** (evaluated but not switched). Offline
 PVWatts/URDB data is harvested and validated separately in `docs/OfflineSolarData_Plan.md`.
-**Last updated:** 2026-09-22 — §1 re-scoped to **per-ZIP** PVWatts yield at a single default
+**Last updated:** 2026-09-22 — solar **simulation interface** decided: `SolarResourceLoader` →
+`SolarResource` (clock time) as `HomeConfig.solar_resource`, `SolarConfig` = user choices only (§1);
+`scf` retired for an **hourly Solar → Battery → Utility energy balance** with export of excess (§0,
+§2 — revises two kickoff decisions: 3-period → hourly, reserved-for-peak → greedy); landing as
+three commits A/B/C. Earlier 2026-09-22: §1 re-scoped to **per-ZIP** PVWatts yield at a single default
 orientation, harvested by CCA region; scalar `specific_yield` retired (roof geometry stays inert) per the revised
 `OfflineSolarData_Plan.md`. Earlier 2026-09-22: folded the URDB interface contract into §3 (`RateStructure` +
 `period_fractions`/`price_month`, coverage gate, ZIP→baseline crosswalk; offline half DONE per
@@ -24,7 +28,8 @@ and pricing:
 1. **Solar generation from PVWatts** — per-ZIP monthly per-kW yield vectors (zone fallback)
    replace the scalar `specific_yield`. The Solar device emits a **(12,) monthly generation array**.
 2. **Battery charge physics** — a real charge/discharge model self-consumes generation against
-   the home's load instead of a flat `scf` fraction.
+   the home's load instead of a flat `scf` fraction: load is served Solar → Battery → Utility,
+   excess solar is exported, and self-consumption becomes an output (§0, §2).
 3. **URDB peak / non-peak TOU rates with tiered slabs** — each device's monthly kWh is split
    into peak vs non-peak (via the existing 24-hour load shapes) and priced against
    peak/non-peak rates with slabs.
@@ -40,7 +45,7 @@ full US footprint of PVWatts + URDB; CA zones/tariffs are simply baked and valid
 |---|---|---|
 | Solar production | `system_kw × specific_yield` (scalar/yr) | `system_kw × pvwatts_monthly_yield[12]` (per ZIP, zone fallback) |
 | Roof geometry | carried, inert | **still inert** — default orientation (tilt 20°, south); correction deferred |
-| Self-consumption | flat `scf` fraction | battery charge/discharge dispatch vs hourly/monthly load |
+| Self-consumption | flat `scf` fraction (user slider) | **output** of an hourly Solar → Battery → Utility energy balance; `scf` retired |
 | Rates | EIA flat / ACC effective monthly | URDB peak + non-peak, tiered slabs |
 | Consumption shape | one monthly stream `(12,)` | peak + non-peak split via 24h device shapes |
 | Data sources | harvested + reviewed (unconsumed) | the same baked files now **consumed** by the model |
@@ -69,48 +74,55 @@ full US footprint of PVWatts + URDB; CA zones/tariffs are simply baked and valid
 
 This is the spine §1–§3 plug into. It makes the net-cost calculation transparent and auditable.
 
-**Representative-day-per-month spine.** For each month *m* we build **one representative day**,
-compute energy + cost, then multiply by days-in-month and sum over 12 months. This is required
-because a battery (~13.5 kWh) only makes sense against a *daily* cycle, not a monthly kWh total.
+**Representative-day-per-month spine.** For each month *m* we build **one representative day**
+of **24 clock hours**, run the energy balance hour by hour, then multiply by days-in-month and sum
+over 12 months (12 × 24 = 288 steps per simulated year). This is required because a battery
+(~13.5 kWh) only makes sense against a *daily* cycle, not a monthly kWh total.
 
-**Three daily periods** (CA TOU has three meaningful ones, not two — solar generates in a
-window that is mostly *off*-peak, which is what makes the battery valuable):
+**Three sources, one fixed order (revised 2026-09-22 — replaces the flat `scf`).** Load is served
+**Solar → Battery → Utility**; solar in excess of load charges the battery, and whatever the
+battery cannot take is **exported**:
 
-| Period | Typical hours | Role |
-|---|---|---|
-| **Solar window** | midday | solar serves load → charges battery → exports surplus |
-| **Peak** | ~4–9pm | battery discharges to load → grid covers shortfall at **peak slab** |
-| **Off-peak** | overnight/morning | grid serves load at **off-peak rate**; battery reserved for peak |
-
-**How the inputs land in periods (per representative day in month m):**
-- Each device's monthly kWh splits into the three periods via its 24-h **load shape**
-  (`period_frac = Σ shape over that period's hours`).
-- **HDD/CDD** (monthly) ÷ days-in-month → representative-day HVAC energy, distributed across
-  hours by the `hvac_heat` / `hvac_cool` shapes.
-- **Solar**: `daily_gen[m] = ac_monthly[m] / days`, placed into periods by the
-  **intra-day solar shape** harvested in `OfflineSolarData_Plan.md` §4b (per ZIP).
-
-**Dispatch waterfall** (locked decisions in brackets):
 ```
-SOLAR WINDOW:  solar → load;  surplus → battery [charge from SOLAR ONLY];  remainder → export
-PEAK:          battery → load (discharge);  shortfall → grid @ peak slab
-OFF-PEAK:      grid → load @ off-peak;  [grid→battery arbitrage OFF by default]
-               battery energy is RESERVED for peak (max bill savings)
+for each month m, representative day, clock hour h = 0..23:
+  G[h] = system_kw × ac_monthly[m] / days[m] × shape_clock[m][h]      # solar generation (§1)
+  L[h] = Σ_devices kWh[m] / days[m] × load_shape_d[h]                  # home electric load
+  direct    = min(G[h], L[h])                                          # 1. solar → load
+  surplus   = G[h] − direct ;  deficit = L[h] − direct
+  charge    = min(surplus, (cap − soc) / √η, p_max)                    #    solar → battery
+  soc      += charge × √η
+  export    = surplus − charge                                         #    excess → grid
+  discharge = min(deficit, soc × √η, p_max)                            # 2. battery → load
+  soc      -= discharge / √η
+  grid      = deficit − discharge                                      # 3. utility → load
 ```
+- **Steady state:** the representative day is run twice and the second pass is kept, so the
+  battery's start-of-day charge equals its end-of-day charge (no free energy from an initial SOC).
+- **Battery parameters:** `cap = battery_kwh` (usable), `η` = round-trip efficiency (default 0.90,
+  split √η on charge and discharge), `p_max` = charge/discharge power cap (default 5 kW —
+  Powerwall-class). No battery → `cap = 0`, and the balance reduces to solar → load → export.
+- **Outputs per month:** `direct`, `discharge`, `export`, `grid[h]` (24-vector). `grid[h]` is
+  what §3 prices; `export` is what earns the NEM credit.
 
-**Locked decisions (Phase 7 kickoff):**
-1. **Battery charges from solar only** — off-peak grid arbitrage is off by default (the dashed
-   path); revisit only for battery-without-solar cases.
-2. **3-period representative-day granularity** — not 24-h or 8760-h. Transparent and cheap;
-   loses within-period timing detail (acceptable for an advocacy simulator).
-3. **Solar placement uses the offline intra-day shape** (`OfflineSolarData_Plan.md` §4b) —
-   accurate solar-window vs peak-tail split per ZIP/month.
+**Locked decisions (Phase 7 kickoff, revised 2026-09-22):**
+1. **Battery charges from solar only** — no grid→battery arbitrage (revisit only for
+   battery-without-solar cases).
+2. **Hourly representative day** (24 clock hours × 12 months) — *replaces* the original
+   3-period granularity. Both inputs are already hourly (the 24-h device load shapes and the
+   PVWatts 12×24 solar shape), so collapsing to 3 periods only threw information away.
+3. **Greedy self-consumption order Solar → Battery → Utility** — *replaces* "battery reserved for
+   peak". The battery discharges whenever solar falls short, which in practice is the evening
+   4–9pm peak first (matches a home battery's default self-powered mode). A peak-reserve /
+   TOU-arbitrage mode is a possible later option, not Phase 7.
+4. **Solar placement uses the offline intra-day shape** (`OfflineSolarData_Plan.md` §4b),
+   converted to clock time once by the loader (§1).
 
 **Net cost assembly (electricity):**
 ```
-net_elec = Σ_m days[m] × ( grid_peak_kWh[m]    × peak_rate (with SLABS on the monthly total)
-                         + grid_offpeak_kWh[m] × offpeak_rate )
-         − Σ_m days[m] ×   export_kWh[m]       × export_credit[m]
+grid_peak_kWh[m]    = days[m] × Σ_{h ∈ tariff.peak_hours[m]} grid[m][h]
+grid_offpeak_kWh[m] = days[m] × Σ_{h ∉ tariff.peak_hours[m]} grid[m][h]
+net_elec = Σ_m price_month(m, grid_peak_kWh[m], grid_offpeak_kWh[m])   # SLABS on the monthly total (§3)
+         − Σ_m days[m] × export[m] × export_credit[m]
 ```
 - **Slabs tier on the monthly grid-import total** (tier 1 → tier 2 …), a whole-home quantity —
   not per device, not per day.
@@ -121,13 +133,10 @@ net_elec = Σ_m days[m] × ( grid_peak_kWh[m]    × peak_rate (with SLABS on the
 
 What a device can and cannot "own" splits cleanly into three tiers:
 
-1. **kWh is per-device, exact.** Every electric device carries a **3-way monthly split** of its
-   kWh — solar-window / peak / off-peak — derived from its 24-h load shape
-   (`period_frac = Σ shape over that period's hours`). No allocation, pure physics. (Gas
-   devices carry monthly therms only — no period split.)
-   - *3 buckets for the dispatch, 2 rates for the bill:* solar-window and off-peak grid import
-     are both billed at the **off-peak rate**; the solar-window bucket is tracked separately
-     only because solar/battery can serve it directly (overnight load can't get that).
+1. **kWh is per-device, exact.** Every electric device's monthly kWh is spread over the 24 clock
+   hours of the representative day by its 24-h load shape (`data/rates/device_load_shapes.json`).
+   No allocation, pure physics. (Gas devices carry monthly therms only — no hourly split.) The
+   home load `L[h]` in §0 is the sum over devices.
 
 2. **Gross cost is per-device only when nothing whole-home interferes.** With flat-per-period
    rates and no solar/battery, `cost = peak_kWh×peak_rate + offpeak_bucket_kWh×offpeak_rate` is
@@ -171,11 +180,49 @@ to devices — **this changes no total, dispatch, or physics**. Convention:
 - **Resolution — always a table, never a scalar:** `zips[zip].site` (harvested region), else the
   ZIP's CEC-zone station table (`zones[zone].site`, all 16 baked in wave 0), else the CZ4 default
   table. Never throws; the resolved level (`zip` / `zone` / `default`) is surfaced for display.
-  **No address is ever collected.** Loaded by the model from `HomeConfig.zip_code` and **injected**
-  into `SolarConfig` (Hard rule 2 — devices never read data files).
-- **Model:** `SolarConfig.monthly_production_kwh()` = `system_kw × ac_monthly[12]` (**monthly
-  variation**), with `system_kw = panels × kw_per_panel` (existing tunables). `intraday_shape`
-  (**daily variation**) places each month's generation into the §0 periods.
+  **No address is ever collected.**
+- **The interface (decided 2026-09-22).** Location data and user choices are kept apart:
+
+  ```
+  data/solar/pvwatts_zip.json        baked, committed; _meta.schema_version checked at load
+          │  read once per process
+          ▼
+  SolarResourceLoader                src/solar_loader.py — module singleton (like _CLIMATE_LOADER);
+          │  .resolve(zip)           ZIP → zone → default; validates shapes; converts to clock time
+          ▼
+  SolarResource  (frozen)            location data only — never user-edited, never serialized
+          │
+  HomeConfig.solar_resource          derived read-only property from zip_code (like climate_zone);
+          │                          not a dataclass field → never in share links / saved configs
+          ▼
+  JourneyHome solar step             production[m] = SolarConfig.system_kw × resource.ac_monthly[m]
+  ```
+
+  ```python
+  @dataclass(frozen=True)
+  class SolarResource:
+      ac_monthly:     np.ndarray  # (12,)   kWh AC per kW DC
+      intraday_shape: np.ndarray  # (12,24) CLOCK time (Mar–Oct shifted +1 h for DST); rows sum to 1
+      level:    str               # "zip" | "zone" | "default"
+      zip_code: str; zone_key: str; site_key: str
+      label:    str               # "PVWatts · ZIP 94040" | "PVWatts · CZ4 zone estimate"
+      source:   str               # "PVWatts v8 · NSRDB tmy-2020 · built 2026-09-22"
+      @property
+      def ac_annual(self) -> float: ...
+  ```
+  - **`SolarConfig` holds user choices only** (panels, kW/panel, NEM mode, NBC) — it is what share
+    links and saved configs carry. `specific_yield` and `scf` both leave it (§1, §2).
+  - **`HomeConfig.solar_resource`** is the single place the home's location becomes solar data
+    (Hard rule 6). It is a property, not a field: always consistent with `zip_code`, never
+    persisted. Devices still never read files (Hard rule 2) — only the loader does.
+  - **Clock time is applied once, in the loader.** The file keeps PVWatts' native local standard
+    time; the loader shifts March–October by +1 h so every consumer (dispatch, URDB peak hours,
+    charts) sees the same clock hours. Month-level DST approximation, same as the review notebook.
+  - **Missing/corrupt file or unknown `schema_version` is a hard error** (the file is committed;
+    a gap is a bug, caught by tests). Unknown/out-of-state ZIPs are *not* errors → `level="default"`.
+- **Model:** production `(12,)` = `system_kw × ac_monthly` (**monthly variation**), with
+  `system_kw = panels × kw_per_panel`. `intraday_shape` (**daily variation**) spreads each month's
+  generation over the §0 representative day.
 - **Retire `specific_yield` / `solar_specific_yield` entirely** — no scalar default, no per-home
   override. Remove it from `SolarConfig` + `SolarBatteryConfig` (`src/journey.py`, incl. the
   `system_kw × specific_yield` production line), `src/ui/state.py`, `config.py` bounds,
@@ -198,17 +245,33 @@ to devices — **this changes no total, dispatch, or physics**. Convention:
 
 ### §2 — Battery charge/discharge physics
 
-- **Replace flat `scf`** with a dispatch model over the home's load. Inputs:
-  `battery_kwh` (usable capacity), round-trip efficiency, monthly generation (§1), and the
-  home's monthly + peak/non-peak load (§3). Discharge preferentially offsets **peak** load;
-  surplus generation that can't be stored is **exported**.
-- Output the same history arrays (`solar_self_consumed_history`, `solar_exported_kwh_history`)
-  but now physically derived. Self-consumption rises with battery size and with peak-aligned
-  loads.
-- Keep the model deterministic (no Monte Carlo — still deferred). Granularity is the **3-period
-  representative-day** dispatch from §0 (solar-window / peak / off-peak), scaled by days-in-month
-  — not 24-h or 8760-h. Battery charges from **solar only** and its stored energy is **reserved
-  for peak**.
+- **Retire `scf` (the self-consumption fraction) entirely.** It was a stand-in for physics we now
+  have: with three sources consumed in order **Solar → Battery → Utility** and excess exported
+  (§0), self-consumption is an *output*, not an input. Remove `SolarConfig.scf`, the UI "Self-use"
+  slider and its 80/35 battery snap (`src/ui/panels.py`, `state.py`, `config.py`, `layout.py`,
+  `sim.py`), and `solar_scf` from `whywatt_default.json`; stale share-link values are dropped.
+- **Battery config becomes live physics:** `BatteryConfig(battery_enabled, battery_kwh,
+  round_trip_eff=0.90, power_kw=5.0)`. `battery_enabled=False` ⇒ `cap = 0`. The
+  `SolarBatteryConfig` shim is retired; `HESModel` takes `SolarConfig` + `BatteryConfig` directly.
+- **Outputs** keep the existing history arrays, now physically derived and reported as an
+  energy balance that closes exactly:
+  `production = solar_direct + battery_charge + export` and
+  `load = solar_direct + battery_discharge + grid_import`, with
+  `battery_discharge = battery_charge × η` (steady state). `solar_self_consumed_history` =
+  `solar_direct + battery_discharge`; self-consumption rises with battery size and with
+  evening-heavy load.
+- Deterministic (no Monte Carlo). Granularity and order are §0's hourly representative day.
+
+### Landing sequence — three commits, one golden-baseline diff each (decided 2026-09-22)
+
+| Commit | Change | Golden diff attributable to |
+|---|---|---|
+| **A — data source** | `SolarResourceLoader` + `HomeConfig.solar_resource`; `specific_yield` retired; production = `system_kw × Σ ac_monthly`, still priced with today's annual-average rates and today's `scf` | ZIP-specific yield only (CZ4 ≈ +10%: 1,644 vs 1,500) |
+| **B — monthly pricing** | production `(12,)` × monthly retail / export rates; `scf` still applied per month | seasonal alignment (summer-heavy solar × summer rates) |
+| **C — energy balance** | §0 hourly Solar → Battery → Utility dispatch; `scf` retired; battery physics live | self-consumption from physics + battery |
+
+`scf` survives A and B *on purpose*, so neither diff mixes in the dispatch change. §3 (URDB TOU
+pricing of `grid[h]`) and §5 (escalation) land after C as their own commits.
 
 ### §3 — Peak / non-peak consumption split + URDB TOU rates
 
@@ -240,8 +303,10 @@ class URDBRateStructure:                       # rate_loader.py
   differ — baked per tariff) dotted with `data/rates/device_load_shapes.json` — the existing ACC
   hourly machinery. Per device, no dollars, so tiers/solar can't leak into a device.
 - **Pricing** (`price_month`) is the only place tiers apply, and runs **once on the home aggregate**
-  (the marginal tier depends on total home import, §0.1). Solar (§1) + battery (§2) reduce the
-  **peak** bucket first. Per-device $ for charts comes from the §0.2 allocation helper.
+  (the marginal tier depends on total home import, §0.1). It prices the **post-dispatch** hourly
+  grid import `grid[h]` from §0 — solar and battery have already reduced load hour by hour, so
+  whichever hours they cover (mostly the evening peak, for the battery) drop out of the bill
+  naturally. Per-device $ for charts comes from the §0.2 allocation helper.
 - A **flat tariff** (`is_tou:false` — e.g. tiered legacy E-1) has empty `peak_hours` and
   `peak==offpeak`, so it collapses to the revenue-neutral flat case (Invariant 4).
 
@@ -275,7 +340,13 @@ selected tariff.
   split; battery self-consumption vs export. Update Help (`solar.html`, rate help) to describe
   the new model.
 - Home Profile roof-geometry inputs **remain inert** (default orientation, §1). The yield field
-  shows the ZIP's PVWatts annual and its source (ZIP / zone fallback).
+  shows the ZIP's PVWatts annual and its source (ZIP / zone fallback), read from
+  `HomeConfig.solar_resource`.
+- **Solar/Battery panel:** the "Self-use" slider (`scf`) and its 80/35 battery snap are removed;
+  self-consumption is now *reported* (from the §0 balance), not entered. Battery inputs are size
+  (kWh) and on/off, with round-trip efficiency and power cap under Details.
+- New energy-balance readout / chart per year: solar → home, solar → battery → home, export,
+  grid import (the four flows of §0).
 - Rate-model selector gains a **URDB TOU** option alongside today's EIA/ACC/CAGR modes and the
   `cec_projection` option added (non-default) in Phase 6 — which §5 now promotes to the default.
 - **Plan-button consolidation (Spec 5.6 #6)** lands here, alongside the Solar/Battery/Panel UI
@@ -340,7 +411,11 @@ Phase 6 evaluation; NEM/social extension decisions are recorded.
 
 ```
 src/
-  journey.py            SolarConfig → monthly yield; BatteryConfig → dispatch physics
+  solar_loader.py       (NEW) SolarResourceLoader + SolarResource — ZIP → zone → default, clock time
+  home_config.py        HomeConfig.solar_resource (derived property from zip_code; not serialized)
+  journey.py            SolarConfig = user choices only (no specific_yield, no scf);
+                        BatteryConfig live (round_trip_eff, power_kw); SolarBatteryConfig retired;
+                        hourly representative-day energy balance (§0)
   rate_loader.py        URDBRateStructure.for_utility / period_fractions / price_month (§3);
                         coverage gate (urdb/harvest_candidate/eia_fallback) + baseline resolver
   projected_rate_source.py  market selector: eiaid → market, EIA-Pacific fallback for non-PG&E (§5.1)
@@ -349,7 +424,7 @@ src/
   ui/charts.py          solar-monthly / peak-offpeak / battery-dispatch charts
   data/config/whywatt_default.json   default rate model cagr_flat → cec_projection (§5)
 data/
-  solar/pvwatts_zip.json       (from OfflineSolarData_Plan) now CONSUMED by SolarConfig
+  solar/pvwatts_zip.json       (from OfflineSolarData_Plan) now CONSUMED via SolarResourceLoader
   rates/urdb_tou.json          (from OfflineURDB_Plan, DONE) now CONSUMED by URDBRateStructure
   rates/urdb_coverage.json     (from OfflineURDB_Plan, DONE) the "can we use URDB?" gate
   rates/urdb_baseline_crosswalk.json (from OfflineURDB_Plan, DONE) ZIP→territory baselines
@@ -358,16 +433,25 @@ data/
 scripts/
   build_urdb*.py / build_baseline_crosswalk.py  (OfflineURDB, DONE; re-run to add utilities)
 tests/
-  test_solar_pvwatts.py (NEW) ZIP→zone→default table resolution, monthly yield, no-scalar gate
-  test_battery.py       (NEW) dispatch physics, self-consumption vs export
+  test_solar_loader.py  (NEW) ZIP→zone→default, schema_version gate, clock-time shift (rows still
+                        sum to 1; July output moves +1 h, Jan does not), production = system_kw×ac_annual,
+                        two ZIPs → two different model outputs, no-scalar grep gate
+  test_battery.py       (NEW) energy balance closes exactly (production & load identities), steady-state
+                        SOC, cap=0 ⇒ solar→load→export only, power cap binds, η losses = charge×(1−η)
   test_urdb_rates.py    (NEW) URDBRateStructure: period_fractions + price_month + tier slabs + fallback
   regression/golden.json  re-baselined (output changes intentionally)
 ```
 
 ## Resolved at kickoff (see §0)
 
-- ✅ Battery dispatch fidelity → **3-period representative-day**, scaled by days-in-month.
-- ✅ Battery charge source → **solar only**; stored energy reserved for peak.
+- ✅ Battery dispatch fidelity → **hourly representative day** (24 clock h × 12 months), scaled by
+  days-in-month — *revised 2026-09-22 from 3-period*.
+- ✅ Consumption order → **Solar → Battery → Utility**, excess solar exported; `scf` retired —
+  *revised 2026-09-22 from "battery reserved for peak"*.
+- ✅ Battery charge source → **solar only** (no grid arbitrage).
+- ✅ Solar data interface → `SolarResourceLoader` → `SolarResource` (frozen, clock time) exposed as
+  `HomeConfig.solar_resource`; `SolarConfig` = user choices only (§1).
+- ✅ Landing → **three commits A/B/C**, one golden diff each (§2 landing sequence).
 - ✅ Tiered slabs → apply on the **monthly grid-import total** (billing-accurate).
 - ✅ Solar placement into periods → **offline intra-day shape** (PVWatts hourly, `OfflineSolarData_Plan.md` §4b).
 - ✅ Solar geo granularity → **per ZIP** (ZCTA centroid), zone-station fallback; no address, no
@@ -380,7 +464,8 @@ tests/
 
 ## Still open (resolve during Phase 7)
 
-- Round-trip efficiency value + whether a battery charge-rate (kW) cap matters at this grain.
+- Confirm battery defaults (round-trip 0.90, 5 kW power cap) against a current spec sheet; the
+  hourly grain makes the power cap meaningful, so it stays in the model.
 - Mid-day "super-off-peak" period (SCE/SDG&E) is folded into off-peak by the 2-rate model — confirm
   acceptable, or extend to 3 billing periods later.
 
@@ -395,7 +480,8 @@ tests/
 ## Definition of done
 
 - [ ] PVWatts tables consumed (ZIP → zone → default, never a scalar); `specific_yield` removed from model/UI/config; Solar device emits (12,).
-- [ ] Battery dispatch physics produce self-consumption/export from real load.
+- [ ] Hourly Solar → Battery → Utility energy balance produces self-consumption/export from real
+      load; balance identities close; `scf` removed from model/UI/config.
 - [ ] URDB `RateStructure` consumed: `period_fractions` split via real per-tariff peak hours,
       `price_month` slabs on the home aggregate, coverage gate + ZIP→baseline resolved (offline DONE).
 - [ ] **PG&E area fully working** end-to-end (URDB rate × `cec_projection`); SCE/SDG&E use URDB rates
