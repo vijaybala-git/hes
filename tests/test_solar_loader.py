@@ -134,3 +134,30 @@ def test_no_scalar_yield_left():
     out = subprocess.run(["git", "grep", "-n", "specific_yield", "--", "src/", "data/"],
                          cwd=ROOT, capture_output=True, text=True)
     assert out.stdout.strip() == "", out.stdout
+
+
+# ── Commit B: monthly pricing ─────────────────────────────────────────────────
+
+def test_solar_is_priced_month_by_month():
+    """Savings = Σ_m self[m]·retail[m] + Σ_m export[m]·export_rate[m] — not annual averages.
+
+    Today's rate models are flat within a year, so the golden barely moves; this test forces a
+    seasonal retail curve (summer-high) to prove the monthly weighting is actually applied."""
+    from journey import CapExOnlySlot, SolarBatteryConfig, interim_scf
+    from model import HESModel
+    cfg = SolarBatteryConfig(panels=2, kw_per_panel=0.40)            # small: stays under the cap
+    m = HESModel(home_config=HomeConfig(zip_code="95140"), n_years=2, solar_config=cfg,
+                 capex_only_slots=[CapExOnlySlot(name="Solar + Battery", install_cost=0,
+                                                 install_year=1)])
+    seasonal = np.array([0.30] * 5 + [0.60] * 4 + [0.30] * 3)       # Jun–Sep at double rate
+    jh = m.journey_home
+    jh._elec_rates = np.tile(seasonal, (2, 1))
+    m.run_all()
+
+    prod = cfg.system_kw * m.solar_resource.ac_monthly
+    scf = interim_scf(cfg.battery_enabled)
+    exp_rates = jh._solar_export_rates[0]
+    expected = (prod * scf) @ seasonal + (prod * (1 - scf)) @ exp_rates
+    averaged = (prod * scf).sum() * seasonal.mean() + (prod * (1 - scf)).sum() * exp_rates.mean()
+    assert jh.solar_savings_history[0] == pytest.approx(expected, rel=1e-9)
+    assert expected > averaged * 1.02          # summer-heavy solar earns more than the average says

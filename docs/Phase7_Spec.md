@@ -331,7 +331,7 @@ to devices — **this changes no total, dispatch, or physics**. Convention:
 | Commit | Change | Golden diff attributable to |
 |---|---|---|
 | **A — data source** | `SolarResourceLoader` + `HomeConfig.solar_resource`; `specific_yield` retired; production = `system_kw × Σ ac_monthly`, still priced with today's annual-average rates and today's `scf` | ZIP-specific yield only (CZ4 ≈ +10%: 1,644 vs 1,500) |
-| **B — monthly pricing** | production `(12,)` × monthly retail / export rates; `scf` still applied per month | seasonal alignment (summer-heavy solar × summer rates) |
+| **B — monthly pricing** | production `(12,)` × monthly retail / export rates; `scf` still applied per month | seasonal alignment (summer-heavy solar × summer rates). **Landed 2026-09-22: ≈ −$50 journey opex over the horizon per solar case** — today's retail arrays (CAGR and ACC alike) are flat within a year and only the NEM 3.0 export credit varies ($0.057–0.072/kWh), so the seasonal signal is near-zero until §3's summer/winter URDB rates. A forced-seasonal-rate unit test proves the monthly weighting. |
 | **C — energy balance** | §0 hourly energy balance, two battery modes + monthly picker; `scf` retired; battery physics live | self-consumption from physics + battery (all months Self-powered until §3 adds peak windows) |
 
 `scf` survives A and B *on purpose*, so neither diff mixes in the dispatch change — but **not as a

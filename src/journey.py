@@ -456,26 +456,30 @@ class JourneyHome(mesa.Agent):
             # Read the solar half only (Phase 6 WS2 §2a). Battery presence never enters the
             # sim — it sets solar.scf via interim_scf() (0.80 / 0.35) until commit C.
             solar = self._solar_config.solar
-            # Phase 7 §1 commit A: per-ZIP PVWatts table, still summed to an annual figure and
-            # priced at the annual-average rate below (monthly pricing is commit B).
-            annual_production_kwh = solar.system_kw * self._solar_resource.ac_annual
+            # Phase 7 §1 — per-ZIP PVWatts table, priced MONTH BY MONTH (landing step B):
+            # summer-heavy production meets that month's retail and export rates instead of
+            # the year's average. Self-use is still interim_scf() until the energy balance (C).
+            monthly_production = solar.system_kw * self._solar_resource.ac_monthly   # (12,) kWh
             scf = solar.self_consumption_fraction   # 0.80 battery, 0.35 solar-only
 
-            self_consumed_kwh = annual_production_kwh * scf
-            exported_kwh      = annual_production_kwh * (1.0 - scf)
+            monthly_self   = monthly_production * scf
+            monthly_export = monthly_production * (1.0 - scf)
 
-            # Retail rate: mean of this year's 12 monthly rates.
-            # In ACC mode, self._elec_rates uses the flat profile → equals retail.
-            avg_retail = float(self._elec_rates[year_idx].mean())
-
-            # Export credit rate from the pre-built (n_years,12) array.
+            # Retail: this year's (12,) monthly rates. In ACC mode self._elec_rates is the flat
+            # profile → equals retail.
+            retail_by_month = self._elec_rates[year_idx]
+            # Export credit from the pre-built (n_years,12) array.
             # NEM 3.0: ACC avoided-cost $/kWh.  NEM 2.0: retail minus NBC.
-            avg_export = float(self._solar_export_rates[year_idx].mean()) \
-                if self._solar_export_rates is not None else 0.0
+            export_by_month = (self._solar_export_rates[year_idx]
+                               if self._solar_export_rates is not None else np.zeros(12))
 
-            retail_savings = self_consumed_kwh * avg_retail
-            export_credit  = exported_kwh      * avg_export
-            # Cap at actual electricity spend — solar can't reduce below zero
+            retail_savings = float(monthly_self   @ retail_by_month)
+            export_credit  = float(monthly_export @ export_by_month)
+            annual_production_kwh = float(monthly_production.sum())
+            self_consumed_kwh     = float(monthly_self.sum())
+            exported_kwh          = float(monthly_export.sum())
+            # Cap at the year's actual electricity spend — solar can't take the bill below zero
+            # (annual, like a NEM true-up: summer credits carry to winter within the year).
             solar_saving = min(retail_savings + export_credit, year_elec_opex)
         else:
             annual_production_kwh = 0.0
