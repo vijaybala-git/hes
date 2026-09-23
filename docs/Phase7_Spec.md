@@ -541,19 +541,24 @@ So the same config keys carry on (`elec_rate_model_a/b`, `gas_rate_model_a/b`); 
 curve growth". `urdb_tou` stops being a separate model: whenever a projection is chosen and the
 utility is URDB-covered, the starting price *is* the URDB plan. Legacy modes never touch URDB.
 
-**StartingRate ladder (per fuel, a home fact shared by scenarios A/B):**
-- **Electricity:** URDB plan (covered, not quarantined; the Tariff picker) → else the
-  starting-rates file.
-- **Gas:** always the starting-rates file (no URDB for gas).
-- **New file `data/rates/starting_rates.json`** (built offline from data already committed, with
-  provenance): for each fuel, per-utility EIA prices (`eia_rates_by_utility.json`, 2024) and a
-  regional **EIA — Pacific** price (AEO 2026 Pacific, 2025), each with its **anchor year**.
-- **Recommendation to confirm:** use the ladder *URDB → EIA per-utility → EIA — Pacific*, not
-  straight to EIA — Pacific. The AEO Pacific level is a Pacific-wide average (includes WA/OR):
-  $0.242/kWh in 2025, vs SCE's own EIA rate $0.324 and PG&E's $0.396 — 25–40% low for California
-  utilities. The per-utility EIA rate is already harvested and is what "My Utility" uses today.
-  EIA — Pacific then only prices ZIPs with no resolved utility (and, TODO beyond CA, would be
-  replaced by the ZIP's own EIA region).
+**StartingRate — by what the ZIP resolves to (per fuel; a home fact shared by scenarios A/B).**
+Clarified 2026-09-23: *the URDB data file is used when the ZIP resolves to a utility;
+`starting_rates.json` only when it does not.*
+
+| ZIP resolves to… | Electricity starting price | Gas starting price |
+|---|---|---|
+| a utility with a URDB plan (covered, not quarantined) | **`urdb_tou.json`** — the plan (Tariff picker) | the LDC's EIA rate |
+| a utility **without** a usable URDB plan (SCE while quarantined; municipal utilities once issue 6 is fixed; not-yet-harvested utilities) | the utility's own EIA rate (`eia_rates_by_utility.json`, 2024) — already harvested, what My Utility uses today | the LDC's EIA rate |
+| **no utility** | **`starting_rates.json`** — EIA — Pacific (2025) | **`starting_rates.json`** — EIA — Pacific (2025) |
+
+- **`data/rates/starting_rates.json` (NEW)** holds *only* the no-utility fallback: a starting
+  price per fuel per region with its anchor year and provenance. For now one region, **EIA —
+  Pacific** (AEO 2026 Pacific: $0.242/kWh, $1.99/therm in 2025). **TODO beyond CA:** one entry
+  per EIA region, chosen from the ZIP's state. Note: the Pacific level is a Pacific-wide average
+  (includes WA/OR) — well below California utilities' own rates (SCE $0.324, PG&E $0.396) — which
+  is why it is used only when no utility is known.
+- The middle row (utility known, no URDB plan) reuses the existing EIA per-utility file rather
+  than duplicating it into `starting_rates.json`.
 
 **Anchor-year rule ("the right starting year").**
 `price(y) = start_price × S[y] / S[anchor]`, where *y* is the calendar year of the simulation
@@ -561,7 +566,7 @@ utility is URDB-covered, the starting price *is* the URDB plan. Legacy modes nev
 - URDB plan → its **effective year**: PG&E plans 2026 (effective 2026-03-27), SDG&E 2026
   (2026-06-01), SCE 2024 (quarantined anyway). A 2025 simulation start therefore *back-scales*
   the 2026 plan by `S[2025] / S[2026]`.
-- Starting-rates file → its data year: EIA per-utility **2024**, EIA — Pacific **2025**.
+- EIA per-utility rate → its data year **2024**; `starting_rates.json` (EIA — Pacific) → **2025**.
 - The curves start at **2025** (the bundle base year; AEO Pacific has no 2024 value), so an anchor
   before 2025 is **clipped to 2025** — i.e. 2024 prices are treated as 2025 prices. Stated in help.
 - After **2050** (a 30-year run reaches 2054) the curve holds its 2050 value, as today — stated
@@ -569,9 +574,11 @@ utility is URDB-covered, the starting price *is* the URDB plan. Legacy modes nev
 - Only $ amounts scale (energy rates and the fixed charge); **tier thresholds (kWh) never scale**.
 
 **What changes, narrowed (U1 + U2 only; golden unchanged throughout Phase 7):**
-- `scripts/build_starting_rates.py` → `data/rates/starting_rates.json` (+ test).
-- `src/starting_rates.py`: StartingRate resolver (URDB `RateStructure` | flat per-utility | flat
-  EIA — Pacific) + the projection index from the bundle with the anchor rule.
+- `scripts/build_starting_rates.py` → `data/rates/starting_rates.json` (no-utility fallback,
+  EIA — Pacific; + test).
+- `src/starting_rates.py`: StartingRate resolver by the table above (URDB `RateStructure` | flat
+  EIA per-utility | flat `starting_rates.json`) + the projection index from the bundle with the
+  anchor rule.
 - `model.py`: projection keys go through *StartingRate × index* (URDB path = today's `urdb_tou`
   wiring with the index as escalation); legacy keys untouched. Retire `urdb_tou` as a key (map
   old links to `whywatt_moderate`).
