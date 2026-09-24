@@ -67,6 +67,14 @@ WhyWatt then **rebases** the CEC delivered *shape* onto the WhyWatt base rate
 ($2.08/therm G-1, vs the CEC's $2.5886 base), so the headline WhyWatt gas rates are
 ~0.80× the CEC delivered price: 2050 moderate ≈ $26.6, stress ≈ $68 on that base.
 
+> **Open review (post-Phase-7, noted 2026-09-24):** the $2.08 G-1 base looks low. The CEC's own
+> 2025 delivered base is $2.5886, EIA-176's effective PG&E rate is $2.66 (2024 × CA ratio), and a
+> spot check of PG&E's site agrees with ~$2.66. Check which component the $2.08 omits (tier mix,
+> public-purpose surcharge, fixed/customer charge, taxes, seasonal weighting) and whether the
+> rebase should use the CEC delivered base. Since Phase 7 §4.1 the model uses only the curve's
+> *shape* (scaled from the home's current rate), so this affects the published curve levels, not
+> Phase 7 model results. Tracked in `docs/Phase7_Spec.md` → Post-Phase-7.
+
 ---
 
 ## Why the >$20/therm — the death-spiral driver (verified from the source)
