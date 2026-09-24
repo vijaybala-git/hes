@@ -873,7 +873,9 @@ damage, respiratory illness) and on the global climate (CO2 and methane emission
 For natural gas, at the default settings these hidden costs total about $2.30 per
 therm — nearly equal to the $2.31/therm market price you actually pay. For gasoline, the
 default hidden cost is about $2.44 per gallon on top of the pump price. This panel is
-informational: advocates can use it to show homeowners the full picture.
+informational: advocates can use it to show homeowners the full picture. All four costs are
+off when WhyWatt first opens (and after Reset); tick them to add the hidden costs to the
+results.
 
 ### Natural gas — climate cost ($1.07/therm default)
 

@@ -9,6 +9,10 @@
     "wh_swap_planned": false,
     "dryer_swap_planned": false,
     "cooktop_swap_planned": false,
-    "ev_swap_planned": false
+    "ev_swap_planned": false,
+    "social_climate_enabled": true,
+    "social_health_enabled": true,
+    "gasoline_climate_enabled": true,
+    "gasoline_health_enabled": true
   }
 }

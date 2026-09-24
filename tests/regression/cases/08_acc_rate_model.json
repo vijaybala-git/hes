@@ -9,6 +9,10 @@
     "ev_swap_planned": true,
     "panel_amps": 200,
     "elec_rate_model_a": "acc_shaped",
-    "gas_rate_model_a": "acc_seasonal"
+    "gas_rate_model_a": "acc_seasonal",
+    "social_climate_enabled": true,
+    "social_health_enabled": true,
+    "gasoline_climate_enabled": true,
+    "gasoline_health_enabled": true
   }
 }

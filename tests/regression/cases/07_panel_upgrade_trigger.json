@@ -7,6 +7,10 @@
     "dryer_swap_planned": true,
     "cooktop_swap_planned": true,
     "ev_swap_planned": true,
-    "panel_amps": 100
+    "panel_amps": 100,
+    "social_climate_enabled": true,
+    "social_health_enabled": true,
+    "gasoline_climate_enabled": true,
+    "gasoline_health_enabled": true
   }
 }

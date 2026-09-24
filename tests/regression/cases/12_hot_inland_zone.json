@@ -9,6 +9,10 @@
     "ev_swap_planned": true,
     "panel_amps": 200,
     "zip_code": "93720",
-    "hvac_has_cooling": true
+    "hvac_has_cooling": true,
+    "social_climate_enabled": true,
+    "social_health_enabled": true,
+    "gasoline_climate_enabled": true,
+    "gasoline_health_enabled": true
   }
 }

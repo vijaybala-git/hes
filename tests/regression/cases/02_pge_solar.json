@@ -8,6 +8,10 @@
     "cooktop_swap_planned": true,
     "ev_swap_planned": true,
     "panel_amps": 200,
-    "solar_planned": true
+    "solar_planned": true,
+    "social_climate_enabled": true,
+    "social_health_enabled": true,
+    "gasoline_climate_enabled": true,
+    "gasoline_health_enabled": true
   }
 }

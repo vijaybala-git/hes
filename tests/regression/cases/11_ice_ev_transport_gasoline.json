@@ -10,6 +10,10 @@
     "panel_amps": 200,
     "ev_swap_year": 5,
     "transport_gasoline_miles": 12000,
-    "transport_ice_miles_after": 2000
+    "transport_ice_miles_after": 2000,
+    "social_climate_enabled": true,
+    "social_health_enabled": true,
+    "gasoline_climate_enabled": true,
+    "gasoline_health_enabled": true
   }
 }
