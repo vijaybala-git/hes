@@ -1194,6 +1194,8 @@ def JourneyGrid():
                            lambda: journey_collapsed.set(not journey_collapsed.value))
         if not collapsed:
             with solara.Column(classes=["jbody"], gap="7px"):
+                # Unified Plan row (§4.2 step 2) — every device's plan toggle at a glance
+                PlanRow()
                 # Row 1 — MAJOR LOADS (label folded into the panel header §3.4)
                 with solara.Row(classes=["jgrid"]):
                     HVACSummaryCard()
@@ -1517,6 +1519,11 @@ def Page():
                 ".v-row.split2>.v-col{padding:0!important}"
                 ".v-col.subpanel>.v-row{margin:0!important}"
                 ".setup-grid>.card,.jgrid>.device{margin:0!important}"
+                # §4.2 step 2 — unplanned cards dim (never hidden); hover / focus restores
+                ".jgrid>.device.unplanned{opacity:.62;transition:opacity .15s}"
+                ".jgrid>.device.unplanned:hover,.jgrid>.device.unplanned:focus-within"
+                "{opacity:1}"
+                ".v-row.plan-row{margin:0!important}"
                 # collapse-all button: beat Vuetify .v-btn--default sizing
                 ".v-btn.collapse-all{height:26px!important;min-height:26px!important;"
                 "min-width:0!important;padding:0 9px!important}"

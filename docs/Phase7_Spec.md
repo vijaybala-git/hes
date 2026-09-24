@@ -5,7 +5,8 @@ data through the model. (Adopting the WhyWatt projection as the *default* moved 
 **Follows:** Phase 6 (`docs/Phase6_Spec.md`) — Solar/Battery split, inert roof-geometry inputs, and
 the **non-default `cec_projection` rate hand-off interface** (evaluated but not switched). Offline
 PVWatts/URDB data is harvested and validated separately in `docs/OfflineSolarData_Plan.md`.
-**Last updated:** 2026-09-24 — **§4.3 charts landed** (R.1 / R.2 four projection curves, EU.9 with year
+**Last updated:** 2026-09-24 — **unified Plan row landed** (§4.2 step 2; nine pills bound to the cards'
+plan toggles, unplanned cards dimmed; golden unchanged). Earlier — **§4.3 charts landed** (R.1 / R.2 four projection curves, EU.9 with year
 selector, EU.10, R.6; golden unchanged). Earlier — added **§4.3 chart design** (R.1 / R.2 = four projection curves on the
 current rate; EU.9 monthly solar; EU.10 energy balance; R.6 peak vs off-peak). Earlier
 2026-09-23 — open-items review: DoD ticked for PG&E end-to-end and the golden
@@ -893,6 +894,19 @@ reactives (Battery's toggle = `solar_battery_enabled`, disabled while solar is o
 analysis: keep every card visible; dim, don't hide, unplanned ones. Its own small commit;
 golden unchanged.
 
+**Landed 2026-09-24 (step 2 — unified Plan row; UI only, golden unchanged, 546 tests):**
+- `PlanRow` at the top of the Journey body: nine pill toggles — HVAC · Water heater · EV
+  charger · Cooktop · Dryer · Baseload · Solar · Battery · Panel — bound to the **same**
+  reactives as each card's Plan checkbox (`*_swap_planned`, `solar_planned`,
+  `solar_battery_enabled`, `panel_upgrade_planned`), so row and cards never disagree.
+- `plan_status(key)` → planned / unplanned / **done** (starting state already electric — a
+  disabled green "✓ … · done" pill, matching the card's "✓ Electrified") / **locked** (Battery
+  while solar is off — the Phase 7 limitation).
+- Unplanned cards get class `unplanned` → opacity 0.62, restored on hover / focus (dim, never
+  hide — the 5.6 analysis). Verified in the preview: pill → card (Cooktop gains its swap year),
+  card → pill (panel checkbox), Solar unlocks Battery. Help (Journey Planner) updated.
+- Rollback point before this commit: tag `p7-before-plan-row`.
+
 **Post-Phase-7 — lift the limitation (independent battery; functional, own golden diff):**
 - Battery gets its own plan toggle, install year, cost and rebate → a second `CapExOnlySlot`
   ("Battery"); `solar_system_cost` splits into solar + battery costs, with a share-link migration
@@ -1291,7 +1305,7 @@ tests/
 - [x] Solar and Battery as separate cards (+ details pages) and the Electrical Panel card in the
       Journey panel's third row (§4.2); Solar + Battery still one install event (limitation
       stated in the UI and help); golden unchanged. *(2026-09-23)*
-- [ ] Unified Plan row across the nine devices (§4.2 step 2, Spec 5.6 #6).
+- [x] Unified Plan row across the nine devices (§4.2 step 2, Spec 5.6 #6). *(2026-09-24)*
 - [x] Charts per §4.3: R.1 / R.2 show the four projection curves on the home's current rate;
       EU.9 monthly solar generation (year selector); EU.10 solar & battery energy balance; R.6
       peak vs off-peak (URDB plans). Help updated; golden unchanged. *(2026-09-24)*

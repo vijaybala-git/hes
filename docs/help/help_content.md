@@ -38,6 +38,12 @@ appliances for electric alternatives one by one, on a schedule you choose —
 compared to doing nothing for the full modeled period. You set which appliances
 to replace and in which year; WhyWatt does the math.
 
+The Plan row at the top of the panel lists every device — HVAC, water heater, EV charger,
+cooktop, dryer, baseload, solar, battery and panel. Click a name to add it to your journey or take
+it out; it does the same as the Plan checkbox on the device's card. Cards that aren't part of the
+journey are dimmed (hover to bring one back). A device that is already electric shows "done", and
+the battery can only be planned together with solar.
+
 The result is two cost curves on the same chart: Your Journey and Do Nothing.
 The gap between them — and the year they cross — is your payback.
 

@@ -74,3 +74,25 @@ def test_battery_card_states_the_linked_install():
         assert not panels._battery_is_default()
     finally:
         S.reset_to_defaults()
+
+
+# ── §4.2 step 2 — unified Plan row ────────────────────────────────────────────
+
+def test_plan_row_mirrors_the_cards_plan_state():
+    from ui import panels
+    try:
+        S.reset_to_defaults()
+        assert panels.plan_status("hvac") == "planned"            # factory: HVAC + WH swaps
+        assert panels.plan_status("cooktop") == "unplanned"
+        assert panels.plan_status("battery") == "locked"          # no solar → no battery
+        S.solar_planned.set(True)
+        assert panels.plan_status("battery") == "planned"         # battery on by default
+        S.cooktop_starting_state.set("electric")
+        assert panels.plan_status("cooktop") == "done"            # already electric
+        assert "unplanned" not in panels._device_classes("cooktop")
+        assert "unplanned" in panels._device_classes("dryer")
+        keys = [k for k, *_ in panels._plan_items()]
+        assert keys == ["hvac", "water_heater", "ice", "cooktop", "dryer", "baseload",
+                        "solar", "battery", "panel"]
+    finally:
+        S.reset_to_defaults()

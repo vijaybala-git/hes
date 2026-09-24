@@ -403,10 +403,77 @@ def _appliance_rows(state_rv, planned_rv, year_rv, cost_rv, rebate_rv,
 
 # ── §25.3 Summary card components ────────────────────────────────────────────
 
+# ── §4.2 step 2 — unified Plan row (Spec 5.6 #6) ─────────────────────────────
+# (key, label, planned reactive, starting-state reactive or None). Same reactives as each
+# card's own Plan checkbox, so the row and the cards can never disagree.
+def _plan_items():
+    return (
+        ("hvac", "HVAC", hvac_swap_planned, hvac_starting_state),
+        ("water_heater", "Water heater", wh_swap_planned, wh_starting_state),
+        ("ice", "EV charger", ev_swap_planned, None),
+        ("cooktop", "Cooktop", cooktop_swap_planned, cooktop_starting_state),
+        ("dryer", "Dryer", dryer_swap_planned, dryer_starting_state),
+        ("baseload", "Baseload", baseload_swap_planned, None),
+        ("solar", "Solar", solar_planned, None),
+        ("battery", "Battery", solar_battery_enabled, None),
+        ("panel", "Panel", panel_upgrade_planned, None),
+    )
+
+
+def plan_status(key: str) -> str:
+    """'planned' | 'unplanned' | 'done' (already electric) | 'locked' (battery without solar)."""
+    for k, _lbl, planned_rv, state_rv in _plan_items():
+        if k != key:
+            continue
+        if state_rv is not None and state_rv.value == "electric":
+            return "done"
+        if k == "battery" and not solar_planned.value:
+            return "locked"
+        return "planned" if planned_rv.value else "unplanned"
+    raise KeyError(key)
+
+
+def _device_classes(key: str, extra=()) -> list:
+    """Card classes — `unplanned` dims a card that is not part of the journey (the Plan row's
+    emphasis; hover restores it). Planned and already-electric cards stay at full strength."""
+    return ["device", *extra] + (["unplanned"] if plan_status(key) in ("unplanned", "locked")
+                                 else [])
+
+
+@solara.component
+def PlanRow():
+    """One-glance toggles for every device in the journey (§4.2 step 2)."""
+    with solara.Row(classes=["plan-row"], gap="6px",
+                    style="align-items:center; flex-wrap:wrap"):
+        solara.HTML(tag="span", unsafe_innerHTML=(
+            "<span style='font-size:0.78em; font-weight:600; color:var(--ink-3,#6b7280);"
+            " margin-right:2px'>Plan:</span>"))
+        for key, label, planned_rv, _state in _plan_items():
+            st = plan_status(key)
+            base = ("border-radius:14px; padding:2px 10px; font-size:0.78em; min-width:0;"
+                    " letter-spacing:0; text-transform:none; height:26px;")
+            if st == "done":
+                solara.Button(f"✓ {label} · done", disabled=True,
+                              style=base + " background:#E8F5E9; color:#2E7D32;"
+                                           " border:1px solid #A5D6A7;")
+            elif st == "locked":
+                solara.Button(f"○ {label}", disabled=True,
+                              style=base + " background:#F5F5F5; color:#B0BEC5;"
+                                           " border:1px dashed #CFD8DC;")
+            else:
+                on = st == "planned"
+                solara.Button(
+                    ("✓ " if on else "○ ") + label,
+                    on_click=lambda rv=planned_rv: rv.set(not rv.value),
+                    style=base + (" background:#3B6FD4; color:white; border:1px solid #3B6FD4;"
+                                  if on else
+                                  " background:white; color:#455A64; border:1px solid #CFD8DC;"))
+
+
 @solara.component
 def HVACSummaryCard():
     """§25.3.1 — state dropdown + plan year | install cost | rebate."""
-    with solara.Column(classes=["device"]):
+    with solara.Column(classes=_device_classes("hvac")):
         _card_header("hvac", "HVAC")
         _appliance_rows(hvac_starting_state, hvac_swap_planned, hvac_swap_year,
                         hvac_install_cost, hvac_rebate,
@@ -416,7 +483,7 @@ def HVACSummaryCard():
 @solara.component
 def WHSummaryCard():
     """§25.3.2 — state dropdown + plan year | install cost | rebate."""
-    with solara.Column(classes=["device"]):
+    with solara.Column(classes=_device_classes("water_heater")):
         _card_header("water_heater", "Water Heater")
         _appliance_rows(wh_starting_state, wh_swap_planned, wh_swap_year,
                         wh_install_cost, wh_rebate,
@@ -470,7 +537,7 @@ def TransportationSummaryCard():
     """Transportation — current-vehicle state dropdown (Gas/Mixed/Electric/None,
     the 'Do Nothing' mix) + plan EV Charger. Mirrors the other appliance cards;
     miles/MPG/efficiency are fine-tuned in the detail panel."""
-    with solara.Column(classes=["device"]):
+    with solara.Column(classes=_device_classes("ice")):
         _card_header("ice", "Transportation")
         # Row 1: current-vehicle state dropdown + Plan EV Charger
         with solara.Row(gap="8px", style=_ROW_CTRL):
@@ -650,7 +717,7 @@ def TransportationDetail():
 @solara.component
 def CooktopSummaryCard():
     """§25.3.4 — state dropdown + plan year | install cost | rebate."""
-    with solara.Column(classes=["device", "minor"]):
+    with solara.Column(classes=_device_classes("cooktop", ["minor"])):
         _card_header("cooktop", "Cooktop")
         _appliance_rows(cooktop_starting_state, cooktop_swap_planned, cooktop_swap_year,
                         cooktop_install_cost, cooktop_rebate,
@@ -660,7 +727,7 @@ def CooktopSummaryCard():
 @solara.component
 def DryerSummaryCard():
     """§25.3.5 — state dropdown + plan year | install cost | rebate."""
-    with solara.Column(classes=["device", "minor"]):
+    with solara.Column(classes=_device_classes("dryer", ["minor"])):
         _card_header("dryer", "Dryer")
         _appliance_rows(dryer_starting_state, dryer_swap_planned, dryer_swap_year,
                         dryer_install_cost, dryer_rebate,
@@ -689,7 +756,7 @@ def _PanelControls():
 @solara.component
 def PanelSummaryCard():
     """§25.3.6 — amperage + plan year | install cost | rebate."""
-    with solara.Column(classes=["device"]):
+    with solara.Column(classes=_device_classes("panel")):
         _card_header("panel", "Electrical Panel")
         _PanelControls()
 
@@ -729,7 +796,7 @@ def _BaseloadControls():
 @solara.component
 def BaseloadSummaryCard():
     """§25.3.7 — elec kWh/mo | gas therms/mo | growth %/yr."""
-    with solara.Column(classes=["device"]):
+    with solara.Column(classes=_device_classes("baseload")):
         _card_header("baseload", "Baseload")
         _BaseloadControls()
 
@@ -769,7 +836,7 @@ def SolarSummaryCard():
     """Solar summary card (Phase 7 §4.2) — plan toggle, panels slider → kW, install year.
     The battery has its own card; Solar + Battery remain one install event in Phase 7."""
     planned = solar_planned.value
-    with solara.Column(classes=["device"]):
+    with solara.Column(classes=_device_classes("solar")):
         _card_header("solar", "Solar")
         with solara.Row(gap="10px", style=_ROW_CTRL):
             _Check(label="Add solar", value=solar_planned)
@@ -809,7 +876,7 @@ def BatterySummaryCard():
     """Battery summary card (Phase 7 §4.2) — on/off and size. In Phase 7 the battery is
     installed with solar (one install event), so it is disabled until solar is planned."""
     solar_on = solar_planned.value
-    with solara.Column(classes=["device"]):
+    with solara.Column(classes=_device_classes("battery")):
         _card_header("battery", "Battery")
         if solar_on:
             with solara.Row(gap="8px", style=_ROW_CTRL + " align-items:center"):
@@ -2163,4 +2230,4 @@ def _SocialBody():
 
 
 
-__all__ = ['_DETAIL_TITLES', '_LEFT_COL', '_RIGHT_COL', '_COSTS_BOX', '_CARD_NORMAL', '_CARD_OPEN', '_ROW_CTRL', '_TOP_ROW', 'DetailTitleBar', '_DS', '_DSl', '_elec_display', '_ElecAmpsInput', '_DetailCosts', '_card_header', '_card_header_main', '_panel_hd', '_PlanCheck', '_Check', '_cost_row', '_appliance_rows', 'HVACSummaryCard', 'WHSummaryCard', 'TransportationSummaryCard', 'TransportationDetail', 'CooktopSummaryCard', 'DryerSummaryCard', '_PanelControls', 'PanelSummaryCard', '_BaseloadControls', 'BaseloadSummaryCard', 'HomeSummaryCard', 'SolarSummaryCard', 'BatterySummaryCard', 'BatteryDetail', 'CurrentRateBlock', 'ModelTimelineCard', 'RatesSummaryCard', 'HVACDetail', 'WaterHeaterDetail', 'EVDetail', 'CooktopDetail', 'DryerDetail', 'ElecPanelDetail', 'BaseloadDetail', 'HomeDetail', 'SolarDetail', '_fuel_model_block', 'RatesDetail', 'JourneyPlannerPanel', 'HomeProfilePanel', 'EnergyPricesPanel', '_SocialBody']
+__all__ = ['_DETAIL_TITLES', '_LEFT_COL', '_RIGHT_COL', '_COSTS_BOX', '_CARD_NORMAL', '_CARD_OPEN', '_ROW_CTRL', '_TOP_ROW', 'DetailTitleBar', '_DS', '_DSl', '_elec_display', '_ElecAmpsInput', '_DetailCosts', '_card_header', '_card_header_main', '_panel_hd', '_PlanCheck', '_Check', '_cost_row', '_appliance_rows', 'HVACSummaryCard', 'WHSummaryCard', 'TransportationSummaryCard', 'TransportationDetail', 'CooktopSummaryCard', 'DryerSummaryCard', '_PanelControls', 'PanelSummaryCard', '_BaseloadControls', 'BaseloadSummaryCard', 'HomeSummaryCard', 'SolarSummaryCard', 'BatterySummaryCard', 'PlanRow', 'plan_status', 'BatteryDetail', 'CurrentRateBlock', 'ModelTimelineCard', 'RatesSummaryCard', 'HVACDetail', 'WaterHeaterDetail', 'EVDetail', 'CooktopDetail', 'DryerDetail', 'ElecPanelDetail', 'BaseloadDetail', 'HomeDetail', 'SolarDetail', '_fuel_model_block', 'RatesDetail', 'JourneyPlannerPanel', 'HomeProfilePanel', 'EnergyPricesPanel', '_SocialBody']
