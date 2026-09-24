@@ -169,6 +169,13 @@ plan (HVAC + water-heater swaps), no solar.
 Trend offsets on 25: Moderate and Stress each raise journey + baseline cost and the final-year
 electricity and gas rates (`25__moderate_vs_conservative`, `25__stress_vs_conservative`).
 
+| 29–32 | Journey B (HVAC → heat pump + HPWH, no solar) — electricity **fixed** at E-TOU-C × WhyWatt Conservative; **gas** × {Conservative, Moderate, Stress, EIA Pacific} | isolates the gas curve: savings $138k / $165k / $255k / $9k over 20 yr (do-nothing $247k / $279k / $385k / $95k) |
+
+Trend offsets on 29 (`29__gas_*_vs_conservative`): the gas final rate and the do-nothing cost
+move (+ for Moderate / Stress, − for EIA Pacific) while the electricity year-1 / final rates and
+the journey's final-year electric bill must **not** move (`0`) — proves the gas projection is
+isolated from electricity.
+
 New snapshot blocks (every case): `rates` — models, `elec_priced_by` ("URDB E-TOU-C" | "flat"),
 current energy rate labels (projection methods only), year-1 / final-year mean rates, the
 escalation index, the journey's final-year electric bill; `battery` — final-year mode summary,

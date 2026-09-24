@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "name": "Gas EIA Pacific vs Conservative (electricity fixed)",
+  "base": "29_pge_gas_conservative_b",
+  "description": "Trend offset on 29_pge_gas_conservative_b: only the gas projection changes \u2192 gas rates and gas-heavy costs move (-); electricity rates must not move",
+  "values": {
+    "gas_rate_model_a": "eia_pacific"
+  },
+  "expect": {
+    "rates.gas_final_mean": "-",
+    "cockpit.baseline_cumulative_opex": "-",
+    "rates.elec_y1_mean": "0",
+    "rates.elec_final_mean": "0",
+    "rates.journey_final_elec_bill": "0"
+  }
+}
