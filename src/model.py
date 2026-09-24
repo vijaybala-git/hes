@@ -23,6 +23,7 @@ from journey import JourneyHome, DeviceSlot, CapExOnlySlot, CATEGORY_ORDER, CATE
 from rate_loader import RateLoader, ACCRateLoader
 from projected_rate_source import ProjectedRateSource, PROJECTION_MODELS
 from rate_resolver import RateResolver
+from nbt_export import nbt_export_rates
 from starting_rates import (IndexedRateSource, get_starting_rates, market_for,
                             projection_index)
 from devices.physics  import GasFurnace, HeatPumpHVAC, GasWaterHeater, HeatPumpWaterHeater, CentralAC
@@ -128,13 +129,6 @@ def _make_loader(base_rl: RateLoader, rate_model: str, fuel: str, fuel_res,
     if fuel_res.utility_id is not None:
         return RateLoader.from_eia_utility(fuel_res.utility_id, fuel)
     return RateLoader.from_eia_state(_DEFAULT_RATE_STATE, fuel)
-
-
-def _is_legacy_acc(loader: object) -> bool:
-    """True only for a real PG&E/CPUC-backed ACCRateLoader (RateLoader base). A projection
-    source wrapped in ACCRateLoader is NOT legacy — the NEM export path (which reaches into
-    the base's RateLoader internals) must fall back to a fresh legacy ACC loader for it."""
-    return isinstance(loader, ACCRateLoader) and isinstance(loader._base, RateLoader)
 
 
 def _cagr_for(rate_model: str, cagr: float) -> float | None:
@@ -588,24 +582,17 @@ class HESModel(mesa.Model):
             self.current_elec_rates = self.elec_rates[0]
 
         # ── Solar export rates (§8) — built once, used by journey_home only ──
-        # NEM 3.0 (nbt): ACC avoided-cost $/kWh from ACCRateLoader.
-        #   We always build an ACCRateLoader for this regardless of the consumption
-        #   rate mode, because the export credit is a grid property, not a billing choice.
-        # NEM 2.0 (nem2): retail rate minus non-bypassable charge (NBC).
+        # (n_years, 12, 24) $/kWh by month × clock hour.
+        # NEM 3.0 (nbt): the ACC's hourly avoided cost for each calendar year (Phase 7 §4.1
+        #   issue 12) — a grid value, independent of the retail rate model and its growth.
+        # NEM 2.0 (nem2): retail rate minus non-bypassable charge (NBC), same every hour.
         solar_export_rates: np.ndarray | None = None
         if solar_config is not None:
             if solar_config.nem_mode == "nbt":
-                # Export credit is a grid property, always priced off a legacy PG&E/CPUC ACC
-                # loader. A projection-wrapped ACC loader has no RateLoader base, so reuse
-                # elec_loader_a only when it is a real legacy ACC loader (Phase 6 WS1: the
-                # NEM export path stays on the legacy source even under projection models).
-                _acc_for_export = elec_loader_a if _is_legacy_acc(elec_loader_a) \
-                    else ACCRateLoader(rl)
-                solar_export_rates = _acc_for_export.get_nem3_export_rates(
-                    sim_start_year, n_years,
-                    scenario=scenario_a, custom_cagr=elec_cagr_a_eff)
+                solar_export_rates = nbt_export_rates(sim_start_year, n_years)
             else:  # nem2: retail minus NBC, floored at zero
-                solar_export_rates = np.maximum(0.0, self.elec_rates - solar_config.nbc)
+                solar_export_rates = np.repeat(
+                    np.maximum(0.0, self.elec_rates - solar_config.nbc)[:, :, None], 24, axis=2)
 
         # ── Two JourneyHome instances — Scenario A ────────────────────────────
         journey_slots  = _build_slots(slot_configs, False, self, **device_kw)

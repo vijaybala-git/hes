@@ -173,10 +173,7 @@ def test_ev_plan_picks_cost_saving_in_winter_for_electrified_home():
         m, _ = sim.run_simulation()
     finally:
         S.reset_to_defaults()
-    # Year 10, not the final year: export credits still grow at the retail CAGR (7%/yr) while a
-    # projection grows retail far slower, so late in the run exporting outpays self-use and
-    # summer months flip to Cost-saving too (Phase7_Spec §4.1 issue 12, decision pending).
-    modes = m.journey_home.battery_mode_history[10]
+    modes = m.journey_home.battery_mode_history[-1]
     assert m.rate_structure_a.family == "EV2"
     assert modes[0] == "cost" and modes[11] == "cost"
     assert modes[6] == "self"

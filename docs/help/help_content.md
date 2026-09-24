@@ -630,9 +630,15 @@ your bill below zero.
 
 The export rate depends on your net-metering era:
 
-- NEM 3.0 / NBT (Net Billing Tariff, today's default for new systems): exports earn the
-  utility's avoided-cost value, which averages roughly $0.06/kWh — far below retail. This
-  is why self-consumption and batteries matter so much under the current rules.
+- NEM 3.0 / NBT (Net Billing Tariff, today's default for new systems): each exported kWh
+  earns the CPUC Avoided Cost Calculator's value for that hour — cheap at midday, when solar
+  floods the grid (about $0.05/kWh on a July noon), and much higher in the evening (about
+  $0.34 at 7pm). Because solar exports at midday, a typical system earns about $0.05/kWh in
+  2025, rising only to about $0.08 by 2050 — far below retail. This is why self-consumption
+  and batteries matter so much under the current rules. The export credit follows the ACC's
+  own forecast year by year; it does not grow with your electricity price projection. Under
+  NBT a system keeps the ACC edition from its install year for 9 years; WhyWatt uses the 2024
+  ACC throughout. Not included: the extra "ACC Plus" credit for early NBT customers.
 - NEM 2.0 (older systems): exports earn the retail rate minus a small non-bypassable
   charge (about $0.025/kWh).
 
@@ -668,7 +674,8 @@ The export rate depends on your net-metering era:
 
 - Solar yield: NREL PVWatts v8 (NSRDB typical-year weather), pre-computed per ZIP /
   climate zone
-- NEM 3.0 avoided-cost export values: CPUC Avoided Cost Calculator (2024)
+- NEM 3.0 export values: CPUC Avoided Cost Calculator 2024, climate zone 4, hourly values
+  for each year 2024–2054, all components (PG&E Schedule NBT)
 - Non-bypassable charge: PG&E NEM 2.0 tariff
 
 ---

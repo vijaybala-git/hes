@@ -291,9 +291,10 @@ class JourneyHome(mesa.Agent):
         solar_config: SolarBatteryConfig for the journey home; None for baseline.
         solar_resource: SolarResource (HomeConfig.solar_resource) — per-kW PVWatts yield for the
           home's ZIP. Required whenever solar_config is given.
-        solar_export_rates: (n_years, 12) $/kWh export credit rates. For NEM 3.0 these
-          are the ACC avoided-cost values; for NEM 2.0, retail minus NBC. Built in
-          HESModel and passed in so JourneyHome.step() needs no rate-loader access.
+        solar_export_rates: (n_years, 12, 24) $/kWh export credit by month × clock hour. For
+          NEM 3.0 these are the ACC hourly avoided-cost values for each calendar year; for NEM
+          2.0, retail minus NBC. Built in HESModel and passed in so JourneyHome.step() needs
+          no rate-loader access.
         elec_rates_by_category: optional dict {device_class_name: (n_years, 12) array}.
           Provided in ACC mode; each electric device uses its category-specific effective
           rate.  None in CAGR mode — all devices share the flat elec_rates array.
@@ -306,7 +307,7 @@ class JourneyHome(mesa.Agent):
         self._external_ev_rates = external_ev_rates  # shape (n_years, 12) | None
         self._elec_rates_by_category = elec_rates_by_category  # dict | None
         self._solar_config       = solar_config        # SolarBatteryConfig | None
-        self._solar_export_rates = solar_export_rates  # (n_years, 12) | None
+        self._solar_export_rates = solar_export_rates  # (n_years, 12, 24) | None
         self._solar_resource     = solar_resource      # SolarResource | None (Phase 7 §1)
         # {device class name: (24,) clock-hour shape summing to 1, "_default": flat} — spreads
         # each electric device's monthly kWh over the representative day (Phase 7 §0.1).
@@ -519,9 +520,9 @@ class JourneyHome(mesa.Agent):
             res = self._solar_resource
             monthly_production = solar.system_kw * res.ac_monthly                  # (12,) kWh
             retail_by_month = self._elec_rates[year_idx]
-            # NEM 3.0: ACC avoided-cost $/kWh.  NEM 2.0: retail minus NBC.
+            # NEM 3.0: ACC hourly avoided cost.  NEM 2.0: retail minus NBC.  (12, 24) $/kWh
             export_by_month = (self._solar_export_rates[year_idx]
-                               if self._solar_export_rates is not None else np.zeros(12))
+                               if self._solar_export_rates is not None else np.zeros((12, 24)))
 
             direct = discharge = charge_grid = losses = grid_import = exported = 0.0
             retail_savings = export_credit = 0.0
@@ -535,7 +536,7 @@ class JourneyHome(mesa.Agent):
                 days = _DAYS_IN_MONTH[m]
                 G = monthly_production[m] / days * res.intraday_shape[m]
                 L = month_loads[m]
-                x = float(export_by_month[m])
+                x = export_by_month[m]                       # (24,) $/kWh by clock hour
                 if rs is not None:
                     # URDB TOU: real peak window; the bill (tiers + fixed) decides the mode.
                     rp, ro = rs.tier1_rates(m)
@@ -545,9 +546,10 @@ class JourneyHome(mesa.Agent):
                         price_fn=lambda pk, op, _m=m, _d=days: rs.price_month(_m, pk, op, _d, esc))
                     d = mr.day
                     exp_m = float(d.export.sum()) * days
+                    credit_m = float((d.export * x).sum()) * days
                     grid_m = float(d.grid_import.sum()) * days
                     # Saving = bill with no solar/battery − bill after dispatch (net of export).
-                    retail_savings += home_bill_no_solar[m] - (mr.bills[mr.mode] + exp_m * x)
+                    retail_savings += home_bill_no_solar[m] - (mr.bills[mr.mode] + credit_m)
                 else:
                     r = float(retail_by_month[m])
                     # Flat retail (no peak window) → Self-powered.
@@ -555,11 +557,12 @@ class JourneyHome(mesa.Agent):
                                         r_peak=r, r_offpeak=r, export_rate=x)
                     d = mr.day
                     exp_m = float(d.export.sum()) * days
+                    credit_m = float((d.export * x).sum()) * days
                     grid_m = float(d.grid_import.sum()) * days
                     # Saving vs the same month with no solar/battery: load − grid import at
                     # retail (grid charging adds import) plus the export credit.
                     retail_savings += (float(L.sum()) * days - grid_m) * r
-                export_credit += exp_m * x
+                export_credit += credit_m
                 direct      += float(d.solar_direct.sum()) * days
                 discharge   += float(d.discharge.sum()) * days
                 charge_grid += float(d.charge_grid.sum()) * days

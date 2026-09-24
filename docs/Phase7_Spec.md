@@ -5,7 +5,8 @@ data through the model. (Adopting the WhyWatt projection as the *default* moved 
 **Follows:** Phase 6 (`docs/Phase6_Spec.md`) — Solar/Battery split, inert roof-geometry inputs, and
 the **non-default `cec_projection` rate hand-off interface** (evaluated but not switched). Offline
 PVWatts/URDB data is harvested and validated separately in `docs/OfflineSolarData_Plan.md`.
-**Last updated:** 2026-09-23 — **U1 landed** (current energy rate × projection growth; EIA 2025
+**Last updated:** 2026-09-23 — **NEM 3.0 export credit fixed** (issue 12: hourly ACC 2024 values
+by calendar year; golden re-baselined, solar cases only). Earlier — **U1 landed** (current energy rate × projection growth; EIA 2025
 starting rates; `starting_rates.json`; `urdb_tou` retired; golden unchanged). Earlier — full-pass review: stale text aligned with the round-2 decisions;
 naming fixed (**current energy rate** = a rate *source*, e.g. `urdb_tou`; **projection method** =
 long-term growth, e.g. the WhyWatt/`cec_projection` curves); battery defaults → **Tesla Powerwall 3**
@@ -550,7 +551,7 @@ Price in year y = StartingRate × idx[y]
 | 9 | **Horizon & start year.** Bundle covers 2025–2050; a 30-year run from 2025 reaches 2054. `sim_start_year` can differ from 2025. | ✅ **Resolved by the anchor-year rule:** index = `S[y] / S[anchor]` with *y* the calendar year; after 2050 hold the 2050 value (stated in help), revisit post-P7. |
 | 10 | **Base-year mismatch.** EIA per-utility prices are 2024; URDB tariffs are 2024–26 vintage; projections start 2025. | Resolved by the anchor-year rule + data-vintage check: EIA electricity rebased to 2025, gas bridged to 2025, URDB anchored at 2026. |
 | 11 | **Gas has no URDB and one market.** The gas "button" is just the LDC (PG&E, SoCalGas, SDG&E) with no plan choices; WhyWatt gas scenarios (the gas-spiral curves) are PG&E-market. | Gas button shows the LDC name (no dropdown); same decision as issue 3 for non-PG&E gas. |
-| 12 | **How do NEM 3.0 export credits change over the years?** The export credit *value* comes from the ACC (correct): the ACC's monthly-average avoided cost. But the model then grows it by **the retail-rate CAGR** of the chosen scenario (`get_nem3_export_rates`: `ACC[m] × (1 + retail CAGR)^y`, e.g. +7%/yr) — so export credits rise with retail prices. That is not how ACC or the Net Billing Tariff works: under NBT the export values are **locked for 9 years** at the ACC values of the year the system is interconnected; after that they follow the ACC's own future-year avoided costs, which are *not* tied to retail rates. Also, the ACC value is hourly (September evenings are very high), but we use one monthly average for every hour. | **Decision needed (not in U1).** Proposal: export credits **ignore the projection method** (they're a grid value, not a retail price): lock the install-year ACC values for 9 years, then step to the ACC's own later-year values (from the ACC workbooks already local) or hold flat; optionally use the ACC hourly shape for the evening hours. Changes solar cases → its own golden-diff commit; can be post-P7. |
+| 12 | **How do NEM 3.0 export credits change over the years?** Model grew the (placeholder) ACC average at the retail CAGR. | ✅ **Fixed 2026-09-23:** hourly ACC 2024 values for each calendar year, all components, independent of the retail model (see "Landed — issue 12" below). |
 | 13 | **Which choices are per home vs per scenario (A/B)?** Scenarios A and B are WhyWatt's side-by-side what-if comparison. *Not the battery modes* — those are never a user choice; the model picks Self-powered or Cost-saving each month automatically (and A and B can pick differently because their prices differ). | ✅ **Decided:** the **current energy rate** (utility + plan) is a fact about the home → **one** plan picker, shared by A and B. The **projection method** is the what-if → chosen **per scenario**. |
 | 14 | **Labels.** Data has long names ("Pacific Gas & Electric"); URDB plan names are long. | Short-name map (PG&E, SCE, SDG&E, SoCalGas) + URDB `family` → "PG&E · E-TOU-C". |
 | 15 | **SCE is quarantined** (§3). | Button "SCE · EIA rate" (no plan dropdown) with the quarantine note until the re-harvest. |
@@ -688,6 +689,37 @@ Clarified 2026-09-23: *the URDB data file is used when the ZIP resolves to a uti
   Jul–Aug Cost-saving by year 19). Confirms issue 12 needs its decision before the default flip.
 - Tests: `tests/test_starting_rates.py` (new, 15), `test_urdb_rates.py` / `test_projected_rate_source.py`
   updated. 501 pass; golden PASS, 37 trend moves correct.
+
+**Landed 2026-09-23 — issue 12, NEM 3.0 export credit (own golden diff, solar cases only):**
+- **What was wrong.** `get_nem3_export_rates` took the `monthly_avg_acc_kwh` values in
+  `acc_electric_shape_pge_2024.json` — marked **PLACEHOLDER**, CZ12, an all-hours average
+  (~$0.062) — and grew them at the *retail* CAGR (slider, or the 7%/yr "moderate" preset under
+  a projection). Export value is a grid value; it has nothing to do with retail growth.
+- **What PG&E Schedule NBT says** (tariff sheet, Advice 7975-E): exports are "multiplied by the
+  hourly avoided costs values calculated by the Avoided Cost Calculator"; rates "for a given
+  installation vintage … in a given calendar year are based on the applicable vintage of ACC
+  forecast of values for that year"; **all** ACC components count — generation (Energy,
+  Generation Capacity, Cap and Trade, Ancillary Services, Losses) and delivery (Distribution,
+  Transmission, **GHG Adder, GHG Rebalancing, Methane Leakage**). The vintage is kept 9 years.
+  (This corrects the review's first proposal, which excluded the GHG adder and assumed a flat
+  9-year lock.)
+- **Now.** `scripts/build_nbt_export.py` → `data/rates/nbt_export_acc.json`: the 2024 ACC
+  (CZ4 cache, same workbook + sha256 as `acc_marginal_electric.json`) per-year TOTAL hourly
+  block, averaged to month × hour, converted to clock time; annual means equal the marginal
+  harvest (2025 $0.0894, 2050 $0.2337). `src/nbt_export.py` → `(n_years, 12, 24)`; calendar
+  year clamped to 2024–2054. With one ACC vintage the credit is ACC 2024's value for each year
+  — during and after the 9-year legacy period (a new vintage is a data drop).
+- **Hourly pricing.** `dispatch.month_bill` and `JourneyHome` price exports by clock hour
+  (`Σ export[h] × rate[h]`); NEM 2.0 passes retail − NBC repeated over 24 h (unchanged value).
+- **Effect.** Solar-weighted credit ≈ $0.052/kWh (2025) → $0.060 (2035) → $0.077 (2050) —
+  midday exports are cheap (July noon $0.046, 7pm $0.337). Golden: journey opex +$2.8k / +$2.4k /
+  +$2.8k over the horizon for cases 02 / 04 / 06 (less export credit); no other case moved; 37
+  trend moves correct. The late-run summer flip to Cost-saving (U1 finding) is gone: case 02 on
+  EV2 under WhyWatt Moderate is Cost-saving only Jan + Dec in every year.
+- Removed: `ACCRateLoader.get_nem3_export_rates`, `model._is_legacy_acc`. The placeholder
+  `monthly_avg_acc_kwh` is now unused by export (still loaded by ACCRateLoader).
+- **Not modelled (noted in help):** ACC Plus adder (first 5 NBT years); CCA customers get the
+  generation part from their CCA, not PG&E; later ACC vintages. Tests: `tests/test_nbt_export.py`.
 
 ### §5 — Adopt the CEC projected-rate escalation as the default (Phase 6 WS1 → live)
 
@@ -894,8 +926,7 @@ tests/
 - ✅ **Two periods only — peak and off-peak.** WhyWatt has no super-off-peak period; where a
   URDB plan has one (e.g. SDG&E, SCE midday) it is ignored for now and those hours are priced as
   off-peak. No 3-period extension planned.
-- **NEM export credit escalation** (§4.1 issue 12): lock-for-9-years + ACC future values vs
-  today's retail-CAGR growth — decide; likely post-P7.
+- ✅ **NEM export credit** (§4.1 issue 12) — fixed: hourly ACC by calendar year.
 - §6 load profiles: does the ACC rate weighting also switch to the NREL profiles, or keep
   `device_load_shapes.json`? NREL source details (version, geography → CEC zone, EV coverage,
   timestamps) to verify at planning.
@@ -925,7 +956,8 @@ tests/
       without a URDB price start from `starting_rates.json`; all CA ZIPs degrade gracefully.
 - [ ] §4.1 UI rework (U1 + U2): Home Profile utilities, **Current energy rate**, **Projection
       method** (naming table applied to keys, UI and help); My Utility / CA Average / ACC in the
-      Details dropdown; municipal-utility ZIPs resolved before U2. NEM export decision recorded.
+      Details dropdown; municipal-utility ZIPs resolved before U2.
+- [x] NEM 3.0 export credit = hourly ACC by calendar year (issue 12; own golden diff, 2026-09-23).
 - [ ] Golden unchanged by U1/U2 (My Utility stays the default); only the battery-defaults commit
       moves it, with the diff explained; full `pytest` green.
 - [ ] *(post-Phase-7)* default → projection with URDB starting price (own golden diff).

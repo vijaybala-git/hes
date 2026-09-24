@@ -208,9 +208,11 @@ def run_day(G, L, battery: BatteryParams, mode: str, peak_hours: Sequence[int] =
 
 
 def month_bill(day: DayFlows, days: int, peak_hours: Sequence[int], r_peak: float,
-               r_offpeak: float, export_rate: float,
+               r_offpeak: float, export_rate,
                price_fn: Callable[[float, float], float] | None = None) -> float:
     """Monthly electricity bill ($) for a representative day, net of export credit.
+
+    export_rate: $/kWh — a scalar, or a (24,) clock-hour vector (NEM 3.0 hourly ACC values).
 
     price_fn(grid_peak_kwh, grid_offpeak_kwh) → $ lets the caller apply tiers/fixed charges
     (URDB price_month, §3); by default the two flat period rates are used.
@@ -219,12 +221,12 @@ def month_bill(day: DayFlows, days: int, peak_hours: Sequence[int], r_peak: floa
     gi = day.grid_import
     g_peak, g_off = float(gi[peak].sum()) * days, float(gi[~peak].sum()) * days
     energy = price_fn(g_peak, g_off) if price_fn else g_peak * r_peak + g_off * r_offpeak
-    return energy - float(day.export.sum()) * days * export_rate
+    return energy - float(np.sum(day.export * export_rate)) * days
 
 
 def dispatch_month(G, L, battery: BatteryParams, *, days: int, mode: str = "auto",
                    peak_hours: Sequence[int] = (), r_peak: float = 0.0,
-                   r_offpeak: float = 0.0, export_rate: float = 0.0,
+                   r_offpeak: float = 0.0, export_rate=0.0,
                    price_fn: Callable[[float, float], float] | None = None) -> MonthResult:
     """Run one mode (or "auto": both, keep the cheaper) for a month's representative day."""
     if mode not in ("self", "cost", "auto"):
