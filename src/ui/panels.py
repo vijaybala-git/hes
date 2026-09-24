@@ -545,7 +545,7 @@ def TransportationSummaryCard():
                 solara.Select("", values=_TRANSPORT_STATES,
                               value=_transport_state(),
                               on_value=_set_transport_state)
-            _PlanCheck(ev_swap_planned, "Plan EV Charger")
+            _PlanCheck(ev_swap_planned, "Plan")
         # When EV charger is planned: year slider + net cost
         if ev_swap_planned.value:
             with solara.Column(style="width:100%"):
@@ -779,7 +779,7 @@ def _BaseloadControls():
             "<strong style='color:#333'>0 therms/month</strong>"
             "</div>"
         ))
-        _PlanCheck(baseload_swap_planned, "Plan upgrade")
+        _PlanCheck(baseload_swap_planned, "Plan")
     # When planned: year slider + install/rebate cost row (same as other cards)
     if baseload_swap_planned.value:
         with solara.Column(style="width:100%"):
