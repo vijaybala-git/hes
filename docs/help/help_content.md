@@ -92,7 +92,7 @@ Loading or resetting changes the whole comparison, so the two cost curves redraw
 
 ### Default values
 
-- Modeled period — 20 years (Energy & Prices → Model Timeline)
+- Modeled period — 20 years (Home & Simulation Timeframe → Model Timeline)
 - Simulation start year — 2025 (Energy & Prices → detail)
 - HVAC swap — planned, Year 3 (HVAC card)
 - Water heater swap — planned, Year 5 (Water Heater card)

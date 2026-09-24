@@ -796,6 +796,16 @@ Clarified 2026-09-23: *the URDB data file is used when the ZIP resolves to a uti
 - **Not modelled (noted in help):** ACC Plus adder (first 5 NBT years); CCA customers get the
   generation part from their CCA, not PG&E; later ACC vintages. Tests: `tests/test_nbt_export.py`.
 
+### §4.1b — Setup-your-home compaction (LANDED 2026-09-23, UI only; golden unchanged)
+
+- **Model Timeline** moved to the first card of the Home group, renamed **"Home & Simulation
+  Timeframe"** (was "Home, Panel & Solar"); same `years` reactive, ⋮ still opens Rate Scenarios.
+- **External Energy Price** (read-only gasoline / external-EV summary) removed from the Energy &
+  Prices summary — the values are edited in Rate Scenarios → Transport Fuels, unchanged.
+- Result at 1280 px: column content 639 / 623 / 686 px (Home / Energy / Social) — balanced;
+  Social & Health now sets the group height. After §4.2 moves Solar / Battery / Panel into the
+  Journey, the Home column shrinks further (re-check balance then).
+
 ### §4.2 — Solar, Battery and Electrical Panel cards in the Journey (PLANNED — decided 2026-09-23)
 
 **Why.** Phase 5.6 #6 (one "Plan" row for every device) was deferred because Solar + Battery and

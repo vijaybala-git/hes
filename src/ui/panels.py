@@ -861,48 +861,54 @@ def _projection_buttons(fuel: str, rv, color: str, compact: bool = False):
                        f" border-radius:4px; padding:{pad}; font-size:0.78em; cursor:pointer;"))
 
 
+def _rates_hd(title, show_help=False):
+    """Sub-card header: rates icon + title + (optional help) + ⋮ detail opener."""
+    icon_svg = _DEVICE_ICONS.get("rates", "")
+    with solara.Row(classes=["device-hd"], gap="0px", style="align-items:center; gap:8px"):
+        if icon_svg:
+            solara.HTML(tag="span", unsafe_innerHTML=f"<span class='di'>{icon_svg}</span>")
+        solara.HTML(tag="span", unsafe_innerHTML=f"<span class='dn'>{title}</span>",
+                    style="flex:1")
+        if show_help:
+            HelpButton("rates")
+        solara.Button(
+            "",
+            on_click=lambda: detail_open.set(None if detail_open.value == "rates" else "rates"),
+            classes=["iconbtn"],
+            children=[solara.HTML(tag="span", unsafe_innerHTML=(
+                "<svg viewBox='0 0 24 24' fill='currentColor'>"
+                "<circle cx='5' cy='12' r='1.8'/><circle cx='12' cy='12' r='1.8'/>"
+                "<circle cx='19' cy='12' r='1.8'/></svg>"))],
+        )
+
+
+@solara.component
+def ModelTimelineCard():
+    """How many years to simulate — first card of "Home & Simulation Timeframe" (moved from
+    Energy & Prices). Same `years` reactive; ⋮ opens the Rate Scenarios details as before."""
+    with solara.Column(classes=["device"]):
+        _rates_hd("Model Timeline", show_help=True)
+        solara.SliderInt(f"⏱ Model: {years.value} yrs", value=years, min=5, max=30)
+
+
 @solara.component
 def RatesSummaryCard():
-    """Energy & Prices summary (§3.8) — sub-cards: Model Timeline · Current Energy Rate ·
-    Projection Method · External Energy Price (Phase 7 §4.1 splits the old Home Energy Prices)."""
+    """Energy & Prices summary (§3.8) — sub-cards: Current Energy Rate · Projection Method
+    (Phase 7 §4.1). Model Timeline moved to the Home card; gasoline and external-EV prices are
+    edited in the Rate Scenarios details only (not repeated here — saves vertical space)."""
     # Seed the CAGR sliders from each utility's EIA historical CAGR (re-runs on ZIP/mode change).
     solara.use_effect(_seed_eia_cagr,
                       [zip_code.value, elec_rate_model_a.value, gas_rate_model_a.value,
                        elec_rate_model_b.value, gas_rate_model_b.value])
 
-    def _hd(title, show_help=False):
-        """Sub-card header: rates icon + title + (optional help) + ⋮ detail opener."""
-        icon_svg = _DEVICE_ICONS.get("rates", "")
-        with solara.Row(classes=["device-hd"], gap="0px", style="align-items:center; gap:8px"):
-            if icon_svg:
-                solara.HTML(tag="span", unsafe_innerHTML=f"<span class='di'>{icon_svg}</span>")
-            solara.HTML(tag="span", unsafe_innerHTML=f"<span class='dn'>{title}</span>",
-                        style="flex:1")
-            if show_help:
-                HelpButton("rates")
-            solara.Button(
-                "",
-                on_click=lambda: detail_open.set(None if detail_open.value == "rates" else "rates"),
-                classes=["iconbtn"],
-                children=[solara.HTML(tag="span", unsafe_innerHTML=(
-                    "<svg viewBox='0 0 24 24' fill='currentColor'>"
-                    "<circle cx='5' cy='12' r='1.8'/><circle cx='12' cy='12' r='1.8'/>"
-                    "<circle cx='19' cy='12' r='1.8'/></svg>"))],
-            )
-
-    # ── Card 1: Model Timeline ────────────────────────────────────────────────
+    # ── Card 1: Current Energy Rate — what the home pays today (Phase 7 §4.1) ──
     with solara.Column(classes=["device"]):
-        _hd("Model Timeline", show_help=True)
-        solara.SliderInt(f"⏱ Model: {years.value} yrs", value=years, min=5, max=30)
-
-    # ── Card 2: Current Energy Rate — what the home pays today (Phase 7 §4.1) ──
-    with solara.Column(classes=["device"]):
-        _hd("Current Energy Rate")
+        _rates_hd("Current Energy Rate")
         CurrentRateBlock(elec_rate_model_a.value, gas_rate_model_a.value)
 
-    # ── Card 3: Projection Method — how prices grow (Scenario A; B in Details) ──
+    # ── Card 2: Projection Method — how prices grow (Scenario A; B in Details) ──
     with solara.Column(classes=["device"]):
-        _hd("Projection Method")
+        _rates_hd("Projection Method")
         solara.HTML(tag="div", unsafe_innerHTML=(
             "<div style='font-size:0.72em; color:#607D8B; margin:0 0 2px 2px'>"
             "WhyWatt scenarios · or the federal EIA Pacific outlook</div>"))
@@ -928,34 +934,6 @@ def RatesSummaryCard():
         solara.HTML(tag="div", unsafe_innerHTML=(
             f"<div style='font-size:0.68em; color:#90A4AE; margin:5px 0 0 4px'>"
             f"ZIP {zip_code.value} · rates from URDB / EIA 2025</div>"))
-
-    # ── Card 4: External Energy Price (gasoline + external EV) ─────────────────
-    gpr = gasoline_price.value
-    gesc = gasoline_escalation_pct.value
-    epr = external_ev_price_per_kwh.value
-    eesc = external_ev_escalation_pct.value
-    _kv = ("<div style='display:flex; justify-content:space-between;"
-           " align-items:baseline; font-size:0.86em; padding:3px 0 3px 4px;'>"
-           "<span style='color:#607D8B'>{k}</span>"
-           "<strong style='color:#263238'>{v}</strong></div>")
-    with solara.Column(classes=["device"]):
-        _hd("External Energy Price")
-        solara.HTML(tag="div", unsafe_innerHTML=(
-            "<div style='font-size:0.78em; font-weight:600; color:#B8860B;"
-            " margin-bottom:2px; margin-top:4px'>⛽ Gasoline Rate &amp; CAGR</div>"
-        ))
-        solara.HTML(tag="div", unsafe_innerHTML=(
-            _kv.format(k="Gasoline Price", v=f"${gpr:.2f}/gal")
-            + _kv.format(k="Gasoline CAGR", v=f"+{gesc}%/yr")
-        ))
-        solara.HTML(tag="div", unsafe_innerHTML=(
-            "<div style='font-size:0.78em; font-weight:600; color:#1D9E75;"
-            " margin-bottom:2px; margin-top:8px'>🔌 External EV Charging Rate &amp; CAGR</div>"
-        ))
-        solara.HTML(tag="div", unsafe_innerHTML=(
-            _kv.format(k="EV Charging Rate", v=f"${epr:.2f}/kWh")
-            + _kv.format(k="EV Charging CAGR", v=f"+{eesc}%/yr")
-        ))
 
 
 # ── §25.4 Detail windows ──────────────────────────────────────────────────────
@@ -2093,4 +2071,4 @@ def _SocialBody():
 
 
 
-__all__ = ['_DETAIL_TITLES', '_LEFT_COL', '_RIGHT_COL', '_COSTS_BOX', '_CARD_NORMAL', '_CARD_OPEN', '_ROW_CTRL', '_TOP_ROW', 'DetailTitleBar', '_DS', '_DSl', '_elec_display', '_ElecAmpsInput', '_DetailCosts', '_card_header', '_card_header_main', '_panel_hd', '_PlanCheck', '_Check', '_cost_row', '_appliance_rows', 'HVACSummaryCard', 'WHSummaryCard', 'TransportationSummaryCard', 'TransportationDetail', 'CooktopSummaryCard', 'DryerSummaryCard', '_PanelControls', 'PanelSummaryCard', '_BaseloadControls', 'BaseloadSummaryCard', 'HomeSummaryCard', 'SolarSummaryCard', 'CurrentRateBlock', 'RatesSummaryCard', 'HVACDetail', 'WaterHeaterDetail', 'EVDetail', 'CooktopDetail', 'DryerDetail', 'ElecPanelDetail', 'BaseloadDetail', 'HomeDetail', 'SolarDetail', '_fuel_model_block', 'RatesDetail', 'JourneyPlannerPanel', 'HomeProfilePanel', 'EnergyPricesPanel', '_SocialBody']
+__all__ = ['_DETAIL_TITLES', '_LEFT_COL', '_RIGHT_COL', '_COSTS_BOX', '_CARD_NORMAL', '_CARD_OPEN', '_ROW_CTRL', '_TOP_ROW', 'DetailTitleBar', '_DS', '_DSl', '_elec_display', '_ElecAmpsInput', '_DetailCosts', '_card_header', '_card_header_main', '_panel_hd', '_PlanCheck', '_Check', '_cost_row', '_appliance_rows', 'HVACSummaryCard', 'WHSummaryCard', 'TransportationSummaryCard', 'TransportationDetail', 'CooktopSummaryCard', 'DryerSummaryCard', '_PanelControls', 'PanelSummaryCard', '_BaseloadControls', 'BaseloadSummaryCard', 'HomeSummaryCard', 'SolarSummaryCard', 'CurrentRateBlock', 'ModelTimelineCard', 'RatesSummaryCard', 'HVACDetail', 'WaterHeaterDetail', 'EVDetail', 'CooktopDetail', 'DryerDetail', 'ElecPanelDetail', 'BaseloadDetail', 'HomeDetail', 'SolarDetail', '_fuel_model_block', 'RatesDetail', 'JourneyPlannerPanel', 'HomeProfilePanel', 'EnergyPricesPanel', '_SocialBody']

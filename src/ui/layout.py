@@ -1097,6 +1097,7 @@ def _SetupCard(collapse_key: str, icon_svg: str, title: str, help_key: str, body
 @solara.component
 def _HomeBody():
     with solara.Column(classes=["card-bd"], gap="8px"):
+        ModelTimelineCard()
         HomeSummaryCard()
         PanelSummaryCard()
         SolarSummaryCard()
@@ -1128,13 +1129,13 @@ def SetupGroup():
                 f"<div style='display:flex;align-items:center;gap:10px;min-width:0'>"
                 f"<span class='ic'>{_CARD_IC['home']}</span>"
                 f"<h3 style='margin:0'>Setup your home</h3>"
-                f"<span class='scope' title='Home, Panel &amp; Solar, Energy &amp; Prices "
+                f"<span class='scope' title='Home &amp; Simulation Timeframe, Energy &amp; Prices "
                 f"and Social &amp; Health collapse together'>— your starting assumptions"
                 f"</span></div>"
             ))
         # 3-card grid (flex; collapsed-all CSS turns this into a chip row)
         with solara.Row(classes=["setup-grid"]):
-            _SetupCard("home",   _CARD_IC["home"],   "Home, Panel &amp; Solar",
+            _SetupCard("home",   _CARD_IC["home"],   "Home &amp; Simulation Timeframe",
                        "home_profile",  _HomeBody)
             _SetupCard("energy", _CARD_IC["energy"], "Energy &amp; Prices",
                        "energy_prices", _EnergyBody)
