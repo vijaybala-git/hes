@@ -103,3 +103,10 @@ class HomeConfig:
         """PVWatts per-kW yield for this home's ZIP (ZIP → zone → default; clock time)."""
         from solar_loader import get_loader   # local import: keeps home_config dependency-free
         return get_loader().resolve(self.zip_code)
+
+    # ── Phase 7 §6 — location-derived hourly end-use load shapes (NREL ResStock). ──
+    @property
+    def load_profiles(self):
+        """End-use (12, 24) clock-time load shapes for this home's CEC zone (ZIP → zone → CZ4)."""
+        from load_profiles import get_loader
+        return get_loader().resolve(self.zip_code)

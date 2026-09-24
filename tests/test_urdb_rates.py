@@ -157,10 +157,12 @@ def test_eia_path_keeps_no_hourly_bill():
     assert all(x is None for x in m.baseline_home.home_load_hourly_history)
 
 
-def test_ev_plan_picks_cost_saving_in_winter_for_electrified_home():
+def test_ev_plan_mode_picker_takes_the_cheaper_mode_each_month():
     """Regression case 02 (PG&E, fully electrified, 6.3 kW + 13.5 kWh) on the EV2 plan under
-    WhyWatt Moderate: winter solar can't cover the evening peak, so Cost-saving wins Jan and
-    Dec; summer stays Self-powered."""
+    WhyWatt Moderate: each month runs on the cheaper of the two battery modes, and summer is
+    Self-powered. (With the old flat everyday-load shape Cost-saving won Jan and Dec; with the
+    evening-heavy NREL shapes, Phase 7 §6, Self-powered already discharges into the peak and
+    wins year-round — Jan $176 vs $184.)"""
     import json
     import ui.state as S
     from ui import config, sim
@@ -175,7 +177,9 @@ def test_ev_plan_picks_cost_saving_in_winter_for_electrified_home():
         S.reset_to_defaults()
     modes = m.journey_home.battery_mode_history[-1]
     assert m.rate_structure_a.family == "EV2"
-    assert modes[0] == "cost" and modes[11] == "cost"
+    bills = m.journey_home.solar_monthly_bills_history[-1]
+    for mo in range(12):
+        assert bills[mo][modes[mo]] == min(bills[mo].values())
     assert modes[6] == "self"
 
 

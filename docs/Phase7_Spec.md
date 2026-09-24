@@ -1080,7 +1080,13 @@ extension decisions.)*
 
 ### §6 — NREL End-Use Load Profiles (planned feature — separate branch)
 
-**Status:** 📋 PLANNED (added 2026-09-23). Built on its own branch (`feat/nrel-end-use-load-profiles`)
+**Status:** ✅ LANDED 2026-09-24 on `feat/nrel-end-use-load-profiles` — ResStock 2025 Release 1
+(AMY2018), CEC zone from each building's metadata, EST→PST shift verified, heat pump split, EV =
+managed L2 (upgrade 22), ACC keeps `device_load_shapes.json`. Source verification, decisions and
+results: `docs/NREL_LoadProfiles_Plan.md`; review: `notebooks/load_profiles_review.ipynb`. Golden
+re-baselined in its own commit (244 metrics, < 2 %, no sign / payback change).
+
+*(Original plan, kept for the record:)* Built on its own branch (`feat/nrel-end-use-load-profiles`)
 **after** `feat/urdb-offline-harvest` is done. **No interim fix** to the current profiles in the
 meantime — the next change to hourly load shapes is this one.
 
@@ -1228,9 +1234,8 @@ tests/
   URDB plan has one (e.g. SDG&E, SCE midday) it is ignored for now and those hours are priced as
   off-peak. No 3-period extension planned.
 - ✅ **NEM export credit** (§4.1 issue 12) — fixed: hourly ACC by calendar year.
-- **§6 NREL End-Use Load Profiles** (separate branch, after this one): does the ACC rate
-  weighting also switch to the NREL profiles, or keep `device_load_shapes.json`? NREL source
-  details (version, geography → CEC zone, EV coverage, timestamps) to verify at planning.
+- ✅ **§6 NREL End-Use Load Profiles** — ACC rate weighting keeps `device_load_shapes.json`
+  (legacy, own rework); NREL source details verified (`docs/NREL_LoadProfiles_Plan.md` §1).
 - **Battery mode on the Battery summary card** (§4.2): the summary cards get no model results;
   the mode is on the Battery details page. Decide whether to thread results to the Journey grid.
 
@@ -1303,5 +1308,6 @@ tests/
 - [x] Charts per §4.3: R.1 / R.2 show the four projection curves on the home's current rate;
       EU.9 monthly solar generation (year selector); EU.10 solar & battery energy balance; R.6
       peak vs off-peak (URDB plans). Help updated; golden unchanged. *(2026-09-24)*
-- [ ] §6 NREL End-Use Load Profiles drive the energy balance (separate branch; own golden re-baseline).
+- [x] §6 NREL End-Use Load Profiles drive the energy balance (separate branch; own golden
+      re-baseline). *(2026-09-24)*
 - [x] CLAUDE.md updated: Phase 7 closed. *(2026-09-24)*

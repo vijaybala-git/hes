@@ -66,32 +66,6 @@ DEVICE_ACC_CATEGORY: dict[str, str] = {
     "Dishwasher":          "baseload",
 }
 
-def _hourly_load_shapes() -> dict:
-    """{device class: (24,) clock-hour shape summing to 1} for the Phase 7 energy balance.
-
-    Same 24-h profiles the ACC rate weighting uses (data/rates/device_load_shapes.json), but
-    normalised: there they are relative weights (some sum to ~1.26); here they spread a
-    device's monthly kWh over the representative day, so each must sum to exactly 1.
-    """
-    raw = json.loads((_DATA / "rates" / "device_load_shapes.json").read_text(encoding="utf-8"))
-    prof = {k: np.asarray(v, dtype=float) for k, v in raw["profiles"].items()}
-    norm = {k: v / v.sum() for k, v in prof.items()}
-    shapes = {cls: norm.get(cat, norm["flat"]) for cls, cat in DEVICE_ACC_CATEGORY.items()}
-    shapes["_default"] = norm["flat"]
-    return shapes
-
-
-_HOURLY_LOAD_SHAPES: dict | None = None
-
-
-def hourly_load_shapes() -> dict:
-    """Process-wide cache of _hourly_load_shapes()."""
-    global _HOURLY_LOAD_SHAPES
-    if _HOURLY_LOAD_SHAPES is None:
-        _HOURLY_LOAD_SHAPES = _hourly_load_shapes()
-    return _HOURLY_LOAD_SHAPES
-
-
 # Rate-model keys retired in Phase 7 §4.1 → their replacement. `urdb_tou` was a rate *source*
 # offered as a model; the URDB plan is now the current energy rate of every projection method.
 RETIRED_RATE_MODELS = {"urdb_tou": "whywatt_moderate"}
@@ -136,25 +110,40 @@ def _cagr_for(rate_model: str, cagr: float) -> float | None:
     return cagr if rate_model in ("cagr_flat", "ca_average") else None
 
 
-def _urdb_arrays(rs, esc: np.ndarray):
+def _hp_heating_share(climate) -> np.ndarray:
+    """(12,) share of a heat pump's monthly kWh that is heating, at the default COP / SEER.
+
+    Only prices the heat pump's own category rate (presentation); the home bill and the energy
+    balance use the device's exact heating / cooling split (journey._load_parts).
+    """
+    heat = np.asarray(climate.monthly_hdd, dtype=float) * 24 / (3.5 * 3412)
+    cool = np.asarray(climate.monthly_cdd, dtype=float) * 24 / (22 * 1000)
+    tot = heat + cool
+    return np.divide(heat, tot, out=np.ones(12), where=tot > 0)
+
+
+def _urdb_arrays(rs, esc: np.ndarray, profiles, hp_heating_share: np.ndarray):
     """URDB plan (Phase 7 §3/§4.1): the per-device-class tier-1 effective rates, grown by the
     projection index `esc` (n_years,) — `S[y] / S[plan effective year]`.
 
-    Each device class gets its own peak-weighted $/kWh per month (its 24-h shape against this
-    tariff's peak hours), so device costs stay exact without tiers; tiers + fixed charge are
+    Each device class gets its own peak-weighted $/kWh per month (that month's NREL 24-h shape,
+    Phase 7 §6, against this tariff's peak hours), so device costs stay exact without tiers; tiers + fixed charge are
     applied once on the home aggregate in JourneyHome (scaled by the same index; tier kWh
     thresholds never scale).
     Returns (elec_rates (n_years,12), rates_by_class {cls: (n_years,12)}).
     """
-    shapes = hourly_load_shapes()
+    def shape(cls, m):
+        if cls == "HeatPumpHVAC":
+            return profiles.heat_pump_shape(m, hp_heating_share[m])
+        return profiles.shape(cls, m)
+
     by_cls = {}
     for cls in DEVICE_ACC_CATEGORY:
         if cls in ("GasWaterHeater", "GasFurnace", "GasDryer", "GasCooktop"):
             continue
-        month = np.array([rs.effective_rate(m, shapes.get(cls, shapes["_default"]))
-                          for m in range(12)])
+        month = np.array([rs.effective_rate(m, shape(cls, m)) for m in range(12)])
         by_cls[cls] = esc[:, None] * month[None, :]
-    base = np.array([rs.effective_rate(m, shapes["LightsAndPlugs"]) for m in range(12)])
+    base = np.array([rs.effective_rate(m, shape("LightsAndPlugs", m)) for m in range(12)])
     return esc[:, None] * base[None, :], by_cls
 
 
@@ -466,6 +455,7 @@ class HESModel(mesa.Model):
 
         # ── Solar resource (Phase 7 §1) — ZIP → PVWatts per-kW table, clock time ──
         self.solar_resource = home_config.solar_resource
+        self.load_profiles = home_config.load_profiles     # Phase 7 §6 — NREL end-use shapes
 
         # UA is building physics, not climate-zone data (§1.9.5). Scales with conditioned
         # floor area so furnace/AC energy tracks home size (Phase 5.5 Fix 1).
@@ -578,7 +568,8 @@ class HESModel(mesa.Model):
         self.rate_structure_b = self.rate_escalation_b = None
         if self.rate_structure_a is not None:
             self.elec_rates, elec_by_cls_a = _urdb_arrays(self.rate_structure_a,
-                                                          self.rate_escalation_a)
+                                                          self.rate_escalation_a,
+                                                          self.load_profiles, _hp_heating_share(self.climate))
             self.current_elec_rates = self.elec_rates[0]
 
         # ── Solar export rates (§8) — built once, used by journey_home only ──
@@ -603,7 +594,7 @@ class HESModel(mesa.Model):
                                          solar_config=solar_config,
                                          solar_export_rates=solar_export_rates,
                                          solar_resource=self.solar_resource,
-                                         hourly_load_shapes=hourly_load_shapes(),
+                                         load_profiles=self.load_profiles,
                                          rate_structure=self.rate_structure_a,
                                          rate_escalation=self.rate_escalation_a,
                                          elec_rates_by_category=elec_by_cls_a,
@@ -611,7 +602,7 @@ class HESModel(mesa.Model):
                                          external_ev_rates=_external_ev_rates)
         self.baseline_home = JourneyHome(self, baseline_slots, self.elec_rates, self.gas_rates,
                                          is_baseline_home=True,
-                                         hourly_load_shapes=hourly_load_shapes(),
+                                         load_profiles=self.load_profiles,
                                          rate_structure=self.rate_structure_a,
                                          rate_escalation=self.rate_escalation_a,
                                          elec_rates_by_category=elec_by_cls_a,
@@ -648,7 +639,8 @@ class HESModel(mesa.Model):
             self.rate_structure_b, self.rate_escalation_b = _urdb_for(elec_rate_model_b)
             if self.rate_structure_b is not None:
                 self.elec_rates_b, elec_by_cls_b = _urdb_arrays(self.rate_structure_b,
-                                                                self.rate_escalation_b)
+                                                                self.rate_escalation_b,
+                                                                self.load_profiles, _hp_heating_share(self.climate))
                 self.current_elec_rates_b = self.elec_rates_b[0]
 
             journey_slots_b  = _build_slots(slot_configs, False, self, **device_kw)
@@ -659,7 +651,7 @@ class HESModel(mesa.Model):
                                                solar_config=solar_config,
                                                solar_export_rates=solar_export_rates,
                                                solar_resource=self.solar_resource,
-                                               hourly_load_shapes=hourly_load_shapes(),
+                                               load_profiles=self.load_profiles,
                                                rate_structure=self.rate_structure_b,
                                                rate_escalation=self.rate_escalation_b,
                                                elec_rates_by_category=elec_by_cls_b,

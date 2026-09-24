@@ -622,8 +622,11 @@ Hour by hour, on a typical day for each month:
 - The battery covers the home when solar falls short; the utility covers the rest.
 
 The home's hourly use comes from each appliance's monthly electricity spread over its
-typical daily pattern (EV charging overnight, heating mornings and evenings, and so on), so
-the share of your solar you use yourself is calculated — it grows as you electrify.
+typical daily pattern for that month and your climate zone — from NREL's ResStock simulations
+of California homes: lights, plugs and cooking peak in the evening, a heat pump heats in the
+morning and cools in the afternoon, a heat-pump water heater runs mornings and evenings, and
+EV charging is mostly overnight. So the share of your solar you use yourself is calculated —
+it grows as you electrify.
 
 A battery can run in two standard modes. Each month WhyWatt uses whichever saves more:
 
@@ -700,6 +703,10 @@ The export rate depends on your net-metering era:
 - NEM 3.0 export values: CPUC Avoided Cost Calculator 2024, climate zone 4, hourly values
   for each year 2024–2054, all components (PG&E Schedule NBT)
 - Non-bypassable charge: PG&E NEM 2.0 tariff
+- Hourly appliance patterns: NREL ResStock 2025 Release 1 (AMY2018), California
+  single-family homes, per climate zone and month. Data includes information from the
+  ResStock™ dataset developed by the National Laboratory of the Rockies (NLR) with funding
+  from the U.S. Department of Energy (DOE).
 
 ---
 

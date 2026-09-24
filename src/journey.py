@@ -9,8 +9,26 @@ import numpy as np
 
 from battery_defaults import DEFAULT_BATTERY
 from dispatch import dispatch_month
+from load_profiles import HP_COOLING, HP_HEATING
 
 _DAYS_IN_MONTH = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+
+
+def _load_parts(device, home_monthly: np.ndarray) -> list:
+    """[(load-shape key, (12,) kWh)] for one electric device's home-meter kWh (Phase 7 §6).
+
+    A heat pump is split into its heating and cooling parts by the device's own monthly
+    heating / cooling energy, so each part is spread by its own hourly profile. Every other
+    device is one part keyed by its class name.
+    """
+    cls = type(device).__name__
+    if cls == "HeatPumpHVAC":
+        heat = np.asarray(device.monthly_heating(), dtype=float)
+        cool = np.asarray(device.monthly_cooling(), dtype=float)
+        tot = heat + cool
+        share = np.divide(heat, tot, out=np.ones(12), where=tot > 0)
+        return [(HP_HEATING, home_monthly * share), (HP_COOLING, home_monthly * (1.0 - share))]
+    return [(cls, home_monthly)]
 
 
 @dataclass
@@ -285,7 +303,7 @@ class JourneyHome(mesa.Agent):
                  solar_config: SolarBatteryConfig | None = None,
                  solar_export_rates: np.ndarray | None = None,
                  solar_resource=None,
-                 hourly_load_shapes: dict | None = None,
+                 load_profiles=None,
                  rate_structure=None,
                  rate_escalation: np.ndarray | None = None,
                  elec_rates_by_category: dict | None = None,
@@ -295,6 +313,8 @@ class JourneyHome(mesa.Agent):
         solar_config: SolarBatteryConfig for the journey home; None for baseline.
         solar_resource: SolarResource (HomeConfig.solar_resource) — per-kW PVWatts yield for the
           home's ZIP. Required whenever solar_config is given.
+        load_profiles: LoadProfiles (HomeConfig.load_profiles) — NREL end-use (12, 24) clock-time
+          shapes for the home's zone (Phase 7 §6); None → every device flat over the day.
         solar_export_rates: (n_years, 12, 24) $/kWh export credit by month × clock hour. For
           NEM 3.0 these are the ACC hourly avoided-cost values for each calendar year; for NEM
           2.0, retail minus NBC. Built in HESModel and passed in so JourneyHome.step() needs
@@ -313,9 +333,9 @@ class JourneyHome(mesa.Agent):
         self._solar_config       = solar_config        # SolarBatteryConfig | None
         self._solar_export_rates = solar_export_rates  # (n_years, 12, 24) | None
         self._solar_resource     = solar_resource      # SolarResource | None (Phase 7 §1)
-        # {device class name: (24,) clock-hour shape summing to 1, "_default": flat} — spreads
-        # each electric device's monthly kWh over the representative day (Phase 7 §0.1).
-        self._hourly_load_shapes = hourly_load_shapes or {}
+        # Spreads each electric device's monthly kWh over its month's representative day
+        # (Phase 7 §0.1 / §6); the heat pump is split into heating + cooling parts in step().
+        self._load_profiles = load_profiles
         # URDB TOU tariff (Phase 7 §3): tiers + fixed charge applied on the home aggregate;
         # None → today's per-device flat/ACC pricing only.
         self._rate_structure  = rate_structure
@@ -361,13 +381,15 @@ class JourneyHome(mesa.Agent):
         self.monthly_cost_history_by_slot:        dict = {s.name: [] for s in slots}
 
     def _month_loads(self, load_by_class: dict) -> list:
-        """12 representative-day home loads (24,) from monthly kWh per device class."""
-        default_shape = self._hourly_load_shapes.get("_default", np.full(24, 1.0 / 24))
+        """12 representative-day home loads (24,) from monthly kWh per device class / part."""
+        lp = self._load_profiles
+        flat = np.full(24, 1.0 / 24)
         out = []
         for m in range(12):
             L = np.zeros(24)
-            for cls, kwh in load_by_class.items():
-                L = L + kwh[m] / _DAYS_IN_MONTH[m] * self._hourly_load_shapes.get(cls, default_shape)
+            for key, kwh in load_by_class.items():
+                shape = lp.shape(key, m) if lp is not None else flat
+                L = L + kwh[m] / _DAYS_IN_MONTH[m] * shape
             out.append(L)
         return out
 
@@ -435,9 +457,9 @@ class JourneyHome(mesa.Agent):
                 if active_dev.fuel_type == "electricity":
                     home_monthly = (np.asarray(mc[-1], dtype=float) if mc else
                                     np.full(12, active_dev.history["consumption"][-1] / 12.0))
-                    cls = type(active_dev).__name__
-                    year_elec_load_by_class[cls] = (year_elec_load_by_class.get(cls, 0.0)
-                                                    + home_monthly)
+                    for key, kwh in _load_parts(active_dev, home_monthly):
+                        year_elec_load_by_class[key] = (year_elec_load_by_class.get(key, 0.0)
+                                                        + kwh)
                     # §3.13 — external EV charging is NOT on the home meter; exclude it
                     # from elec opex so the §8 solar cap can't offset public charging.
                     year_elec_opex += cost - slot_ext_cost

@@ -1,8 +1,8 @@
 # WhyWatt — Project Brain (Claude Code reads this automatically)
 
 > Keep this file current after each phase. Last updated: 2026-09-24 — **Phase 7 closed** (real solar,
-> battery physics, URDB time-of-use pricing, projection methods). Next: §6 NREL load profiles +
-> gas-rate base review → Beta release.
+> battery physics, URDB time-of-use pricing, projection methods). §6 NREL load profiles and the
+> gas-rate base review done → next: Beta release.
 
 ---
 
@@ -24,8 +24,11 @@ Phase 7 is **complete and closed** as of 2026-09-24. See `docs/Phase7_Spec.md` (
 "Landed" notes per section) for the full delivery record.
 
 Before the Beta release (each on its own branch off `main`):
-- **§6 NREL End-Use Load Profiles** — replace `device_load_shapes.json` in the hourly energy
-  balance (per CEC zone × end use × month × 24 h); own golden re-baseline.
+- ✅ **§6 NREL End-Use Load Profiles** (branch `feat/nrel-end-use-load-profiles`,
+  `docs/NREL_LoadProfiles_Plan.md`) — the hourly energy balance and URDB per-device rates use NREL
+  ResStock 2025.1 shapes per CEC zone × end use × month × 24 clock hours; heat pump split into
+  heating + cooling; EV = managed L2 charging. `device_load_shapes.json` now feeds legacy ACC only.
+  Golden re-baselined (< 2 % moves, no sign / payback change).
 - ✅ **Gas-rate base review** (branch `fix/gas-rate-base-review`, `docs/GasRateBase_Review_Plan.md`)
   — the $2.08 "G-1" figure was PG&E's CARE baseline charge; the WhyWatt gas curves now follow the CEC
   delivered price ($2.649 nominal 2025, ≈ EIA's $2.66). Model results unchanged (shape only).
@@ -212,6 +215,9 @@ data/ solar/pvwatts_zip.json  rates/urdb_tou.json  rates/starting_rates.json
       rates/nbt_export_acc.json  appliances/battery_defaults.json
 scripts/ build_pvwatts.py  build_urdb*.py  build_starting_rates.py  build_nbt_export.py
       build_battery_defaults.py  ca_munis.py (+ muni rule in build_zip_utility_map.py)
+§6:   src/load_profiles.py (HomeConfig.load_profiles)  data/loads/end_use_profiles.json
+      data/loads/sources/manifest.json  scripts/build_load_profiles.py (needs pyarrow;
+      cache data/loads/.cache/ git-ignored)
 ```
 Interpreter: `.venv/Scripts/python.exe` (the base `python` has no deps). Regression:
 `scripts/run_regression.py` (`--update` re-blesses golden).
