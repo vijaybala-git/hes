@@ -884,9 +884,10 @@ def CurrentRateBlock(elec_method: str, gas_method: str):
 
 def _projection_buttons(fuel: str, rv, color: str, compact: bool = False):
     """Projection method row: WhyWatt Conservative / Moderate / Stress + EIA Pacific."""
-    # Compact (summary card): all four on one line — no button min-width / letter-spacing,
-    # tighter padding, and "EIAPacific" without the space.
-    pad = "2px 6px; min-width:0; letter-spacing:0" if compact else "3px 10px"
+    # Compact (summary card): all four on one line — mixed case (no upper-casing), no button
+    # min-width / letter-spacing, tighter padding, and "EIAPacific" without the space.
+    pad = ("2px 6px; min-width:0; letter-spacing:0; text-transform:none" if compact
+           else "3px 10px")
     fs = "0.78em"
     with solara.Row(gap="4px", style="align-items:center; flex-wrap:wrap"):
         for key, label in PROJECTION_BUTTONS:
