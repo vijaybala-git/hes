@@ -228,7 +228,9 @@ Projection Method — how prices grow over the years; each scenario picks its ow
     revenue divided by total residential energy — grown at a fixed rate.
   - California average: the statewide blended rate, grown at a fixed rate.
   - ACC-shaped (electricity) or ACC-seasonal (gas): the CPUC Avoided Cost Calculator rate
-    shape on the PG&E CPUC base.
+    shape on the PG&E CPUC base. Known limitation: its gas base ($2.08/therm) is PG&E's
+    discounted CARE baseline rate, about 20% below what a typical PG&E household pays — the
+    projection methods and My Utility start from the average rate instead.
   These keep their own starting price; pick a projection method to start from your utility's
   own plan or 2025 rate.
 
