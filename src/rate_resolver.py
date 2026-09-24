@@ -103,7 +103,7 @@ class RateResolver:
             db = self._rates[db_key]
             candidates = [i for i in ids if i in db]       # only utilities we price
             if candidates:
-                uid = sorted(candidates)[0]                # deterministic pick
+                uid = candidates[0]                        # the map lists the server first
                 rec = db[uid]
                 prov = "inferred" if str(zipcode).strip() in inferred else "matched"
                 return FuelResolution(

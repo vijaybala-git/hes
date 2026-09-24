@@ -28,5 +28,11 @@
     "sha256": "9181b1de1c06e217c1bf0c5ced1685987bb65654d9e3e2f72b7b99ac16920343",
     "bytes": 6562,
     "downloaded": "2026-09-23"
+  },
+  "eia861_sales_ult_cust_2024.xlsx": {
+    "url": "https://www.eia.gov/electricity/data/eia861/zip/f8612024.zip",
+    "sha256": "78f0a24db2b3eced624311f14974906eb82595e3fed17d910ef3bc8fb755780e",
+    "bytes": 472434,
+    "downloaded": "2026-09-23"
   }
 }

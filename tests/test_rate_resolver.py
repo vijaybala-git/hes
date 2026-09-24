@@ -37,8 +37,8 @@ def test_matched_la_sce_socalgas(resolver):
 
 
 def test_fallback_unresolved_zip(resolver):
-    """SF 94103 is a municipal (CCSF) ZIP we have no rate for → CA average fallback."""
-    res = resolver.resolve("94103")
+    """An out-of-state ZIP resolves to no utility → CA average fallback (My Utility)."""
+    res = resolver.resolve("10001")
     assert res.electricity.provenance == "fallback"
     assert res.gas.provenance == "fallback"
     assert "average" in res.electricity.name.lower()
@@ -46,6 +46,31 @@ def test_fallback_unresolved_zip(resolver):
     # Fallback uses the statewide-average numbers
     state_e = json.loads((_RATES / "eia_rates_by_utility.json").read_text())
     assert res.electricity.rate == state_e["state_average"]["CA"]["electricity"]["current_rate"]
+
+
+@pytest.mark.parametrize("zip_code,elec,gas", [
+    ("95814", "16534", "17610617"),   # downtown Sacramento → SMUD (gas PG&E)
+    ("95630", "14328", "17610617"),   # Folsom lists SMUD too, but is PG&E
+    ("95050", "16655", "17610617"),   # Santa Clara → Silicon Valley Power
+    ("94301", "14401", "17610617"),   # Palo Alto → City of Palo Alto Utilities
+    ("90012", "11208", "17621931"),   # downtown LA → LADWP (gas SoCalGas)
+    ("94103", "14328", "17610617"),   # San Francisco → PG&E (SFPUC serves municipal loads)
+    ("90401", "17609", "17621931"),   # Santa Monica: OpenEI lists only LADWP; it is SCE
+    ("95380", "19281", "17610617"),   # Turlock → Turlock Irrigation District
+    ("92236", "9216", "17621931"),    # Coachella → IID
+    ("95112", "14328", "17610617"),   # San José stays PG&E
+])
+def test_municipal_utilities_resolve(resolver, zip_code, elec, gas):
+    """Phase 7 §4.1 issue 6 — munis win by service geography, not by listing alone."""
+    res = resolver.resolve(zip_code)
+    assert res.electricity.utility_id == elec
+    assert res.gas.utility_id == gas
+
+
+def test_muni_priced_at_its_own_rate(resolver):
+    smud = resolver.resolve("95814").electricity
+    assert smud.name == "Sacramento Municipal Util Dist" and smud.rate == pytest.approx(0.1787)
+    assert smud.base_year == 2024
 
 
 def test_bogus_zip_falls_back(resolver):

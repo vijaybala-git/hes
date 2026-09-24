@@ -5,7 +5,8 @@ data through the model. (Adopting the WhyWatt projection as the *default* moved 
 **Follows:** Phase 6 (`docs/Phase6_Spec.md`) — Solar/Battery split, inert roof-geometry inputs, and
 the **non-default `cec_projection` rate hand-off interface** (evaluated but not switched). Offline
 PVWatts/URDB data is harvested and validated separately in `docs/OfflineSolarData_Plan.md`.
-**Last updated:** 2026-09-23 — **U2 landed** (UI: utilities in Home Profile, Current Energy Rate +
+**Last updated:** 2026-09-23 — **Municipal utilities resolved** (issue 6: SMUD, LADWP, SVP, Palo
+Alto… priced at their own EIA rate; SF → PG&E; golden unchanged). Earlier — **U2 landed** (UI: utilities in Home Profile, Current Energy Rate +
 Projection Method cards, fixed-%/yr dropdown; golden unchanged). Earlier — **NEM 3.0 export credit fixed** (issue 12: hourly ACC 2024 values
 by calendar year; golden re-baselined, solar cases only). Earlier — **U1 landed** (current energy rate × projection growth; EIA 2025
 starting rates; `starting_rates.json`; `urdb_tou` retired; golden unchanged). Earlier — full-pass review: stale text aligned with the round-2 decisions;
@@ -551,7 +552,7 @@ Price in year y = StartingRate × idx[y]
 | 3 | **WhyWatt scenarios exist only for `CA_PGE`.** For SDG&E / SCE / others there is no curve. | ✅ **Resolved (round 2, decision 3):** non-PG&E defaults to EIA — Pacific; WhyWatt selectable everywhere, badged "PG&E-based" outside PG&E. |
 | 4 | **EIA Pacific is a single copy inside the `CA_PGE` market** (AEO Pacific census division). Beyond CA needs one curve per EIA region. Gas EIA Pacific *drops* 10% 2025→2026 before rising. | Treat as region-level data (`benchmarks` keyed by EIA region); **TODO beyond CA:** harvest AEO curves for all census divisions. Flag the first-year gas dip in help. |
 | 5 | **"EIA — Pacific (default)" mixes a price with a projection.** Today an uncovered ZIP starts from the **California-average EIA price ($0.32/kWh)**, and *out-of-state* ZIPs (e.g. 10001 NYC, 97201 Portland) also get the CA average — wrong outside CA. | Utility label: "Not covered — California average (EIA)"; projection defaults to EIA — Pacific. **TODO beyond CA:** EIA state (or division) average starting prices. |
-| 6 | **Municipal utilities resolve to PG&E.** `zip_to_electric_utility.json` holds only the three IOUs; a ZIP with *any* PG&E customers maps to PG&E. SMUD (95814), Silicon Valley Power (95050), Palo Alto CPAU (94301) all show **PG&E** (SMUD's rate is roughly half of PG&E's); LADWP ZIPs fall back to CA average. Becomes very visible once the UI says "Your utility". | Separate fix before/with the UI: add the non-IOU file, resolve multi-utility ZIPs by service share, show "Municipal utility — EIA rate" for munis; flag ambiguous ZIPs. |
+| 6 | **Municipal utilities resolved to PG&E.** Only the IOU file was read; a ZIP listing PG&E went to PG&E (SMUD 95814, SVP 95050, CPAU 94301); LADWP and SF ZIPs fell back to the CA average. | ✅ **Fixed 2026-09-23** — see "Landed — issue 6" below. |
 | 7 | **CA Average and ACC aren't projections today.** CA Average = CA-average *price* × CAGR; ACC = PG&E CPUC *base level* + ACC *monthly shape* + ACC CAGR. | ⏸ **Deferred (round 2, decision 4):** both stay as today's legacy fixed-% modes through P7; reinterpreting them as pure projections (and whether ACC keeps its seasonal shape on a URDB start) is post-P7. |
 | 8 | **Moving the default off My Utility** would move the golden, the regression cases, trend offsets (`01__elec_cagr_up`, `08__acc_*`), tests and share links. | ✅ **Mostly avoided (round 2, decision 1):** My Utility stays the default through P7. Remaining: the old-key → new-key migration map (naming table above). |
 | 9 | **Horizon & start year.** Bundle covers 2025–2050; a 30-year run from 2025 reaches 2054. `sim_start_year` can differ from 2025. | ✅ **Resolved by the anchor-year rule:** index = `S[y] / S[anchor]` with *y* the calendar year; after 2050 hold the 2050 value (stated in help), revisit post-P7. |
@@ -717,8 +718,35 @@ Clarified 2026-09-23: *the URDB data file is used when the ZIP resolves to a uti
   `LEGACY_METHODS`, `_starting_rate`, `_current_rate_display`, `_utilities_html`.
 - Tests: `tests/test_ui_rates.py` (7). 514 pass; golden PASS. Help (rates) rewritten around the
   two cards. Verified in the preview (plan button → list; dropdown → slider).
-- **Known gap (issue 6, still open):** municipal-utility ZIPs (SMUD 95814, SVP 95050, CPAU
-  94301) still show PG&E in "Your utilities".
+- ~~Known gap (issue 6)~~ — fixed right after, see "Landed — issue 6".
+
+**Landed 2026-09-23 — issue 6, municipal utilities (golden unchanged):**
+- **Why listing alone fails.** OpenEI lists every utility with customers in a ZIP, so muni ZIPs
+  also list the IOU (95814: PG&E + SMUD). But Folsom (95630) lists SMUD and is PG&E; SF ZIPs
+  list only CCSF, whose power serves municipal loads (2,618 residential customers) — SF homes
+  are PG&E; OpenEI lists only LADWP for Santa Monica / Beverly Hills / Culver City (SCE).
+- **Rule** (`scripts/ca_munis.py` table + `build_zip_utility_map.py`): 20 "full" munis with a
+  curated service geography (Census places, or a county minus IOU-served places for SMUD / IID);
+  a ZIP goes to the muni when ≥ 50% of its land — or, for place-listed munis, of its *town*
+  land (homes sit in towns: 95380 Turlock 14% by land, 100% by town) — lies inside; 5 "partial"
+  munis (SFPUC, Corona, Moreno Valley, Escondido, Merced ID) never win and send muni-only ZIPs
+  to their host IOU; a muni-only ZIP the muni covers < 35% of goes to the neighbouring IOU
+  (prefix, else the county's dominant IOU). Every decision is in `_meta.muni_decisions`
+  (254 muni by share · 151 IOU by share · 59 SF → PG&E · 238 muni-only · 14 neighbour IOU).
+  Winner listed first; `RateResolver` takes the first priced id (was: lowest id).
+- **Prices.** `build_eia_rates.py` adds a record for each of the 26 CA publicly owned / co-op
+  utilities with residential sales: 2024 from the **EIA-861 annual** file (all utilities —
+  EIA-861M samples only the larger ones; snapshot `sources/eia861_sales_ult_cust_2024.xlsx`),
+  2025 observed from EIA-861M where present (LADWP 0.265, SMUD 0.189, SVP 0.179, IID, MID, TID,
+  Pasadena), else 2024 × CA state ratio (flagged). `short_name` added to every record (UI:
+  "SMUD · EIA 2025"). IOU / state records byte-identical except `short_name`.
+- **Effect.** "Your utilities: ⚡ SMUD · 🔥 PG&E" in Sacramento; My Utility and the projection
+  methods price muni homes at the muni's own rate (SMUD $0.179 vs PG&E $0.396). No regression
+  ZIP changed utility → golden unchanged. Tests: 10 ZIP cases in `test_rate_resolver.py`, muni
+  lines in `test_ui_rates.py`; 526 pass.
+- **Limits:** Palo Alto sells gas itself (PG&E gas used as a proxy); Treasure Island (94130,
+  SFPUC) → PG&E; munis absent from the OpenEI non-IOU file (Healdsburg, Ukiah, Lompoc, Truckee
+  Donner, …) still resolve to the IOU listed; area/town share is a proxy for homes.
 
 **Landed 2026-09-23 — issue 12, NEM 3.0 export credit (own golden diff, solar cases only):**
 - **What was wrong.** `get_nem3_export_rates` took the `monthly_avg_acc_kwh` values in
@@ -987,7 +1015,7 @@ tests/
 - [x] §4.1 UI rework (U1 + U2): Home Profile utilities, **Current energy rate**, **Projection
       method** (naming applied to UI and help; keys kept); My Utility / CA Average / ACC in the
       Details dropdown. *(2026-09-23)*
-- [ ] Municipal-utility ZIPs resolved (issue 6) — the "Your utilities" line depends on it.
+- [x] Municipal-utility ZIPs resolved (issue 6). *(2026-09-23)*
 - [x] NEM 3.0 export credit = hourly ACC by calendar year (issue 12; own golden diff, 2026-09-23).
 - [ ] Golden unchanged by U1/U2 (My Utility stays the default); only the battery-defaults commit
       moves it, with the diff explained; full `pytest` green.

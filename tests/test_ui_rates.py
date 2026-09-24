@@ -23,6 +23,7 @@ def zip_state():
     ("95112", "PG&E · E-TOU-C", "urdb", "peak 4pm–9pm"),
     ("90001", "SCE · EIA 2025", "eia_utility", "plan data under review"),
     ("10001", "EIA — Pacific", "eia_region", "no utility found"),
+    ("95814", "SMUD · EIA 2025", "eia_utility", "no plan data yet"),
 ])
 def test_projection_shows_the_current_energy_rate(zip_state, zip_code, head, kind, detail_has):
     zip_state(zip_code)
@@ -47,6 +48,8 @@ def test_utilities_line():
     assert "PG&amp;E" in sim._utilities_html("95112") or "PG&E" in sim._utilities_html("95112")
     assert "SoCalGas" in sim._utilities_html("90001")
     assert "not found" in sim._utilities_html("10001")
+    assert "SMUD" in sim._utilities_html("95814")                 # municipal (issue 6)
+    assert "Silicon Valley Power" in sim._utilities_html("95050")
 
 
 def test_every_primary_projection_button_is_a_known_method():

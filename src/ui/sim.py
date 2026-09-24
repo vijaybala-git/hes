@@ -106,7 +106,7 @@ def _current_rate_display(fuel: str, method: str) -> tuple[str, str, str]:
 
 def _utilities_html(zipcode: str) -> str:
     """Home Profile line: the ZIP's electric + gas utility (or the fallback)."""
-    from starting_rates import SHORT_NAMES
+    from starting_rates import get_starting_rates
     ri = _rate_info(zipcode, "auto")
     parts = []
     for fr in (ri.electricity, ri.gas):
@@ -114,7 +114,8 @@ def _utilities_html(zipcode: str) -> str:
         if fr.utility_id is None:
             name = "<span style='color:#9A4D00'>not found — EIA Pacific</span>"
         else:
-            name = "<b>" + SHORT_NAMES[fr.fuel].get(str(fr.utility_id), fr.name) + "</b>"
+            short = get_starting_rates().short_name(fr.fuel, fr.utility_id) or fr.name
+            name = "<b>" + short + "</b>"
             if fr.provenance == "inferred":
                 name += "<span style='color:#B26A00'> ≈</span>"
         parts.append(f"{icon} {name}")

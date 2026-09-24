@@ -31,6 +31,12 @@ were — they drive "My Utility", which stays the golden default through Phase 7
     it is, each LDC's BASE_YEAR rate is BRIDGED by the state's residential gas price ratio
     (EIA natural-gas price series N3010<ST>3, annual) and flagged `"method": "bridged_state_ratio"`.
 
+Municipal utilities (Phase 7 §4.1 issue 6): every publicly owned / co-op electric utility in
+the OpenEI non-IOU ZIP file gets a record too, so a ZIP resolved to SMUD, LADWP, Silicon
+Valley Power … is priced at its own rate. 2024 from the EIA-861 ANNUAL file (all utilities;
+EIA-861M samples only the larger ones); 2025 observed from EIA-861M where the utility is in
+it, else the 2024 rate bridged by the CA state electricity ratio (flagged).
+
 USAGE (run from project root):
     python scripts/build_eia_rates.py --states CA      # default state is CA
     python scripts/build_eia_rates.py --check          # parse cached snapshots, no download
@@ -56,6 +62,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+sys.path.insert(0, str(Path(__file__).parent))
+from ca_munis import CA_MUNIS  # noqa: E402
+
 # ── Paths ──────────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).parent.parent
 RATES = ROOT / "data" / "rates"
@@ -71,11 +80,19 @@ MCF_TO_THERM = 10.37   # 1 Mcf natural gas ≈ 10.37 therms (HHV ~1037 Btu/cf)
 ELEC_UTIL_URL = ("https://www.eia.gov/electricity/data/eia861m/archive/xls/"
                  f"sales_ult_cust_{BASE_YEAR}.xlsx")
 ELEC_STATE_URL = "https://www.eia.gov/electricity/data/eia861m/xls/sales_revenue.xlsx"
+ELEC_ANNUAL_ZIP_URL = ("https://www.eia.gov/electricity/data/eia861/zip/"
+                       f"f861{BASE_YEAR}.zip")          # contains Sales_Ult_Cust_<year>.xlsx
+ELEC_ANNUAL_NAME = f"eia861_sales_ult_cust_{BASE_YEAR}.xlsx"
+NON_IOU_CSV = SOURCES / "openei_non_iou_zipcodes_2024.csv"     # which utilities are munis
 ELEC_UTIL_START_URL = ("https://www.eia.gov/electricity/data/eia861m/archive/xls/"
                        f"sales_ult_cust_{STARTING_YEAR}.xlsx")
 NGQS = "https://www.eia.gov/naturalgas/ngqs/data/report"
 # State residential natural-gas price, annual ($/Mcf) — the gas bridge (see module docstring).
 NG_STATE_PRICE_URL = "https://www.eia.gov/dnav/ng/hist/n3010{st}3a.htm"
+
+# Short display names (UI: "PG&E · E-TOU-C"); munis carry theirs from scripts/ca_munis.py.
+SHORT_NAMES = {"14328": "PG&E", "17609": "SCE", "16609": "SDG&E",
+               "17610617": "PG&E", "17621931": "SoCalGas", "17611927": "SDG&E"}
 
 # ── Per-state utility selections (EIA ids). Extend to add states. ───────────────
 # Electric utility numbers (EIA-861) and gas LDC ids (EIA-176, with state suffix).
@@ -339,6 +356,71 @@ def _gas_starting(state: str, sel: dict, per_ldc: dict, state_avg: dict,
     return per, blend
 
 
+def _muni_records(state: str, provenance: dict, fetch: bool, state_ratio: float,
+                  start_obs: dict, cagr: float) -> dict:
+    """Records for the state's publicly owned / co-op electric utilities (Phase 7 §4.1
+    issue 6): 2024 from EIA-861 annual; 2025 observed (EIA-861M) or bridged."""
+    import zipfile
+    if fetch:
+        raw = zipfile.ZipFile(io.BytesIO(_get(ELEC_ANNUAL_ZIP_URL))).read(
+            f"Sales_Ult_Cust_{BASE_YEAR}.xlsx")
+        _snapshot(ELEC_ANNUAL_NAME, raw, ELEC_ANNUAL_ZIP_URL, provenance)
+    ann = pd.read_excel(SOURCES / ELEC_ANNUAL_NAME, sheet_name="States", header=2)
+    ann = ann[ann["State"] == state]
+    rev_c, sales_c, cust_c = ann.columns[9], ann.columns[10], ann.columns[11]
+    non = pd.read_csv(NON_IOU_CSV, dtype={"zip": str})
+    ids = sorted({str(int(e)) for e in non[non["state"] == state]["eiaid"].dropna()}, key=int)
+    out = {}
+    for eid in ids:
+        sub = ann[ann["Utility Number"] == int(eid)]
+        rev = pd.to_numeric(sub[rev_c], errors="coerce").sum()
+        sales = pd.to_numeric(sub[sales_c], errors="coerce").sum()
+        if not sales or not rev:
+            continue                                   # no residential service
+        name = str(sub["Utility Name"].iloc[0])
+        rate = round(float(rev / sales), 4)
+        if eid in start_obs:
+            start = {"year": STARTING_YEAR, "rate": start_obs[eid], "method": "observed",
+                     "source": f"EIA-861M {STARTING_YEAR} per utility (revenue ÷ sales)"}
+        else:
+            start = {"year": STARTING_YEAR, "rate": round(rate * state_ratio, 4),
+                     "method": "bridged_state_ratio", "bridge_ratio": round(state_ratio, 4),
+                     "source": f"EIA-861 {BASE_YEAR} × CA residential electricity ratio "
+                               f"{STARTING_YEAR}/{BASE_YEAR}"}
+        out[eid] = {
+            "name": name, "short_name": (CA_MUNIS.get(eid) or {}).get("short", name),
+            "state": state, "unit": "$/kWh", "base_year": BASE_YEAR,
+            "current_rate": rate, "historical_cagr_10yr": cagr,
+            "monthly_seasonal_shape": FLAT_SHAPE, "shape_method": "flat",
+            "monthly_rate_observed": None, "monthly_shape_observed": None,
+            "ownership": str(sub["Ownership"].iloc[0]),
+            "residential_customers": int(pd.to_numeric(sub[cust_c], errors="coerce").sum()),
+            "source": f"EIA-861 {BASE_YEAR} annual (revenue ÷ sales)",
+            "starting_rate": start,
+        }
+    print(f"  munis {state}: {len(out)} priced — "
+          + ", ".join(f"{r['short_name']} {r['current_rate']:.3f}" for r in
+                      sorted(out.values(), key=lambda r: -r["residential_customers"])[:6]))
+    return out
+
+
+def _elec_muni_starting(state: str) -> dict:
+    """{utility number: 2025 $/kWh} for every utility with a full year in EIA-861M 2025."""
+    udf = pd.read_excel(SOURCES / f"eia861m_sales_ult_cust_{STARTING_YEAR}.xlsx",
+                        sheet_name="Sales Ultimate Cust. -States", header=2)
+    udf = udf[udf["State"] == state]
+    rev_c, sales_c = udf.columns[7], udf.columns[8]
+    out = {}
+    for num, sub in udf.groupby("Utility Number"):
+        if sub["Month"].nunique() != 12:
+            continue
+        rev = pd.to_numeric(sub[rev_c], errors="coerce").sum()
+        sales = pd.to_numeric(sub[sales_c], errors="coerce").sum()
+        if sales:
+            out[str(int(num))] = round(float(rev / sales), 4)
+    return out
+
+
 def _elec_start_block(rate: float, what: str) -> dict:
     return {"year": STARTING_YEAR, "rate": rate, "method": "observed",
             "source": f"EIA-861M {STARTING_YEAR} {what} (revenue ÷ sales)"}
@@ -361,7 +443,7 @@ def _write_doc_fragment(db: dict):
     L += ["    ELECTRICITY — residential effective rate ($/kWh)",
           f"    {'Utility':30} {'$/kWh':>7} {'vs blend':>9}"]
     blend_e = ca["electricity"]["current_rate"]
-    for rec in db["electric_utilities"].values():
+    for rec in (r for r in db["electric_utilities"].values() if "ownership" not in r):
         d = (rec["current_rate"] / blend_e - 1.0) * 100
         L.append(f"    {rec['name']:30} {rec['current_rate']:7.3f} {d:+8.0f}%")
     L.append(f"    {'California average (fallback)':30} {blend_e:7.3f} {'—':>9}")
@@ -422,10 +504,16 @@ def build(states: list[str], check: bool, offline: bool = False):
         g_start, g_start_blend = _gas_starting(state, sel, g_ldc, g_avg, provenance, fetch)
         for num, u in e_util.items():
             db["electric_utilities"][num] = _elec_record(u["name"], state, u)
+            db["electric_utilities"][num]["short_name"] = SHORT_NAMES.get(num, u["name"])
             db["electric_utilities"][num]["starting_rate"] = _elec_start_block(
                 e_start[num], "per utility")
+        if state == "CA":
+            ratio = e_start_blend / e_avg["rate"]
+            db["electric_utilities"].update(_muni_records(
+                state, provenance, fetch, ratio, _elec_muni_starting(state), e_avg["cagr"]))
         for cid, u in g_ldc.items():
             db["gas_ldcs"][cid] = _gas_record(u["name"], state, u)
+            db["gas_ldcs"][cid]["short_name"] = SHORT_NAMES.get(cid, u["name"])
             db["gas_ldcs"][cid]["starting_rate"] = g_start[cid]
         db["state_average"][state] = {
             "label": sel["label"],

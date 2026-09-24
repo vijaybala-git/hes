@@ -230,8 +230,12 @@ Gas 2025 rates: EIA has not yet published 2025 prices for each gas utility, so e
 rate is carried forward by California's statewide 2024→2025 residential gas price change
 (+15%). These will be replaced when EIA publishes them.
 
-WhyWatt currently prices the three large California investor-owned utilities — PG&E, Southern
-California Edison (SCE), and San Diego Gas & Electric (SDG&E). The Electricity & Gas Rates
+WhyWatt prices the three large California investor-owned utilities — PG&E, Southern
+California Edison (SCE), and San Diego Gas & Electric (SDG&E) — and California's municipal
+utilities, such as SMUD, LADWP, Silicon Valley Power, and the cities of Palo Alto, Pasadena and
+Anaheim, each at its own EIA residential rate. A ZIP goes to a municipal utility when most of
+it lies inside that utility's city or district (Folsom, for example, is PG&E even though it is
+in Sacramento County). San Francisco homes are PG&E customers. The Electricity & Gas Rates
 technical reference documents the method, the per-utility numbers, and the fallback in full.
 
 ### Escalation scenarios
@@ -1092,8 +1096,9 @@ escalation, capital expenditure for appliance swaps, and solar savings.
   otherwise the timeline follows your scheduled swaps
 - Income-qualified rebate programs are coming in a future release
 - Monte Carlo uncertainty bands are coming in a future release
-- Three California investor-owned utilities are priced (PG&E, SCE, SDG&E); a ZIP outside
-  their territory falls back to the California statewide average
+- The three California investor-owned utilities (PG&E, SCE, SDG&E) and the state's municipal
+  utilities are priced; a ZIP that matches none falls back to the California statewide
+  average (or EIA Pacific under a projection method)
 
 ### Disclaimer
 
@@ -1246,8 +1251,10 @@ and the statewide average is only a fallback.
 ### Default, fallback, and manual override
 
 WhyWatt resolves your utility from your ZIP code automatically. If the ZIP cannot be matched
-to a known utility — an unlisted municipal utility, or a ZIP that maps to several utilities
-with no clear choice — it falls back to the California statewide average and says so on screen.
+to a known utility, it falls back to the California statewide average and says so on screen.
+Municipal utilities are matched by geography: a ZIP goes to the city or district utility when
+most of the ZIP (or most of its town area) lies inside that utility's service area; otherwise
+it goes to the investor-owned utility listed with it.
 You can always pick a utility manually or enter your own rate from a recent bill.
 
 ### How rates grow over time

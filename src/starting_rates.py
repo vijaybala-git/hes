@@ -36,11 +36,6 @@ _RATES = Path(__file__).parent.parent / "data" / "rates"
 _EIA_FILE = _RATES / "eia_rates_by_utility.json"
 _REGION_FILE = _RATES / "starting_rates.json"
 
-# Short display names (EIA-861 electric utility numbers; EIA-176 gas LDC ids).
-SHORT_NAMES = {
-    "electricity": {"14328": "PG&E", "17609": "SCE", "16609": "SDG&E"},
-    "gas": {"17610617": "PG&E", "17621931": "SoCalGas", "17611927": "SDG&E"},
-}
 
 # Utility -> rate-projection market. A market absent from the bundle falls back to the
 # bundle's default market (a proxy — today every non-PG&E utility).
@@ -120,6 +115,12 @@ class StartingRates:
         self._eia = json.loads(eia_file.read_text(encoding="utf-8"))
         self._regions = json.loads(region_file.read_text(encoding="utf-8"))
 
+    def short_name(self, fuel: str, utility_id: str | None) -> str | None:
+        """Display name from the rates data (e.g. "PG&E", "SMUD"), None if not priced."""
+        db = self._eia["electric_utilities" if fuel == "electricity" else "gas_ldcs"]
+        rec = db.get(str(utility_id)) if utility_id else None
+        return (rec.get("short_name") or rec["name"]) if rec else None
+
     def region(self, fuel: str, region_key: str | None = None) -> StartingRate:
         key = region_key or self._regions["default_region"]
         reg = self._regions["regions"][key]
@@ -133,7 +134,7 @@ class StartingRates:
         """The current energy rate for `fuel`. `utility_id` is the ZIP's resolved utility
         (RateResolver), None when the ZIP resolved to no utility."""
         uid = str(utility_id) if utility_id else None
-        short = SHORT_NAMES[fuel].get(uid or "", None)
+        short = self.short_name(fuel, uid)
         if fuel == "electricity" and uid:
             rs = get_urdb().resolve(zip_code, uid, tariff_label)
             if rs is not None:
