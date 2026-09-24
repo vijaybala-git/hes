@@ -201,14 +201,29 @@ Each fuel offers three rate models:
 - California average: the statewide blended rate, used automatically when a ZIP can't be
   matched to a utility.
 - ACC-shaped (electricity) or ACC-seasonal (gas): the CPUC Avoided Cost Calculator rate shape.
-- TOU (URDB), electricity only: your utility's actual time-of-use plan from the OpenEI Utility
-  Rate Database — a higher price in the evening peak (for example 4–9pm), summer/winter
-  prices, the baseline tiers for your area, and the daily fixed charge. Pick the plan from the
-  Tariff list (your utility's default time-of-use plan is pre-selected; EV and all-electric
-  plans are there too). Solar and the battery are priced hour by hour against this plan, so
-  the battery can choose its Cost-saving mode in months where that pays. Available for PG&E
-  and SDG&E; SCE uses its EIA rate until its URDB data is corrected; other utilities use My
-  Utility automatically. Prices grow at the same yearly rate as My Utility.
+
+Under Details, the projection methods (WhyWatt Conservative / Moderate / Stress, EIA Pacific
+and the reference curves) separate two things: your current energy rate — what you pay
+today — and how that price grows over the years.
+
+- Current energy rate. If your electric utility's actual plan is in the OpenEI Utility Rate
+  Database (PG&E and SDG&E today), WhyWatt uses that plan: a higher price in the evening peak
+  (for example 4–9pm), summer/winter prices, the baseline tiers for your area, and the daily
+  fixed charge. Pick the plan from the Plan list (your utility's default time-of-use plan is
+  pre-selected; EV and all-electric plans are there too). Solar and the battery are priced
+  hour by hour against this plan, so the battery can choose its Cost-saving mode in months
+  where that pays. Otherwise the current rate is your utility's EIA 2025 rate (SCE uses this
+  until its plan data is corrected), and if the ZIP matches no utility, the EIA Pacific
+  regional average. Gas always uses your gas utility's EIA rate.
+- Growth. The chosen curve is used only for its shape: your current rate is multiplied by how
+  much the curve rises (or falls) from the year your rate is valid for. A plan that took
+  effect in 2026 is scaled back to a 2025 start by the curve's 2025/2026 ratio. After 2050 the
+  curve holds its 2050 value. The WhyWatt curves are built for PG&E; elsewhere they are a
+  PG&E-based stand-in.
+
+Gas 2025 rates: EIA has not yet published 2025 prices for each gas utility, so each one's 2024
+rate is carried forward by California's statewide 2024→2025 residential gas price change
+(+15%). These will be replaced when EIA publishes them.
 
 WhyWatt currently prices the three large California investor-owned utilities — PG&E, Southern
 California Edison (SCE), and San Diego Gas & Electric (SDG&E). The Electricity & Gas Rates

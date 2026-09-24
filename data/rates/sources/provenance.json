@@ -16,5 +16,17 @@
     "sha256": "d8d4114a4ad90f5649c826d88925ee22a2a7fa4fd443cc3520bb473b18ded32e",
     "bytes": 796335,
     "downloaded": "2026-06-18"
+  },
+  "eia861m_sales_ult_cust_2025.xlsx": {
+    "url": "https://www.eia.gov/electricity/data/eia861m/archive/xls/sales_ult_cust_2025.xlsx",
+    "sha256": "b43f08a1cdfb1f2d193fdb925b1180607b3734918fc74f7cf5a90087bb557f23",
+    "bytes": 1503948,
+    "downloaded": "2026-09-23"
+  },
+  "eia_ng_n3010ca3_annual.htm": {
+    "url": "https://www.eia.gov/dnav/ng/hist/n3010ca3a.htm",
+    "sha256": "9181b1de1c06e217c1bf0c5ced1685987bb65654d9e3e2f72b7b99ac16920343",
+    "bytes": 6562,
+    "downloaded": "2026-09-23"
   }
 }

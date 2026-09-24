@@ -72,6 +72,12 @@ class RateStructure:
     baseline_region: str | None      # territory used for tier-1 thresholds
     baseline_confidence: str         # high | approximate | fallback | not_applicable
     closed_to_enrollment: bool = False
+    startdate: str | None = None     # URDB effective date, e.g. "2026-03-27"
+
+    @property
+    def effective_year(self) -> int | None:
+        """Calendar year the plan's prices are valid for — the projection anchor (§4.1)."""
+        return int(self.startdate[:4]) if self.startdate else None
 
     # ── geometry ──────────────────────────────────────────────────────────────
     def peak_mask(self) -> np.ndarray:
@@ -188,6 +194,7 @@ class URDBRates:
             fixed_amount=float(fc.get("value") or 0.0), fixed_unit=fc.get("unit") or "$/day",
             baseline_region=region, baseline_confidence=conf,
             closed_to_enrollment=bool(t.get("closed_to_enrollment", False)),
+            startdate=t.get("startdate"),
         )
 
     @staticmethod

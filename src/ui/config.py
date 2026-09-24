@@ -136,7 +136,13 @@ _LEGACY_RATE_MODELS = {"cagr_flat", "ca_average", "acc_shaped", "acc_seasonal"}
 # Phase 6 WS1 — projection-backed rate models are fuel-aware (an elec-only model like
 # cec_iepr must not be accepted on a gas slot from a shared link, and vice versa).
 from projected_rate_source import PROJECTION_ELEC_MODELS, PROJECTION_GAS_MODELS
-_ELEC_RATE_MODELS = _LEGACY_RATE_MODELS | set(PROJECTION_ELEC_MODELS) | {"urdb_tou"}  # §3
+_ELEC_RATE_MODELS = _LEGACY_RATE_MODELS | set(PROJECTION_ELEC_MODELS)
+# Retired rate-model values → replacement (Phase 7 §4.1). `urdb_tou` was a rate *source*; the
+# URDB plan is now the current energy rate of every projection method. Old links migrate.
+RETIRED_VALUES = {
+    "elec_rate_model_a": {"urdb_tou": "whywatt_moderate"},
+    "elec_rate_model_b": {"urdb_tou": "whywatt_moderate"},
+}
 _GAS_RATE_MODELS = _LEGACY_RATE_MODELS | set(PROJECTION_GAS_MODELS)
 _RATE_MODELS = _ELEC_RATE_MODELS | _GAS_RATE_MODELS   # kept for back-compat imports
 # Allowed values for string enums. A value outside the set is dropped (reverts to factory).
@@ -242,6 +248,9 @@ def sanitize(values: dict) -> tuple[dict, list[str]]:
         if k in SHARE_EXCLUDE:
             warnings.append(f"transient key ignored: {k!r}"); continue
         default = base[k]
+        if k in RETIRED_VALUES and v in RETIRED_VALUES[k]:
+            warnings.append(f"{k}: {v!r} retired, migrated to {RETIRED_VALUES[k][v]!r}")
+            v = RETIRED_VALUES[k][v]
 
         if isinstance(default, bool):
             if not isinstance(v, bool):

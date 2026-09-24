@@ -790,8 +790,9 @@ def SolarSummaryCard():
 
 @solara.component
 def TariffPicker(eiaid):
-    """URDB tariff dropdown for the home's utility (Phase 7 §3). "" = the utility default (a TOU
-    plan); closed-to-enrollment plans are flagged. Falls back to a note when not covered."""
+    """URDB plan dropdown for the home's utility — the current energy rate a projection method
+    grows (Phase 7 §3/§4.1). "" = the utility default (a TOU plan); closed-to-enrollment plans
+    are flagged. Falls back to a note when not covered (the EIA current rate is used)."""
     from urdb_rates import get_urdb
     urdb = get_urdb()
     opts = urdb.tariff_options(eiaid)
@@ -804,7 +805,7 @@ def TariffPicker(eiaid):
                            + (" — closed" if o["closed"] else "")) for o in opts}
     by_text = {v: k for k, v in labels.items()}
     current = elec_tariff_label.value if elec_tariff_label.value in labels else opts[0]["label"]
-    solara.Select(label="Tariff", values=list(labels.values()), value=labels[current],
+    solara.Select(label="Plan", values=list(labels.values()), value=labels[current],
                   on_value=lambda txt: elec_tariff_label.set(
                       "" if by_text[txt] == opts[0]["label"] else by_text[txt]))
 
@@ -881,9 +882,9 @@ def RatesSummaryCard():
             solara.HTML(tag="div", unsafe_innerHTML=_rate_line_html(fuel, name, prov, cagr))
 
         _picker("electricity", "⚡ Electricity Rate Model", C_RATE_ELEC, elec_rate_model_a,
-                [("cagr_flat", "My Utility"), ("ca_average", "CA Average"), ("acc_shaped", "ACC"), ("urdb_tou", "TOU (URDB)")],
+                [("cagr_flat", "My Utility"), ("ca_average", "CA Average"), ("acc_shaped", "ACC")],
                 elec_cagr_pct_a.value, acc_elec_cagr_a.value)
-        if elec_rate_model_a.value == "urdb_tou":
+        if elec_rate_model_a.value in PROJECTION_ELEC_MODELS:
             TariffPicker(_ri_auto.electricity.utility_id)
         _picker("gas", "🔥 Gas Rate Model", C_RATE_GAS, gas_rate_model_a,
                 [("cagr_flat", "My Utility"), ("ca_average", "CA Average"), ("acc_seasonal", "ACC")],
@@ -1830,8 +1831,9 @@ def _fuel_model_block(fuel: str, heading: str, color: str,
                   if model_rv.value in ("cec_bau",) else "")
         solara.HTML(tag="div", unsafe_innerHTML=(
             "<div style='font-size:0.75em; color:#546E7A; margin:1px 0 4px'>"
-            "Baked CEC/EIA projection curve · ACC monthly shape applied. "
-            "No escalation slider — the trajectory is fixed by the model." + _upper + "</div>"
+            "Your current energy rate, grown by this curve's yearly change "
+            "(the curve's own price level is not used). "
+            "No escalation slider — the growth is fixed by the curve." + _upper + "</div>"
         ))
     elif model_rv.value in ("cagr_flat", "ca_average"):
         WhyWattSlider(
@@ -1874,8 +1876,8 @@ def RatesDetail():
     _fuel_model_block("electricity", "⚡ Electricity Rate Model", C_RATE_ELEC,
                        elec_rate_model_a, elec_cagr_pct_a, acc_elec_cagr_a,
                        [("cagr_flat", "My Utility"), ("ca_average", "CA Average"),
-                        ("acc_shaped", "ACC"), ("urdb_tou", "TOU (URDB)")], 15, _ri_auto, _ri_ca)
-    if elec_rate_model_a.value == "urdb_tou":
+                        ("acc_shaped", "ACC")], 15, _ri_auto, _ri_ca)
+    if elec_rate_model_a.value in PROJECTION_ELEC_MODELS:
         TariffPicker(_ri_auto.electricity.utility_id)
     _fuel_model_block("gas", "🔥 Gas Rate Model", C_RATE_GAS,
                        gas_rate_model_a, gas_cagr_pct_a, acc_gas_cagr_a,
@@ -1921,7 +1923,7 @@ def RatesDetail():
         _fuel_model_block("electricity", "⚡ Electricity Rate Model", C_RATE_ELEC,
                            elec_rate_model_b, elec_cagr_pct_b, acc_elec_cagr_b,
                            [("cagr_flat", "My Utility"), ("ca_average", "CA Average"),
-                            ("acc_shaped", "ACC"), ("urdb_tou", "TOU (URDB)")], 15, _ri_auto, _ri_ca)
+                            ("acc_shaped", "ACC")], 15, _ri_auto, _ri_ca)
         _fuel_model_block("gas", "🔥 Gas Rate Model", C_RATE_GAS,
                            gas_rate_model_b, gas_cagr_pct_b, acc_gas_cagr_b,
                            [("cagr_flat", "My Utility"), ("ca_average", "CA Average"),

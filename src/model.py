@@ -23,6 +23,8 @@ from journey import JourneyHome, DeviceSlot, CapExOnlySlot, CATEGORY_ORDER, CATE
 from rate_loader import RateLoader, ACCRateLoader
 from projected_rate_source import ProjectedRateSource, PROJECTION_MODELS
 from rate_resolver import RateResolver
+from starting_rates import (IndexedRateSource, get_starting_rates, market_for,
+                            projection_index)
 from devices.physics  import GasFurnace, HeatPumpHVAC, GasWaterHeater, HeatPumpWaterHeater, CentralAC
 from devices.seasonal import GasDryer, HeatPumpDryer, GasCooktop, InductionCooktop, LightsAndPlugs
 from devices.schedule import EVCharger, PhysicsEVCharger
@@ -89,28 +91,37 @@ def hourly_load_shapes() -> dict:
     return _HOURLY_LOAD_SHAPES
 
 
+# Rate-model keys retired in Phase 7 §4.1 → their replacement. `urdb_tou` was a rate *source*
+# offered as a model; the URDB plan is now the current energy rate of every projection method.
+RETIRED_RATE_MODELS = {"urdb_tou": "whywatt_moderate"}
+
+
 # All electric ACC categories that need pre-computed rate arrays
 _ELEC_ACC_CATEGORIES = ["hpwh", "hvac_heat", "hvac_cool", "ev", "baseload", "flat"]
 
 
 def _make_loader(base_rl: RateLoader, rate_model: str, fuel: str, fuel_res,
-                 project_acc_shape: bool = True) -> object:
-    """Phase 4 §2 + Phase 6 WS1 — rate modes (per fuel):
+                 project_acc_shape: bool = True, start=None) -> object:
+    """Phase 4 §2 + Phase 6 WS1 + Phase 7 §4.1 — rate modes (per fuel):
       - "acc_shaped"/"acc_seasonal"  → ACCRateLoader (PG&E/CPUC base, unchanged)
       - "ca_average"                 → EIA statewide-average series
       - "cagr_flat" (= "My Utility") → EIA per-utility from ZIP, falling back to the state
                                        average when the ZIP didn't resolve to a priced utility
-      - a PROJECTION_MODELS key      → ProjectedRateSource (one standalone bundle series),
-                                       wrapped in ACCRateLoader so the monthly/seasonal shape
-                                       is layered on top (Phase 6 WS1). project_acc_shape=False
-                                       returns the bare source (flat months) for testing.
+      - a PROJECTION_MODELS key      → projection method: the home's current energy rate
+                                       (`start`, a StartingRate) × the curve's growth
+                                       (IndexedRateSource), wrapped in ACCRateLoader so the
+                                       monthly/seasonal shape is layered on top.
+                                       project_acc_shape=False returns the bare source (flat
+                                       months) for testing. A URDB current rate replaces these
+                                       arrays afterwards (the plan carries its own seasons).
 
-    `fuel` uses the sim's names ("electricity" | "gas"); ProjectedRateSource wants the same.
+    `fuel` uses the sim's names ("electricity" | "gas").
     """
     if rate_model in ("acc_shaped", "acc_seasonal"):
         return ACCRateLoader(base_rl)
     if rate_model in PROJECTION_MODELS:
-        src = ProjectedRateSource(rate_model, fuel)
+        market, _ = market_for(fuel, start.utility_id)
+        src = IndexedRateSource(start, rate_model, market)
         return ACCRateLoader(src) if project_acc_shape else src
     if rate_model == "ca_average":
         return RateLoader.from_eia_state(_DEFAULT_RATE_STATE, fuel)
@@ -128,19 +139,19 @@ def _is_legacy_acc(loader: object) -> bool:
 
 def _cagr_for(rate_model: str, cagr: float) -> float | None:
     """Return cagr when CAGR model selected; None for ACC (ignores user CAGR)."""
-    return cagr if rate_model in ("cagr_flat", "ca_average", "urdb_tou") else None
+    return cagr if rate_model in ("cagr_flat", "ca_average") else None
 
 
-def _urdb_arrays(rs, n_years: int, cagr: float | None):
-    """URDB TOU (Phase 7 §3): escalation index + the per-device-class tier-1 effective rates.
+def _urdb_arrays(rs, esc: np.ndarray):
+    """URDB plan (Phase 7 §3/§4.1): the per-device-class tier-1 effective rates, grown by the
+    projection index `esc` (n_years,) — `S[y] / S[plan effective year]`.
 
     Each device class gets its own peak-weighted $/kWh per month (its 24-h shape against this
     tariff's peak hours), so device costs stay exact without tiers; tiers + fixed charge are
-    applied once on the home aggregate in JourneyHome. Escalation: the tariff is taken as the
-    start-year level and grows at the chosen CAGR (the §5 projection replaces this later).
-    Returns (escalation (n_years,), elec_rates (n_years,12), rates_by_class {cls: (n_years,12)}).
+    applied once on the home aggregate in JourneyHome (scaled by the same index; tier kWh
+    thresholds never scale).
+    Returns (elec_rates (n_years,12), rates_by_class {cls: (n_years,12)}).
     """
-    esc = (1.0 + (cagr or 0.0)) ** np.arange(n_years)
     shapes = hourly_load_shapes()
     by_cls = {}
     for cls in DEVICE_ACC_CATEGORY:
@@ -150,7 +161,7 @@ def _urdb_arrays(rs, n_years: int, cagr: float | None):
                           for m in range(12)])
         by_cls[cls] = esc[:, None] * month[None, :]
     base = np.array([rs.effective_rate(m, shapes["LightsAndPlugs"]) for m in range(12)])
-    return esc, esc[:, None] * base[None, :], by_cls
+    return esc[:, None] * base[None, :], by_cls
 
 
 def _build_elec_rates_by_class(acc_loader: ACCRateLoader,
@@ -376,7 +387,7 @@ class HESModel(mesa.Model):
                  slot_configs:     list | None = None,
                  capex_only_slots: list | None = None,
                  solar_config: SolarBatteryConfig | None = None,
-                 elec_tariff_label: str | None = None,   # URDB tariff (None = utility default)
+                 elec_tariff_label: str | None = None,   # URDB plan (None = utility default)
                  social_cost_config: SocialCostConfig | None = None,
                  # §3 Transportation — gasoline price model
                  gasoline_price_per_gallon:        float = 4.50,
@@ -404,6 +415,8 @@ class HESModel(mesa.Model):
                  # so it can never affect the golden default path.
                  project_acc_shape: bool = True):
         super().__init__()
+        elec_rate_model_a = RETIRED_RATE_MODELS.get(elec_rate_model_a, elec_rate_model_a)
+        elec_rate_model_b = RETIRED_RATE_MODELS.get(elec_rate_model_b, elec_rate_model_b)
         self.elec_rate_model_a = elec_rate_model_a
         self.gas_rate_model_a  = gas_rate_model_a
         self.elec_rate_model_b = elec_rate_model_b
@@ -509,12 +522,36 @@ class HESModel(mesa.Model):
         # mode prices off the statewide series directly in _make_loader.
         self.rate_resolution = _RATE_RESOLVER.resolve(home_config.zip_code, source="auto")
 
+        # ── Current energy rate (Phase 7 §4.1) — a home fact shared by scenarios A and B;
+        # consumed only by projection methods (legacy modes above price their own way).
+        _sr = get_starting_rates()
+        self.starting_rate_elec = _sr.resolve(
+            "electricity", self.rate_resolution.electricity.utility_id,
+            home_config.zip_code, elec_tariff_label)
+        self.starting_rate_gas = _sr.resolve(
+            "gas", self.rate_resolution.gas.utility_id, home_config.zip_code)
+        self.projection_market_elec, self.projection_proxy_elec = market_for(
+            "electricity", self.starting_rate_elec.utility_id)
+        self.projection_market_gas, self.projection_proxy_gas = market_for(
+            "gas", self.starting_rate_gas.utility_id)
+        _years = sim_start_year + np.arange(n_years)
+
+        def _urdb_for(model_key):
+            """(RateStructure, index) when a projection method prices off a URDB plan."""
+            st = self.starting_rate_elec
+            if model_key not in PROJECTION_MODELS or st.kind != "urdb":
+                return None, None
+            return st.structure, projection_index(model_key, "electricity", _years, st.year,
+                                                  self.projection_market_elec)
+
         # ── Rate arrays — Scenario A ──────────────────────────────────────────
         rl = RateLoader()
         elec_loader_a = _make_loader(rl, elec_rate_model_a, "electricity",
-                                     self.rate_resolution.electricity, project_acc_shape)
+                                     self.rate_resolution.electricity, project_acc_shape,
+                                     start=self.starting_rate_elec)
         gas_loader_a  = _make_loader(rl, gas_rate_model_a, "gas",
-                                     self.rate_resolution.gas, project_acc_shape)
+                                     self.rate_resolution.gas, project_acc_shape,
+                                     start=self.starting_rate_gas)
 
         # CAGR mode uses user slider; ACC mode uses acc_cagr slider (ignores CAGR slider)
         elec_cagr_a_eff = acc_elec_cagr_a if elec_rate_model_a == "acc_shaped"  else _cagr_for(elec_rate_model_a, elec_cagr_a)
@@ -537,19 +574,18 @@ class HESModel(mesa.Model):
                 elec_loader_a, sim_start_year, n_years, scenario_a,
                 custom_cagr=elec_cagr_a_eff)
 
-        # ── URDB TOU (Phase 7 §3) — replaces the EIA arrays when the utility is covered ──
+        # ── URDB plan (Phase 7 §3/§4.1) — a projection method on a URDB-covered utility
+        # prices off the plan (tiers, peak window, fixed charge) grown by the curve index.
         _urdb = get_urdb()
         _eiaid = self.rate_resolution.electricity.utility_id
         self.urdb_decision = _urdb.decision(_eiaid)
         self.urdb_reason = _urdb.fallback_reason(_eiaid)
-        self.rate_structure_a = self.rate_structure_b = None
-        self.rate_escalation_a = self.rate_escalation_b = None
-        if elec_rate_model_a == "urdb_tou":
-            self.rate_structure_a = _urdb.resolve(home_config.zip_code, _eiaid, elec_tariff_label)
-            if self.rate_structure_a is not None:
-                self.rate_escalation_a, self.elec_rates, elec_by_cls_a = _urdb_arrays(
-                    self.rate_structure_a, n_years, elec_cagr_a_eff)
-                self.current_elec_rates = self.elec_rates[0]
+        self.rate_structure_a, self.rate_escalation_a = _urdb_for(elec_rate_model_a)
+        self.rate_structure_b = self.rate_escalation_b = None
+        if self.rate_structure_a is not None:
+            self.elec_rates, elec_by_cls_a = _urdb_arrays(self.rate_structure_a,
+                                                          self.rate_escalation_a)
+            self.current_elec_rates = self.elec_rates[0]
 
         # ── Solar export rates (§8) — built once, used by journey_home only ──
         # NEM 3.0 (nbt): ACC avoided-cost $/kWh from ACCRateLoader.
@@ -598,9 +634,11 @@ class HESModel(mesa.Model):
         # ── Scenario B (lazy — only when comparison_mode=True) ────────────────
         if comparison_mode:
             elec_loader_b = _make_loader(rl, elec_rate_model_b, "electricity",
-                                         self.rate_resolution.electricity, project_acc_shape)
+                                         self.rate_resolution.electricity, project_acc_shape,
+                                         start=self.starting_rate_elec)
             gas_loader_b  = _make_loader(rl, gas_rate_model_b, "gas",
-                                         self.rate_resolution.gas, project_acc_shape)
+                                         self.rate_resolution.gas, project_acc_shape,
+                                         start=self.starting_rate_gas)
 
             elec_cagr_b_eff = acc_elec_cagr_b if elec_rate_model_b == "acc_shaped"  else _cagr_for(elec_rate_model_b, elec_cagr_b)
             gas_cagr_b_eff  = acc_gas_cagr_b  if gas_rate_model_b  == "acc_seasonal" else _cagr_for(gas_rate_model_b,  gas_cagr_b)
@@ -620,13 +658,11 @@ class HESModel(mesa.Model):
                 elec_by_cls_b = _build_elec_rates_by_class(
                     elec_loader_b, sim_start_year, n_years, scenario_b,
                     custom_cagr=elec_cagr_b_eff)
-            if elec_rate_model_b == "urdb_tou":
-                self.rate_structure_b = _urdb.resolve(home_config.zip_code, _eiaid,
-                                                      elec_tariff_label)
-                if self.rate_structure_b is not None:
-                    self.rate_escalation_b, self.elec_rates_b, elec_by_cls_b = _urdb_arrays(
-                        self.rate_structure_b, n_years, elec_cagr_b_eff)
-                    self.current_elec_rates_b = self.elec_rates_b[0]
+            self.rate_structure_b, self.rate_escalation_b = _urdb_for(elec_rate_model_b)
+            if self.rate_structure_b is not None:
+                self.elec_rates_b, elec_by_cls_b = _urdb_arrays(self.rate_structure_b,
+                                                                self.rate_escalation_b)
+                self.current_elec_rates_b = self.elec_rates_b[0]
 
             journey_slots_b  = _build_slots(slot_configs, False, self, **device_kw)
             baseline_slots_b = _build_slots(slot_configs, True,  self, **device_kw)

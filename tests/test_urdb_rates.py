@@ -106,6 +106,7 @@ def test_peak_hours_label():
 # ── Wiring into the model ─────────────────────────────────────────────────────
 
 def _run(zip_code, rate_model, label=None, solar=True):
+    """Short run; a projection method on a URDB-covered utility prices off the plan (§4.1)."""
     from home_config import HomeConfig
     from journey import CapExOnlySlot, SolarBatteryConfig
     from model import HESModel
@@ -120,16 +121,18 @@ def _run(zip_code, rate_model, label=None, solar=True):
     return m
 
 
-def test_quarantined_zip_prices_exactly_like_eia():
-    a, b = _run("90001", "cagr_flat"), _run("90001", "urdb_tou")
-    assert b.rate_structure_a is None and b.urdb_decision == "quarantined"
-    assert a.journey_home.cumulative_opex == pytest.approx(b.journey_home.cumulative_opex)
+def test_quarantined_zip_prices_off_the_eia_current_rate():
+    """SCE is quarantined: a projection method starts from SCE's EIA 2025 rate instead."""
+    m = _run("90001", "whywatt_moderate")
+    assert m.rate_structure_a is None and m.urdb_decision == "quarantined"
+    st = m.starting_rate_elec
+    assert st.kind == "eia_utility" and st.utility_id == SCE and st.year == 2025
 
 
 def test_urdb_home_bill_is_price_month_on_home_load():
     """The home's electric bill = Σ price_month over its own hourly load (tiers + fixed on the
     aggregate), and the category costs absorb the difference so the home total stays exact."""
-    m = _run("95112", "urdb_tou", solar=False)
+    m = _run("95112", "whywatt_moderate", solar=False)
     rs, esc = m.rate_structure_a, m.rate_escalation_a
     days = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
     peak = rs.peak_mask()
@@ -140,7 +143,12 @@ def test_urdb_home_bill_is_price_month_on_home_load():
                                           loads[mo][~peak].sum() * days[mo], days[mo], esc[y])
                            for mo in range(12))
             assert home.home_elec_bill_history[y] == pytest.approx(expected, rel=1e-9)
-    assert rs.family == "E-TOU-C" and esc[0] == pytest.approx(1.0)
+    # Grown by the projection curve from the plan's effective year (2026): 2025 back-scales.
+    from starting_rates import projection_index
+    assert rs.family == "E-TOU-C" and rs.effective_year == 2026
+    assert esc == pytest.approx(projection_index("whywatt_moderate", "electricity",
+                                                 [2025, 2026, 2027], 2026))
+    assert esc[1] == pytest.approx(1.0)
 
 
 def test_eia_path_keeps_no_hourly_bill():
@@ -150,8 +158,9 @@ def test_eia_path_keeps_no_hourly_bill():
 
 
 def test_ev_plan_picks_cost_saving_in_winter_for_electrified_home():
-    """Regression case 02 (PG&E, fully electrified, 6.3 kW + 13.5 kWh) on EV2: winter solar
-    can't cover the evening peak, so Cost-saving wins Jan and Dec; summer stays Self-powered."""
+    """Regression case 02 (PG&E, fully electrified, 6.3 kW + 13.5 kWh) on the EV2 plan under
+    WhyWatt Moderate: winter solar can't cover the evening peak, so Cost-saving wins Jan and
+    Dec; summer stays Self-powered."""
     import json
     import ui.state as S
     from ui import config, sim
@@ -159,19 +168,31 @@ def test_ev_plan_picks_cost_saving_in_winter_for_electrified_home():
     case = json.loads((ROOT / "tests/regression/cases/02_pge_solar.json").read_text())["values"]
     try:
         S.reset_to_defaults()
-        S.apply_config(config.merge({**case, "elec_rate_model_a": "urdb_tou",
+        S.apply_config(config.merge({**case, "elec_rate_model_a": "whywatt_moderate",
                                      "elec_tariff_label": ev2["label"]}))
         m, _ = sim.run_simulation()
     finally:
         S.reset_to_defaults()
-    modes = m.journey_home.battery_mode_history[-1]
+    # Year 10, not the final year: export credits still grow at the retail CAGR (7%/yr) while a
+    # projection grows retail far slower, so late in the run exporting outpays self-use and
+    # summer months flip to Cost-saving too (Phase7_Spec §4.1 issue 12, decision pending).
+    modes = m.journey_home.battery_mode_history[10]
     assert m.rate_structure_a.family == "EV2"
     assert modes[0] == "cost" and modes[11] == "cost"
     assert modes[6] == "self"
 
 
-def test_config_accepts_urdb_for_electricity_only():
+def test_retired_urdb_tou_key_migrates_to_whywatt_moderate():
+    """`urdb_tou` was a rate source offered as a model (§3); old links migrate (§4.1)."""
     from ui import config
-    clean, _ = config.sanitize({"elec_rate_model_a": "urdb_tou", "gas_rate_model_a": "urdb_tou"})
-    assert clean.get("elec_rate_model_a") == "urdb_tou"
+    clean, warn = config.sanitize({"elec_rate_model_a": "urdb_tou",
+                                   "elec_rate_model_b": "urdb_tou",
+                                   "gas_rate_model_a": "urdb_tou"})
+    assert clean["elec_rate_model_a"] == clean["elec_rate_model_b"] == "whywatt_moderate"
     assert "gas_rate_model_a" not in clean
+    assert any("retired" in w for w in warn)
+
+
+def test_model_accepts_retired_key_as_alias():
+    m = _run("95112", "urdb_tou", solar=False)
+    assert m.elec_rate_model_a == "whywatt_moderate" and m.rate_structure_a is not None

@@ -96,20 +96,24 @@ def _fuel_resolved_display(fuel: str, mode: str, cagr_pct: int, acc_cagr_pct: in
     """(name, provenance, cagr) for a fuel given its selected rate mode."""
     fr_auto = ri_auto.electricity if fuel == "electricity" else ri_auto.gas
     if mode in PROJECTION_LABELS:
-        # Projection models carry a baked curve; no user CAGR (cagr=None hides the +%/yr tag).
-        # ACC shape is layered on in the core (Phase 6 WS1).
-        return PROJECTION_LABELS[mode], "acc", None
+        # Projection method (Phase 7 §4.1): the home's current energy rate grown by the curve;
+        # no user CAGR (cagr=None hides the +%/yr tag). A URDB plan shows its family + peak
+        # window; otherwise the EIA current rate (ACC shape layered on in the core).
+        from starting_rates import get_starting_rates
+        st = get_starting_rates().resolve(
+            fuel, fr_auto.utility_id, zip_code.value,
+            (elec_tariff_label.value or None) if fuel == "electricity" else None)
+        if st.kind == "urdb":
+            from urdb_rates import peak_hours_label
+            rs = st.structure
+            peak = peak_hours_label(rs.peak_hours) if rs.is_tou else "tiered, no peak window"
+            return (f"{st.label} · peak {peak} · {PROJECTION_LABELS[mode]}", "urdb", None)
+        prov = "tou_fallback" if (fuel == "electricity" and fr_auto.utility_id) else "acc"
+        return f"{st.label} · {PROJECTION_LABELS[mode]}", prov, None
     if mode in ("acc_shaped", "acc_seasonal"):
         return "PG&E CPUC base", "acc", acc_cagr_pct
     if mode == "ca_average":
         return "California average", "selected", cagr_pct
-    if mode == "urdb_tou" and fuel == "electricity":
-        from urdb_rates import get_urdb, peak_hours_label
-        rs = get_urdb().resolve(zip_code.value, fr_auto.utility_id, elec_tariff_label.value or None)
-        if rs is None:
-            return f"{fr_auto.name} — EIA rate (TOU not available)", "tou_fallback", cagr_pct
-        peak = peak_hours_label(rs.peak_hours) if rs.is_tou else "tiered, no peak window"
-        return f"{rs.family} · peak {peak}", "urdb", cagr_pct
     return fr_auto.name, fr_auto.provenance, cagr_pct          # cagr_flat = My Utility
 
 
@@ -128,7 +132,7 @@ def _seed_eia_cagr():
              (elec_rate_model_b, elec_cagr_pct_b, "electricity"),
              (gas_rate_model_b,  gas_cagr_pct_b,  "gas")]
     for mode_rv, cagr_rv, fuel in pairs:
-        if mode_rv.value in ("cagr_flat", "ca_average", "urdb_tou"):   # urdb_tou escalates at the EIA CAGR
+        if mode_rv.value in ("cagr_flat", "ca_average"):
             src = "ca_average" if mode_rv.value == "ca_average" else "auto"
             fr = getattr(_rate_info(zip_code.value, src), fuel)
             cagr_rv.set(round(fr.cagr * 100))

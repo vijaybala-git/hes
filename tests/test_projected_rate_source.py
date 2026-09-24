@@ -135,18 +135,29 @@ def test_core_does_not_import_rate_projection():
 
 # ── (d) ACC monthly shape layered on in core, revenue-neutrally ───────────────
 
+def _start(fuel):
+    """A current energy rate to grow (Phase 7 §4.1) — the EIA — Pacific region."""
+    from starting_rates import get_starting_rates
+    return get_starting_rates().region(fuel)
+
+
 def test_make_loader_wraps_in_acc_by_default():
-    loader = _make_loader(RateLoader(), "whywatt_stress", "gas", None, project_acc_shape=True)
+    from starting_rates import IndexedRateSource
+    loader = _make_loader(RateLoader(), "whywatt_stress", "gas", None, project_acc_shape=True,
+                          start=_start("gas"))
     assert isinstance(loader, ACCRateLoader)
-    bare = _make_loader(RateLoader(), "whywatt_stress", "gas", None, project_acc_shape=False)
-    assert isinstance(bare, ProjectedRateSource)
+    bare = _make_loader(RateLoader(), "whywatt_stress", "gas", None, project_acc_shape=False,
+                        start=_start("gas"))
+    assert isinstance(bare, IndexedRateSource)
 
 
 def test_acc_shape_is_seasonal_but_revenue_neutral_for_gas():
     """Gas ACC shape has mean 1.0 → the 12-month average equals the raw annual level, but the
     months are NOT flat (seasonal). The raw (unshaped) source is flat."""
-    raw = _make_loader(RateLoader(), "cec_bau", "gas", None, project_acc_shape=False)
-    shaped = _make_loader(RateLoader(), "cec_bau", "gas", None, project_acc_shape=True)
+    raw = _make_loader(RateLoader(), "cec_bau", "gas", None, project_acc_shape=False,
+                       start=_start("gas"))
+    shaped = _make_loader(RateLoader(), "cec_bau", "gas", None, project_acc_shape=True,
+                          start=_start("gas"))
     raw_row = raw.get_annual_monthly_rates("gas", 2025, 1)[0]
     shaped_row = shaped.get_annual_monthly_rates("gas", 2025, 1)[0]
     assert np.allclose(raw_row, raw_row[0])                     # raw is flat

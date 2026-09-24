@@ -21,9 +21,20 @@ embeds tiered-pricing/true-up artifacts; multiplying it onto the model's already
 consumption would double-count. Seasonal variation therefore comes from consumption, and the
 rate is constant across months. Per-LDC gas shaping from EIA NG-Monthly is a future option.
 
+Starting rate (Phase 7 §4.1, the "current energy rate" for projection methods): every record
+also carries a `starting_rate` block for STARTING_YEAR, the year the projection curves start
+(2025). The legacy fields (`current_rate`, `base_year` = 2024, CAGR) are left exactly as they
+were — they drive "My Utility", which stays the golden default through Phase 7.
+  • Electricity: EIA-861M sales_ult_cust_<STARTING_YEAR>.xlsx (per utility) and the
+    Monthly-States sheet (state blend) — observed.
+  • Gas: EIA-176 per-LDC data for STARTING_YEAR is published late in the following year. Until
+    it is, each LDC's BASE_YEAR rate is BRIDGED by the state's residential gas price ratio
+    (EIA natural-gas price series N3010<ST>3, annual) and flagged `"method": "bridged_state_ratio"`.
+
 USAGE (run from project root):
     python scripts/build_eia_rates.py --states CA      # default state is CA
     python scripts/build_eia_rates.py --check          # parse cached snapshots, no download
+    python scripts/build_eia_rates.py --offline        # rebuild the JSON from cached snapshots
 
 OUTPUT:
     data/rates/eia_rates_by_utility.json               # the rate database (committed)
@@ -53,13 +64,18 @@ OUT_JSON = RATES / "eia_rates_by_utility.json"
 DOC_FRAGMENT = ROOT / "docs" / "help" / "_generated" / "rate_tables.md"
 
 BASE_YEAR = 2024
+STARTING_YEAR = 2025   # projection curves start here (whywatt_rate_projection.json base year)
 MCF_TO_THERM = 10.37   # 1 Mcf natural gas ≈ 10.37 therms (HHV ~1037 Btu/cf)
 
 # ── Source URLs ────────────────────────────────────────────────────────────────
 ELEC_UTIL_URL = ("https://www.eia.gov/electricity/data/eia861m/archive/xls/"
                  f"sales_ult_cust_{BASE_YEAR}.xlsx")
 ELEC_STATE_URL = "https://www.eia.gov/electricity/data/eia861m/xls/sales_revenue.xlsx"
+ELEC_UTIL_START_URL = ("https://www.eia.gov/electricity/data/eia861m/archive/xls/"
+                       f"sales_ult_cust_{STARTING_YEAR}.xlsx")
 NGQS = "https://www.eia.gov/naturalgas/ngqs/data/report"
+# State residential natural-gas price, annual ($/Mcf) — the gas bridge (see module docstring).
+NG_STATE_PRICE_URL = "https://www.eia.gov/dnav/ng/hist/n3010{st}3a.htm"
 
 # ── Per-state utility selections (EIA ids). Extend to add states. ───────────────
 # Electric utility numbers (EIA-861) and gas LDC ids (EIA-176, with state suffix).
@@ -250,6 +266,84 @@ def _build_gas(state: str, sel: dict, provenance: dict, check: bool) -> tuple[di
     return per_ldc, state_avg
 
 
+# ── Starting rate (STARTING_YEAR) ───────────────────────────────────────────────
+def _elec_starting(state: str, sel: dict, provenance: dict, fetch: bool) -> tuple[dict, dict]:
+    """Observed STARTING_YEAR electricity rates: ({utility number: rate}, state blend block)."""
+    name = f"eia861m_sales_ult_cust_{STARTING_YEAR}.xlsx"
+    if fetch:
+        _snapshot(name, _get(ELEC_UTIL_START_URL), ELEC_UTIL_START_URL, provenance)
+    udf = pd.read_excel(SOURCES / name, sheet_name="Sales Ultimate Cust. -States", header=2)
+    rev_c, sales_c = udf.columns[7], udf.columns[8]
+    per_util = {}
+    for num in sel["electric"]:
+        sub = udf[udf["Utility Number"] == num]
+        months = sub["Month"].nunique()
+        if months != 12:
+            raise SystemExit(f"EIA-861M {STARTING_YEAR}: utility {num} has {months} months")
+        rev = pd.to_numeric(sub[rev_c], errors="coerce").sum()
+        sales = pd.to_numeric(sub[sales_c], errors="coerce").sum()
+        per_util[str(num)] = round(float(rev / sales), 4)
+
+    sdf = pd.read_excel(SOURCES / "eia861m_sales_revenue.xlsx", sheet_name="Monthly-States",
+                        header=2)
+    sdf.columns = [str(c).strip() for c in sdf.columns]
+    st = sdf[(sdf["State"] == state) & (sdf["Year"] == STARTING_YEAR)]
+    if st["Month"].nunique() != 12:
+        raise SystemExit(f"EIA-861M state sheet: {state} {STARTING_YEAR} is not a full year")
+    rev = pd.to_numeric(st[sdf.columns[4]], errors="coerce").sum()
+    sales = pd.to_numeric(st[sdf.columns[5]], errors="coerce").sum()
+    blend = round(float(rev / sales), 4)
+    print(f"  electric {state} {STARTING_YEAR}: blend {blend:.4f} $/kWh; "
+          + ", ".join(f"{k} {v:.4f}" for k, v in per_util.items()))
+    return per_util, blend
+
+
+def _ng_state_prices(state: str, provenance: dict, fetch: bool) -> dict[int, float]:
+    """{year: $/Mcf} from the EIA state residential gas price page (annual history table)."""
+    import re
+    name = f"eia_ng_n3010{state.lower()}3_annual.htm"
+    url = NG_STATE_PRICE_URL.format(st=state.lower())
+    if fetch:
+        _snapshot(name, _get(url), url, provenance)
+    html = (SOURCES / name).read_text(encoding="utf-8", errors="ignore")
+    text = re.sub(r"<[^>]+>", " ", html).replace("&nbsp;", " ")
+    out: dict[int, float] = {}
+    # Rows read "2020's  14.14  16.34 ..." — decade label then Year-0..Year-9 values.
+    for m in re.finditer(r"(\d{3})0's((?:\s+[\d.]+|\s+NA|\s+-{1,2}|\s+W)+)", text):
+        decade = int(m.group(1)) * 10
+        for i, tok in enumerate(m.group(2).split()):
+            try:
+                out[decade + i] = float(tok)
+            except ValueError:
+                pass
+    return out
+
+
+def _gas_starting(state: str, sel: dict, per_ldc: dict, state_avg: dict,
+                  provenance: dict, fetch: bool) -> tuple[dict, dict]:
+    """STARTING_YEAR gas rates: ({ldc: block}, state block). Bridged by the state price ratio
+    until EIA-176 publishes STARTING_YEAR per-LDC data."""
+    prices = _ng_state_prices(state, provenance, fetch)
+    if BASE_YEAR not in prices or STARTING_YEAR not in prices:
+        raise SystemExit(f"EIA NG state price for {state}: missing {BASE_YEAR}/{STARTING_YEAR}")
+    ratio = prices[STARTING_YEAR] / prices[BASE_YEAR]
+    src = (f"EIA-176 {BASE_YEAR} × CA residential gas price ratio {STARTING_YEAR}/{BASE_YEAR} "
+           f"(${prices[STARTING_YEAR]:.2f} / ${prices[BASE_YEAR]:.2f} per Mcf)")
+    per = {cid: {"year": STARTING_YEAR, "rate": round(u["rate"] * ratio, 4),
+                 "method": "bridged_state_ratio", "bridge_ratio": round(ratio, 4),
+                 "source": src} for cid, u in per_ldc.items()}
+    blend = {"year": STARTING_YEAR, "rate": round(prices[STARTING_YEAR] / MCF_TO_THERM, 4),
+             "method": "observed",
+             "source": f"EIA natural gas price series N3010{state}3 (annual, $/Mcf ÷ {MCF_TO_THERM})"}
+    print(f"  gas {state} {STARTING_YEAR}: bridge ratio {ratio:.4f}; blend {blend['rate']:.4f} $/therm")
+    return per, blend
+
+
+def _elec_start_block(rate: float, what: str) -> dict:
+    return {"year": STARTING_YEAR, "rate": rate, "method": "observed",
+            "source": f"EIA-861M {STARTING_YEAR} {what} (revenue ÷ sales)"}
+
+
 # ── Help fragment ───────────────────────────────────────────────────────────────
 def _write_doc_fragment(db: dict):
     """Emit the per-utility rate tables as a 4-space-indented help fragment.
@@ -310,8 +404,11 @@ def _gas_record(name: str, state: str, u: dict) -> dict:
             "source": f"EIA-176/NGQS {BASE_YEAR} (revenue ÷ volume)"}
 
 
-def build(states: list[str], check: bool):
-    provenance: dict = {}
+def build(states: list[str], check: bool, offline: bool = False):
+    fetch = not (check or offline)
+    # Cached-snapshot runs keep the recorded provenance of the files they re-read.
+    prov_file = SOURCES / "provenance.json"
+    provenance: dict = (json.loads(prov_file.read_text()) if prov_file.exists() else {})
     db = {"electric_utilities": {}, "gas_ldcs": {}, "state_average": {}}
     for state in states:
         sel = STATE_UTILITIES.get(state)
@@ -319,12 +416,17 @@ def build(states: list[str], check: bool):
             print(f"  WARN: no utility selection for {state!r}; skipping", file=sys.stderr)
             continue
         print(f"[{state}]")
-        e_util, e_avg = _build_electric(state, sel, provenance, check)
-        g_ldc, g_avg = _build_gas(state, sel, provenance, check)
+        e_util, e_avg = _build_electric(state, sel, provenance, not fetch)
+        g_ldc, g_avg = _build_gas(state, sel, provenance, not fetch)
+        e_start, e_start_blend = _elec_starting(state, sel, provenance, fetch)
+        g_start, g_start_blend = _gas_starting(state, sel, g_ldc, g_avg, provenance, fetch)
         for num, u in e_util.items():
             db["electric_utilities"][num] = _elec_record(u["name"], state, u)
+            db["electric_utilities"][num]["starting_rate"] = _elec_start_block(
+                e_start[num], "per utility")
         for cid, u in g_ldc.items():
             db["gas_ldcs"][cid] = _gas_record(u["name"], state, u)
+            db["gas_ldcs"][cid]["starting_rate"] = g_start[cid]
         db["state_average"][state] = {
             "label": sel["label"],
             "electricity": {"unit": "$/kWh", "base_year": BASE_YEAR,
@@ -340,6 +442,9 @@ def build(states: list[str], check: bool):
                     "monthly_rate_observed": None, "monthly_shape_observed": None,
                     "source": f"EIA-176/NGQS {BASE_YEAR} state total"},
         }
+        db["state_average"][state]["electricity"]["starting_rate"] = _elec_start_block(
+            e_start_blend, "state aggregate")
+        db["state_average"][state]["gas"]["starting_rate"] = g_start_blend
 
     db["_meta"] = {
         "schema_version": 1,
@@ -354,6 +459,12 @@ def build(states: list[str], check: bool):
                         "tier/true-up effects. Gas (EIA-176) is annual-only: null.",
         "effective_rate_method": "residential revenue ÷ residential sales (elec) / volume (gas)",
         "mcf_to_therm": MCF_TO_THERM,
+        "starting_year": STARTING_YEAR,
+        "starting_rate_note": "`starting_rate` = the record's STARTING_YEAR rate — the current "
+                        "energy rate that projection methods scale (Phase 7 §4.1). Legacy "
+                        "`current_rate`/`base_year` are unchanged and drive My Utility. Gas "
+                        "starting rates are bridged from BASE_YEAR by the state price ratio "
+                        "until EIA-176 publishes STARTING_YEAR.",
         "sources": provenance,
         "note": "Keys '_meta' aside: electric_utilities keyed by EIA-861 utility number; "
                 "gas_ldcs by EIA-176 company id; state_average is the ZIP-unresolved fallback.",
@@ -363,7 +474,7 @@ def build(states: list[str], check: bool):
         OUT_JSON.write_text(json.dumps(db, indent=2), encoding="utf-8")
         print(f"\nWrote {OUT_JSON.relative_to(ROOT)}")
         # provenance sidecar
-        (SOURCES / "provenance.json").write_text(json.dumps(provenance, indent=2))
+        prov_file.write_text(json.dumps(provenance, indent=2))
     _write_doc_fragment(db)
     return db
 
@@ -373,8 +484,10 @@ def main():
     ap.add_argument("--states", nargs="+", default=["CA"], help="state codes (default: CA)")
     ap.add_argument("--check", action="store_true",
                     help="parse cached snapshots only; no download, no JSON write")
+    ap.add_argument("--offline", action="store_true",
+                    help="rebuild the JSON from cached snapshots (no download)")
     args = ap.parse_args()
-    build([s.upper() for s in args.states], check=args.check)
+    build([s.upper() for s in args.states], check=args.check, offline=args.offline)
 
 
 if __name__ == "__main__":

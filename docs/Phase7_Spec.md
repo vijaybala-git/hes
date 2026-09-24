@@ -5,7 +5,8 @@ data through the model. (Adopting the WhyWatt projection as the *default* moved 
 **Follows:** Phase 6 (`docs/Phase6_Spec.md`) — Solar/Battery split, inert roof-geometry inputs, and
 the **non-default `cec_projection` rate hand-off interface** (evaluated but not switched). Offline
 PVWatts/URDB data is harvested and validated separately in `docs/OfflineSolarData_Plan.md`.
-**Last updated:** 2026-09-23 — full-pass review: stale text aligned with the round-2 decisions;
+**Last updated:** 2026-09-23 — **U1 landed** (current energy rate × projection growth; EIA 2025
+starting rates; `starting_rates.json`; `urdb_tou` retired; golden unchanged). Earlier — full-pass review: stale text aligned with the round-2 decisions;
 naming fixed (**current energy rate** = a rate *source*, e.g. `urdb_tou`; **projection method** =
 long-term growth, e.g. the WhyWatt/`cec_projection` curves); battery defaults → **Tesla Powerwall 3**
 datasheet harvest; peak / off-peak only (super-off-peak priced as off-peak); issues 12/13 clarified.
@@ -493,7 +494,7 @@ selected tariff.
 **Naming (fixed 2026-09-23 — use these terms in code, config, UI and docs).** Phase 6/7 text
 blurred two different things under "rate model":
 
-| Term | What it answers | Scope | Values | Proposed config keys (U1) |
+| Term | What it answers | Scope | Values | Proposed config keys (U2) |
 |---|---|---|---|---|
 | **Current energy rate** (a *rate source*) | What do you pay **today**? | per fuel; a **home fact** — shared by scenarios A and B | electricity: `urdb` (the URDB plan, + `elec_tariff_label`) · `eia_utility` (EIA per-utility) · `eia_region` (`starting_rates.json`); gas: `eia_utility` · `eia_region` | resolved from the ZIP; only the plan is user-chosen: `elec_tariff_label` |
 | **Projection method** | How do prices **grow** over the years? | per fuel, **per scenario** | `whywatt_conservative / _moderate / _stress` (the CEC-driven curves Phase 6 called `cec_projection`) · `eia_pacific`; legacy fixed-%: `cagr_flat` (My Utility) · `ca_average` · `acc_shaped` | `elec_projection_a/b`, `gas_projection_a/b` |
@@ -502,7 +503,8 @@ blurred two different things under "rate model":
 - `cec_projection` is the **family name** of the WhyWatt curves (§5); the keys are `whywatt_*`.
 - Legacy modes (My Utility / CA Average / ACC) still set *both* axes their old way through Phase 7.
 - Old `elec_rate_model_a/b` / `gas_rate_model_a/b` share links and regression cases migrate by a map
-  (old key → projection method; `urdb_tou` → `whywatt_moderate`), golden-neutral.
+  (old key → projection method; `urdb_tou` → `whywatt_moderate`), golden-neutral. *(U1 landed the
+  `urdb_tou` migration; the config-key split is done with the UI cards in U2.)*
 
 **Requested (2026-09-23):**
 1. **Home Profile** shows, next to the climate-zone line, *your electricity utility* and *your gas
@@ -651,6 +653,41 @@ Clarified 2026-09-23: *the URDB data file is used when the ZIP resolves to a uti
   utility"), SCE re-harvest, **TODO beyond CA:** EIA regional curves and regional starting prices.
 - **Post-Phase-7:** switch the default from My Utility to a projection (with URDB starting
   price); reinterpret CA Average / ACC as pure % projections on the starting rate; drop My Utility.
+
+**Landed 2026-09-23 — U1 (current energy rate × projection growth; golden unchanged):**
+- **Data.** `scripts/build_eia_rates.py` gained a `starting_rate` block per record (and an
+  `--offline` rebuild from cached snapshots). Electricity = EIA-861M 2025 observed (PG&E 0.3991,
+  SCE 0.3296, SDG&E 0.4373, CA 0.3254 $/kWh). Gas = 2024 × CA state ratio 22.01 / 19.14 = 1.1499,
+  flagged `bridged_state_ratio` (PG&E 2.6618, SoCalGas 1.7449, SDG&E 2.2140; CA 2.1225 $/therm
+  observed). **Legacy `current_rate` / `base_year` 2024 / CAGR are byte-identical** — they drive
+  My Utility, so the golden cannot move; the 2025 values live beside them. New snapshots:
+  `sources/eia861m_sales_ult_cust_2025.xlsx`, `sources/eia_ng_n3010ca3_annual.htm`.
+- `scripts/build_starting_rates.py` → `data/rates/starting_rates.json`: EIA — Pacific 2025
+  ($0.24181/kWh, $1.987/therm) from the bundle's `eia_pacific` benchmark (+ bundle sha256).
+- `src/starting_rates.py`: `StartingRate` (kind `urdb` | `eia_utility` | `eia_region`, anchor
+  year, short label e.g. "PG&E · E-TOU-C"), `StartingRates.resolve`, `market_for` (non-PG&E →
+  CA_PGE curves, `is_proxy`), `projection_index` (S[y]/S[anchor]), `IndexedRateSource`.
+  `RateStructure.startdate` / `effective_year` added (PG&E plans → 2026).
+- `model.py`: every projection key = current rate × index. EIA start → `IndexedRateSource`
+  wrapped in ACCRateLoader (Phase 6's monthly shape kept); URDB start → the plan's arrays ×
+  index (tiers + fixed charge scale by the same index; kWh thresholds do not). Scenario A and B
+  share the plan; each has its own index. `urdb_tou` retired → alias of `whywatt_moderate`
+  (`RETIRED_RATE_MODELS`; `ui/config.RETIRED_VALUES` migrates links with a warning). Legacy
+  modes untouched. New attributes: `starting_rate_elec/gas`, `projection_market_*`,
+  `projection_proxy_*`.
+- **UI (minimal, U2 does the cards):** "TOU (URDB)" button removed; the **Plan** picker shows
+  whenever a projection method is selected for electricity; resolved line "PG&E · E-TOU-C ·
+  peak 4pm–9pm · WhyWatt Moderate" / "SCE · EIA 2025 · WhyWatt Moderate ⚠ no URDB tariff — EIA";
+  projection note rewritten. Help (rates) updated.
+- **Behaviour change vs Phase 6 (intended):** projection levels now start at the home's own
+  rate — e.g. an out-of-area ZIP under WhyWatt Moderate starts at $0.242 (EIA — Pacific), not
+  PG&E's $0.386; a PG&E home on E-TOU-C back-scales the 2026 plan by S[2025]/S[2026] = 0.965.
+- **Finding for issue 12:** under a projection the retail price grows ~1.24× over 20 years but
+  NEM 3.0 export credits still grow at 7%/yr (~3.6×) — so late in the run exporting outpays
+  self-use and summer months flip to Cost-saving (case 02, EV2: all Self-powered in year 1;
+  Jul–Aug Cost-saving by year 19). Confirms issue 12 needs its decision before the default flip.
+- Tests: `tests/test_starting_rates.py` (new, 15), `test_urdb_rates.py` / `test_projected_rate_source.py`
+  updated. 501 pass; golden PASS, 37 trend moves correct.
 
 ### §5 — Adopt the CEC projected-rate escalation as the default (Phase 6 WS1 → live)
 
