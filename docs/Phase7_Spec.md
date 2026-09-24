@@ -5,7 +5,9 @@ data through the model. (Adopting the WhyWatt projection as the *default* moved 
 **Follows:** Phase 6 (`docs/Phase6_Spec.md`) — Solar/Battery split, inert roof-geometry inputs, and
 the **non-default `cec_projection` rate hand-off interface** (evaluated but not switched). Offline
 PVWatts/URDB data is harvested and validated separately in `docs/OfflineSolarData_Plan.md`.
-**Last updated:** 2026-09-23 — **Powerwall 3 battery defaults** (13.5 kWh, 89%, 5 kW charge /
+**Last updated:** 2026-09-23 — added **§4.2** Solar / Battery / Electrical Panel cards in the Journey
+(two cards + details, third Journey row; Solar + Battery stay one install event in Phase 7 —
+limitation stated; independent battery post-P7). Earlier — **Powerwall 3 battery defaults** (13.5 kWh, 89%, 5 kW charge /
 11.5 kW discharge; golden +$242–295 on solar cases, all from the efficiency). Earlier —
 **Municipal utilities resolved** (issue 6: SMUD, LADWP, SVP, Palo
 Alto… priced at their own EIA rate; SF → PG&E; golden unchanged). Earlier — **U2 landed** (UI: utilities in Home Profile, Current Energy Rate +
@@ -501,8 +503,9 @@ selected tariff.
   **Superseded by §4.1:** URDB TOU is a **current energy rate** *source* (landed as the interim
   selector option `urdb_tou`, retired in U1); the WhyWatt curves (Phase 6's `cec_projection`) are
   **projection methods**; the default stays My Utility through Phase 7.
-- **Plan-button consolidation (Spec 5.6 #6)** lands here, alongside the Solar/Battery/Panel UI
-  work, when a unified plan-row can be coherent (it was deferred from 5.6 for exactly this moment).
+- **Solar / Battery / Panel cards → the Journey panel** — designed in **§4.2** (decided
+  2026-09-23). **Plan-button consolidation (Spec 5.6 #6)** follows it (§4.2 step 2): once all nine
+  devices share the Journey zone, a unified plan row can be coherent.
 
 ---
 
@@ -793,6 +796,79 @@ Clarified 2026-09-23: *the URDB data file is used when the ZIP resolves to a uti
 - **Not modelled (noted in help):** ACC Plus adder (first 5 NBT years); CCA customers get the
   generation part from their CCA, not PG&E; later ACC vintages. Tests: `tests/test_nbt_export.py`.
 
+### §4.2 — Solar, Battery and Electrical Panel cards in the Journey (PLANNED — decided 2026-09-23)
+
+**Why.** Phase 5.6 #6 (one "Plan" row for every device) was deferred because Solar + Battery and
+the Electrical Panel live in a different zone ("Setup your home → Home, Panel & Solar") from
+the six appliance cards; Phase 6 WS2 §2a split Solar and Battery in the *model*
+(`SolarConfig` / `BatteryConfig`) but left one UI card. With the Phase 7 battery now a real,
+configurable device (§2: two modes, Powerwall 3 defaults, charge/discharge limits, grid
+charging), it earns its own card.
+
+**Decisions (2026-09-23):**
+1. **Two cards — Solar and Battery — each with its own details page.** The Battery card carries
+   only battery features.
+2. **Move the Electrical Panel card** out of "Home, Panel & Solar" as well.
+3. **Solar, Battery and Electrical Panel become the third row of "Your Electrification
+   Journey"** (row 1 HVAC · Water heater · Transportation; row 2 Cooktop · Dryer · Baseload;
+   row 3 Solar · Battery · Electrical Panel; count pill "6 devices" → "9 devices").
+4. **Phase 7 limitation — Solar + Battery stay ONE install event.** Kept deliberately, see below.
+
+**Limitation (Phase 7): the battery is installed with solar.**
+- One `CapExOnlySlot` "Solar + Battery" (solar's install year; one "Total installed cost" and
+  rebate, on the Solar card, covering both) — Hard Rule 9's single-event pattern. The energy
+  balance runs the battery whenever solar is installed.
+- So a battery **cannot** be planned without solar, in a different year, or with its own cost.
+  The Battery card says so: when solar is not planned its controls are disabled with the note
+  "Installed with solar — add solar to plan a battery"; when solar is planned it shows "Installed
+  with solar in <year> · cost included in the Solar card".
+- **No functional change:** same model, same config / share-link keys (`solar_planned`,
+  `solar_install_year`, `solar_system_cost`, `solar_rebate`, `solar_battery_*`), same numbers —
+  **golden unchanged**. It is a layout/UI change only.
+
+**Card contents (from today's single card + `SolarDetail`):**
+
+| | Summary card | Details page |
+|---|---|---|
+| **Solar** | Add solar (plan) · panels slider → kW · yield from ZIP (source) · install year · total installed cost (incl. battery) | System size · net metering (NEM 3.0/NBT vs NEM 2.0, NBC) · Advanced (inert PVWatts geometry) · cost, rebate, install year · results: production, self-consumed, exported, export credit note (hourly ACC) |
+| **Battery** | Battery on/off · kWh · after a run "Battery: Cost-saving Jan, Dec · Self-powered Feb–Nov" · the linked-install note | kWh · charge kW · discharge kW · efficiency % · grid charging · "Tesla Powerwall 3 defaults" note with the datasheet source · results: energy via battery, grid-charged kWh, losses, the mode per month |
+| **Electrical Panel** | unchanged (moved) | unchanged `ElecPanelDetail` |
+
+NEM settings stay with Solar (they price exports, which solar makes); the battery results that
+today sit in the solar results table ("…via battery", the mode line) move to Battery.
+
+**Implementation notes:**
+- `panels.py`: `SolarSummaryCard` loses the battery toggle; new `BatterySummaryCard` +
+  `BatteryDetail`; `SolarDetail` loses the battery box and battery results. Detail routing
+  (`layout.DetailView`, `_DETAIL_TITLES`): "solar" → "☀️ Solar", new "battery" → "🔋 Battery".
+- `layout.py`: third `jgrid` row in the Journey panel; `_HomeBody` keeps only `HomeSummaryCard`
+  and the group card is renamed "Home Profile" (alt layout `HomeProfilePanel` "Home & Solar" →
+  "Home Profile"); the setup-group tooltip text updated.
+- Icons: a battery icon in `ui/icons.py` (`_DEVICE_ICONS`, `_CARD_IC`), help key → the solar
+  help page's battery section (a separate `battery.html` is optional).
+- **Risk (Phase 5.6 analysis):** the Journey panel's vertical fit is held by a fixed grid and
+  `!important` CSS. Verify desktop and phone widths in the preview; the Setup group gets shorter,
+  the Journey panel taller.
+- Tests: card/detail smoke tests; golden unchanged.
+
+**Step 2 — unified Plan row (Spec 5.6 #6), after the move.** With all nine devices in one zone,
+add a quick-toggle row at the top of the Journey panel bound to the existing `*_planned`
+reactives (Battery's toggle = `solar_battery_enabled`, disabled while solar is off). Per the 5.6
+analysis: keep every card visible; dim, don't hide, unplanned ones. Its own small commit;
+golden unchanged.
+
+**Post-Phase-7 — lift the limitation (independent battery; functional, own golden diff):**
+- Battery gets its own plan toggle, install year, cost and rebate → a second `CapExOnlySlot`
+  ("Battery"); `solar_system_cost` splits into solar + battery costs, with a share-link migration
+  (old total → solar, battery 0, or a documented split).
+- The energy balance gates the battery by its own install year (a battery added in year 5 does
+  nothing before then).
+- **Battery without solar** — TOU arbitrage (grid-charge off-peak, cover the peak): the dispatch
+  already supports G = 0, but the solar block only runs once solar is installed; it needs its
+  own path.
+- Replace the name lookups (`"Solar" in cslot.name` in `journey.py` and `ui/charts.py`) with an
+  explicit slot kind.
+
 ### §5 — Adopt the CEC projected-rate escalation as the default (Phase 6 WS1 → live)
 
 > **Status (2026-09-23): default switch DEFERRED to post-Phase-7.** In Phase 7 the WhyWatt
@@ -936,6 +1012,8 @@ src/
   ui/sim.py, panels.py  roof geometry stays inert; Current energy rate + Projection method cards,
                         utilities in Home Profile (U2)
   ui/charts.py          solar-monthly / peak-offpeak / energy-balance charts (§4)
+  ui/panels.py, layout.py  Solar / Battery / Electrical Panel cards → Journey row 3 (§4.2);
+                        BatterySummaryCard + BatteryDetail; unified Plan row (§4.2 step 2)
   data/config/whywatt_default.json   default stays cagr_flat (My Utility) through P7; new keys per
                         the §4.1 naming table; battery defaults from battery_defaults.json
 data/
@@ -1005,6 +1083,9 @@ tests/
 
 ## Post-Phase-7 (separate efforts, not gating close)
 
+- **Independent battery** (§4.2): own plan toggle, install year, cost and rebate (second capex
+  slot), battery-only TOU arbitrage path, cost-split migration — lifts the Phase 7 "installed with
+  solar" limitation; own golden diff.
 - **SCE/SDG&E rate-projection markets** — extend the offline "Rate Projections" harvest (manual
   spreadsheet step) with `CA_SCE`/`CA_SDGE`, then flip those ZIPs off the EIA-Pacific fallback (§5.1).
 - URDB coverage beyond CA (national ZIP crosswalk + harvest of maintained utilities).
@@ -1034,6 +1115,10 @@ tests/
 - [ ] Golden unchanged by U1/U2 (My Utility stays the default); only the battery-defaults commit
       moves it, with the diff explained; full `pytest` green.
 - [ ] *(post-Phase-7)* default → projection with URDB starting price (own golden diff).
+- [ ] Solar and Battery as separate cards (+ details pages) and the Electrical Panel card in the
+      Journey panel's third row (§4.2); Solar + Battery still one install event (limitation
+      stated in the UI and help); golden unchanged.
+- [ ] Unified Plan row across the nine devices (§4.2 step 2, Spec 5.6 #6).
 - [ ] Charts + Help updated (roof geometry remains inert — default orientation).
 - [ ] §6 NREL End-Use Load Profiles drive the energy balance (separate branch; own golden re-baseline).
 - [ ] CLAUDE.md updated: Phase 7 closed.
