@@ -5,7 +5,10 @@ data through the model. (Adopting the WhyWatt projection as the *default* moved 
 **Follows:** Phase 6 (`docs/Phase6_Spec.md`) — Solar/Battery split, inert roof-geometry inputs, and
 the **non-default `cec_projection` rate hand-off interface** (evaluated but not switched). Offline
 PVWatts/URDB data is harvested and validated separately in `docs/OfflineSolarData_Plan.md`.
-**Last updated:** 2026-09-23 — **§4.2 step 1 landed** (Solar / Battery / Electrical Panel = Journey row 3;
+**Last updated:** 2026-09-23 — open-items review: DoD ticked for PG&E end-to-end and the golden
+record; stale §2/§3 lines fixed; Post-Phase-7 list completed (default flip, SCE re-harvest, shim
+retirement, solar wave 2, beyond CA); remaining in P7: charts, unified Plan row, close-out; §6
+NREL on its own branch. Earlier — **§4.2 step 1 landed** (Solar / Battery / Electrical Panel = Journey row 3;
 Battery card + details; golden unchanged). Earlier — added **§4.2** Solar / Battery / Electrical Panel cards in the Journey
 (two cards + details, third Journey row; Solar + Battery stay one install event in Phase 7 —
 limitation stated; independent battery post-P7). Earlier — **Powerwall 3 battery defaults** (13.5 kWh, 89%, 5 kW charge /
@@ -355,7 +358,8 @@ to devices — **this changes no total, dispatch, or physics**. Convention:
 - **Dispatch is one pure function**, `dispatch_month(G, L, peak_hours, rates, battery, mode)` with
   `mode ∈ {"self", "cost", "auto"}` (`"auto"` = run both, keep the cheaper — what the model uses).
   Pure and deterministic (arrays in, flows out) so tests can run each mode on its own. The
-  `SolarBatteryConfig` shim is retired; `HESModel` takes `SolarConfig` + `BatteryConfig` directly.
+  `SolarBatteryConfig` shim is **kept** for now (`HESModel` / `ui/sim.py` still build it; its
+  `.solar` / `.battery` give the split configs) — retiring it is a pure refactor, post-P7.
 - **Outputs** keep the existing history arrays, now physically derived and reported as an
   energy balance that closes exactly:
   `production = solar_direct + battery_charge + export` and
@@ -391,9 +395,9 @@ pricing of `grid[h]`) and §5 (escalation) land after C as their own commits.
 
 ### §3 — Peak / non-peak consumption split + URDB TOU rates
 
-> **Runtime half LANDED 2026-09-23 as an option (`urdb_tou`), not yet the default** — see
-> "Landed" at the end of this section. The golden did not move; flipping the default is its own
-> commit.
+> **Runtime half LANDED 2026-09-23** — first as the option `urdb_tou`, then (§4.1 U1) as the
+> current energy rate under every projection method. The golden did not move; making a
+> projection the default is post-P7.
 >
 > **The offline half is DONE** and committed (`docs/OfflineURDB_Plan.md`, branch
 > `feat/urdb-offline-harvest`). CA's three IOUs (PG&E, SCE, SDG&E) are harvested — 19 flagship
@@ -483,7 +487,9 @@ selected tariff.
 - Tests: `tests/test_urdb_rates.py` (coverage, quarantine, baselines by ZIP, price_month hand
   check, revenue-neutral flat case, home bill = Σ price_month on the home's own load, EV2 winter
   Cost-saving on case 02). Golden unchanged; 485 tests pass.
-- **Not yet:** URDB as the default rate model (next, own golden diff); SCE re-harvest.
+- **Superseded by §4.1 (U1):** `urdb_tou` is no longer a rate model — the URDB plan is the
+  *current energy rate* every projection method grows; making a projection the default is
+  post-P7. **Still open:** SCE re-harvest (Post-Phase-7 list).
 
 ### §4 — UI / charts / outputs
 
@@ -1103,18 +1109,33 @@ tests/
   URDB plan has one (e.g. SDG&E, SCE midday) it is ignored for now and those hours are priced as
   off-peak. No 3-period extension planned.
 - ✅ **NEM export credit** (§4.1 issue 12) — fixed: hourly ACC by calendar year.
-- §6 load profiles: does the ACC rate weighting also switch to the NREL profiles, or keep
-  `device_load_shapes.json`? NREL source details (version, geography → CEC zone, EV coverage,
-  timestamps) to verify at planning.
+- **§6 NREL End-Use Load Profiles** (separate branch, after this one): does the ACC rate
+  weighting also switch to the NREL profiles, or keep `device_load_shapes.json`? NREL source
+  details (version, geography → CEC zone, EV coverage, timestamps) to verify at planning.
+- **Battery mode on the Battery summary card** (§4.2): the summary cards get no model results;
+  the mode is on the Battery details page. Decide whether to thread results to the Journey grid.
 
 ## Post-Phase-7 (separate efforts, not gating close)
 
+- **Default → a projection method** with the URDB current energy rate (own golden diff, §5); then
+  reinterpret CA Average / ACC as pure % projections and drop My Utility (§4.1 round 2).
+- **§5 extensions:** whether the projection drives the gas social-cost overlay (the NEM export
+  path is settled — hourly ACC, issue 12).
+- **SCE re-harvest** — SCE's URDB TOU-D-4-9PM record is quarantined ($0.33 summer on-peak vs
+  ~$0.58 published); re-harvest, verify against SCE's tariff sheets, lift the quarantine (§3).
+- **Retire the `SolarBatteryConfig` shim** — pass `SolarConfig` + `BatteryConfig` directly (pure
+  refactor, golden unchanged).
+- **Solar wave 2** — PVWatts harvest for Peninsula Clean Energy and San José Clean Energy ZIPs
+  (`docs/OfflineSolarData_Plan.md` §2b).
+- **Beyond CA** — EIA regional projection curves and regional starting prices (`starting_rates.json`
+  one region per census division), URDB coverage, municipal tables.
 - **Independent battery** (§4.2): own plan toggle, install year, cost and rebate (second capex
   slot), battery-only TOU arbitrage path, cost-split migration — lifts the Phase 7 "installed with
   solar" limitation; own golden diff.
 - **SCE/SDG&E rate-projection markets** — extend the offline "Rate Projections" harvest (manual
   spreadsheet step) with `CA_SCE`/`CA_SDGE`, then flip those ZIPs off the EIA-Pacific fallback (§5.1).
-- URDB coverage beyond CA (national ZIP crosswalk + harvest of maintained utilities).
+- URDB coverage beyond CA (national ZIP crosswalk + harvest of maintained utilities) — part of
+  "Beyond CA" above.
 - **Solar orientation correction** — make roof tilt/azimuth live (baked per-zone orientation
   factors + orientation-specific intra-day shapes; west-facing shifts output toward peak).
 
@@ -1130,21 +1151,27 @@ tests/
       *(§3, 2026-09-23 — as the interim `urdb_tou` option; SCE quarantined)*
 - [x] Battery defaults = Tesla Powerwall 3 (harvested with provenance; charge/discharge caps split);
       own golden diff. *(2026-09-23)*
-- [ ] **PG&E area fully working** end-to-end as a selectable choice (URDB plan × WhyWatt curve
-      growth, §4.1); non-PG&E areas default to EIA — Pacific growth with WhyWatt selectable; ZIPs
-      without a URDB price start from `starting_rates.json`; all CA ZIPs degrade gracefully.
+- [x] **PG&E area fully working** end-to-end as a selectable choice (URDB plan × WhyWatt curve
+      growth, §4.1); WhyWatt and EIA — Pacific selectable everywhere (non-PG&E on the PG&E-based
+      curves as a proxy); utilities without a URDB plan start from their EIA 2025 rate, ZIPs with
+      no utility from `starting_rates.json`; all CA ZIPs degrade gracefully (munis priced at their
+      own rate). *(U1 + U2 + issue 6, 2026-09-23)*
 - [x] §4.1 UI rework (U1 + U2): Home Profile utilities, **Current energy rate**, **Projection
       method** (naming applied to UI and help; keys kept); My Utility / CA Average / ACC in the
       Details dropdown. *(2026-09-23)*
 - [x] Municipal-utility ZIPs resolved (issue 6). *(2026-09-23)*
 - [x] NEM 3.0 export credit = hourly ACC by calendar year (issue 12; own golden diff, 2026-09-23).
-- [ ] Golden unchanged by U1/U2 (My Utility stays the default); only the battery-defaults commit
-      moves it, with the diff explained; full `pytest` green.
+- [x] Golden unchanged by U1, U2, the muni fix and all UI work (My Utility stays the default);
+      it moved only in two dedicated, explained commits — NEM 3.0 export credit (issue 12:
+      +$2.4k–2.8k journey opex on the solar cases) and the Powerwall 3 defaults (+$242–295, all
+      from 90% → 89%); full `pytest` green (530). *(2026-09-23)*
 - [ ] *(post-Phase-7)* default → projection with URDB starting price (own golden diff).
 - [x] Solar and Battery as separate cards (+ details pages) and the Electrical Panel card in the
       Journey panel's third row (§4.2); Solar + Battery still one install event (limitation
       stated in the UI and help); golden unchanged. *(2026-09-23)*
 - [ ] Unified Plan row across the nine devices (§4.2 step 2, Spec 5.6 #6).
-- [ ] Charts + Help updated (roof geometry remains inert — default orientation).
+- [ ] Charts: monthly solar generation, peak vs off-peak consumption + cost, and the yearly
+      energy balance (solar → home, solar → battery → home, export, grid import) (§4). Help is
+      current for everything landed; update it with the charts (roof geometry stays inert).
 - [ ] §6 NREL End-Use Load Profiles drive the energy balance (separate branch; own golden re-baseline).
 - [ ] CLAUDE.md updated: Phase 7 closed.
