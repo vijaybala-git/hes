@@ -934,10 +934,16 @@ Gas CAGR Projection")
 - R.3 / R.4 (ACC bands) and R.5 (ACC shape) unchanged.
 
 **EU.9 · Monthly Solar Generation** (new)
-- **What:** 12 monthly bars of the home's solar production (kWh) for the **final simulated year**
-  (fully electrified), with a line for the home's monthly electricity use in that year — the
-  summer surplus / winter shortfall at a glance. Subtitle: system kW, annual kWh, yield source
-  ("PVWatts · CZ4 zone estimate").
+- **What:** 12 monthly bars of the home's solar production (kWh) for a **selected year**, with a
+  line for the home's monthly electricity use in that year — the summer surplus / winter
+  shortfall at a glance, and how it shifts as the journey electrifies. Subtitle: system kW,
+  annual kWh, yield source ("PVWatts · CZ4 zone estimate").
+- **Year selector** (decided 2026-09-24): a compact slider in the chart header over the simulated
+  years from the solar install year to the final year, labelled with the calendar year
+  ("2025 … 2044"); **default = the final year** (fully electrified). Production is the same every
+  year (no degradation modelled); the use line changes with the swaps, so the selector shows the
+  shortfall shrinking or growing. A UI-only reactive (`eu9_year`), not a config / share-link key;
+  it resets to the final year when the horizon or the install year changes.
 - **Data:** production = `system_kW × SolarResource.ac_monthly`; use = a new per-year history
   `home_elec_kwh_monthly_history` (12,) on `JourneyHome` (the energy balance already computes the
   monthly loads; today they are kept hourly only on the URDB path).
@@ -971,7 +977,8 @@ self-consumption vs export")
 **Tests:** R.1 / R.2 in-use line == model rates (every year); the four curves' year-1 values
 equal the current rate (anchor 2025) or current rate × S[2025]/S[2026] (URDB anchor 2026);
 `price_month_parts` sums to `price_month` for every PG&E plan and month; EU.10 flows reproduce the
-§0 identities per year; empty states render. Golden unchanged.
+§0 identities per year; empty states render; EU.9's year selector spans install year → final
+year and defaults to the final year. Golden unchanged.
 
 ### §5 — Adopt the CEC projected-rate escalation as the default (Phase 6 WS1 → live)
 
