@@ -663,6 +663,10 @@ The export rate depends on your net-metering era:
   losses. Across California it ranges from about 1,350 kWh per kW per year on the foggy
   north coast to about 1,840 in the desert; San José is about 1,640. Degradation,
   shading, and your roof's actual tilt and direction are not modeled yet.
+- Solar and the battery have separate cards (Solar, Battery) in Your Electrification Journey,
+  but in this version they are one install: the battery is installed with solar, in solar's
+  install year, and the Solar card's total installed cost covers both. A battery on its own,
+  or added in a later year, is planned for a future release.
 - You enter the total installed system cost from a contractor quote, minus any rebate.
 
 ### Default values

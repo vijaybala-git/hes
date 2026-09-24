@@ -56,3 +56,21 @@ def test_every_primary_projection_button_is_a_known_method():
     from projected_rate_source import PROJECTION_LABELS
     assert all(k in PROJECTION_LABELS for k, _ in sim.PROJECTION_BUTTONS)
     assert [k for k, _ in sim.LEGACY_METHODS["electricity"]][0] == "cagr_flat"
+
+
+# ── §4.2 Battery card: the Phase 7 "installed with solar" limitation ──────────
+
+def test_battery_card_states_the_linked_install():
+    from ui import panels
+    try:
+        S.solar_planned.set(False)
+        assert "add solar" in panels._battery_link_note()
+        S.solar_planned.set(True)
+        S.solar_install_year.set(3)
+        note = panels._battery_link_note()
+        assert "Installed with solar in" in note and str(S.sim_start_year.value + 2) in note
+        assert panels._battery_is_default()                 # factory = Powerwall 3
+        S.solar_battery_kwh.set(10.0)
+        assert not panels._battery_is_default()
+    finally:
+        S.reset_to_defaults()

@@ -23,6 +23,7 @@ from ui.slider import WhyWattSlider, SliderSpec
 from help_utils import HelpButton, ChartHelpButton, HelpPopupOverlay, HelpLink
 from journey import CATEGORY_ORDER, CATEGORY_LABELS, CapExOnlySlot, SolarBatteryConfig
 from dispatch import battery_mode_summary
+from battery_defaults import DEFAULT_BATTERY
 from home_config import HomeConfig, compute_baseload_kwh, compute_ua, suggest_hvac_tons
 from model import HESModel
 from panel_assessor import PanelAssessor
@@ -42,9 +43,21 @@ _DETAIL_TITLES = {
     "panel":        "⚡ Electrical Panel Upgrade",
     "baseload":     "💡 Baseload & Lights",
     "home":         "🏠 Home Profile",
-    "solar":        "☀️ Solar + Battery",
+    "solar":        "☀️ Solar",
+    "battery":      "🔋 Battery",
     "rates":        "📈 Rate Scenarios",
 }
+
+DEFAULT_BATTERY_LABEL = DEFAULT_BATTERY["label"]
+
+
+def _battery_is_default() -> bool:
+    """True while the battery settings are the datasheet defaults (label the card with it)."""
+    return (solar_battery_kwh.value == DEFAULT_BATTERY["usable_kwh"]
+            and solar_battery_charge_kw.value == DEFAULT_BATTERY["charge_kw"]
+            and solar_battery_discharge_kw.value == DEFAULT_BATTERY["discharge_kw"]
+            and solar_battery_rte_pct.value == round(DEFAULT_BATTERY["round_trip_eff"] * 100))
+
 
 # ── §25.4.1 Style constants for two-column layout ─────────────────────────────
 _LEFT_COL  = "flex:1; min-width:180px; padding:0 16px 0 0"
@@ -753,10 +766,11 @@ def HomeSummaryCard():
 
 @solara.component
 def SolarSummaryCard():
-    """Solar + Battery summary card — panels slider, battery toggle, derived kW and coverage %."""
+    """Solar summary card (Phase 7 §4.2) — plan toggle, panels slider → kW, install year.
+    The battery has its own card; Solar + Battery remain one install event in Phase 7."""
     planned = solar_planned.value
     with solara.Column(classes=["device"]):
-        _card_header("solar", "Solar + Battery")
+        _card_header("solar", "Solar")
         with solara.Row(gap="10px", style=_ROW_CTRL):
             _Check(label="Add solar", value=solar_planned)
         if planned:
@@ -771,14 +785,6 @@ def SolarSummaryCard():
                                unit=f"≈ {system_kw:.1f} kW"),
                     value=solar_panels,
                 )
-            # Battery toggle
-            with solara.Row(gap="8px", style="align-items:center"):
-                _Check(label="Battery", value=solar_battery_enabled)
-                if solar_battery_enabled.value:
-                    solara.HTML(tag="div", unsafe_innerHTML=(
-                        f"<div style='font-size:0.78em; color:#555;'>"
-                        f"{solar_battery_kwh.value:.0f} kWh</div>"
-                    ))
             # Install year
             with solara.Column(style="width:100%"):
                 _YSl(solar_install_year, _DEFAULTS["solar_install_year"],
@@ -788,6 +794,36 @@ def SolarSummaryCard():
                 "<div style='font-size:0.80em; color:#AAAAAA; margin-top:3px;'>"
                 "Not planned</div>"
             ))
+
+
+def _battery_link_note() -> str:
+    """The Phase 7 limitation, stated where the battery is configured (§4.2)."""
+    if not solar_planned.value:
+        return "Installed with solar — add solar to plan a battery."
+    return (f"Installed with solar in {solar_install_year.value + sim_start_year.value - 1}"
+            " · cost included in the Solar card.")
+
+
+@solara.component
+def BatterySummaryCard():
+    """Battery summary card (Phase 7 §4.2) — on/off and size. In Phase 7 the battery is
+    installed with solar (one install event), so it is disabled until solar is planned."""
+    solar_on = solar_planned.value
+    with solara.Column(classes=["device"]):
+        _card_header("battery", "Battery")
+        if solar_on:
+            with solara.Row(gap="8px", style=_ROW_CTRL + " align-items:center"):
+                _Check(label="Battery", value=solar_battery_enabled)
+                if solar_battery_enabled.value:
+                    solara.HTML(tag="div", unsafe_innerHTML=(
+                        f"<div style='font-size:0.78em; color:#555;'>"
+                        f"{solar_battery_kwh.value:g} kWh · {DEFAULT_BATTERY_LABEL}</div>"
+                        if _battery_is_default() else
+                        f"<div style='font-size:0.78em; color:#555;'>"
+                        f"{solar_battery_kwh.value:g} kWh</div>"))
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            "<div style='font-size:0.78em; color:#90A4AE; margin-top:3px;'>"
+            + _battery_link_note() + "</div>"))
 
 
 @solara.component
@@ -1540,7 +1576,8 @@ def HomeDetail():
 
 @solara.component
 def SolarDetail(model):
-    """Solar + battery detail panel (§8)."""
+    """Solar detail panel (§8; Phase 7 §4.2 — battery settings and results are on the Battery
+    details page)."""
     planned = solar_planned.value
     net = solar_system_cost.value - solar_rebate.value
 
@@ -1596,24 +1633,10 @@ def SolarDetail(model):
         # Right box — Battery & Net Metering
         with solara.Column(style=_HALF):
             with solara.Column(style=_BOX):
-                _DS("Battery &amp; Net Metering")
+                _DS("Net Metering")
 
-                # Single line: [x] Battery  [13.5 kWh]  |  ⦿ NEM 3.0/NBT  ○ NEM 2.0
+                # ⦿ NEM 3.0/NBT  ○ NEM 2.0
                 with solara.Row(gap="4px", style="align-items:center; flex-wrap:wrap"):
-                    _Check(label="Battery", value=solar_battery_enabled)
-                    if battery_on:
-                        with solara.Column(style="width:80px; flex-shrink:0"):
-                            solara.InputFloat("kWh", value=solar_battery_kwh)
-                        with solara.Column(style="width:78px; flex-shrink:0"):
-                            solara.InputFloat("Charge kW", value=solar_battery_charge_kw)
-                        with solara.Column(style="width:88px; flex-shrink:0"):
-                            solara.InputFloat("Discharge kW", value=solar_battery_discharge_kw)
-                        with solara.Column(style="width:70px; flex-shrink:0"):
-                            solara.InputInt("Eff. %", value=solar_battery_rte_pct)
-                    # Thin separator
-                    solara.HTML(tag="span", unsafe_innerHTML=(
-                        "<span style='color:#C5CAE9; margin:0 4px;'>|</span>"
-                    ))
                     # NEM radio options inline
                     for key, lbl in [("nbt", "NEM 3.0/NBT"), ("nem2", "NEM 2.0")]:
                         active = nem == key
@@ -1630,9 +1653,6 @@ def SolarDetail(model):
                             ),
                         )
 
-                if battery_on:
-                    _Check(label="Charge from grid when it saves money",
-                           value=solar_battery_grid_charging)
                 solara.HTML(tag="div", unsafe_innerHTML=(
                     "<div style='font-size:0.73em; color:#888; margin-top:2px;'>"
                     + ("Export: hourly ACC value (midday solar ~$0.05/kWh, evening far more)" if nem == "nbt"
@@ -1733,7 +1753,7 @@ def SolarDetail(model):
             _batt_row = (
                 f"<tr><td style='{_td_l}'>&nbsp;&nbsp;…via battery</td>"
                 f"<td style='{_td_r}'>{_kwh(batt_kwh)} kWh</td></tr>"
-                if battery_on and batt_kwh is not None else "")
+                if battery_on and batt_kwh is not None else "")   # details: Battery page
             with solara.Column(style="flex:1; min-width:140px"):
                 solara.HTML(tag="div", unsafe_innerHTML=(
                     f"<table style='width:100%; border-collapse:collapse;'>"
@@ -1749,10 +1769,8 @@ def SolarDetail(model):
                     f"  <td style='{_td_r}'><b>{_kwh(export_kwh)}</b> kWh"
                     f"  <span style='color:#888; font-size:0.9em'>&nbsp;→ {credit_label}</span></td>"
                     f"</tr>{need_rows}</table>"
-                    + (f"<div style='font-size:0.74em; color:#888; margin-top:4px;'>"
-                       f"Battery: {battery_mode_summary(battery_modes)}"
-                       + (f" · {grid_chg_kwh:,.0f} kWh/yr charged from grid"
-                          if grid_chg_kwh else "") + "</div>"
+                    + ("<div style='font-size:0.74em; color:#888; margin-top:4px;'>"
+                       "Battery modes, grid charging and losses: Battery card ⋮</div>"
                        if battery_on and battery_modes else "")
                 ))
 
@@ -1776,7 +1794,8 @@ def SolarDetail(model):
         ))
         solara.HTML(tag="div", unsafe_innerHTML=(
             "<div style='font-size:0.79em; color:#555; margin-bottom:6px;'>"
-            "Enter the total installed cost from your contractor quote.</div>"
+            "Enter the total installed cost from your contractor quote — solar and battery "
+            "together (in Phase 7 they are one install event).</div>"
         ))
         with solara.Row(gap="12px", style="flex-wrap:wrap; align-items:center"):
             with solara.Column(style="min-width:130px"):
@@ -1787,6 +1806,73 @@ def SolarDetail(model):
                 f"<div style='font-size:1.05em; font-weight:700; color:#1976D2;'>"
                 f"Net ${net:,}</div>"
             ))
+
+
+@solara.component
+def BatteryDetail(model):
+    """Battery detail panel (Phase 7 §2 / §4.2): size, charge / discharge limits, efficiency,
+    grid charging, and the battery's results for the final simulated year. Installed with
+    solar in Phase 7 (one install event) — the controls are disabled until solar is planned."""
+    solar_on = solar_planned.value
+    battery_on = solar_on and solar_battery_enabled.value
+    _BOX = ("padding:8px 12px; background:#F0F4FF; border-radius:6px;"
+            " margin-top:6px; border:1px solid #C5CAE9;")
+
+    with solara.Row(gap="12px", style=_TOP_ROW + " align-items:center"):
+        if solar_on:
+            _Check(label="Battery in my journey", value=solar_battery_enabled)
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            "<div style='font-size:0.82em; color:#607D8B'>" + _battery_link_note() + "</div>"))
+    if not battery_on:
+        return
+
+    with solara.Column(style=_BOX):
+        _DS("Battery")
+        with solara.Row(gap="8px", style="align-items:center; flex-wrap:wrap"):
+            with solara.Column(style="width:90px; flex-shrink:0"):
+                solara.InputFloat("Usable kWh", value=solar_battery_kwh)
+            with solara.Column(style="width:90px; flex-shrink:0"):
+                solara.InputFloat("Charge kW", value=solar_battery_charge_kw)
+            with solara.Column(style="width:100px; flex-shrink:0"):
+                solara.InputFloat("Discharge kW", value=solar_battery_discharge_kw)
+            with solara.Column(style="width:90px; flex-shrink:0"):
+                solara.InputInt("Round trip %", value=solar_battery_rte_pct)
+        _Check(label="Charge from grid when it saves money",
+               value=solar_battery_grid_charging)
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            "<div style='font-size:0.73em; color:#888; margin-top:2px;'>"
+            f"Defaults: {DEFAULT_BATTERY_LABEL} datasheet (13.5 kWh, 89%, 5 kW in / 11.5 kW out)."
+            " Each month the battery runs Self-powered or Cost-saving, whichever saves more.</div>"))
+
+    # Results — final simulated year (the journey home), once the model has run
+    rows = None
+    if model is not None:
+        jh = model.journey_home
+        hist = jh.battery_discharge_history
+        if hist and jh.solar_production_kwh_history and jh.solar_production_kwh_history[-1] > 0:
+            i = len(hist) - 1
+            rows = (i + 1, jh.battery_discharge_history[i], jh.battery_charge_grid_history[i],
+                    jh.battery_losses_history[i], jh.battery_mode_history[i])
+    with solara.Column(style=_BOX):
+        _DS("Results")
+        if rows is None:
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                "<div style='font-size:0.80em; color:#888'>Run the model to see the battery's "
+                "results.</div>"))
+        else:
+            yr, dis, grid_in, loss, modes = rows
+            _td_l = "font-size:0.80em; color:#555; padding:3px 8px 3px 0"
+            _td_r = "font-size:0.80em; color:#333; text-align:right; padding:3px 0"
+            solara.HTML(tag="div", unsafe_innerHTML=(
+                "<table style='border-collapse:collapse'>"
+                f"<tr><td style='{_td_l}'>Energy supplied by the battery (yr {yr})</td>"
+                f"<td style='{_td_r}'><b>{dis:,.0f}</b> kWh</td></tr>"
+                f"<tr><td style='{_td_l}'>Charged from the grid</td>"
+                f"<td style='{_td_r}'>{grid_in:,.0f} kWh</td></tr>"
+                f"<tr><td style='{_td_l}'>Lost in charging / discharging</td>"
+                f"<td style='{_td_r}'>{loss:,.0f} kWh</td></tr></table>"
+                "<div style='font-size:0.80em; color:#555; margin-top:4px'>"
+                f"Mode: {battery_mode_summary(modes)}</div>"))
 
 
 def _fuel_model_block(fuel: str, heading: str, color: str,
@@ -2071,4 +2157,4 @@ def _SocialBody():
 
 
 
-__all__ = ['_DETAIL_TITLES', '_LEFT_COL', '_RIGHT_COL', '_COSTS_BOX', '_CARD_NORMAL', '_CARD_OPEN', '_ROW_CTRL', '_TOP_ROW', 'DetailTitleBar', '_DS', '_DSl', '_elec_display', '_ElecAmpsInput', '_DetailCosts', '_card_header', '_card_header_main', '_panel_hd', '_PlanCheck', '_Check', '_cost_row', '_appliance_rows', 'HVACSummaryCard', 'WHSummaryCard', 'TransportationSummaryCard', 'TransportationDetail', 'CooktopSummaryCard', 'DryerSummaryCard', '_PanelControls', 'PanelSummaryCard', '_BaseloadControls', 'BaseloadSummaryCard', 'HomeSummaryCard', 'SolarSummaryCard', 'CurrentRateBlock', 'ModelTimelineCard', 'RatesSummaryCard', 'HVACDetail', 'WaterHeaterDetail', 'EVDetail', 'CooktopDetail', 'DryerDetail', 'ElecPanelDetail', 'BaseloadDetail', 'HomeDetail', 'SolarDetail', '_fuel_model_block', 'RatesDetail', 'JourneyPlannerPanel', 'HomeProfilePanel', 'EnergyPricesPanel', '_SocialBody']
+__all__ = ['_DETAIL_TITLES', '_LEFT_COL', '_RIGHT_COL', '_COSTS_BOX', '_CARD_NORMAL', '_CARD_OPEN', '_ROW_CTRL', '_TOP_ROW', 'DetailTitleBar', '_DS', '_DSl', '_elec_display', '_ElecAmpsInput', '_DetailCosts', '_card_header', '_card_header_main', '_panel_hd', '_PlanCheck', '_Check', '_cost_row', '_appliance_rows', 'HVACSummaryCard', 'WHSummaryCard', 'TransportationSummaryCard', 'TransportationDetail', 'CooktopSummaryCard', 'DryerSummaryCard', '_PanelControls', 'PanelSummaryCard', '_BaseloadControls', 'BaseloadSummaryCard', 'HomeSummaryCard', 'SolarSummaryCard', 'BatterySummaryCard', 'BatteryDetail', 'CurrentRateBlock', 'ModelTimelineCard', 'RatesSummaryCard', 'HVACDetail', 'WaterHeaterDetail', 'EVDetail', 'CooktopDetail', 'DryerDetail', 'ElecPanelDetail', 'BaseloadDetail', 'HomeDetail', 'SolarDetail', '_fuel_model_block', 'RatesDetail', 'JourneyPlannerPanel', 'HomeProfilePanel', 'EnergyPricesPanel', '_SocialBody']

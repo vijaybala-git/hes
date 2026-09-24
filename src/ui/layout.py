@@ -567,6 +567,8 @@ def DetailView(item: str, model):
             HomeDetail()
         elif item == "solar":
             SolarDetail(model)
+        elif item == "battery":
+            BatteryDetail(model)
         elif item == "rates":
             RatesDetail()
 
@@ -589,13 +591,13 @@ def DetailDock(model):
     _DETAIL_ICONS = {
         k: _DEVICE_ICONS.get(k, "")
         for k in ("hvac", "water_heater", "ice", "ev", "cooktop", "dryer",
-                  "panel", "baseload", "home", "solar", "rates")
+                  "panel", "baseload", "home", "solar", "battery", "rates")
     }
     _DETAIL_HELP = {
         "hvac": "hvac", "water_heater": "water_heater",
         "ice": "transportation", "ev": "ev_charger",
         "cooktop": "cooktop", "dryer": "dryer", "panel": "panel_upgrade",
-        "baseload": "baseload", "home": "home_profile", "solar": "solar",
+        "baseload": "baseload", "home": "home_profile", "solar": "solar", "battery": "solar",
         "rates": "rates",
     }
     icon_svg = _DETAIL_ICONS.get(dopen, "")
@@ -1099,8 +1101,6 @@ def _HomeBody():
     with solara.Column(classes=["card-bd"], gap="8px"):
         ModelTimelineCard()
         HomeSummaryCard()
-        PanelSummaryCard()
-        SolarSummaryCard()
 
 
 @solara.component
@@ -1160,7 +1160,7 @@ def JourneyGrid():
                 f"white-space:nowrap;letter-spacing:-0.01em'>Your Electrification Journey</h3>"
                 f"<span style='font-size:12px;color:var(--ink-3);white-space:nowrap;"
                 f"letter-spacing:0.01em'>— Configure Major Loads</span>"
-                f"<span class='count-pill'>6 devices</span></div>"
+                f"<span class='count-pill'>9 devices</span></div>"
             ))
             # §5 — help first, then the collapse chevron as the rightmost control
             # (lets users shrink the biggest panel to bring the graphs back into view).
@@ -1179,6 +1179,11 @@ def JourneyGrid():
                     CooktopSummaryCard()
                     DryerSummaryCard()
                     BaseloadSummaryCard()
+                # Row 3 — SOLAR · BATTERY · ELECTRICAL PANEL (Phase 7 §4.2)
+                with solara.Row(classes=["jgrid"]):
+                    SolarSummaryCard()
+                    BatterySummaryCard()
+                    PanelSummaryCard()
 
 
 # ── Main Page ──────────────────────────────────────────────────────────────────

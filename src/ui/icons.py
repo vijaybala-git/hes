@@ -65,6 +65,10 @@ _DEVICE_ICONS = {
     "rates":        ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
                      " stroke-linecap='round' stroke-linejoin='round'>"
                      "<path d='M3 3v18h18'/><path d='M7 14l3-4 3 2 4-6'/></svg>"),
+    "battery":      ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'"
+                     " stroke-linecap='round' stroke-linejoin='round'>"
+                     "<rect x='2' y='7' width='17' height='10' rx='2'/><path d='M22 11v2'/>"
+                     "<path d='M11 9l-2 3h4l-2 3'/></svg>"),
 }
 
 # ── Card-level header icons (accent-soft .ic chip in .card-hd) ────────────────
@@ -111,6 +115,7 @@ _DEVICE_HELP_KEY = {
     "baseload":     "baseload",
     "home":         "home_profile",
     "solar":        "solar",
+    "battery":      "solar",          # battery help lives on the Solar & Battery page
     "rates":        "rates",
 }
 

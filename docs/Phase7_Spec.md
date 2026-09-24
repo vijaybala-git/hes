@@ -5,7 +5,8 @@ data through the model. (Adopting the WhyWatt projection as the *default* moved 
 **Follows:** Phase 6 (`docs/Phase6_Spec.md`) — Solar/Battery split, inert roof-geometry inputs, and
 the **non-default `cec_projection` rate hand-off interface** (evaluated but not switched). Offline
 PVWatts/URDB data is harvested and validated separately in `docs/OfflineSolarData_Plan.md`.
-**Last updated:** 2026-09-23 — added **§4.2** Solar / Battery / Electrical Panel cards in the Journey
+**Last updated:** 2026-09-23 — **§4.2 step 1 landed** (Solar / Battery / Electrical Panel = Journey row 3;
+Battery card + details; golden unchanged). Earlier — added **§4.2** Solar / Battery / Electrical Panel cards in the Journey
 (two cards + details, third Journey row; Solar + Battery stay one install event in Phase 7 —
 limitation stated; independent battery post-P7). Earlier — **Powerwall 3 battery defaults** (13.5 kWh, 89%, 5 kW charge /
 11.5 kW discharge; golden +$242–295 on solar cases, all from the efficiency). Earlier —
@@ -806,7 +807,7 @@ Clarified 2026-09-23: *the URDB data file is used when the ZIP resolves to a uti
   Social & Health now sets the group height. After §4.2 moves Solar / Battery / Panel into the
   Journey, the Home column shrinks further (re-check balance then).
 
-### §4.2 — Solar, Battery and Electrical Panel cards in the Journey (PLANNED — decided 2026-09-23)
+### §4.2 — Solar, Battery and Electrical Panel cards in the Journey (LANDED 2026-09-23 — step 1)
 
 **Why.** Phase 5.6 #6 (one "Plan" row for every device) was deferred because Solar + Battery and
 the Electrical Panel live in a different zone ("Setup your home → Home, Panel & Solar") from
@@ -860,6 +861,21 @@ today sit in the solar results table ("…via battery", the mode line) move to B
   `!important` CSS. Verify desktop and phone widths in the preview; the Setup group gets shorter,
   the Journey panel taller.
 - Tests: card/detail smoke tests; golden unchanged.
+
+**Landed 2026-09-23 (step 1; UI only — golden unchanged, 530 tests):**
+- Journey rows: HVAC · Water Heater · Transportation / Cooktop · Dryer · Baseload / **Solar ·
+  Battery · Electrical Panel**; "9 devices". The Home group keeps Model Timeline + Home Profile.
+- `SolarSummaryCard` → "Solar" (no battery toggle); new `BatterySummaryCard` ("13.5 kWh · Tesla
+  Powerwall 3" while the settings are the datasheet defaults; `_battery_link_note()`: "Installed
+  with solar in 2025 · cost included in the Solar card", or "add solar to plan a battery" with
+  the controls hidden). New `BatteryDetail`: usable kWh, charge / discharge kW, round trip %,
+  grid charging, the datasheet note, and final-year results (energy supplied, grid-charged,
+  losses, mode). `SolarDetail`: "Net Metering" box only, the cost note says solar + battery; the
+  results table keeps "…via battery" and points to the Battery card for the rest.
+- Battery icon; detail title "🔋 Battery"; help → the Solar & Battery page (limitation added).
+- **Not done:** the battery mode line on the *summary* card (the summary cards get no model; it
+  is on the details page). **Balance:** the Home column is now short (373 px vs Energy 623 /
+  Social 686 at 1280 px) — see the follow-up below.
 
 **Step 2 — unified Plan row (Spec 5.6 #6), after the move.** With all nine devices in one zone,
 add a quick-toggle row at the top of the Journey panel bound to the existing `*_planned`
@@ -1125,9 +1141,9 @@ tests/
 - [ ] Golden unchanged by U1/U2 (My Utility stays the default); only the battery-defaults commit
       moves it, with the diff explained; full `pytest` green.
 - [ ] *(post-Phase-7)* default → projection with URDB starting price (own golden diff).
-- [ ] Solar and Battery as separate cards (+ details pages) and the Electrical Panel card in the
+- [x] Solar and Battery as separate cards (+ details pages) and the Electrical Panel card in the
       Journey panel's third row (§4.2); Solar + Battery still one install event (limitation
-      stated in the UI and help); golden unchanged.
+      stated in the UI and help); golden unchanged. *(2026-09-23)*
 - [ ] Unified Plan row across the nine devices (§4.2 step 2, Spec 5.6 #6).
 - [ ] Charts + Help updated (roof geometry remains inert — default orientation).
 - [ ] §6 NREL End-Use Load Profiles drive the energy balance (separate branch; own golden re-baseline).
