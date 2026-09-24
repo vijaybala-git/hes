@@ -43,78 +43,83 @@ def _rate_info(zipcode: str, source: str):
     return _APP_RATE_RESOLVER.resolve(zipcode, source=source)
 
 
-def _utility_line(fr) -> str:
-    """One-row HTML for a resolved fuel: icon + utility name + provenance badge."""
-    icon = "⚡" if fr.fuel == "electricity" else "🔥"
-    color = C_RATE_ELEC if fr.fuel == "electricity" else C_RATE_GAS
-    if fr.provenance == "inferred":
-        badge = ("<span style='font-size:0.72em; color:#B26A00; background:#FFF3E0;"
-                 " border-radius:3px; padding:1px 5px; margin-left:6px'>≈ estimated from area</span>")
-    elif fr.provenance == "fallback":
-        badge = ("<span style='font-size:0.72em; color:#9A4D00; background:#FFE0B2;"
-                 " border-radius:3px; padding:1px 5px; margin-left:6px'>⚠ utility not found — CA avg</span>")
-    elif fr.provenance == "selected":
-        badge = ("<span style='font-size:0.72em; color:#546E7A; background:#ECEFF1;"
-                 " border-radius:3px; padding:1px 5px; margin-left:6px'>statewide</span>")
-    else:
-        badge = ""
-    return (f"<div style='display:flex; align-items:baseline; font-size:0.84em;"
-            f" padding:2px 0 2px 4px;'>"
-            f"<span style='color:{color}; margin-right:6px'>{icon}</span>"
-            f"<strong style='color:#263238'>{fr.name}</strong>{badge}</div>")
-
-
-_PROV_BADGE = {  # provenance -> (text, fg, bg)
-    "inferred": ("≈ estimated from area", "#B26A00", "#FFF3E0"),
-    "fallback": ("⚠ utility not found — CA avg", "#9A4D00", "#FFE0B2"),
-    "selected": ("statewide", "#546E7A", "#ECEFF1"),
-    "acc":      ("ACC shape", "#546E7A", "#ECEFF1"),
-    "urdb":     ("URDB tariff", "#1B5E20", "#E8F5E9"),
-    "tou_fallback": ("⚠ no URDB tariff — EIA", "#9A4D00", "#FFE0B2"),
+# ── Current energy rate vs projection method (Phase 7 §4.1, U2) ─────────────────
+# Projection methods shown as primary buttons (short labels; the card says "WhyWatt").
+PROJECTION_BUTTONS = (("whywatt_conservative", "Conservative"),
+                      ("whywatt_moderate", "Moderate"),
+                      ("whywatt_stress", "Stress"),
+                      ("eia_pacific", "EIA Pacific"))
+# Legacy fixed-%/yr methods — the Details dropdown (My Utility stays the default through P7).
+LEGACY_METHODS = {
+    "electricity": (("cagr_flat", "My Utility"), ("ca_average", "CA Average"),
+                    ("acc_shaped", "ACC")),
+    "gas": (("cagr_flat", "My Utility"), ("ca_average", "CA Average"),
+            ("acc_seasonal", "ACC")),
 }
+_UNIT_SHORT = {"electricity": "kWh", "gas": "therm"}
 
 
-def _rate_line_html(fuel: str, name: str, provenance: str, cagr_pct=None) -> str:
-    """Resolved-rate line: icon + name + provenance badge + right-aligned CAGR."""
-    icon = "⚡" if fuel == "electricity" else "🔥"
-    color = C_RATE_ELEC if fuel == "electricity" else C_RATE_GAS
-    badge = ""
-    if provenance in _PROV_BADGE:
-        t, fg, bg = _PROV_BADGE[provenance]
-        badge = (f"<span style='font-size:0.72em; color:{fg}; background:{bg};"
-                 f" border-radius:3px; padding:1px 5px; margin-left:6px'>{t}</span>")
-    cagr = ("" if cagr_pct is None else
-            f"<span style='margin-left:auto; color:#546E7A; font-size:0.82em'>+{cagr_pct}%/yr</span>")
-    return (f"<div style='display:flex; align-items:baseline; font-size:0.84em;"
-            f" padding:2px 0 2px 4px;'>"
-            f"<span style='color:{color}; margin-right:6px'>{icon}</span>"
-            f"<strong style='color:#263238'>{name}</strong>{badge}{cagr}</div>")
+def _starting_rate(fuel: str):
+    """The home's current energy rate for `fuel` (StartingRate) — shared by scenarios A/B."""
+    from starting_rates import get_starting_rates
+    fr = getattr(_rate_info(zip_code.value, "auto"), fuel)
+    label = (elec_tariff_label.value or None) if fuel == "electricity" else None
+    return get_starting_rates().resolve(fuel, fr.utility_id, zip_code.value, label)
 
 
-def _fuel_resolved_display(fuel: str, mode: str, cagr_pct: int, acc_cagr_pct: int,
-                           ri_auto, ri_ca) -> tuple[str, str, int]:
-    """(name, provenance, cagr) for a fuel given its selected rate mode."""
-    fr_auto = ri_auto.electricity if fuel == "electricity" else ri_auto.gas
-    if mode in PROJECTION_LABELS:
-        # Projection method (Phase 7 §4.1): the home's current energy rate grown by the curve;
-        # no user CAGR (cagr=None hides the +%/yr tag). A URDB plan shows its family + peak
-        # window; otherwise the EIA current rate (ACC shape layered on in the core).
-        from starting_rates import get_starting_rates
-        st = get_starting_rates().resolve(
-            fuel, fr_auto.utility_id, zip_code.value,
-            (elec_tariff_label.value or None) if fuel == "electricity" else None)
+def _current_rate_display(fuel: str, method: str) -> tuple[str, str, str]:
+    """(headline, detail, kind) for the current energy rate a method prices from.
+
+    Projection methods use the home's StartingRate (URDB plan / utility EIA 2025 / EIA —
+    Pacific). Legacy methods keep their own starting price (shown as such)."""
+    unit = _UNIT_SHORT[fuel]
+    fr = getattr(_rate_info(zip_code.value, "auto"), fuel)
+    if method in PROJECTION_LABELS:
+        st = _starting_rate(fuel)
         if st.kind == "urdb":
             from urdb_rates import peak_hours_label
             rs = st.structure
-            peak = peak_hours_label(rs.peak_hours) if rs.is_tou else "tiered, no peak window"
-            return (f"{st.label} · peak {peak} · {PROJECTION_LABELS[mode]}", "urdb", None)
-        prov = "tou_fallback" if (fuel == "electricity" and fr_auto.utility_id) else "acc"
-        return f"{st.label} · {PROJECTION_LABELS[mode]}", prov, None
-    if mode in ("acc_shaped", "acc_seasonal"):
-        return "PG&E CPUC base", "acc", acc_cagr_pct
-    if mode == "ca_average":
-        return "California average", "selected", cagr_pct
-    return fr_auto.name, fr_auto.provenance, cagr_pct          # cagr_flat = My Utility
+            peak = (f"peak {peak_hours_label(rs.peak_hours)}" if rs.is_tou
+                    else "tiered, no peak window")
+            return st.label, f"{peak} · URDB plan, effective {rs.startdate}", "urdb"
+        if st.kind == "eia_utility":
+            est = " · 2024 rate carried to 2025" if st.method == "bridged_state_ratio" else ""
+            note = ""
+            if fuel == "electricity":
+                from urdb_rates import get_urdb
+                u = get_urdb()
+                if u.decision(st.utility_id) == "quarantined":
+                    note = " · plan data under review"
+                elif u.decision(st.utility_id) != "urdb":
+                    note = " · no plan data yet"
+            return st.label, f"${st.rate:.3f}/{unit}{est}{note}", "eia_utility"
+        return st.label, f"${st.rate:.3f}/{unit} · regional average (no utility found)", \
+            "eia_region"
+    if method in ("acc_shaped", "acc_seasonal"):
+        return "PG&E CPUC base", "ACC shape · fixed %/yr", "legacy"
+    if method == "ca_average":
+        ca = _rate_info(zip_code.value, "ca_average")
+        r = getattr(ca, fuel)
+        return "California average", f"${r.rate:.3f}/{unit} · EIA {r.base_year}", "legacy"
+    return (fr.name, f"${fr.rate:.3f}/{unit} · EIA {fr.base_year} · My Utility", "legacy")
+
+
+def _utilities_html(zipcode: str) -> str:
+    """Home Profile line: the ZIP's electric + gas utility (or the fallback)."""
+    from starting_rates import SHORT_NAMES
+    ri = _rate_info(zipcode, "auto")
+    parts = []
+    for fr in (ri.electricity, ri.gas):
+        icon = "⚡" if fr.fuel == "electricity" else "🔥"
+        if fr.utility_id is None:
+            name = "<span style='color:#9A4D00'>not found — EIA Pacific</span>"
+        else:
+            name = "<b>" + SHORT_NAMES[fr.fuel].get(str(fr.utility_id), fr.name) + "</b>"
+            if fr.provenance == "inferred":
+                name += "<span style='color:#B26A00'> ≈</span>"
+        parts.append(f"{icon} {name}")
+    return ("<div style='font-size:0.82em; color:#555; margin-top:2px;'>"
+            "Your utilities: " + " &nbsp;·&nbsp; ".join(parts) + "</div>")
 
 
 def _seed_eia_cagr():
@@ -543,7 +548,8 @@ def extract_metrics(model, df) -> dict:
 
 
 __all__ = ["_APP_CLIMATE_LOADER", "_TREND_LABELS", "_climate_info", "_APP_RATE_RESOLVER",
-           "_rate_info", "_utility_line", "_PROV_BADGE", "_rate_line_html",
-           "_fuel_resolved_display", "_seed_eia_cagr",
+           "_rate_info", "_seed_eia_cagr",
+           "PROJECTION_BUTTONS", "LEGACY_METHODS", "_starting_rate", "_current_rate_display",
+           "_utilities_html",
            "_eff_swap_year", "_build_slot_configs", "run_simulation",
            "_verdict_numbers", "extract_metrics"]

@@ -5,7 +5,8 @@ data through the model. (Adopting the WhyWatt projection as the *default* moved 
 **Follows:** Phase 6 (`docs/Phase6_Spec.md`) — Solar/Battery split, inert roof-geometry inputs, and
 the **non-default `cec_projection` rate hand-off interface** (evaluated but not switched). Offline
 PVWatts/URDB data is harvested and validated separately in `docs/OfflineSolarData_Plan.md`.
-**Last updated:** 2026-09-23 — **NEM 3.0 export credit fixed** (issue 12: hourly ACC 2024 values
+**Last updated:** 2026-09-23 — **U2 landed** (UI: utilities in Home Profile, Current Energy Rate +
+Projection Method cards, fixed-%/yr dropdown; golden unchanged). Earlier — **NEM 3.0 export credit fixed** (issue 12: hourly ACC 2024 values
 by calendar year; golden re-baselined, solar cases only). Earlier — **U1 landed** (current energy rate × projection growth; EIA 2025
 starting rates; `starting_rates.json`; `urdb_tou` retired; golden unchanged). Earlier — full-pass review: stale text aligned with the round-2 decisions;
 naming fixed (**current energy rate** = a rate *source*, e.g. `urdb_tou`; **projection method** =
@@ -495,7 +496,7 @@ selected tariff.
 **Naming (fixed 2026-09-23 — use these terms in code, config, UI and docs).** Phase 6/7 text
 blurred two different things under "rate model":
 
-| Term | What it answers | Scope | Values | Proposed config keys (U2) |
+| Term | What it answers | Scope | Values | Config keys |
 |---|---|---|---|---|
 | **Current energy rate** (a *rate source*) | What do you pay **today**? | per fuel; a **home fact** — shared by scenarios A and B | electricity: `urdb` (the URDB plan, + `elec_tariff_label`) · `eia_utility` (EIA per-utility) · `eia_region` (`starting_rates.json`); gas: `eia_utility` · `eia_region` | resolved from the ZIP; only the plan is user-chosen: `elec_tariff_label` |
 | **Projection method** | How do prices **grow** over the years? | per fuel, **per scenario** | `whywatt_conservative / _moderate / _stress` (the CEC-driven curves Phase 6 called `cec_projection`) · `eia_pacific`; legacy fixed-%: `cagr_flat` (My Utility) · `ca_average` · `acc_shaped` | `elec_projection_a/b`, `gas_projection_a/b` |
@@ -505,7 +506,12 @@ blurred two different things under "rate model":
 - Legacy modes (My Utility / CA Average / ACC) still set *both* axes their old way through Phase 7.
 - Old `elec_rate_model_a/b` / `gas_rate_model_a/b` share links and regression cases migrate by a map
   (old key → projection method; `urdb_tou` → `whywatt_moderate`), golden-neutral. *(U1 landed the
-  `urdb_tou` migration; the config-key split is done with the UI cards in U2.)*
+  `urdb_tou` migration.)*
+- **Decided in U2: no config-key rename.** After `urdb_tou` left, `elec/gas_rate_model_a/b`
+  already hold exactly the projection method, and the current energy rate has no user key
+  except `elec_tariff_label` (the rest resolves from the ZIP). Renaming would churn ~90 call
+  sites, the regression cases and every share link for no behaviour change — the *names* in the
+  UI, help and docs follow the table; the keys stay.
 
 **Requested (2026-09-23):**
 1. **Home Profile** shows, next to the climate-zone line, *your electricity utility* and *your gas
@@ -689,6 +695,30 @@ Clarified 2026-09-23: *the URDB data file is used when the ZIP resolves to a uti
   Jul–Aug Cost-saving by year 19). Confirms issue 12 needs its decision before the default flip.
 - Tests: `tests/test_starting_rates.py` (new, 15), `test_urdb_rates.py` / `test_projected_rate_source.py`
   updated. 501 pass; golden PASS, 37 trend moves correct.
+
+**Landed 2026-09-23 — U2 (UI; golden unchanged):**
+- **Home Profile:** "Your utilities: ⚡ PG&E · 🔥 PG&E" under the climate line (`≈` when the
+  ZIP was inferred; "not found — EIA Pacific" when unresolved).
+- **Energy & Prices summary** — the old "Home Energy Prices" card is split:
+  - **Current Energy Rate** (`CurrentRateBlock`, shared A/B): with a URDB plan the electricity
+    line is a button "PG&E · E-TOU-C ▾" opening the Plan list; otherwise "SCE · EIA 2025 ·
+    plan data under review" / "EIA — Pacific · regional average". Gas: "PG&E · EIA 2025 ·
+    2024 rate carried to 2025". Legacy methods show their own start (e.g. "Pacific Gas &
+    Electric · $0.396/kWh · EIA 2024 · My Utility") with a hint to pick a projection.
+  - **Projection Method** (scenario A): Conservative / Moderate / Stress / EIA Pacific per
+    fuel; when a legacy method is active: "Using My Utility · +7%/yr (fixed) — change in ⋯
+    Details".
+- **Details:** "Current Energy Rate (shared by scenarios A and B)" on top; then "Projection
+  Method — Scenario A/B" per fuel: the four buttons, reference curves (expander), and a
+  **Fixed %/yr methods** dropdown (My Utility — default through P7 — / CA Average / ACC) that
+  brings up the escalation slider.
+- Removed dead display code (`_model_toggle`, `_fuel_resolved_display`, `_rate_line_html`,
+  `_utility_line`, `_PROV_BADGE`). New helpers in `ui/sim.py`: `PROJECTION_BUTTONS`,
+  `LEGACY_METHODS`, `_starting_rate`, `_current_rate_display`, `_utilities_html`.
+- Tests: `tests/test_ui_rates.py` (7). 514 pass; golden PASS. Help (rates) rewritten around the
+  two cards. Verified in the preview (plan button → list; dropdown → slider).
+- **Known gap (issue 6, still open):** municipal-utility ZIPs (SMUD 95814, SVP 95050, CPAU
+  94301) still show PG&E in "Your utilities".
 
 **Landed 2026-09-23 — issue 12, NEM 3.0 export credit (own golden diff, solar cases only):**
 - **What was wrong.** `get_nem3_export_rates` took the `monthly_avg_acc_kwh` values in
@@ -954,9 +984,10 @@ tests/
 - [ ] **PG&E area fully working** end-to-end as a selectable choice (URDB plan × WhyWatt curve
       growth, §4.1); non-PG&E areas default to EIA — Pacific growth with WhyWatt selectable; ZIPs
       without a URDB price start from `starting_rates.json`; all CA ZIPs degrade gracefully.
-- [ ] §4.1 UI rework (U1 + U2): Home Profile utilities, **Current energy rate**, **Projection
-      method** (naming table applied to keys, UI and help); My Utility / CA Average / ACC in the
-      Details dropdown; municipal-utility ZIPs resolved before U2.
+- [x] §4.1 UI rework (U1 + U2): Home Profile utilities, **Current energy rate**, **Projection
+      method** (naming applied to UI and help; keys kept); My Utility / CA Average / ACC in the
+      Details dropdown. *(2026-09-23)*
+- [ ] Municipal-utility ZIPs resolved (issue 6) — the "Your utilities" line depends on it.
 - [x] NEM 3.0 export credit = hourly ACC by calendar year (issue 12; own golden diff, 2026-09-23).
 - [ ] Golden unchanged by U1/U2 (My Utility stays the default); only the battery-defaults commit
       moves it, with the diff explained; full `pytest` green.

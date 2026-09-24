@@ -747,6 +747,8 @@ def HomeSummaryCard():
             f"CDD {_ci.annual_cdd_65f:,.0f}</span>"
             f"<br><span style='color:#999;'>{_src}</span></div>"
         ))
+        # Row 4: the ZIP's utilities (Phase 7 §4.1)
+        solara.HTML(tag="div", unsafe_innerHTML=_utilities_html(zip_code.value))
 
 
 @solara.component
@@ -810,32 +812,59 @@ def TariffPicker(eiaid):
                       "" if by_text[txt] == opts[0]["label"] else by_text[txt]))
 
 
-def _model_toggle(label: str, rv, options: list, color: str):
-    """Inline model selector — two buttons + optional CAGR badge."""
+@solara.component
+def CurrentRateBlock(elec_method: str, gas_method: str):
+    """Current energy rate per fuel (Phase 7 §4.1) — what the home pays today; a home fact
+    shared by scenarios A and B. With a URDB plan the electricity line is a button
+    ("PG&E · E-TOU-C ▾") that opens the plan list. Legacy methods show their own start."""
+    plans_open, set_plans_open = solara.use_state(False)
+    for fuel, method, color in (("electricity", elec_method, C_RATE_ELEC),
+                                ("gas", gas_method, C_RATE_GAS)):
+        icon = "⚡" if fuel == "electricity" else "🔥"
+        head, detail, kind = _current_rate_display(fuel, method)
+        with solara.Row(gap="6px", style="align-items:center; margin-top:4px; flex-wrap:wrap"):
+            solara.HTML(tag="span", unsafe_innerHTML=(
+                f"<span style='color:{color}; font-size:0.9em'>{icon}</span>"))
+            if kind == "urdb":
+                solara.Button(
+                    head + (" ▴" if plans_open else " ▾"),
+                    on_click=lambda: set_plans_open(not plans_open),
+                    style=(f"background:{color}; color:white; border:none; border-radius:4px;"
+                           " padding:2px 10px; font-size:0.80em; cursor:pointer;"
+                           " text-transform:none"))
+            else:
+                solara.HTML(tag="span", unsafe_innerHTML=(
+                    f"<strong style='font-size:0.84em; color:#263238'>{head}</strong>"))
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            f"<div style='font-size:0.72em; color:#607D8B; margin:0 0 2px 22px'>{detail}</div>"))
+        if fuel == "electricity" and kind == "urdb" and plans_open:
+            TariffPicker(_rate_info(zip_code.value, "auto").electricity.utility_id)
+    if "legacy" in (_current_rate_display("electricity", elec_method)[2],
+                    _current_rate_display("gas", gas_method)[2]):
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            "<div style='font-size:0.70em; color:#90A4AE; margin:4px 0 0 4px'>"
+            "Pick a projection method to start from your utility's own plan / 2025 rate.</div>"))
+
+
+def _projection_buttons(fuel: str, rv, color: str, compact: bool = False):
+    """Projection method row: WhyWatt Conservative / Moderate / Stress + EIA Pacific."""
+    pad = "2px 8px" if compact else "3px 10px"
     with solara.Row(gap="4px", style="align-items:center; flex-wrap:wrap"):
-        solara.HTML(tag="span", unsafe_innerHTML=(
-            f"<span style='font-size:0.80em; font-weight:600; color:{color};"
-            f" min-width:28px'>{label}</span>"
-        ))
-        for key, display in options:
-            is_active = rv.value == key
+        for key, label in PROJECTION_BUTTONS:
+            active = rv.value == key
             solara.Button(
-                display,
-                on_click=lambda k=key: rv.set(k),
-                style=(
-                    f"background:{color}; color:white; border:none;"
-                    " border-radius:4px; padding:2px 8px; font-size:0.78em; cursor:pointer;"
-                    if is_active else
-                    "background:#F5F5F5; color:#666; border:1px solid #CCC;"
-                    " border-radius:4px; padding:2px 8px; font-size:0.78em; cursor:pointer;"
-                ),
-            )
+                label, on_click=lambda k=key: rv.set(k),
+                style=(f"background:{color}; color:white; border:none; border-radius:4px;"
+                       f" padding:{pad}; font-size:0.78em; cursor:pointer;"
+                       if active else
+                       "background:#F5F5F5; color:#555; border:1px solid #CCC;"
+                       f" border-radius:4px; padding:{pad}; font-size:0.78em; cursor:pointer;"))
 
 
 @solara.component
 def RatesSummaryCard():
-    """Energy & Prices summary (§3.8) — three balance-matched sub-cards:
-    Model Timeline · Home Energy Prices · External Energy Price."""
+    """Energy & Prices summary (§3.8) — sub-cards: Model Timeline · Current Energy Rate ·
+    Projection Method · External Energy Price (Phase 7 §4.1 splits the old Home Energy Prices)."""
     # Seed the CAGR sliders from each utility's EIA historical CAGR (re-runs on ZIP/mode change).
     solara.use_effect(_seed_eia_cagr,
                       [zip_code.value, elec_rate_model_a.value, gas_rate_model_a.value,
@@ -866,34 +895,41 @@ def RatesSummaryCard():
         _hd("Model Timeline", show_help=True)
         solara.SliderInt(f"⏱ Model: {years.value} yrs", value=years, min=5, max=30)
 
-    # ── Card 2: Home Energy Prices — per-fuel rate model (My Utility / CA Average / ACC) ──
+    # ── Card 2: Current Energy Rate — what the home pays today (Phase 7 §4.1) ──
     with solara.Column(classes=["device"]):
-        _hd("Home Energy Prices")
-        _ri_auto = _rate_info(zip_code.value, "auto")
-        _ri_ca   = _rate_info(zip_code.value, "ca_average")
+        _hd("Current Energy Rate")
+        CurrentRateBlock(elec_rate_model_a.value, gas_rate_model_a.value)
 
-        def _picker(fuel, heading, color, mode_rv, options, cagr_pct, acc_cagr_pct):
+    # ── Card 3: Projection Method — how prices grow (Scenario A; B in Details) ──
+    with solara.Column(classes=["device"]):
+        _hd("Projection Method")
+        solara.HTML(tag="div", unsafe_innerHTML=(
+            "<div style='font-size:0.72em; color:#607D8B; margin:0 0 2px 2px'>"
+            "WhyWatt scenarios · or the federal EIA Pacific outlook</div>"))
+        for fuel, rv, color, cagr_rv, acc_rv in (
+                ("electricity", elec_rate_model_a, C_RATE_ELEC, elec_cagr_pct_a, acc_elec_cagr_a),
+                ("gas", gas_rate_model_a, C_RATE_GAS, gas_cagr_pct_a, acc_gas_cagr_a)):
+            icon = "⚡ Electricity" if fuel == "electricity" else "🔥 Gas"
             solara.HTML(tag="div", unsafe_innerHTML=(
                 f"<div style='font-size:0.78em; font-weight:600; color:{color};"
-                f" margin-bottom:2px; margin-top:8px'>{heading}</div>"))
-            _model_toggle("", mode_rv, options, color)
-            name, prov, cagr = _fuel_resolved_display(
-                fuel, mode_rv.value, cagr_pct, acc_cagr_pct, _ri_auto, _ri_ca)
-            solara.HTML(tag="div", unsafe_innerHTML=_rate_line_html(fuel, name, prov, cagr))
-
-        _picker("electricity", "⚡ Electricity Rate Model", C_RATE_ELEC, elec_rate_model_a,
-                [("cagr_flat", "My Utility"), ("ca_average", "CA Average"), ("acc_shaped", "ACC")],
-                elec_cagr_pct_a.value, acc_elec_cagr_a.value)
-        if elec_rate_model_a.value in PROJECTION_ELEC_MODELS:
-            TariffPicker(_ri_auto.electricity.utility_id)
-        _picker("gas", "🔥 Gas Rate Model", C_RATE_GAS, gas_rate_model_a,
-                [("cagr_flat", "My Utility"), ("ca_average", "CA Average"), ("acc_seasonal", "ACC")],
-                gas_cagr_pct_a.value, acc_gas_cagr_a.value)
+                f" margin:6px 0 2px'>{icon}</div>"))
+            _projection_buttons(fuel, rv, color, compact=True)
+            if rv.value not in PROJECTION_LABELS:
+                legacy = dict(LEGACY_METHODS[fuel]).get(rv.value, rv.value)
+                pct = (acc_rv.value if rv.value in ("acc_shaped", "acc_seasonal")
+                       else cagr_rv.value)
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    f"<div style='font-size:0.72em; color:#546E7A; margin:2px 0 0 4px'>"
+                    f"Using <b>{legacy}</b> · +{pct}%/yr (fixed) — change in ⋯ Details</div>"))
+            elif rv.value not in dict(PROJECTION_BUTTONS):
+                solara.HTML(tag="div", unsafe_innerHTML=(
+                    f"<div style='font-size:0.72em; color:#546E7A; margin:2px 0 0 4px'>"
+                    f"Using <b>{PROJECTION_LABELS[rv.value]}</b> (reference curve)</div>"))
         solara.HTML(tag="div", unsafe_innerHTML=(
             f"<div style='font-size:0.68em; color:#90A4AE; margin:5px 0 0 4px'>"
-            f"{_APP_RATE_RESOLVER.data_vintage} · ZIP {zip_code.value}</div>"))
+            f"ZIP {zip_code.value} · rates from URDB / EIA 2025</div>"))
 
-    # ── Card 3: External Energy Price (gasoline + external EV) ─────────────────
+    # ── Card 4: External Energy Price (gasoline + external EV) ─────────────────
     gpr = gasoline_price.value
     gesc = gasoline_escalation_pct.value
     epr = external_ev_price_per_kwh.value
@@ -1774,55 +1810,42 @@ def SolarDetail(model):
 
 
 def _fuel_model_block(fuel: str, heading: str, color: str,
-                       model_rv, cagr_rv, acc_cagr_rv,
-                       model_options: list, cagr_max: int, ri_auto, ri_ca):
-    """Fuel rate model section: legacy toggle + WhyWatt projection scenarios (primary row) +
-    reference/testing projection models (expander) + resolved name line + the editable CAGR
-    slider (EIA modes) / ACC base-escalation slider / baked-curve note (projection models).
-
-    Phase 6 WS1: projection models (whywatt_*, eia_*, cec_*, e3_gas) are non-default. Each is a
-    standalone baked curve — no escalation slider; the ACC monthly shape is layered on in core.
-    """
+                       model_rv, cagr_rv, acc_cagr_rv, cagr_max: int):
+    """Projection method for one fuel and scenario (Phase 7 §4.1): the four primary methods,
+    the reference curves (expander), and the legacy fixed-%/yr methods in a dropdown — My
+    Utility (default through Phase 7), CA Average, ACC — whose escalation slider appears when
+    one is selected. The current energy rate is shown once, above the scenarios."""
     solara.HTML(tag="div", unsafe_innerHTML=(
         f"<div style='font-weight:600; font-size:0.84em; color:{color};"
         " margin:8px 0 4px'>" + heading + "</div>"
     ))
+    _projection_buttons(fuel, model_rv, color)
 
-    def _btn(key: str, display: str):
-        is_active = model_rv.value == key
-        solara.Button(
-            display,
-            on_click=lambda k=key: model_rv.set(k),
-            style=(
-                f"background:{color}; color:white; border:none;"
-                " border-radius:4px; padding:3px 10px; font-size:0.80em; cursor:pointer;"
-                if is_active else
-                "background:#F5F5F5; color:#444; border:1px solid #CCC;"
-                " border-radius:4px; padding:3px 10px; font-size:0.80em; cursor:pointer;"
-            ),
-        )
-
-    # Primary row: legacy models (My Utility / CA Average / ACC) + the 3 WhyWatt scenarios.
-    with solara.Row(gap="6px", style="flex-wrap:wrap"):
-        for key, display in model_options:
-            _btn(key, display)
-        for key in PROJECTION_PRIMARY:
-            _btn(key, PROJECTION_LABELS[key])
-
-    # Expander: reference / testing projection models for this fuel (excluding the primary 3).
     _proj_for_fuel = PROJECTION_ELEC_MODELS if fuel == "electricity" else PROJECTION_GAS_MODELS
     _extra = [k for k in PROJECTION_LABELS
-              if k in _proj_for_fuel and k not in PROJECTION_PRIMARY]
+              if k in _proj_for_fuel and k not in dict(PROJECTION_BUTTONS)]
     if _extra:
-        with solara.Details(summary="Reference / testing models", expand=False):
+        with solara.Details(summary="Reference / testing curves", expand=False):
             with solara.Row(gap="6px", style="flex-wrap:wrap"):
                 for key in _extra:
-                    _btn(key, PROJECTION_LABELS[key])
+                    active = model_rv.value == key
+                    solara.Button(
+                        PROJECTION_LABELS[key], on_click=lambda k=key: model_rv.set(k),
+                        style=(f"background:{color}; color:white; border:none;"
+                               " border-radius:4px; padding:3px 10px; font-size:0.80em;"
+                               if active else
+                               "background:#F5F5F5; color:#444; border:1px solid #CCC;"
+                               " border-radius:4px; padding:3px 10px; font-size:0.80em;"))
 
-    # Resolved utility for this fuel + mode (name + provenance badge).
-    _name, _prov, _ = _fuel_resolved_display(
-        fuel, model_rv.value, cagr_rv.value, acc_cagr_rv.value, ri_auto, ri_ca)
-    solara.HTML(tag="div", unsafe_innerHTML=_rate_line_html(fuel, _name, _prov, None))
+    # Legacy fixed-%/yr methods — a dropdown; "—" while a projection method is active.
+    legacy = dict(LEGACY_METHODS[fuel])
+    by_label = {v: k for k, v in legacy.items()}
+    none_lbl = "— (using a projection method)"
+    current = legacy.get(model_rv.value, none_lbl)
+    solara.Select(label="Fixed %/yr methods", values=[none_lbl] + list(legacy.values()),
+                  value=current,
+                  on_value=lambda v: model_rv.set(by_label[v]) if v in by_label else None)
+
     _fkey = "elec" if fuel == "electricity" else "gas"
     _cagr_def = _DEFAULTS[f"{_fkey}_cagr_pct_a"]            # A/B share factory default
     _acc_def = _DEFAULTS[f"acc_{_fkey}_cagr_a"]
@@ -1831,9 +1854,9 @@ def _fuel_model_block(fuel: str, heading: str, color: str,
                   if model_rv.value in ("cec_bau",) else "")
         solara.HTML(tag="div", unsafe_innerHTML=(
             "<div style='font-size:0.75em; color:#546E7A; margin:1px 0 4px'>"
-            "Your current energy rate, grown by this curve's yearly change "
-            "(the curve's own price level is not used). "
-            "No escalation slider — the growth is fixed by the curve." + _upper + "</div>"
+            f"<b>{PROJECTION_LABELS[model_rv.value]}</b>: your current energy rate, grown by "
+            "this curve's yearly change (the curve's own price level is not used). No "
+            "escalation slider — the growth is fixed by the curve." + _upper + "</div>"
         ))
     elif model_rv.value in ("cagr_flat", "ca_average"):
         WhyWattSlider(
@@ -1869,20 +1892,20 @@ def RatesDetail():
         "<div style='border-top:1px solid #E0E0E0; margin:10px 0 6px'></div>"
     ))
 
-    # ── Scenario A — electricity + gas (scenario-split) ───────────────────────
-    _ri_auto = _rate_info(zip_code.value, "auto")
-    _ri_ca   = _rate_info(zip_code.value, "ca_average")
-    _DS("Scenario A")
-    _fuel_model_block("electricity", "⚡ Electricity Rate Model", C_RATE_ELEC,
-                       elec_rate_model_a, elec_cagr_pct_a, acc_elec_cagr_a,
-                       [("cagr_flat", "My Utility"), ("ca_average", "CA Average"),
-                        ("acc_shaped", "ACC")], 15, _ri_auto, _ri_ca)
-    if elec_rate_model_a.value in PROJECTION_ELEC_MODELS:
-        TariffPicker(_ri_auto.electricity.utility_id)
-    _fuel_model_block("gas", "🔥 Gas Rate Model", C_RATE_GAS,
-                       gas_rate_model_a, gas_cagr_pct_a, acc_gas_cagr_a,
-                       [("cagr_flat", "My Utility"), ("ca_average", "CA Average"),
-                        ("acc_seasonal", "ACC")], 20, _ri_auto, _ri_ca)
+    # ── Current energy rate — a home fact, shared by scenarios A and B ─────────
+    _DS("Current Energy Rate  (shared by scenarios A and B)")
+    CurrentRateBlock(elec_rate_model_a.value, gas_rate_model_a.value)
+
+    solara.HTML(tag="div", unsafe_innerHTML=(
+        "<div style='border-top:1px solid #E0E0E0; margin:10px 0 6px'></div>"
+    ))
+
+    # ── Projection method — Scenario A (scenario-split) ───────────────────────
+    _DS("Projection Method — Scenario A")
+    _fuel_model_block("electricity", "⚡ Electricity", C_RATE_ELEC,
+                       elec_rate_model_a, elec_cagr_pct_a, acc_elec_cagr_a, 15)
+    _fuel_model_block("gas", "🔥 Gas", C_RATE_GAS,
+                       gas_rate_model_a, gas_cagr_pct_a, acc_gas_cagr_a, 20)
 
     # ── Shared transport fuels (NOT scenario-split) ───────────────────────────
     solara.HTML(tag="div", unsafe_innerHTML=(
@@ -1919,15 +1942,11 @@ def RatesDetail():
             "Scenario A above — solid lines on charts. "
             "Transport fuels are shared (not split).</div>"
         ))
-        _DS("Scenario B  (dashed lines)")
-        _fuel_model_block("electricity", "⚡ Electricity Rate Model", C_RATE_ELEC,
-                           elec_rate_model_b, elec_cagr_pct_b, acc_elec_cagr_b,
-                           [("cagr_flat", "My Utility"), ("ca_average", "CA Average"),
-                            ("acc_shaped", "ACC")], 15, _ri_auto, _ri_ca)
-        _fuel_model_block("gas", "🔥 Gas Rate Model", C_RATE_GAS,
-                           gas_rate_model_b, gas_cagr_pct_b, acc_gas_cagr_b,
-                           [("cagr_flat", "My Utility"), ("ca_average", "CA Average"),
-                            ("acc_seasonal", "ACC")], 20, _ri_auto, _ri_ca)
+        _DS("Projection Method — Scenario B  (dashed lines)")
+        _fuel_model_block("electricity", "⚡ Electricity", C_RATE_ELEC,
+                           elec_rate_model_b, elec_cagr_pct_b, acc_elec_cagr_b, 15)
+        _fuel_model_block("gas", "🔥 Gas", C_RATE_GAS,
+                           gas_rate_model_b, gas_cagr_pct_b, acc_gas_cagr_b, 20)
 
 
 # ── §25 Summary panel components ─────────────────────────────────────────────
@@ -2072,4 +2091,4 @@ def _SocialBody():
 
 
 
-__all__ = ['_DETAIL_TITLES', '_LEFT_COL', '_RIGHT_COL', '_COSTS_BOX', '_CARD_NORMAL', '_CARD_OPEN', '_ROW_CTRL', '_TOP_ROW', 'DetailTitleBar', '_DS', '_DSl', '_elec_display', '_ElecAmpsInput', '_DetailCosts', '_card_header', '_card_header_main', '_panel_hd', '_PlanCheck', '_Check', '_cost_row', '_appliance_rows', 'HVACSummaryCard', 'WHSummaryCard', 'TransportationSummaryCard', 'TransportationDetail', 'CooktopSummaryCard', 'DryerSummaryCard', '_PanelControls', 'PanelSummaryCard', '_BaseloadControls', 'BaseloadSummaryCard', 'HomeSummaryCard', 'SolarSummaryCard', '_model_toggle', 'RatesSummaryCard', 'HVACDetail', 'WaterHeaterDetail', 'EVDetail', 'CooktopDetail', 'DryerDetail', 'ElecPanelDetail', 'BaseloadDetail', 'HomeDetail', 'SolarDetail', '_fuel_model_block', 'RatesDetail', 'JourneyPlannerPanel', 'HomeProfilePanel', 'EnergyPricesPanel', '_SocialBody']
+__all__ = ['_DETAIL_TITLES', '_LEFT_COL', '_RIGHT_COL', '_COSTS_BOX', '_CARD_NORMAL', '_CARD_OPEN', '_ROW_CTRL', '_TOP_ROW', 'DetailTitleBar', '_DS', '_DSl', '_elec_display', '_ElecAmpsInput', '_DetailCosts', '_card_header', '_card_header_main', '_panel_hd', '_PlanCheck', '_Check', '_cost_row', '_appliance_rows', 'HVACSummaryCard', 'WHSummaryCard', 'TransportationSummaryCard', 'TransportationDetail', 'CooktopSummaryCard', 'DryerSummaryCard', '_PanelControls', 'PanelSummaryCard', '_BaseloadControls', 'BaseloadSummaryCard', 'HomeSummaryCard', 'SolarSummaryCard', 'CurrentRateBlock', 'RatesSummaryCard', 'HVACDetail', 'WaterHeaterDetail', 'EVDetail', 'CooktopDetail', 'DryerDetail', 'ElecPanelDetail', 'BaseloadDetail', 'HomeDetail', 'SolarDetail', '_fuel_model_block', 'RatesDetail', 'JourneyPlannerPanel', 'HomeProfilePanel', 'EnergyPricesPanel', '_SocialBody']

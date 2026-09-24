@@ -193,33 +193,38 @@ apply to both scenarios.
 
 ### Which rate you pay
 
-Each fuel offers three rate models:
+Energy & Prices separates two questions. Your utilities (from your ZIP) are listed in the Home
+Profile.
 
-- My Utility (default): your utility's own effective rate — total residential revenue divided
-  by total residential energy — from federal EIA data. At the default San Jose ZIP this is
-  Pacific Gas & Electric.
-- California average: the statewide blended rate, used automatically when a ZIP can't be
-  matched to a utility.
-- ACC-shaped (electricity) or ACC-seasonal (gas): the CPUC Avoided Cost Calculator rate shape.
+Current Energy Rate — what you pay today. It is a fact about your home, so both scenarios
+share it.
 
-Under Details, the projection methods (WhyWatt Conservative / Moderate / Stress, EIA Pacific
-and the reference curves) separate two things: your current energy rate — what you pay
-today — and how that price grows over the years.
+- If your electric utility's actual plan is in the OpenEI Utility Rate Database (PG&E and
+  SDG&E today), WhyWatt uses that plan: a higher price in the evening peak (for example
+  4–9pm), summer/winter prices, the baseline tiers for your area, and the daily fixed charge.
+  The button shows the plan (for example "PG&E · E-TOU-C"); click it to pick another plan (EV
+  and all-electric plans are there too). Solar and the battery are priced hour by hour against
+  this plan, so the battery can choose its Cost-saving mode in months where that pays.
+- Otherwise it is your utility's EIA 2025 rate (SCE uses this until its plan data is
+  corrected), and if the ZIP matches no utility, the EIA Pacific regional average.
+- Gas always uses your gas utility's EIA rate.
 
-- Current energy rate. If your electric utility's actual plan is in the OpenEI Utility Rate
-  Database (PG&E and SDG&E today), WhyWatt uses that plan: a higher price in the evening peak
-  (for example 4–9pm), summer/winter prices, the baseline tiers for your area, and the daily
-  fixed charge. Pick the plan from the Plan list (your utility's default time-of-use plan is
-  pre-selected; EV and all-electric plans are there too). Solar and the battery are priced
-  hour by hour against this plan, so the battery can choose its Cost-saving mode in months
-  where that pays. Otherwise the current rate is your utility's EIA 2025 rate (SCE uses this
-  until its plan data is corrected), and if the ZIP matches no utility, the EIA Pacific
-  regional average. Gas always uses your gas utility's EIA rate.
-- Growth. The chosen curve is used only for its shape: your current rate is multiplied by how
-  much the curve rises (or falls) from the year your rate is valid for. A plan that took
-  effect in 2026 is scaled back to a 2025 start by the curve's 2025/2026 ratio. After 2050 the
-  curve holds its 2050 value. The WhyWatt curves are built for PG&E; elsewhere they are a
-  PG&E-based stand-in.
+Projection Method — how prices grow over the years; each scenario picks its own.
+
+- WhyWatt Conservative / Moderate / Stress, or EIA Pacific (the federal outlook). The chosen
+  curve is used only for its shape: your current rate is multiplied by how much the curve
+  rises (or falls) from the year your rate is valid for. A plan that took effect in 2026 is
+  scaled back to a 2025 start by the curve's 2025/2026 ratio. After 2050 the curve holds its
+  2050 value. The WhyWatt curves are built for PG&E; elsewhere they are a PG&E-based stand-in.
+  More reference curves are under Details.
+- Fixed %/yr methods (Details dropdown), each with an escalation slider:
+  - My Utility (today's default): your utility's EIA 2024 effective rate — total residential
+    revenue divided by total residential energy — grown at a fixed rate.
+  - California average: the statewide blended rate, grown at a fixed rate.
+  - ACC-shaped (electricity) or ACC-seasonal (gas): the CPUC Avoided Cost Calculator rate
+    shape on the PG&E CPUC base.
+  These keep their own starting price; pick a projection method to start from your utility's
+  own plan or 2025 rate.
 
 Gas 2025 rates: EIA has not yet published 2025 prices for each gas utility, so each one's 2024
 rate is carried forward by California's statewide 2024→2025 residential gas price change
