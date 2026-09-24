@@ -5,7 +5,9 @@ data through the model. (Adopting the WhyWatt projection as the *default* moved 
 **Follows:** Phase 6 (`docs/Phase6_Spec.md`) — Solar/Battery split, inert roof-geometry inputs, and
 the **non-default `cec_projection` rate hand-off interface** (evaluated but not switched). Offline
 PVWatts/URDB data is harvested and validated separately in `docs/OfflineSolarData_Plan.md`.
-**Last updated:** 2026-09-23 — open-items review: DoD ticked for PG&E end-to-end and the golden
+**Last updated:** 2026-09-24 — added **§4.3 chart design** (R.1 / R.2 = four projection curves on the
+current rate; EU.9 monthly solar; EU.10 energy balance; R.6 peak vs off-peak). Earlier
+2026-09-23 — open-items review: DoD ticked for PG&E end-to-end and the golden
 record; stale §2/§3 lines fixed; Post-Phase-7 list completed (default flip, SCE re-harvest, shim
 retirement, solar wave 2, beyond CA); remaining in P7: charts, unified Plan row, close-out; §6
 NREL on its own branch. Earlier — **§4.2 step 1 landed** (Solar / Battery / Electrical Panel = Journey row 3;
@@ -494,8 +496,9 @@ selected tariff.
 ### §4 — UI / charts / outputs
 
 - New/updated charts: monthly solar generation curve; peak vs non-peak consumption + cost
-  split; battery self-consumption vs export. Update Help (`solar.html`, rate help) to describe
-  the new model.
+  split; battery self-consumption vs export — **designed in §4.3** (EU.9, EU.10, R.6) together
+  with the R.1 / R.2 redesign (all four projection curves). Update Help (`solar.html`, rate help)
+  to describe the new model.
 - Home Profile roof-geometry inputs **remain inert** (default orientation, §1). The yield field
   shows the ZIP's PVWatts annual and its source (ZIP / zone fallback), read from
   `HomeConfig.solar_resource`.
@@ -505,7 +508,7 @@ selected tariff.
   and **grid charging (on)** under Details.
   The chosen mode per month is shown ("Battery: Self-powered Nov–Mar, Cost-saving Apr–Oct").
 - New energy-balance readout / chart per year: solar → home, solar → battery → home, export,
-  grid import (the four flows of §0).
+  grid import (the four flows of §0) — **EU.10, §4.3**.
 - ~~Rate-model selector gains a URDB TOU option; §5 promotes `cec_projection` to the default.~~
   **Superseded by §4.1:** URDB TOU is a **current energy rate** *source* (landed as the interim
   selector option `urdb_tou`, retired in U1); the WhyWatt curves (Phase 6's `cec_projection`) are
@@ -901,6 +904,75 @@ golden unchanged.
 - Replace the name lookups (`"Solar" in cslot.name` in `journey.py` and `ui/charts.py`) with an
   explicit slot kind.
 
+### §4.3 — Charts (PLANNED — design drafted 2026-09-24)
+
+Four chart changes: R.1 / R.2 redrawn around the projection methods, and three new charts for
+the Phase 7 physics. All are **presentation only** — Plotly, same `_pl_layout` style, same chart
+picker, same A/B conventions; **golden unchanged** (the new model histories are not snapshot
+metrics). Prices are **nominal $**, like the model.
+
+**R.1 · Electricity Price Projection / R.2 · Gas Price Projection** (redesign; were "Electric /
+Gas CAGR Projection")
+- **What:** the home's price per year under **all four projection methods** — WhyWatt
+  Conservative, Moderate, Stress and EIA Pacific — as four lines, so the choice is visible, not
+  just its result. Each line = the home's **current energy rate** × that curve's growth
+  (`S[y] / S[anchor]`) — exactly how the model prices a projection (§4.1), so the line for the
+  method in use equals the model's own yearly rate.
+- **Styling:** the method in use for scenario A = bold solid; the other three = thin, muted,
+  labelled. Scenario B (compare mode) = its method dashed. When A (or B) uses a fixed-%/yr method
+  (My Utility / CA Average / ACC) that line is added in bold with its label ("My Utility +7%/yr —
+  in use"), and the four curves stay as thin reference lines.
+- **Start level:** electricity — the current energy rate's level: a URDB plan's average energy
+  rate (tier 1, peak-weighted flat equivalent; the fixed charge and higher tiers are **not** in
+  the line — footnote), else the utility's EIA 2025 rate, else EIA Pacific. Gas — the utility's
+  EIA 2025 rate ($2.66 PG&E). Anchor year from the current rate (URDB plan 2026, EIA 2025).
+- **Notes on the chart:** "PG&E-based curve" when the home's utility has no market of its own
+  (`projection_proxy_*`); the gas curves' spiral is visible directly (Conservative peaks ~$36/therm
+  in 2043 nominal on the $2.66 start).
+- **Data:** `starting_rates.projection_index` per key — no extra model runs; the in-use line is
+  cross-checked against `model.elec_rates` / `gas_rates` (test).
+- R.3 / R.4 (ACC bands) and R.5 (ACC shape) unchanged.
+
+**EU.9 · Monthly Solar Generation** (new)
+- **What:** 12 monthly bars of the home's solar production (kWh) for the **final simulated year**
+  (fully electrified), with a line for the home's monthly electricity use in that year — the
+  summer surplus / winter shortfall at a glance. Subtitle: system kW, annual kWh, yield source
+  ("PVWatts · CZ4 zone estimate").
+- **Data:** production = `system_kW × SolarResource.ac_monthly`; use = a new per-year history
+  `home_elec_kwh_monthly_history` (12,) on `JourneyHome` (the energy balance already computes the
+  monthly loads; today they are kept hourly only on the URDB path).
+- Empty state (no solar): "Add solar to see monthly generation."
+
+**EU.10 · Solar & Battery Energy Balance** (new — the §0 four flows, merged with "battery
+self-consumption vs export")
+- **What:** per simulated year, stacked bars of where the home's electricity came from — solar →
+  home (direct), battery → home, grid → home — plus exported solar drawn below the axis (negative)
+  and grid-charged battery energy as a hatched segment of grid. Hover: that year's kWh per flow,
+  self-use %, battery losses, and the battery mode summary ("Cost-saving Jan, Dec · Self-powered
+  Feb–Nov").
+- **Data:** existing histories — `solar_direct`, `battery_discharge`, `grid_import`,
+  `battery_charge_grid`, `battery_losses`, `solar_exported_kwh`, `battery_mode`. Journey only (the
+  do-nothing home has no solar). Empty state as EU.9.
+
+**R.6 · Peak vs Off-Peak Electricity** (new — URDB plans only)
+- **What:** per year, stacked bars of the home's electricity **cost** split into peak-window
+  energy, off-peak energy and the fixed charge (after solar / battery); hover adds the kWh in
+  each window and the peak share. Toggle "Your journey / Do nothing" like the EU charts. Title
+  carries the plan and window ("PG&E · E-TOU-C · peak 4pm–9pm").
+- **Data:** new per-year histories `grid_peak_kwh_history`, `grid_offpeak_kwh_history` and a cost
+  split from a new `RateStructure.price_month_parts()` → (peak $, off-peak $, fixed $), which sums
+  to `price_month` exactly (tiers apportioned peak / off-peak as `price_month` already does).
+- Flat pricing (legacy methods, or no URDB plan): empty state "Your rate has no peak window —
+  pick a projection method with a time-of-use plan."
+
+**Placement:** EU.9 and EU.10 in the Energy Use family (after EU.8); R.6 in the Rates family
+(after R.5). Help (`charts` page) gets the four entries; R.1 / R.2 text rewritten.
+
+**Tests:** R.1 / R.2 in-use line == model rates (every year); the four curves' year-1 values
+equal the current rate (anchor 2025) or current rate × S[2025]/S[2026] (URDB anchor 2026);
+`price_month_parts` sums to `price_month` for every PG&E plan and month; EU.10 flows reproduce the
+§0 identities per year; empty states render. Golden unchanged.
+
 ### §5 — Adopt the CEC projected-rate escalation as the default (Phase 6 WS1 → live)
 
 > **Status (2026-09-23): default switch DEFERRED to post-Phase-7.** In Phase 7 the WhyWatt
@@ -1043,7 +1115,10 @@ src/
                         index (U1); legacy keys untouched
   ui/sim.py, panels.py  roof geometry stays inert; Current energy rate + Projection method cards,
                         utilities in Home Profile (U2)
-  ui/charts.py          solar-monthly / peak-offpeak / energy-balance charts (§4)
+  ui/charts.py          R.1 / R.2 redesign (four projection curves) + EU.9 monthly solar,
+                        EU.10 energy balance, R.6 peak vs off-peak (§4.3)
+  journey.py / urdb_rates.py  presentation histories (monthly home kWh, grid peak / off-peak kWh)
+                        + RateStructure.price_month_parts (§4.3)
   ui/panels.py, layout.py  Solar / Battery / Electrical Panel cards → Journey row 3 (§4.2);
                         BatterySummaryCard + BatteryDetail; unified Plan row (§4.2 step 2)
   data/config/whywatt_default.json   default stays cagr_flat (My Utility) through P7; new keys per
@@ -1189,8 +1264,8 @@ tests/
       Journey panel's third row (§4.2); Solar + Battery still one install event (limitation
       stated in the UI and help); golden unchanged. *(2026-09-23)*
 - [ ] Unified Plan row across the nine devices (§4.2 step 2, Spec 5.6 #6).
-- [ ] Charts: monthly solar generation, peak vs off-peak consumption + cost, and the yearly
-      energy balance (solar → home, solar → battery → home, export, grid import) (§4). Help is
-      current for everything landed; update it with the charts (roof geometry stays inert).
+- [ ] Charts per §4.3: R.1 / R.2 show the four projection curves on the home's current rate;
+      EU.9 monthly solar generation; EU.10 solar & battery energy balance; R.6 peak vs off-peak
+      (URDB plans). Help updated; golden unchanged (roof geometry stays inert).
 - [ ] §6 NREL End-Use Load Profiles drive the energy balance (separate branch; own golden re-baseline).
 - [ ] CLAUDE.md updated: Phase 7 closed.
