@@ -19,8 +19,11 @@
 #
 # Some repo paths are NOT part of the running Space and must not be uploaded to HF:
 #   - docs/presentations/  - slide decks + images (not served)
+#   - docs/explainer/      - explainer pages, still being built (not served; excluded for now)
 #   - data/climate/sources/ and data/rates/sources/ - raw TMYx weather .zip and EIA .xlsx
 #     snapshots (build-time inputs to scripts/build_*.py only; the app reads the processed JSON).
+#   - data/loads/sources/ - the NREL ResStock build manifest (provenance for
+#     scripts/build_load_profiles.py; the app reads data/loads/end_use_profiles.json).
 #     HF's hub rejects large non-LFS blobs, so they must be stripped.
 # The script strips $ExcludePaths from history in a throwaway clone, then force-pushes that
 # cleaned history to the Space's main branch. Your local repo (and GitHub) are never rewritten.
@@ -33,8 +36,10 @@ param(
     [switch]   $Yes,                          # skip the plain confirm (prototype only)
     [string[]] $ExcludePaths = @(
         "docs/presentations",
+        "docs/explainer",
         "data/climate/sources",
         "data/rates/sources",
+        "data/loads/sources",
         # Legacy binary that HF (Git-Xet/LFS) rejects; superseded by rate_projection_curves.svg.
         # It only ever existed in Phase 6 history, so strip it from every deployed commit.
         "public/help/rate_projection_curves.png",

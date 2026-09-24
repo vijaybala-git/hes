@@ -1,0 +1,3 @@
+# Offline data-build tools only — NOT installed in the deployed app (the Dockerfile installs
+# requirements.txt). Install locally with:  .venv/Scripts/python.exe -m pip install -r requirements-build.txt
+pyarrow>=15      # scripts/build_load_profiles.py reads NREL ResStock parquet

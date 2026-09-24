@@ -20,7 +20,7 @@ The file stores local STANDARD time, like data/solar/pvwatts_zip.json; src/load_
 applies the same month-level daylight-saving shift as the solar loader, so loads and solar
 share one clock.
 
-NOTHING here is imported by src/. Needs pyarrow (build-time only).
+NOTHING here is imported by src/. Needs pyarrow (requirements-build.txt; not deployed).
 
 USAGE (from project root):
     .venv/Scripts/python.exe scripts/build_load_profiles.py            # full build

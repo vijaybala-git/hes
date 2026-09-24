@@ -1,0 +1,21 @@
+# Docker build context exclusions. The Dockerfile copies only requirements.txt, src/, data/,
+# docs/assets/, public/ and templates/ — but `COPY data/` takes everything under data/, and
+# deploy_fly.ps1 builds from the working tree (git-ignored files included). Keep build-only
+# inputs and caches out of the image.
+
+# NREL ResStock build cache (scripts/build_load_profiles.py) — ~600 MB, git-ignored
+data/loads/.cache/
+
+# Build-time source snapshots / provenance (the app reads the processed JSON only)
+data/climate/sources/
+data/rates/sources/
+data/loads/sources/
+
+# Never needed in the image
+.git/
+.venv/
+**/__pycache__/
+secrets/
+
+# Explainer pages (docs only, still being built)
+docs/explainer/

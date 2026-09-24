@@ -221,7 +221,7 @@ data/ solar/pvwatts_zip.json  rates/urdb_tou.json  rates/starting_rates.json
 scripts/ build_pvwatts.py  build_urdb*.py  build_starting_rates.py  build_nbt_export.py
       build_battery_defaults.py  ca_munis.py (+ muni rule in build_zip_utility_map.py)
 §6:   src/load_profiles.py (HomeConfig.load_profiles)  data/loads/end_use_profiles.json
-      data/loads/sources/manifest.json  scripts/build_load_profiles.py (needs pyarrow;
+      data/loads/sources/manifest.json  scripts/build_load_profiles.py (needs pyarrow from requirements-build.txt;
       cache data/loads/.cache/ git-ignored)
 ```
 Interpreter: `.venv/Scripts/python.exe` (the base `python` has no deps). Regression:
