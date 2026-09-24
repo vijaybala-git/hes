@@ -107,6 +107,49 @@ $2.08 is the outlier.
 - *ACC-2:* start ACC gas from the EIA per-utility rate (like My Utility) — moves case 08 and the
   `08__acc_*` offsets (own golden diff).
 
+## 4b. Decisions (2026-09-24)
+
+- **Curves: option A.** The WhyWatt gas projection curves follow the **CEC delivered price as
+  published**, inflated to nominal — no rebase. All three Planning-Area scenarios share the same
+  2025 value ($2.5886 real 2024 = **$2.649 nominal 2025**), so one base: `BASE_RETAIL["gas"]` is
+  *derived* from `cec_gas_rate.json` × the GDP deflator (not a literal), and each scenario's curve
+  equals the CEC delivered price exactly.
+- **Current rates stay EIA, per utility.** The price a home starts from keeps coming from EIA per
+  utility (`eia_rates_by_utility.json` `starting_rate`, refreshed by `build_eia_rates.py` as EIA
+  publishes; gas 2025 is bridged until EIA-176 2025 is out). The curves give only the growth.
+- **Legacy ACC mode: ACC-1** (not chosen explicitly — defaulted to the non-disruptive option):
+  unchanged, golden unchanged; noted for the post-P7 reinterpretation of ACC.
+
+## 4c. What depends on the gas curves (inventory, 2026-09-24)
+
+**Group A — the curve *levels* (change in this branch):**
+
+| Item | What changes |
+|---|---|
+| `src/rate_projection/projected_rate_model.py` | `BASE_RETAIL["gas"]` derived from the CEC 2025 delivered price (nominal) |
+| `scripts/export_rate_projection.py` → `data/rates/projection/whywatt_rate_projection.json` | gas scenario series ×(2.649 / 2.08); `base_retail.gas`, `base_retail_note`; electricity and benchmarks unchanged |
+| `tests/test_rate_projection.py` | the base-year anchor ($2.08 → derived) and any level-based bounds |
+| `docs/help/rate_projection_guide.md` + `public/help/rate_projection_guide.html` + `public/help/rate_projection_curves.svg` (`scripts/build_guide_charts.py`) | gas curve levels in text and chart (e.g. the 2050 $14 / $27 / $68 figures) |
+| `notebooks/rate_projection_review.ipynb` | re-run so plotted gas levels match |
+| `docs/OfflineRateProjection_Plan.md`, `docs/rate_projection_gas_provenance.md` | the rebase description; close the Open review with the build-up |
+| `CLAUDE.md` key constants, `docs/Phase7_Spec.md` Post-Phase-7 item | stop quoting $2.08 as PG&E's residential gas rate; mark resolved |
+| `docs/Phase6_Spec.md` | historical record — add a dated note, don't rewrite |
+
+**Not affected** (use only the curve *shape* or other series): the simulation's projection
+results (regression cases 13–32 — golden must not move), R.1 / R.2 charts, `starting_rates.json`
+and `build_eia_rates.py` (EIA Pacific benchmark), `build_urdb_report.py` (electricity).
+
+**Group B — Phase 6 *model-result* reports (not moved by the base, but stale since Phase 7):**
+`notebooks/rate_switch_review.ipynb`, `tests/validation/rate_model_impact.{json,md}`
+(`scripts/validate_rate_models.py`, generated 2026-09-10) and the **Rate Model Impact Report**
+(`docs/reports/RateModel_Impact_Report.{md,html,docx}`, `public/help/RateModel_Impact_Report.html`,
+charts via `build_impact_report_charts.py` / `build_impact_report_html.py`). They were produced
+with Phase 6 semantics (projection = the curve's own price level). Phase 7 changed how projections
+price (current rate × curve growth), the NEM 3.0 export credit and the battery defaults — so a
+re-run changes their numbers regardless of this fix, and the report's narrative must be re-read.
+**Proposal:** regenerate them once on top of this branch, as a separate commit, and re-check the
+report text before the Beta.
+
 ## 5. Implementation (once options are chosen)
 
 1. `src/rate_projection/projected_rate_model.py`: `BASE_RETAIL["gas"]` per the option (A: derive
