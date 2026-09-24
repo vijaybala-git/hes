@@ -1300,7 +1300,8 @@ tests/
       it moved only in two dedicated, explained commits — NEM 3.0 export credit (issue 12:
       +$2.4k–2.8k journey opex on the solar cases) and the Powerwall 3 defaults (+$242–295, all
       from 90% → 89%); full `pytest` green (530). *(2026-09-23)*
-- [ ] *(post-Phase-7)* default → projection with URDB starting price (own golden diff).
+- [x] *(post-Phase-7)* default → projection with URDB starting price (own golden diff).
+      *(WhyWatt Conservative, 2026-09-24 — branch feat/default-projection-method)*
 - [x] Solar and Battery as separate cards (+ details pages) and the Electrical Panel card in the
       Journey panel's third row (§4.2); Solar + Battery still one install event (limitation
       stated in the UI and help); golden unchanged. *(2026-09-23)*
