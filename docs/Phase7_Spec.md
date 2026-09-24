@@ -505,7 +505,7 @@ Price in year y = StartingRate × idx[y]
 | 7 | **CA Average and ACC aren't projections today.** CA Average = CA-average *price* × CAGR; ACC = PG&E CPUC *base level* + ACC *monthly shape* + ACC CAGR. | In the new model both become "constant CAGR" projections (slider shown). ACC's monthly shape must **not** stack on a URDB starting rate (double-counts seasonality, §3) — with URDB, ACC is just a CAGR; with an EIA flat start it may keep its seasonal shape. **Decision needed:** keep the ACC shape at all, or drop it for simplicity? |
 | 8 | **Removing "My Utility" moves the default** — the current default is `cagr_flat` (EIA utility price × EIA historical CAGR, +7%/yr). The golden baseline, 12 regression cases, trend offsets (`01__elec_cagr_up`, `08__acc_*`), tests and **share links** all use the old keys. | Keep an internal `eia_historical` projection (not shown) so the refactor is golden-neutral; add a config migration map (old key → start + projection); make the default change its own commit (= §5's default flip). |
 | 9 | **Horizon & start year.** Bundle covers 2025–2050; a 30-year run from 2025 reaches 2054 and holds 2050 flat. `sim_start_year` can differ from 2025. | Index relative to `sim_start_year`; after 2050 continue at the last 5-year CAGR (not flat) — or keep flat and say so in help. |
-| 10 | **Base-year mismatch.** EIA per-utility prices are 2024; URDB tariffs are 2024–26 vintage; projections start 2025. | Treat the starting rate as the sim-start level; note ±1 year of vintage in help. |
+| 10 | **Base-year mismatch.** EIA per-utility prices are 2024; URDB tariffs are 2024–26 vintage; projections start 2025. | Resolved by the anchor-year rule + data-vintage check: EIA electricity rebased to 2025, gas bridged to 2025, URDB anchored at 2026. |
 | 11 | **Gas has no URDB and one market.** The gas "button" is just the LDC (PG&E, SoCalGas, SDG&E) with no plan choices; WhyWatt gas scenarios (the gas-spiral curves) are PG&E-market. | Gas button shows the LDC name (no dropdown); same decision as issue 3 for non-PG&E gas. |
 | 12 | **NEM export credit escalation.** Today NEM 3.0 export = ACC avoided cost × CAGR, independent of the chosen projection. | Follow the electricity projection index (ties to §5's open "does the projection drive NEM export?"). |
 | 13 | **Scenario A/B.** The starting rate / tariff is a fact about the home; only the projection is a what-if. | One tariff picker (shared); projection chosen per scenario. |
@@ -548,7 +548,7 @@ Clarified 2026-09-23: *the URDB data file is used when the ZIP resolves to a uti
 | ZIP resolves to… | Electricity starting price | Gas starting price |
 |---|---|---|
 | a utility with a URDB plan (covered, not quarantined) | **`urdb_tou.json`** — the plan (Tariff picker) | the LDC's EIA rate |
-| a utility **without** a usable URDB plan (SCE while quarantined; municipal utilities once issue 6 is fixed; not-yet-harvested utilities) | the utility's own EIA rate (`eia_rates_by_utility.json`, 2024) — already harvested, what My Utility uses today | the LDC's EIA rate |
+| a utility **without** a usable URDB plan (SCE while quarantined; municipal utilities once issue 6 is fixed; not-yet-harvested utilities) | the utility's own EIA rate (`eia_rates_by_utility.json`, rebased to 2025) — already harvested, what My Utility uses today | the LDC's EIA rate |
 | **no utility** | **`starting_rates.json`** — EIA — Pacific (2025) | **`starting_rates.json`** — EIA — Pacific (2025) |
 
 - **`data/rates/starting_rates.json` (NEW)** holds *only* the no-utility fallback: a starting
@@ -566,9 +566,27 @@ Clarified 2026-09-23: *the URDB data file is used when the ZIP resolves to a uti
 - URDB plan → its **effective year**: PG&E plans 2026 (effective 2026-03-27), SDG&E 2026
   (2026-06-01), SCE 2024 (quarantined anyway). A 2025 simulation start therefore *back-scales*
   the 2026 plan by `S[2025] / S[2026]`.
-- EIA per-utility rate → its data year **2024**; `starting_rates.json` (EIA — Pacific) → **2025**.
+- EIA per-utility rate → its data year; `starting_rates.json` (EIA — Pacific) → **2025**.
 - The curves start at **2025** (the bundle base year; AEO Pacific has no 2024 value), so an anchor
-  before 2025 is **clipped to 2025** — i.e. 2024 prices are treated as 2025 prices. Stated in help.
+  before 2025 would be **clipped to 2025**. The data check below removes that case.
+
+**Data-vintage check (2026-09-23) — closing the 2024 → 2025 gap:**
+- **URDB is already 2026.** PG&E plans effective 2026-03-27, SDG&E TOU-DR-1 2026-06-01; SCE's
+  record is 2024-06-01 (quarantined). So URDB anchors at 2026 and back-scales to a 2025 start.
+- **EIA-861M 2025 per-utility electricity is out** (full year, preliminary, file updated
+  2026-02-24; the 2026 file runs to June). Full-year residential ¢/kWh, 2024 → 2025:
+  PG&E 39.62 → 39.91 (+0.7%), SCE 32.43 → 32.96 (+1.6%), SDG&E 43.63 → 43.73 (+0.2%),
+  SMUD 17.87 → 18.93 (+5.9%), LADWP 23.84 → 26.48 (+11.1%); CA state 31.97 → 32.54 (+1.8%).
+  Part-year 2026 is not usable yet (PG&E −14.8%, SDG&E +19.6% Jan–Jun vs Jan–Jun 2025 —
+  credit / true-up timing), so full years only.
+  → **Rebuild `eia_rates_by_utility.json` electricity at base year 2025** (anchor 2025, no clip).
+- **Gas per-LDC 2025 (EIA-176) is not published yet** (API: "Invalid years passed"; usually
+  late in the year). The state series is: CA residential gas $19.14 → $22.01 per Mcf, 2024 → 2025
+  (+15.0%, release 2026-08-31); Jan–Mar 2026 is mixed (+10%, 0%, −7% vs 2025).
+  → **Bridge gas to 2025**: per-LDC 2024 × CA state ratio (22.01 / 19.14), flagged
+  `"bridged": "state_ratio"` with both years in provenance (PG&E $2.315 → ≈ $2.66/therm); replace
+  with EIA-176 2025 when it lands. Anchor 2025.
+- Result: every starting price anchors at 2025 (EIA) or 2026 (URDB); nothing is clipped.
 - After **2050** (a 30-year run reaches 2054) the curve holds its 2050 value, as today — stated
   in help; revisit post-P7.
 - Only $ amounts scale (energy rates and the fixed charge); **tier thresholds (kWh) never scale**.
