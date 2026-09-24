@@ -951,7 +951,7 @@ Both are added to the modeled gasoline cost only when their checkboxes are on.
 
 ## §14 · Charts Reference
 @file: charts.html
-@keys: chart_jc1, chart_jc2, chart_jc3, chart_jc4, chart_jc5, chart_jc6, chart_eu1, chart_eu2, chart_eu3, chart_eu4, chart_eu6, chart_eu7, chart_eu8
+@keys: chart_jc1, chart_jc2, chart_jc3, chart_jc4, chart_jc5, chart_jc6, chart_eu1, chart_eu2, chart_eu3, chart_eu4, chart_eu6, chart_eu7, chart_eu8, chart_eu9, chart_eu10, chart_r6
 @popup: Charts are organized into three groups — Journey Costs (JC),
   Energy Use (EU), and Rates (R). Pick any chart from the dropdown above
   each chart panel; the code (JC.1, EU.7, R.3 …) appears in the chart's header.
@@ -1029,15 +1029,32 @@ counted — journey electricity that replaced gas or gasoline still carries a gr
 footprint, so the true net reduction is smaller than the drop shown here (grid-carbon modeling
 is a later phase).
 
+EU.9 · Monthly Solar Generation
+Your solar production each month (bars) next to your home's electricity use in the same month
+(line), for the year you pick with the slider — the default is the last year, when the journey
+is complete. Summer surplus charges the battery or is exported; the winter shortfall comes from
+the grid.
+
+EU.10 · Solar & Battery Energy Balance
+Where your home's electricity came from each year: solar used directly, solar stored in the
+battery and used later, and the grid — including any grid charging of the battery (hatched) —
+with exported solar drawn below the axis. Hover a year for self-use, battery losses and the
+battery's monthly mode.
+
 ### Rates (R)
 
-R.1 · Electric CAGR Projection
-Your electricity price projected forward each year from your utility's current rate, using the
-escalation you chose. A second dashed line appears when you compare two scenarios.
+R.1 · Electricity Price Projection
+Your electricity price over the years under each projection method — WhyWatt Conservative,
+Moderate, Stress and EIA Pacific — all starting from your current electricity rate (your
+utility's plan, or its EIA rate). The method in use is drawn bold; when a fixed-%/yr method (My
+Utility, CA Average, ACC) is in use it is added in bold and the four curves stay as reference
+lines. With a time-of-use plan the line is the plan's energy rate — the fixed charge and higher
+tiers are not in it. A dashed line shows scenario B when you compare two.
 
-R.2 · Gas CAGR Projection
-Your natural-gas price projected forward each year from your utility's current rate, using the
-escalation you chose. A second dashed line appears when you compare two scenarios.
+R.2 · Gas Price Projection
+The same for natural gas, starting from your gas utility's current rate. The WhyWatt gas curves
+rise steeply because they follow the California Energy Commission's gas-system cost forecast;
+EIA Pacific is the federal outlook and stays nearly flat.
 
 R.3 · ACC Electrical Rate Projection
 Your electricity price projected forward each year along the selected rate model's
@@ -1053,6 +1070,12 @@ R.5 · ACC Electrical Rate Shape
 A heatmap of how the effective electricity rate varies by hour of day and by month under the
 CPUC Avoided Cost Calculator. Summer afternoons and winter evenings carry the highest avoided
 cost.
+
+R.6 · Peak vs Off-Peak Electricity
+Your electricity cost each year split into energy bought in your plan's peak window (for example
+4–9pm), energy bought off-peak, and the daily fixed charge — after solar and the battery — with
+the solar export credit drawn below the axis. Toggle between Your Journey and Do Nothing. It
+appears when a projection method prices your home with a time-of-use plan.
 
 ### Default values
 

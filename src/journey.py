@@ -343,6 +343,11 @@ class JourneyHome(mesa.Agent):
         self.solar_monthly_bills_history:  list = []  # per year: 12 × {mode: $} (each mode run)
         self.home_elec_bill_history:       list = []  # $/yr home-meter electricity before solar
         self.home_load_hourly_history:     list = []  # per year: (12, 24) kWh representative days | None
+        # §4.3 chart histories (presentation only — never read by the model)
+        self.home_elec_kwh_monthly_history: list = []  # per year: (12,) home electricity kWh
+        self.grid_peak_kwh_history:        list = []  # per year: kWh bought in the peak window | None
+        self.grid_offpeak_kwh_history:     list = []  # per year: kWh bought off-peak | None
+        self.elec_cost_parts_history:      list = []  # per year: {peak, offpeak, fixed, export_credit} $ | None
         self.gasoline_gallons_history: list = []  # annual gallons (transportation slot)
         self.external_ev_kwh_history:  list = []  # annual external (public) EV charging kWh
         self.external_ev_cost_history: list = []  # annual external EV charging cost ($)
@@ -467,6 +472,7 @@ class JourneyHome(mesa.Agent):
         # the home total is exact).
         home_bill_no_solar = None
         month_loads = None
+        grid_pk = grid_op = credit_by_month = None       # §4.3 R.6 (URDB only)
         if self._rate_structure is not None:
             rs = self._rate_structure
             esc = float(self._rate_escalation[year_idx]) if self._rate_escalation is not None else 1.0
@@ -485,6 +491,11 @@ class JourneyHome(mesa.Agent):
                 year_category_costs[cat] += adjustment * share
             year_opex += adjustment
             year_elec_opex = float(home_bill_no_solar.sum())
+            grid_pk = np.array([float(month_loads[m][peak].sum()) * _DAYS_IN_MONTH[m]
+                                for m in range(12)])
+            grid_op = np.array([float(month_loads[m][~peak].sum()) * _DAYS_IN_MONTH[m]
+                                for m in range(12)])
+            credit_by_month = np.zeros(12)
         self.home_elec_bill_history.append(year_elec_opex)
         self.home_load_hourly_history.append(
             np.array(month_loads) if month_loads is not None else None)
@@ -552,6 +563,10 @@ class JourneyHome(mesa.Agent):
                     exp_m = float(d.export.sum()) * days
                     credit_m = float((d.export * x).sum()) * days
                     grid_m = float(d.grid_import.sum()) * days
+                    pmask = rs.peak_mask()                   # §4.3 R.6: purchases after dispatch
+                    grid_pk[m] = float(d.grid_import[pmask].sum()) * days
+                    grid_op[m] = float(d.grid_import[~pmask].sum()) * days
+                    credit_by_month[m] = credit_m
                     # Saving = bill with no solar/battery − bill after dispatch (net of export).
                     retail_savings += home_bill_no_solar[m] - (mr.bills[mr.mode] + credit_m)
                 else:
@@ -591,6 +606,26 @@ class JourneyHome(mesa.Agent):
             modes, bills = [], []
 
         year_opex -= solar_saving
+        # §4.3 chart histories — presentation only.
+        self.home_elec_kwh_monthly_history.append(
+            sum((np.asarray(v, dtype=float) for v in year_elec_load_by_class.values()),
+                np.zeros(12)))
+        if grid_pk is not None:
+            rs_ = self._rate_structure
+            esc_ = (float(self._rate_escalation[year_idx])
+                    if self._rate_escalation is not None else 1.0)
+            parts = np.array([rs_.price_month_parts(m, grid_pk[m], grid_op[m],
+                                                    _DAYS_IN_MONTH[m], esc_)
+                              for m in range(12)]).sum(axis=0)
+            self.grid_peak_kwh_history.append(float(grid_pk.sum()))
+            self.grid_offpeak_kwh_history.append(float(grid_op.sum()))
+            self.elec_cost_parts_history.append(
+                {"peak": float(parts[0]), "offpeak": float(parts[1]), "fixed": float(parts[2]),
+                 "export_credit": float(credit_by_month.sum())})
+        else:
+            self.grid_peak_kwh_history.append(None)
+            self.grid_offpeak_kwh_history.append(None)
+            self.elec_cost_parts_history.append(None)
         self.solar_savings_history.append(solar_saving)
         self.solar_production_kwh_history.append(annual_production_kwh)
         self.solar_self_consumed_history.append(self_consumed_kwh)

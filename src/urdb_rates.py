@@ -128,6 +128,27 @@ class RateStructure:
         return (cost + self.fixed_charge(days)) * escalation
 
 
+    def price_month_parts(self, month: int, peak_kwh: float, offpeak_kwh: float, days: int,
+                          escalation: float = 1.0) -> tuple[float, float, float]:
+        """`price_month` split into (peak energy $, off-peak energy $, fixed $) — for charts
+        (§4.3 R.6). Same tier walk: each tier's kWh is apportioned peak / off-peak by the
+        month's peak share, so the three parts sum to `price_month`."""
+        peak_kwh, offpeak_kwh = max(peak_kwh, 0.0), max(offpeak_kwh, 0.0)
+        total = peak_kwh + offpeak_kwh
+        share = peak_kwh / total if total > 0 else 0.0
+        pk, op = self.peak_ladders[month], self.offpeak_ladders[month]
+        c_pk = c_op = prev = 0.0
+        for i, tier in enumerate(pk):
+            bound = total if tier.max_kwh_day is None else min(total, tier.max_kwh_day * days)
+            kwh = max(bound - prev, 0.0)
+            c_pk += kwh * share * tier.rate
+            c_op += kwh * (1.0 - share) * op[min(i, len(op) - 1)].rate
+            prev = max(prev, bound)
+            if prev >= total:
+                break
+        return (c_pk * escalation, c_op * escalation, self.fixed_charge(days) * escalation)
+
+
 class URDBRates:
     """Coverage gate + tariff builder over the committed URDB files. Load once per process."""
 

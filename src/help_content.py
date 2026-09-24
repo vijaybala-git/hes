@@ -226,15 +226,19 @@ HELP_POPUPS: dict[str, tuple[str, str]] = {
         "charts.html",
     ),
     "chart_r1": (
-        "Your electricity price projected forward each year from your utility's"
-        " current EIA effective rate, using the escalation you choose. A second"
-        " dashed line appears when you compare two scenarios.",
+        "Your electricity price over the years under each projection method —"
+        " WhyWatt Conservative, Moderate, Stress and EIA Pacific — all starting"
+        " from your current rate. The method you use is drawn bold; a fixed-%/yr"
+        " method, when in use, is added in bold. A dashed line shows scenario B"
+        " when you compare two.",
         "rates.html",
     ),
     "chart_r2": (
-        "Your natural-gas price projected forward each year from your utility's"
-        " current EIA effective rate, using the escalation you choose. A second"
-        " dashed line appears when you compare two scenarios.",
+        "Your natural-gas price over the years under each projection method —"
+        " WhyWatt Conservative, Moderate, Stress and EIA Pacific — all starting"
+        " from your current gas rate. The WhyWatt gas curves rise steeply (they"
+        " follow the CEC's gas-system cost forecast); EIA Pacific is the federal"
+        " outlook.",
         "rates.html",
     ),
     "chart_r3": (
@@ -257,6 +261,28 @@ HELP_POPUPS: dict[str, tuple[str, str]] = {
         " winter evening peaks carry the highest avoided cost.",
         "acc.html",
     ),
+    "chart_r6": (
+        "Your electricity cost each year split into energy bought in the plan's"
+        " peak window, energy bought off-peak, and the fixed charge — after solar"
+        " and the battery — with the solar export credit below the axis. Shown for"
+        " time-of-use plans (pick a projection method with your utility's plan).",
+        "rates.html",
+    ),
+    "chart_eu9": (
+        "Your solar system's production each month next to your home's"
+        " electricity use in the same month, for the year you pick (default: the"
+        " last year, once the journey is complete). Summer surplus goes to the"
+        " battery or is exported; the winter shortfall comes from the grid.",
+        "solar.html",
+    ),
+    "chart_eu10": (
+        "Where your home's electricity came from each year: solar used directly,"
+        " solar stored and used later from the battery, and the grid (including"
+        " any grid charging of the battery), with exported solar below the axis."
+        " Hover a year for self-use %, battery losses and the battery's monthly"
+        " mode.",
+        "solar.html",
+    ),
 
     # ── Chart name → key mapping (stable) ────────────────────────────────────
     "_chart_name_to_key": {  # type: ignore[assignment]
@@ -273,11 +299,14 @@ HELP_POPUPS: dict[str, tuple[str, str]] = {
         "Energy Mix Timeline": "chart_eu6",
         "HVAC Monthly Energy": "chart_eu7",
         "Direct Emissions (CO₂ / CO₂e)": "chart_eu8",
-        "Electric CAGR Projection": "chart_r1",
-        "Gas CAGR Projection": "chart_r2",
+        "Monthly Solar Generation": "chart_eu9",
+        "Solar & Battery Energy Balance": "chart_eu10",
+        "Electricity Price Projection": "chart_r1",
+        "Gas Price Projection": "chart_r2",
         "ACC Electrical Rate Projection": "chart_r3",
         "ACC Gas Rate Projection": "chart_r4",
         "ACC Electrical Rate Shape": "chart_r5",
+        "Peak vs Off-Peak Electricity": "chart_r6",
     },
 
 }

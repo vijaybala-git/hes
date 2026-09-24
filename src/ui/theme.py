@@ -49,11 +49,12 @@ CHART_OPTIONS = [
     "Cost Breakdown by Category",
     "Equipment Replacements (CapEx)",
     "Estimated Electrical Load",
-    "Electric CAGR Projection",
-    "Gas CAGR Projection",
+    "Electricity Price Projection",
+    "Gas Price Projection",
     "ACC Electrical Rate Projection",
     "ACC Gas Rate Projection",
     "ACC Electrical Rate Shape",
+    "Peak vs Off-Peak Electricity",
     "Journey Timeline",
     "Home Energy Cost by Device",
     "Home Energy Use by Device",
@@ -62,6 +63,8 @@ CHART_OPTIONS = [
     "HVAC Monthly Energy",
     "Energy Mix Timeline",
     "Direct Emissions (CO₂ / CO₂e)",
+    "Monthly Solar Generation",
+    "Solar & Battery Energy Balance",
 ]
 
 # Reference codes shown in chart titles and headers — used in help files
@@ -79,11 +82,14 @@ CHART_CODES = {
     "HVAC Monthly Energy":            "EU.7",
     "Energy Mix Timeline":            "EU.6",
     "Direct Emissions (CO₂ / CO₂e)":  "EU.8",
-    "Electric CAGR Projection":       "R.1",
-    "Gas CAGR Projection":            "R.2",
+    "Electricity Price Projection":   "R.1",
+    "Gas Price Projection":           "R.2",
     "ACC Electrical Rate Projection": "R.3",
     "ACC Gas Rate Projection":        "R.4",
     "ACC Electrical Rate Shape":      "R.5",
+    "Peak vs Off-Peak Electricity":   "R.6",
+    "Monthly Solar Generation":       "EU.9",
+    "Solar & Battery Energy Balance": "EU.10",
 }
 
 # Per-slot color palette (consistent across EU.3 / EU.4 / cost charts)

@@ -322,7 +322,7 @@ def make_capex(df, model, n):
     return fig
 
 
-# Chart 5 — Electric CAGR Projection
+# R.1 / R.2 helpers — labels for fixed-%/yr methods (the builders are in §4.3 below)
 def _elec_rate_label(model_str: str, cagr_pct: int, suffix: str = "") -> str:
     if model_str == "cagr_flat":
         return f"Elec (my utility) +{cagr_pct}%/yr{suffix}"
@@ -352,23 +352,6 @@ def _make_price_chart(df, model, n, col, color, label_a, label_b, ytitle, unit):
     lay["yaxis"].update(tickprefix="$", tickformat=".2f")
     fig.update_layout(**lay)
     return fig
-
-
-def make_elec_price(df, model, n):
-    return _make_price_chart(
-        df, model, n, "Elec Rate", _CC_J,
-        _elec_rate_label(model.elec_rate_model_a, elec_cagr_pct_a.value),
-        _elec_rate_label(model.elec_rate_model_b, elec_cagr_pct_b.value, " (B)"),
-        "Avg electricity price ($/kWh)", "/kWh")
-
-
-# Chart 6 — Gas CAGR Projection
-def make_gas_price(df, model, n):
-    return _make_price_chart(
-        df, model, n, "Gas Rate", "#EF6C00",
-        _gas_rate_label(model.gas_rate_model_a, gas_cagr_pct_a.value),
-        _gas_rate_label(model.gas_rate_model_b, gas_cagr_pct_b.value, " (B)"),
-        "Avg gas price ($/therm)", "/therm")
 
 
 # Chart 7b — ACC Rate Projection (§24.3)
@@ -1128,14 +1111,225 @@ def make_hvac_monthly(df, model, n, home="journey"):
     return fig
 
 
+
+def _note(lay: dict, text: str) -> dict:
+    """A one-line grey note under the x-axis title (the stacked legend owns the top)."""
+    lay["margin"] = {**lay["margin"], "b": lay["margin"]["b"] + 22}
+    lay["annotations"] = [dict(text=text, xref="paper", yref="paper", x=0, y=0,
+                               yanchor="top", yshift=-44, showarrow=False, xanchor="left",
+                               font=dict(size=10, color="#607D8B"))]
+    return lay
+
+
+# ── §4.3 R.1 / R.2 — price projection under all four projection methods ───────
+_PROJ_COLORS = {"whywatt_conservative": "#2E7D32", "whywatt_moderate": "#1565C0",
+                "whywatt_stress": "#C62828", "eia_pacific": "#6D4C41"}
+_PROJ_NAMES = {"whywatt_conservative": "WhyWatt Conservative",
+               "whywatt_moderate": "WhyWatt Moderate", "whywatt_stress": "WhyWatt Stress",
+               "eia_pacific": "EIA Pacific"}
+
+
+def projection_curves(model, fuel: str, n: int) -> dict:
+    """{method key: (n,) $/unit} — the home's price under each of the four projection methods:
+    level × S[y] / S[anchor]. The level is chosen so the method IN USE reproduces the model's
+    own yearly mean rate exactly (a URDB plan's tier-1 energy rate, or the EIA start × the ACC
+    month-shape mean); with a fixed-%/yr method in use, the level is the current energy rate."""
+    from starting_rates import projection_index
+    start = model.starting_rate_elec if fuel == "electricity" else model.starting_rate_gas
+    market = model.projection_market_elec if fuel == "electricity" else model.projection_market_gas
+    years = model.sim_start_year + np.arange(n)
+    idx = {k: projection_index(k, fuel, years, start.year, market) for k in _PROJ_COLORS}
+    in_use = model.elec_rate_model_a if fuel == "electricity" else model.gas_rate_model_a
+    rates = model.elec_rates if fuel == "electricity" else model.gas_rates
+    level = (float(np.mean(rates[0])) / float(idx[in_use][0]) if in_use in idx
+             else start.rate)
+    return {k: level * v for k, v in idx.items()}
+
+
+def _make_projection_chart(df, model, n, fuel: str):
+    unit = "/kWh" if fuel == "electricity" else "/therm"
+    col = "Elec Rate" if fuel == "electricity" else "Gas Rate"
+    in_a = model.elec_rate_model_a if fuel == "electricity" else model.gas_rate_model_a
+    in_b = model.elec_rate_model_b if fuel == "electricity" else model.gas_rate_model_b
+    curves = projection_curves(model, fuel, n)
+    yrs = list(range(1, n + 1))
+    fmt = "$%{y:.3f}" + unit
+    fig = go.Figure()
+    for k, y in curves.items():
+        use = k == in_a
+        fig.add_trace(go.Scatter(
+            x=yrs, y=list(y), mode="lines",
+            name=_PROJ_NAMES[k] + (" — in use" if use else ""),
+            opacity=1.0 if use else 0.55,
+            line=dict(color=_PROJ_COLORS[k], width=3.0 if use else 1.4),
+            hovertemplate=fmt + "<extra>" + _PROJ_NAMES[k] + "</extra>"))
+    if in_a not in curves:                       # a fixed-%/yr method is in use
+        lbl = (_elec_rate_label(in_a, elec_cagr_pct_a.value) if fuel == "electricity"
+               else _gas_rate_label(in_a, gas_cagr_pct_a.value))
+        fig.add_trace(go.Scatter(x=yrs, y=df[col].values, mode="lines", name=f"{lbl} — in use",
+                                 line=dict(color=_CC_J, width=3.0),
+                                 hovertemplate=fmt + "<extra>in use</extra>"))
+    if model.comparison_mode and f"{col} B" in df.columns:
+        yb = curves[in_b] if in_b in curves else df[f"{col} B"].values
+        lbl_b = (_PROJ_NAMES[in_b] if in_b in curves else
+                 (_elec_rate_label(in_b, elec_cagr_pct_b.value) if fuel == "electricity"
+                  else _gas_rate_label(in_b, gas_cagr_pct_b.value)))
+        fig.add_trace(go.Scatter(x=yrs, y=list(yb), mode="lines", name=f"{lbl_b} (B)",
+                                 line=dict(color=_PROJ_COLORS.get(in_b, _CC_B), width=2.2,
+                                           dash="dash"),
+                                 hovertemplate=fmt + "<extra>B</extra>"))
+    start = model.starting_rate_elec if fuel == "electricity" else model.starting_rate_gas
+    proxy = (model.projection_proxy_elec if fuel == "electricity"
+             else model.projection_proxy_gas)
+    notes = [f"From your current rate: {start.label}"]
+    if fuel == "electricity" and start.kind == "urdb":
+        notes.append("plan's energy rate — fixed charge and higher tiers not included")
+    if proxy:
+        notes.append("WhyWatt curves are PG&E-based here")
+    lay = _pl_layout(height=300, ytitle=("Electricity price ($/kWh)" if fuel == "electricity"
+                                         else "Gas price ($/therm)"),
+                     xtitle="Year", money_y=False, xdtick=1)
+    lay["yaxis"].update(tickprefix="$", tickformat=".2f")
+    fig.update_layout(**_stacked_legend(_note(lay, " · ".join(notes)), rows=2))
+    return fig
+
+
+def make_elec_price(df, model, n):
+    """R.1 — electricity price under the four projection methods (§4.3)."""
+    return _make_projection_chart(df, model, n, "electricity")
+
+
+def make_gas_price(df, model, n):
+    """R.2 — gas price under the four projection methods (§4.3)."""
+    return _make_projection_chart(df, model, n, "gas")
+
+
+# ── §4.3 EU.9 — Monthly Solar Generation (with a year selector) ────────────────
+_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def solar_install_index(model) -> int | None:
+    """1-based simulation year the solar is installed, or None when there is no solar."""
+    jh = model.journey_home
+    if jh._solar_config is None:
+        return None
+    for s in jh.capex_only_slots:
+        if "Solar" in s.name and s.install_year is not None:
+            return int(s.install_year)
+    return None
+
+
+def make_monthly_solar(df, model, n, year: int | None = None):
+    """EU.9 — monthly solar production vs the home's monthly electricity use, one year."""
+    inst = solar_install_index(model)
+    if inst is None:
+        return _pl_empty("Add solar to see monthly generation.")
+    jh = model.journey_home
+    yr = n if year is None else max(inst, min(int(year), n))
+    prod = jh._solar_config.solar.system_kw * np.asarray(model.solar_resource.ac_monthly)
+    use = np.asarray(jh.home_elec_kwh_monthly_history[yr - 1])
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=_MONTHS, y=list(prod), name="Solar production",
+                         marker_color="#F9A825",
+                         hovertemplate="%{y:,.0f} kWh<extra>Solar</extra>"))
+    fig.add_trace(go.Scatter(x=_MONTHS, y=list(use), mode="lines+markers",
+                             name="Home electricity use", line=dict(color=_CC_J, width=2.5),
+                             hovertemplate="%{y:,.0f} kWh<extra>Home use</extra>"))
+    kw = jh._solar_config.solar.system_kw
+    lay = _pl_layout(height=300, ytitle="kWh / month", xtitle="", money_y=False)
+    fig.update_layout(**_stacked_legend(_note(
+        lay, f"{model.sim_start_year + yr - 1} · {kw:.1f} kW · {prod.sum():,.0f} kWh/yr · "
+             f"{model.solar_resource.label}")))
+    return fig
+
+
+# ── §4.3 EU.10 — Solar & Battery Energy Balance ─────────────────────────────────
+def make_energy_balance(df, model, n):
+    """EU.10 — per year: where the home's electricity came from (solar → home, battery → home,
+    grid → home, grid → battery) with exported solar below the axis (§0's four flows)."""
+    if solar_install_index(model) is None:
+        return _pl_empty("Add solar to see the solar & battery energy balance.")
+    from dispatch import battery_mode_summary
+    jh = model.journey_home
+    yrs = list(range(1, n + 1))
+    load = np.array([float(np.sum(m)) for m in jh.home_elec_kwh_monthly_history])
+    direct = np.array(jh.solar_direct_history, dtype=float)
+    batt = np.array(jh.battery_discharge_history, dtype=float)
+    to_batt = np.array(jh.battery_charge_grid_history, dtype=float)
+    grid_home = np.maximum(load - direct - batt, 0.0)
+    export = np.array(jh.solar_exported_kwh_history, dtype=float)
+    losses = np.array(jh.battery_losses_history, dtype=float)
+    selfuse = np.where(direct + batt + export > 0,
+                       (direct + batt) / np.maximum(direct + batt + export, 1e-9) * 100, 0)
+    modes = [battery_mode_summary(m) if m else "—" for m in jh.battery_mode_history]
+    cd = np.column_stack([selfuse, losses, np.array(modes, dtype=object)])
+    hov = ("%{y:,.0f} kWh<br>self-use %{customdata[0]:.0f}% · battery losses "
+           "%{customdata[1]:,.0f} kWh<br>%{customdata[2]}<extra>%{fullData.name}</extra>")
+    fig = go.Figure()
+    for y, name, color, pattern in ((direct, "Solar → home", "#F9A825", ""),
+                                    (batt, "Battery → home", "#2E7D32", ""),
+                                    (grid_home, "Grid → home", _CC_J, ""),
+                                    (to_batt, "Grid → battery", _CC_J, "/"),
+                                    (-export, "Exported", "#EF6C00", "")):
+        fig.add_trace(go.Bar(x=yrs, y=list(y), name=name, customdata=cd,
+                             marker=dict(color=color, pattern_shape=pattern,
+                                         opacity=0.55 if pattern else 1.0),
+                             hovertemplate=hov))
+    lay = _pl_layout(height=300, ytitle="kWh / year", xtitle="Year", money_y=False, xdtick=1)
+    lay["barmode"] = "relative"
+    fig.update_layout(**_stacked_legend(lay))
+    return fig
+
+
+# ── §4.3 R.6 — Peak vs Off-Peak Electricity (URDB plans) ────────────────────────
+def make_peak_offpeak(df, model, n, home="journey"):
+    """R.6 — the home's electricity cost per year split into peak-window energy, off-peak
+    energy and the fixed charge (after solar / battery), with the export credit below."""
+    rs = model.rate_structure_a
+    if rs is None:
+        return _pl_empty("Your rate has no peak window — pick a projection method with a "
+                         "time-of-use plan.")
+    from urdb_rates import peak_hours_label
+    h = model.journey_home if home == "journey" else model.baseline_home
+    parts = h.elec_cost_parts_history
+    pk_kwh = np.array([x or 0.0 for x in h.grid_peak_kwh_history])
+    op_kwh = np.array([x or 0.0 for x in h.grid_offpeak_kwh_history])
+    yrs = list(range(1, n + 1))
+    share = np.where(pk_kwh + op_kwh > 0, pk_kwh / np.maximum(pk_kwh + op_kwh, 1e-9) * 100, 0)
+    cd = np.column_stack([pk_kwh, op_kwh, share])
+    hov = ("$%{y:,.0f}<br>peak %{customdata[0]:,.0f} kWh · off-peak %{customdata[1]:,.0f} kWh"
+           " (%{customdata[2]:.0f}% peak)<extra>%{fullData.name}</extra>")
+    fig = go.Figure()
+    for key, name, color in (("peak", "Peak energy", "#C62828"),
+                             ("offpeak", "Off-peak energy", _CC_J),
+                             ("fixed", "Fixed charge", "#90A4AE")):
+        fig.add_trace(go.Bar(x=yrs, y=[p[key] if p else 0.0 for p in parts], name=name,
+                             marker_color=color, customdata=cd, hovertemplate=hov))
+    # The credit can't take the year's bill below zero — the model caps the solar saving at the
+    # year's electricity bill (annual true-up), so the chart shows the credit that is used.
+    credit = [-min(p["export_credit"], p["peak"] + p["offpeak"] + p["fixed"]) if p else 0.0
+              for p in parts]
+    if any(credit):
+        fig.add_trace(go.Bar(x=yrs, y=credit, name="Export credit (used)",
+                             marker_color="#EF6C00", customdata=cd, hovertemplate=hov))
+    peak = (f"peak {peak_hours_label(rs.peak_hours)}" if rs.is_tou else "no peak window")
+    lay = _pl_layout(height=300, ytitle="Electricity cost / year", xtitle="Year", xdtick=1)
+    lay["barmode"] = "relative"
+    fig.update_layout(**_stacked_legend(_note(lay, f"{model.starting_rate_elec.label} · {peak}")))
+    return fig
+
+
 CHART_FNS = {
     "Cumulative Energy Costs":        make_cumulative_opex,
     "Estimated Electrical Load":      make_panel_load_timeline,
     "Annual Cost by Year":            make_annual_cost,
     "Cost Breakdown by Category":     make_cost_breakdown,
     "Equipment Replacements (CapEx)": make_capex_v2,
-    "Electric CAGR Projection":        make_elec_price,
-    "Gas CAGR Projection":                make_gas_price,
+    "Electricity Price Projection":   make_elec_price,
+    "Gas Price Projection":           make_gas_price,
+    "Solar & Battery Energy Balance": make_energy_balance,
+    "Monthly Solar Generation":       make_monthly_solar,       # final year (pane adds selector)
+    "Peak vs Off-Peak Electricity":   make_peak_offpeak,        # journey (pane adds toggle)
     "ACC Electrical Rate Projection": make_acc_elec_trajectory,
     "ACC Gas Rate Projection":        make_acc_gas_trajectory,
     "ACC Electrical Rate Shape":      make_acc_rate_shape,
@@ -1149,4 +1343,5 @@ CHART_FNS = {
 
 
 
-__all__ = [n for n in dir() if n.startswith("make_")] + ["CHART_FNS", "render_device_chart"]
+__all__ = [n for n in dir() if n.startswith("make_")] + [
+    "CHART_FNS", "render_device_chart", "projection_curves", "solar_install_index"]

@@ -16,7 +16,9 @@ from ui import config
 # Module-level reactives that are intentionally NOT config-driven (ephemeral UI state).
 _TRANSIENT = {"setup_collapsed", "_panel_state", "_baseload_state",
               # Phase 5 §5 per-block collapse chevrons — view state, left out of reset/config.
-              "cockpit_collapsed", "graphs_collapsed", "journey_collapsed"}
+              "cockpit_collapsed", "graphs_collapsed", "journey_collapsed",
+              # Phase 7 §4.3 — EU.9's year selector: UI-only, not a config / share-link key.
+              "eu9_year"}
 
 
 @pytest.fixture(autouse=True)

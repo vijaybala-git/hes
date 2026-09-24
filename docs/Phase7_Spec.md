@@ -5,7 +5,8 @@ data through the model. (Adopting the WhyWatt projection as the *default* moved 
 **Follows:** Phase 6 (`docs/Phase6_Spec.md`) — Solar/Battery split, inert roof-geometry inputs, and
 the **non-default `cec_projection` rate hand-off interface** (evaluated but not switched). Offline
 PVWatts/URDB data is harvested and validated separately in `docs/OfflineSolarData_Plan.md`.
-**Last updated:** 2026-09-24 — added **§4.3 chart design** (R.1 / R.2 = four projection curves on the
+**Last updated:** 2026-09-24 — **§4.3 charts landed** (R.1 / R.2 four projection curves, EU.9 with year
+selector, EU.10, R.6; golden unchanged). Earlier — added **§4.3 chart design** (R.1 / R.2 = four projection curves on the
 current rate; EU.9 monthly solar; EU.10 energy balance; R.6 peak vs off-peak). Earlier
 2026-09-23 — open-items review: DoD ticked for PG&E end-to-end and the golden
 record; stale §2/§3 lines fixed; Post-Phase-7 list completed (default flip, SCE re-harvest, shim
@@ -904,7 +905,7 @@ golden unchanged.
 - Replace the name lookups (`"Solar" in cslot.name` in `journey.py` and `ui/charts.py`) with an
   explicit slot kind.
 
-### §4.3 — Charts (PLANNED — design drafted 2026-09-24)
+### §4.3 — Charts (LANDED 2026-09-24)
 
 Four chart changes: R.1 / R.2 redrawn around the projection methods, and three new charts for
 the Phase 7 physics. All are **presentation only** — Plotly, same `_pl_layout` style, same chart
@@ -973,6 +974,26 @@ self-consumption vs export")
 
 **Placement:** EU.9 and EU.10 in the Energy Use family (after EU.8); R.6 in the Rates family
 (after R.5). Help (`charts` page) gets the four entries; R.1 / R.2 text rewritten.
+
+**Landed 2026-09-24 (golden unchanged; 545 tests):**
+- `ui/charts.py`: `projection_curves()` + `_make_projection_chart` (R.1 / R.2 — four curves; the
+  in-use level is taken from the model's year-1 rate so that curve equals the model every year;
+  fixed-%/yr method added bold when in use; B dashed); `make_monthly_solar` (EU.9),
+  `make_energy_balance` (EU.10 — grid → home = load − direct − battery, so pre-install years show
+  the whole home on the grid), `make_peak_offpeak` (R.6). Notes sit under the x-axis title (the
+  stacked legend owns the top).
+- Model (presentation histories only): `home_elec_kwh_monthly_history`, `grid_peak_kwh_history`,
+  `grid_offpeak_kwh_history`, `elec_cost_parts_history` {peak, offpeak, fixed, export_credit}
+  (after dispatch); `RateStructure.price_month_parts`.
+- **R.6 export credit is shown *as used*:** capped at the year's purchases, matching the model's
+  cap on the solar saving (annual true-up) — early years of a mostly-gas home hit it.
+- UI: `Eu9Pane` (year slider install → final, reset to final on horizon / install change;
+  `eu9_year` transient reactive); R.6 with the journey / do-nothing toggle; chart names renamed
+  "Electricity / Gas Price Projection"; help entries for R.1, R.2, R.6, EU.9, EU.10.
+- Verified in the preview: R.1 (four curves, Moderate bold, footnote), EU.9 (slider, 2044),
+  EU.10, R.6 (E-TOU-C 4pm–9pm). The chart dropdown now has 21 entries; Vuetify lazy-loads the
+  last one on scroll.
+- Tests: `tests/test_charts_phase7.py` (15).
 
 **Tests:** R.1 / R.2 in-use line == model rates (every year); the four curves' year-1 values
 equal the current rate (anchor 2025) or current rate × S[2025]/S[2026] (URDB anchor 2026);
@@ -1271,8 +1292,8 @@ tests/
       Journey panel's third row (§4.2); Solar + Battery still one install event (limitation
       stated in the UI and help); golden unchanged. *(2026-09-23)*
 - [ ] Unified Plan row across the nine devices (§4.2 step 2, Spec 5.6 #6).
-- [ ] Charts per §4.3: R.1 / R.2 show the four projection curves on the home's current rate;
-      EU.9 monthly solar generation; EU.10 solar & battery energy balance; R.6 peak vs off-peak
-      (URDB plans). Help updated; golden unchanged (roof geometry stays inert).
+- [x] Charts per §4.3: R.1 / R.2 show the four projection curves on the home's current rate;
+      EU.9 monthly solar generation (year selector); EU.10 solar & battery energy balance; R.6
+      peak vs off-peak (URDB plans). Help updated; golden unchanged. *(2026-09-24)*
 - [ ] §6 NREL End-Use Load Profiles drive the energy balance (separate branch; own golden re-baseline).
 - [ ] CLAUDE.md updated: Phase 7 closed.

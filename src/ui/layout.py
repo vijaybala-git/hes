@@ -109,6 +109,7 @@ _TOGGLE_CHART_NAMES = _DEVICE_CHART_NAMES | {
     "Annual Gasoline by Vehicle",
     "HVAC Monthly Energy",
     "Energy Mix Timeline",
+    "Peak vs Off-Peak Electricity",
 }
 
 
@@ -209,6 +210,22 @@ def _render_fig(fig, key=None):
 
 
 @solara.component
+def Eu9Pane(model, df, n):
+    """EU.9 with its year selector (install year → final year, default final) — §4.3."""
+    inst = solar_install_index(model)
+    # Back to the final year whenever the horizon or the install year changes.
+    solara.use_effect(lambda: eu9_year.set(None), [n, inst])
+    yr = n if (eu9_year.value is None or inst is None) else max(inst, min(eu9_year.value, n))
+    with solara.Column(gap="4px"):
+        if inst is not None and n > inst:
+            with solara.Column(style="max-width:320px; padding-left:8px"):
+                solara.SliderInt(f"Year {model.sim_start_year + yr - 1}", value=yr,
+                                 min=inst, max=n, on_value=eu9_year.set)
+        fig = make_monthly_solar(df, model, n, year=yr)
+        _render_fig(fig, key=f"Monthly Solar Generation:{yr}")
+
+
+@solara.component
 def ChartPane(chart_name, model, df, n, home_rv=None):
     # Phase 6 §3d — each pane passes its own scenario reactive (left/right); default to the
     # left one so any caller that omits it behaves as before.
@@ -283,6 +300,14 @@ def ChartPane(chart_name, model, df, n, home_rv=None):
                 "reduction is smaller than the drop shown here. Grid-carbon modeling is a later phase. "
                 "Factors: gas 5.30 kg CO₂/therm · CO₂e 6.5 (2.3% leak × GWP100 28) · gasoline "
                 "8.89 kg/gal (EPA/EIA).</div>"))
+    elif chart_name == "Peak vs Off-Peak Electricity":
+        home = home_rv.value
+        with solara.Column(gap="4px"):
+            _toggle_buttons(home_rv)
+            fig = make_peak_offpeak(df, model, n, home=home)
+            _render_fig(fig, key=f"{chart_name}:{home}")
+    elif chart_name == "Monthly Solar Generation":
+        Eu9Pane(model, df, n)
     elif chart_name == "ACC Electrical Rate Shape":
         # No reference-year control: the ACC shape is year-independent (single static
         # hour×month factor matrix), so R.5 renders bare — matching every other chart's

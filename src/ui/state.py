@@ -195,6 +195,9 @@ device_chart_home_left  = solara.reactive(_DEFAULTS["device_chart_home_left"])
 device_chart_home_right = solara.reactive(_DEFAULTS["device_chart_home_right"])
 # §3b Direct Emissions chart — CO2 vs CO2e metric toggle ("co2" | "co2e")
 emissions_metric = solara.reactive(_DEFAULTS["emissions_metric"])
+# §4.3 EU.9 Monthly Solar Generation — selected simulation year (1-based); None = final year.
+# UI-only (not a config / share-link key); reset when the horizon or the install year changes.
+eu9_year = solara.reactive(None)
 
 # Pricing & timeline
 # §2 per-fuel rate model — "cagr_flat" (= My Utility, EIA per-utility from ZIP) |
@@ -403,6 +406,7 @@ def reset_to_defaults():
     device_chart_home_left.set(_DEFAULTS["device_chart_home_left"])
     device_chart_home_right.set(_DEFAULTS["device_chart_home_right"])
     emissions_metric.set(_DEFAULTS["emissions_metric"])
+    eu9_year.set(None)
     detail_open.set(_DEFAULTS["detail_open"])
     _set_all_setup(False)
     global _loaded_ctx
