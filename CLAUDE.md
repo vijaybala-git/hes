@@ -33,9 +33,13 @@ Before the Beta release (each on its own branch off `main`):
   — the $2.08 "G-1" figure was PG&E's CARE baseline charge; the WhyWatt gas curves now follow the CEC
   delivered price ($2.649 nominal 2025, ≈ EIA's $2.66). Model results unchanged (shape only).
 
-Other post-Phase-7 items (not gating Beta): default → a projection method (target: WhyWatt
-Conservative + PG&E E-TOU-C + solar + battery = regression case 13 — review the gas curve first),
-independent battery, SCE re-harvest, `SolarBatteryConfig` shim retirement, solar wave 2 (PCE /
+- ✅ **Default → WhyWatt Conservative** (branch `feat/default-projection-method`, 2026-09-24):
+  journey A's electricity + gas default to the WhyWatt Conservative projection on the home's current
+  rate (PG&E → URDB E-TOU-C). Solar / battery stay unplanned; only HVAC + water heater planned;
+  Social & Health off. Regression case 01 pins My Utility (`cagr_flat`) for coverage; golden
+  re-baselined.
+
+Other post-Phase-7 items (not gating Beta): independent battery, SCE re-harvest, `SolarBatteryConfig` shim retirement, solar wave 2 (PCE /
 SJCE), beyond-CA data.
 
 ---
@@ -129,8 +133,9 @@ Gas (G-1):          $2.08/therm  ⚠ NOT the typical rate — this "G-1" series 
                     $2.649 (the projection curves' base since 2026-09-24).
 ```
 
-**Phase 7 rate model (current):** default rate model is still **My Utility** (`cagr_flat`: EIA
-per-utility 2024 rate × fixed %/yr) — golden-stable until the post-P7 default flip. Projection
+**Rate model (current):** the default is the **WhyWatt Conservative** projection method (since
+2026-09-24; before that My Utility — `cagr_flat`: EIA per-utility 2024 rate × fixed %/yr, still
+selectable and pinned in regression case 01). Scenario B defaults stay ACC. Projection
 methods price *current energy rate × S[y]/S[anchor]*: current rate = URDB plan (PG&E E-TOU-C,
 effective 2026) → utility EIA 2025 (PG&E elec $0.3991/kWh; gas $2.66/therm = EIA-176 2024 × CA
 ratio 1.1499, bridged) → EIA Pacific ($0.242 / $1.99) when no utility. Battery default = Tesla

@@ -29,23 +29,22 @@ _BUNDLE = json.loads(_BUNDLE_PATH.read_text(encoding="utf-8"))
 _MKT = _BUNDLE["markets"][_BUNDLE["default_market"]]
 
 
-# ── (a) Invariant 2 — the default path selects no projection model ─────────────
+# ── (a) Factory defaults — journey A defaults to a projection method (2026-09-24) ──
+# Phase 6 Invariant 2 ("the default path selects no projection model") was retired when the
+# default switched to WhyWatt Conservative (post-Phase-7, branch feat/default-projection-method).
 
-def test_factory_default_selects_no_projection_model():
+def test_factory_default_is_whywatt_conservative():
     from ui import config
     d = config.factory_defaults()
-    for key in ("elec_rate_model_a", "elec_rate_model_b",
-                "gas_rate_model_a", "gas_rate_model_b"):
-        assert d[key] not in PROJECTION_MODELS, (
-            f"factory default {key}={d[key]!r} is a projection model — would move the golden")
+    assert d["elec_rate_model_a"] == "whywatt_conservative"
+    assert d["gas_rate_model_a"] == "whywatt_conservative"
+    assert d["elec_rate_model_a"] in PROJECTION_MODELS
 
 
-def test_default_rate_models_untouched():
-    """The exact legacy defaults (the golden gate lives in test_regression.py)."""
+def test_default_comparison_models_untouched():
+    """Scenario B's defaults (used only in comparison mode) stay on the legacy ACC engine."""
     from ui import config
     d = config.factory_defaults()
-    assert d["elec_rate_model_a"] == "cagr_flat"
-    assert d["gas_rate_model_a"] == "cagr_flat"
     assert d["elec_rate_model_b"] == "acc_shaped"
     assert d["gas_rate_model_b"] == "acc_seasonal"
 

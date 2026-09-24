@@ -217,14 +217,14 @@ share it.
 
 Projection Method — how prices grow over the years; each scenario picks its own.
 
-- WhyWatt Conservative / Moderate / Stress, or EIA Pacific (the federal outlook). The chosen
+- WhyWatt Conservative (the default) / Moderate / Stress, or EIA Pacific (the federal outlook). The chosen
   curve is used only for its shape: your current rate is multiplied by how much the curve
   rises (or falls) from the year your rate is valid for. A plan that took effect in 2026 is
   scaled back to a 2025 start by the curve's 2025/2026 ratio. After 2050 the curve holds its
   2050 value. The WhyWatt curves are built for PG&E; elsewhere they are a PG&E-based stand-in.
   More reference curves are under Details.
 - Fixed %/yr methods (Details dropdown), each with an escalation slider:
-  - My Utility (today's default): your utility's EIA 2024 effective rate — total residential
+  - My Utility (the default until September 2026): your utility's EIA 2024 effective rate — total residential
     revenue divided by total residential energy — grown at a fixed rate.
   - California average: the statewide blended rate, grown at a fixed rate.
   - ACC-shaped (electricity) or ACC-seasonal (gas): the CPUC Avoided Cost Calculator rate

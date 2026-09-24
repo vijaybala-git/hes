@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "name": "01_pge_no_solar",
-  "description": "PG&E 95112 \u2014 full electrification journey, no solar",
+  "description": "PG&E 95112 — full electrification journey, no solar · My Utility (EIA per-utility × fixed %/yr) pinned — the pre-2026-09-24 default; covers the cagr_flat path and its %/yr offsets",
   "based_on": "whywatt_default",
   "values": {
     "dryer_swap_planned": true,
@@ -11,6 +11,8 @@
     "social_climate_enabled": true,
     "social_health_enabled": true,
     "gasoline_climate_enabled": true,
-    "gasoline_health_enabled": true
+    "gasoline_health_enabled": true,
+    "elec_rate_model_a": "cagr_flat",
+    "gas_rate_model_a": "cagr_flat"
   }
 }
