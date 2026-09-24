@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "name": "23_pge_ev2_cons_b",
+  "description": "PG&E 95112 \u2014 URDB EV2 \u00d7 WhyWatt Conservative (elec + gas) \u2014 journey B: HVAC + water heater swaps, no solar",
+  "based_on": "whywatt_default",
+  "values": {
+    "elec_rate_model_a": "whywatt_conservative",
+    "gas_rate_model_a": "whywatt_conservative",
+    "elec_tariff_label": "69de78ffe547dde41109edfe",
+    "social_climate_enabled": true,
+    "social_health_enabled": true,
+    "gasoline_climate_enabled": true,
+    "gasoline_health_enabled": true
+  }
+}

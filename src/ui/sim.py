@@ -546,7 +546,40 @@ def extract_metrics(model, df) -> dict:
             "baseline_fuel": b["fuel"],
         }
 
-    return {"cockpit": cockpit, "gasoline": gasoline, "devices": devices}
+    # Rates + battery (Phase 7): which plan / projection priced the run, so a silent fallback
+    # (e.g. an unknown tariff label → the utility default) changes the snapshot.
+    import numpy as _np
+    from dispatch import battery_mode_summary
+    rs, esc = model.rate_structure_a, model.rate_escalation_a
+    jh = model.journey_home
+    rates = {
+        "elec_model": model.elec_rate_model_a,
+        "gas_model": model.gas_rate_model_a,
+        "elec_priced_by": (f"URDB {rs.family}" if rs is not None else "flat"),
+        # the current energy rate — used only by projection methods (None under legacy modes)
+        "elec_start": (model.starting_rate_elec.label
+                       if model.elec_rate_model_a in PROJECTION_LABELS else None),
+        "gas_start": (model.starting_rate_gas.label
+                      if model.gas_rate_model_a in PROJECTION_LABELS else None),
+        "elec_y1_mean": round(float(_np.mean(model.elec_rates[0])), 4),
+        "elec_final_mean": round(float(_np.mean(model.elec_rates[-1])), 4),
+        "gas_y1_mean": round(float(_np.mean(model.gas_rates[0])), 4),
+        "gas_final_mean": round(float(_np.mean(model.gas_rates[-1])), 4),
+        "elec_escalation_final": (round(float(esc[-1]), 4) if esc is not None else None),
+        "journey_final_elec_bill": (round(jh.home_elec_bill_history[-1])
+                                    if jh.home_elec_bill_history
+                                    and jh.home_elec_bill_history[-1] is not None else None),
+    }
+    solar_on = bool(jh.solar_production_kwh_history and jh.solar_production_kwh_history[-1] > 0)
+    battery = {
+        "final_mode": (battery_mode_summary(jh.battery_mode_history[-1])
+                       if solar_on and jh.battery_mode_history[-1] else None),
+        "final_discharge_kwh": round(jh.battery_discharge_history[-1], 1) if solar_on else 0.0,
+        "final_export_kwh": round(jh.solar_exported_kwh_history[-1], 1) if solar_on else 0.0,
+    }
+
+    return {"cockpit": cockpit, "gasoline": gasoline, "devices": devices,
+            "rates": rates, "battery": battery}
 
 
 __all__ = ["_APP_CLIMATE_LOADER", "_TREND_LABELS", "_climate_info", "_APP_RATE_RESOLVER",

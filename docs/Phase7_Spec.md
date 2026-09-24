@@ -1118,7 +1118,11 @@ tests/
 ## Post-Phase-7 (separate efforts, not gating close)
 
 - **Default → a projection method** with the URDB current energy rate (own golden diff, §5); then
-  reinterpret CA Average / ACC as pure % projections and drop My Utility (§4.1 round 2).
+  reinterpret CA Average / ACC as pure % projections and drop My Utility (§4.1 round 2). Intended
+  target (2026-09-23): **WhyWatt Conservative + PG&E E-TOU-C + solar + battery** — already tracked
+  as regression case 13 (and 13–28 cover all PG&E plans × the four projections). **Review first:**
+  Conservative's gas curve is the CEC spiral (×13 by 2044, PG&E gas ≈ $35/therm) — the do-nothing
+  home costs $247k over 20 yr vs $132k under My Utility and $98k under EIA Pacific.
 - **§5 extensions:** whether the projection drives the gas social-cost overlay (the NEM export
   path is settled — hourly ACC, issue 12).
 - **SCE re-harvest** — SCE's URDB TOU-D-4-9PM record is quarantined ($0.33 summer on-peak vs

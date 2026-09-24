@@ -23,7 +23,7 @@ import run_regression as R
 
 @pytest.fixture(scope="module")
 def results():
-    """Run the 12 base cases + 24 trend offsets ONCE for the whole module."""
+    """Run every base case + trend offset ONCE for the whole module."""
     base = R.run_all_base()
     trends = R.run_trends(base)
     return base, trends

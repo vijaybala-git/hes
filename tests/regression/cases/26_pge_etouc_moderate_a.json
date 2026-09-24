@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "name": "26_pge_etouc_moderate_a",
+  "description": "PG&E 95112 \u2014 URDB E-TOU-C (default plan) \u00d7 WhyWatt Moderate (elec + gas) \u2014 journey A: full journey + solar + battery (projection set)",
+  "based_on": "whywatt_default",
+  "values": {
+    "dryer_swap_planned": true,
+    "cooktop_swap_planned": true,
+    "ev_swap_planned": true,
+    "panel_amps": 200,
+    "solar_planned": true,
+    "elec_rate_model_a": "whywatt_moderate",
+    "gas_rate_model_a": "whywatt_moderate",
+    "elec_tariff_label": "",
+    "social_climate_enabled": true,
+    "social_health_enabled": true,
+    "gasoline_climate_enabled": true,
+    "gasoline_health_enabled": true
+  }
+}

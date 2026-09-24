@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "name": "E-TOU-C: Moderate vs Conservative projection",
+  "base": "25_pge_etouc_conservative_a",
+  "description": "Trend offset on 25_pge_etouc_conservative_a: faster rate growth (Moderate) raises both homes' costs and the final-year rates",
+  "values": {
+    "elec_rate_model_a": "whywatt_moderate",
+    "gas_rate_model_a": "whywatt_moderate"
+  },
+  "expect": {
+    "cockpit.baseline_cumulative_opex": "+",
+    "cockpit.journey_cumulative_opex": "+",
+    "rates.elec_final_mean": "+",
+    "rates.gas_final_mean": "+"
+  }
+}

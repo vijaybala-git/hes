@@ -4,9 +4,10 @@ Runs every case in tests/regression/cases/ through the REAL headless pipeline
 (ui.sim.run_simulation), snapshots the user-visible numbers (ui.sim.extract_metrics),
 and:
 
-  • compares the 12 base cases against the committed golden.json (exact at the rounded
-    precision — zero tolerance, per Regression_Test_Spec); and
-  • runs the 24 trend offsets and checks each moved its metric in the PREDICTED direction
+  • compares every base case (tests/regression/cases/, 28 as of Phase 7) against the committed
+    golden.json (exact at the rounded precision — zero tolerance, per Regression_Test_Spec); and
+  • runs the trend offsets (tests/regression/offsets/) and checks each moved its metric in the
+    PREDICTED direction
     (a metamorphic / "trend" check that survives golden re-blessing).
 
 Layering (per the user's decisions):
@@ -101,7 +102,7 @@ def get_metric(metrics: dict, dotted: str):
 
 
 def run_all_base() -> dict:
-    """Run the 12 base cases → {case_stem: metrics}."""
+    """Run every base case → {case_stem: metrics}."""
     return {stem: run_values(env["values"]) for stem, env in discover_cases().items()}
 
 

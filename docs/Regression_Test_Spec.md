@@ -153,6 +153,32 @@ Tricky additions (each exercises a distinct code path the base set misses):
 > Highest priority if trimming: **7 (panel), 8 (ACC), 9 (baseline)** — cheap, and they cover
 > the cockpit's riskiest numbers.
 
+### Phase 7 — PG&E URDB plans × projections (cases 13–28, added 2026-09-23)
+
+Every case: PG&E 95112, electricity **and** gas on a projection method, the URDB plan as the
+current energy rate (`elec_tariff_label`; "" = the default E-TOU-C), social toggles pinned on.
+**Journey A** = full journey + solar + battery (Powerwall 3 defaults); **Journey B** = the factory
+plan (HVAC + water-heater swaps), no solar.
+
+| # | Cases | What it locks |
+|---|-------|---------------|
+| 13–18 | Journey A × each PG&E plan (E-TOU-C, E-TOU-D, E-ELEC, EV, EV2, E-1) × WhyWatt Conservative | per-plan tiers / peak windows / fixed charge through the hourly battery dispatch (E-ELEC, EV, EV2 pick Cost-saving in winter). **13 = the intended post-Phase-7 default** (Conservative + E-TOU-C + solar + battery) |
+| 19–24 | Journey B × the same six plans × Conservative | the URDB home bill without solar / battery |
+| 25–28 | Journey A × E-TOU-C × {Conservative, Moderate, Stress, EIA Pacific} | the projection index on a URDB plan (anchor 2026, back-scaled to 2025) and on the EIA gas start |
+
+Trend offsets on 25: Moderate and Stress each raise journey + baseline cost and the final-year
+electricity and gas rates (`25__moderate_vs_conservative`, `25__stress_vs_conservative`).
+
+New snapshot blocks (every case): `rates` — models, `elec_priced_by` ("URDB E-TOU-C" | "flat"),
+current energy rate labels (projection methods only), year-1 / final-year mean rates, the
+escalation index, the journey's final-year electric bill; `battery` — final-year mode summary,
+energy supplied, export. A silent fallback (e.g. an unknown plan label → the default plan)
+therefore changes the snapshot.
+
+Note (2026-09-23): WhyWatt Conservative is conservative for **electricity** (≈ flat) but its gas
+curve is the CEC-based spiral (×13 by 2044 — PG&E gas ≈ $35/therm); do-nothing costs in 13–28
+reflect that. Review before making Conservative the factory default.
+
 ### Extended set (run less often / full regression)
 - NEM 2.0 solar (vs the default NBT/NEM 3 export path)
 - Climate trend RCP 8.5 (HDD/CDD trajectory → HVAC drifts across years)
