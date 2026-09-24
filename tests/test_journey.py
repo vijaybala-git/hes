@@ -907,10 +907,11 @@ def test_solar_battery_split_decomposes_and_round_trips():
     sbc = SolarBatteryConfig(panels=12, kw_per_panel=0.50,
                              battery_enabled=False, battery_kwh=10.0,
                              nem_mode="nem2", nbc=0.03, round_trip_eff=0.85,
-                             power_kw=7.0, grid_charging=False)
+                             charge_kw=7.0, discharge_kw=9.0, grid_charging=False)
     assert sbc.solar == SolarConfig(panels=12, kw_per_panel=0.50, nem_mode="nem2", nbc=0.03)
     assert sbc.battery == BatteryConfig(battery_enabled=False, battery_kwh=10.0,
-                                        round_trip_eff=0.85, power_kw=7.0, grid_charging=False)
+                                        round_trip_eff=0.85, charge_kw=7.0, discharge_kw=9.0,
+                                        grid_charging=False)
     assert sbc.battery.params().cap_kwh == 0.0          # switched off → no capacity
     assert sbc.solar.system_kw == 12 * 0.50
     # from_parts rebuilds an equal shim

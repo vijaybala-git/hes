@@ -69,8 +69,8 @@ def check_identities(d, G, L, b: BatteryParams):
     assert np.allclose(L, d.solar_direct + d.discharge + d.grid_to_home, atol=TOL)
     for arr in (d.solar_direct, d.charge_solar, d.charge_grid, d.discharge, d.export, d.grid_to_home):
         assert (arr >= -TOL).all()
-    assert (d.charge_solar + d.charge_grid <= b.power_kw + TOL).all()
-    assert (d.discharge <= b.power_kw + TOL).all()
+    assert (d.charge_solar + d.charge_grid <= b.charge_kw + TOL).all()
+    assert (d.discharge <= b.discharge_kw + TOL).all()
     stored_in = (d.charge_solar.sum() + d.charge_grid.sum()) * b.round_trip_eff
     assert stored_in == pytest.approx(d.discharge.sum(), abs=1e-6)      # steady state + η
     if b.cap_kwh == 0:
@@ -101,8 +101,8 @@ def lp_optimum(G, L, b: BatteryParams, peak_hours, r_peak, r_off):
         A_eq.append(row); b_eq.append(0.0)
     A_ub, b_ub = [], []
     for h in range(H):
-        row = np.zeros(nv); row[[idx(1, h), idx(2, h)]] = 1; A_ub.append(row); b_ub.append(b.power_kw)
-        row = np.zeros(nv); row[idx(3, h)] = 1; A_ub.append(row); b_ub.append(b.power_kw)
+        row = np.zeros(nv); row[[idx(1, h), idx(2, h)]] = 1; A_ub.append(row); b_ub.append(b.charge_kw)
+        row = np.zeros(nv); row[idx(3, h)] = 1; A_ub.append(row); b_ub.append(b.discharge_kw)
     bounds = [(0, None)] * (6 * H) + [(0, b.cap_kwh)] * H
     if not b.grid_charging:
         for h in range(H):
@@ -192,3 +192,52 @@ def test_unknown_mode_rejected():
     G, L = home(2.0, 0, False)
     with pytest.raises(ValueError):
         dispatch_month(G, L, BatteryParams(13.5), days=31, mode="greedy")
+
+
+# ── Powerwall 3 defaults + separate charge / discharge limits (Phase 7 §2) ───────
+
+def test_defaults_are_the_powerwall3_datasheet_everywhere():
+    """battery_defaults.json (datasheet) == BatteryConfig defaults == UI factory config."""
+    import json
+    from pathlib import Path
+    from journey import BatteryConfig
+    root = Path(__file__).parent.parent
+    doc = json.loads((root / "data/appliances/battery_defaults.json").read_text(encoding="utf-8"))
+    pw3 = doc["models"][doc["default_model"]]
+    assert doc["default_model"] == "tesla_powerwall_3"
+    assert (pw3["usable_kwh"], pw3["round_trip_eff"], pw3["charge_kw"], pw3["discharge_kw"]) \
+        == (13.5, 0.89, 5.0, 11.5)
+    b = BatteryConfig()
+    assert (b.battery_kwh, b.round_trip_eff, b.charge_kw, b.discharge_kw) \
+        == (pw3["usable_kwh"], pw3["round_trip_eff"], pw3["charge_kw"], pw3["discharge_kw"])
+    ui = json.loads((root / "data/config/whywatt_default.json").read_text(encoding="utf-8"))
+    ui = ui.get("values", ui)
+    assert ui["solar_battery_kwh"] == pw3["usable_kwh"]
+    assert ui["solar_battery_rte_pct"] == round(pw3["round_trip_eff"] * 100)
+    assert ui["solar_battery_charge_kw"] == pw3["charge_kw"]
+    assert ui["solar_battery_discharge_kw"] == pw3["discharge_kw"]
+
+
+def test_charge_and_discharge_limits_bind_separately():
+    """A 10 kWh surplus hour charges at most charge_kw; a 10 kWh evening need is met up to
+    discharge_kw — the two limits are independent."""
+    G = np.zeros(24); G[12] = 10.0
+    L = np.zeros(24); L[19] = 10.0
+    b = BatteryParams(cap_kwh=20.0, round_trip_eff=1.0, charge_kw=3.0, discharge_kw=8.0)
+    d = run_day(G, L, b, "self")
+    assert d.charge_solar[12] == pytest.approx(3.0)
+    assert d.discharge[19] == pytest.approx(3.0)          # only 3 kWh stored
+    G[11] = 10.0                                          # two surplus hours → 6 kWh stored
+    d = run_day(G, L, b, "self")
+    assert d.discharge[19] == pytest.approx(6.0)
+    L[19] = 20.0
+    G[10] = G[9] = 10.0                                   # plenty stored → discharge cap binds
+    d = run_day(G, L, b, "self")
+    assert d.discharge[19] == pytest.approx(8.0)
+
+
+def test_old_power_kw_share_links_migrate():
+    from ui import config
+    clean, warn = config.sanitize({"solar_battery_power_kw": 7.0})
+    assert clean["solar_battery_charge_kw"] == clean["solar_battery_discharge_kw"] == 7.0
+    assert any("renamed" in w for w in warn)

@@ -1,0 +1,27 @@
+{
+  "_meta": {
+    "schema_version": 1,
+    "built": "2026-09-23",
+    "built_by": "scripts/build_battery_defaults.py",
+    "role": "default home battery for the Phase 7 energy balance (§2)",
+    "source_url": "https://energylibrary.tesla.com/docs/Public/EnergyStorage/Powerwall/3/Datasheet/en-us/Powerwall-3-Datasheet.pdf",
+    "source_sha256": "051a791aad83910e269cf727499007f170769cc4a4118cee2f0472c05d5e377b",
+    "datasheet_edition": 2025,
+    "notes": {
+      "round_trip_eff": "Solar → battery → home/grid, 25 °C, beginning of life, 3.3 kW; applied as √η on charge and on discharge",
+      "discharge_kw": "highest nominal on-grid output rating (5.8 / 7.6 / 10 / 11.5)",
+      "charge_kw": "Maximum continuous charge, Powerwall 3 only (8 kW with expansion units) — the datasheet's only charge rating",
+      "not_modelled": "Solar → home/grid inverter efficiency 97.5% (PVWatts system losses already cover the inverter); degradation"
+    }
+  },
+  "default_model": "tesla_powerwall_3",
+  "models": {
+    "tesla_powerwall_3": {
+      "label": "Tesla Powerwall 3",
+      "usable_kwh": 13.5,
+      "round_trip_eff": 0.89,
+      "charge_kw": 5.0,
+      "discharge_kw": 11.5
+    }
+  }
+}

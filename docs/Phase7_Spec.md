@@ -5,7 +5,9 @@ data through the model. (Adopting the WhyWatt projection as the *default* moved 
 **Follows:** Phase 6 (`docs/Phase6_Spec.md`) — Solar/Battery split, inert roof-geometry inputs, and
 the **non-default `cec_projection` rate hand-off interface** (evaluated but not switched). Offline
 PVWatts/URDB data is harvested and validated separately in `docs/OfflineSolarData_Plan.md`.
-**Last updated:** 2026-09-23 — **Municipal utilities resolved** (issue 6: SMUD, LADWP, SVP, Palo
+**Last updated:** 2026-09-23 — **Powerwall 3 battery defaults** (13.5 kWh, 89%, 5 kW charge /
+11.5 kW discharge; golden +$242–295 on solar cases, all from the efficiency). Earlier —
+**Municipal utilities resolved** (issue 6: SMUD, LADWP, SVP, Palo
 Alto… priced at their own EIA rate; SF → PG&E; golden unchanged). Earlier — **U2 landed** (UI: utilities in Home Profile, Current Energy Rate +
 Projection Method cards, fixed-%/yr dropdown; golden unchanged). Earlier — **NEM 3.0 export credit fixed** (issue 12: hourly ACC 2024 values
 by calendar year; golden re-baselined, solar cases only). Earlier — **U1 landed** (current energy rate × projection growth; EIA 2025
@@ -144,7 +146,7 @@ mode[m]   = argmin(bill_self, bill_cost)        # tie → Self-powered
 - Both modes share: **steady state** (the day is run twice, the second pass kept, so start- and
   end-of-day charge match); **battery parameters** `cap = battery_kwh` (usable), `η` round-trip
   efficiency (√η on charge and on discharge), charge / discharge power caps — defaults from the
-  **Tesla Powerwall 3** datasheet (§2: 13.5 kWh, 89%, 11.5 kW out; landed code still 0.90 / 5 kW);
+  **Tesla Powerwall 3** datasheet (§2: 13.5 kWh, 89%, 5 kW in, 11.5 kW out);
   no battery → `cap = 0` and both modes reduce to solar → home → export.
 - **Outputs per month:** `mode`, `direct`, `battery_charge_solar`, `battery_charge_grid`,
   `discharge`, `export`, `grid[h]` (24-vector). `grid[h]` is what §3 prices; `export` earns the
@@ -316,8 +318,8 @@ to devices — **this changes no total, dispatch, or physics**. Convention:
   slider and its 80/35 battery snap (`src/ui/panels.py`, `state.py`, `config.py`, `layout.py`,
   `sim.py`), and `solar_scf` from `whywatt_default.json`; stale share-link values are dropped.
 - **Battery config becomes live physics:** `BatteryConfig(battery_enabled, battery_kwh,
-  round_trip_eff, power_kw, grid_charging=True)`. `battery_enabled=False` ⇒ `cap = 0`. *(Landed in
-  commit C with placeholder defaults 0.90 / 5 kW.)*
+  round_trip_eff, charge_kw, discharge_kw, grid_charging=True)`. `battery_enabled=False` ⇒
+  `cap = 0`. *(Commit C landed placeholder defaults 0.90 / 5 kW; Powerwall 3 values since.)*
 - **Battery defaults = Tesla Powerwall 3 (decided 2026-09-23 — the most common home battery in the
   Bay Area today).** Harvest the datasheet into `data/appliances/battery_defaults.json` with
   provenance (source URL, sha256, datasheet year); the PDF itself is not committed.
@@ -335,6 +337,18 @@ to devices — **this changes no total, dispatch, or physics**. Convention:
   Model change: split `power_kw` into `charge_kw` (5) and `discharge_kw` (11.5); `round_trip_eff`
   0.89. With a 24-point hourly day the 11.5 kW discharge cap rarely binds. This moves battery cases
   → **its own golden-diff commit** (small, explained), the one planned output change left in Phase 7.
+
+  **Landed 2026-09-23.** `scripts/build_battery_defaults.py` parses the datasheet PDF (cached in
+  `scripts/downloads/`, not committed) → `data/appliances/battery_defaults.json` (URL, sha256,
+  2025 edition). `src/battery_defaults.py` feeds `BatteryConfig` / the shim defaults;
+  `whywatt_default.json` carries the same values (a test keeps them equal). `BatteryParams` has
+  `charge_kw` (solar + grid charging together) and `discharge_kw`; UI "Charge kW" / "Discharge
+  kW" inputs; old `solar_battery_power_kw` links migrate to both (`config.RENAMED_KEYS`).
+  **Golden:** journey opex +$295 / +$293 / +$242 over the horizon (cases 02 / 04 / 06) — all of
+  it from 90% → 89% efficiency (case 02: battery losses 7,960 → 8,818 kWh); the 11.5 kW
+  discharge limit changes nothing (the representative-day load never needs > 5 kW from the
+  battery). 37 trend moves correct; tests in `test_battery.py` (defaults everywhere equal,
+  limits bind separately, link migration).
 - **Dispatch is one pure function**, `dispatch_month(G, L, peak_hours, rates, battery, mode)` with
   `mode ∈ {"self", "cost", "auto"}` (`"auto"` = run both, keep the cheaper — what the model uses).
   Pure and deterministic (arrays in, flows out) so tests can run each mode on its own. The
@@ -1007,8 +1021,8 @@ tests/
 - [x] URDB `RateStructure` consumed: `period_fractions` split via real per-tariff peak hours,
       `price_month` slabs on the home aggregate, coverage gate + ZIP→baseline resolved.
       *(§3, 2026-09-23 — as the interim `urdb_tou` option; SCE quarantined)*
-- [ ] Battery defaults = Tesla Powerwall 3 (harvested with provenance; charge/discharge caps split);
-      own golden diff.
+- [x] Battery defaults = Tesla Powerwall 3 (harvested with provenance; charge/discharge caps split);
+      own golden diff. *(2026-09-23)*
 - [ ] **PG&E area fully working** end-to-end as a selectable choice (URDB plan × WhyWatt curve
       growth, §4.1); non-PG&E areas default to EIA — Pacific growth with WhyWatt selectable; ZIPs
       without a URDB price start from `starting_rates.json`; all CA ZIPs degrade gracefully.

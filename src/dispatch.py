@@ -44,7 +44,8 @@ _TOL = 1e-10
 class BatteryParams:
     cap_kwh: float = 0.0          # usable capacity; 0 = no battery
     round_trip_eff: float = 0.90
-    power_kw: float = 5.0         # charge / discharge limit (kWh per hour)
+    charge_kw: float = 5.0        # charge limit (kWh per hour) — solar + grid together
+    discharge_kw: float = 5.0     # discharge limit (kWh per hour)
     grid_charging: bool = True    # cost-saving mode may top up from the grid when it pays
 
 
@@ -108,9 +109,9 @@ def _self_day(G, L, b: BatteryParams, soc0: float) -> DayFlows:
     for h in range(HOURS):
         direct = min(G[h], L[h])
         surplus, deficit = G[h] - direct, L[h] - direct
-        charge = min(surplus, max(b.cap_kwh - soc, 0.0) / sq, b.power_kw) if b.cap_kwh else 0.0
+        charge = min(surplus, max(b.cap_kwh - soc, 0.0) / sq, b.charge_kw) if b.cap_kwh else 0.0
         soc += charge * sq
-        discharge = min(deficit, soc * sq, b.power_kw) if b.cap_kwh else 0.0
+        discharge = min(deficit, soc * sq, b.discharge_kw) if b.cap_kwh else 0.0
         soc -= discharge / sq
         f.solar_direct[h], f.charge_solar[h], f.export[h] = direct, charge, surplus - charge
         f.discharge[h], f.grid_to_home[h] = discharge, deficit - discharge
@@ -128,21 +129,21 @@ def _cost_day(G, L, b: BatteryParams, peak: np.ndarray, reserve: float,
         if peak[h]:
             direct = min(G[h], L[h])
             surplus, deficit = G[h] - direct, L[h] - direct
-            discharge = min(deficit, soc * sq, b.power_kw)
+            discharge = min(deficit, soc * sq, b.discharge_kw)
             soc -= discharge / sq
-            charge = min(surplus, max(b.cap_kwh - soc, 0.0) / sq, b.power_kw)
+            charge = min(surplus, max(b.cap_kwh - soc, 0.0) / sq, b.charge_kw)
             soc += charge * sq
             f.solar_direct[h], f.charge_solar[h], f.export[h] = direct, charge, surplus - charge
             f.discharge[h], f.grid_to_home[h] = discharge, deficit - discharge
             continue
         # off-peak: solar fills the battery up to the reserve first, then serves the home
-        first = min(G[h], max(reserve - soc, 0.0) / sq, b.power_kw)
+        first = min(G[h], max(reserve - soc, 0.0) / sq, b.charge_kw)
         soc += first * sq
         direct = min(G[h] - first, L[h])
         leftover = G[h] - first - direct
-        more = min(leftover, max(b.cap_kwh - soc, 0.0) / sq, b.power_kw - first)
+        more = min(leftover, max(b.cap_kwh - soc, 0.0) / sq, b.charge_kw - first)
         soc += more * sq
-        grid_in = min(grid_plan[h], max(b.cap_kwh - soc, 0.0) / sq, b.power_kw - first - more)
+        grid_in = min(grid_plan[h], max(b.cap_kwh - soc, 0.0) / sq, b.charge_kw - first - more)
         grid_in = max(grid_in, 0.0)
         soc += grid_in * sq
         f.solar_direct[h], f.charge_solar[h] = direct, first + more
@@ -176,7 +177,7 @@ def run_day(G, L, battery: BatteryParams, mode: str, peak_hours: Sequence[int] =
 
     peak = _peak_mask(peak_hours)
     sq = np.sqrt(battery.round_trip_eff)
-    need = np.minimum(np.maximum(L - G, 0.0), battery.power_kw)[peak].sum()
+    need = np.minimum(np.maximum(L - G, 0.0), battery.discharge_kw)[peak].sum()
     reserve = min(battery.cap_kwh, need / sq)
     grid_ok = (battery.grid_charging and peak.any()
                and battery.round_trip_eff * r_peak > r_offpeak)
@@ -193,7 +194,7 @@ def run_day(G, L, battery: BatteryParams, mode: str, peak_hours: Sequence[int] =
                 break
             need_in = short / sq
             for h in range(start - 1, -1, -1):                    # latest hour first
-                room = battery.power_kw - day.charge_solar[h] - plan[h]
+                room = battery.charge_kw - day.charge_solar[h] - plan[h]
                 add = min(max(room, 0.0), need_in)
                 plan[h] += add
                 need_in -= add

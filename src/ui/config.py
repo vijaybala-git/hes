@@ -137,6 +137,10 @@ _LEGACY_RATE_MODELS = {"cagr_flat", "ca_average", "acc_shaped", "acc_seasonal"}
 # cec_iepr must not be accepted on a gas slot from a shared link, and vice versa).
 from projected_rate_source import PROJECTION_ELEC_MODELS, PROJECTION_GAS_MODELS
 _ELEC_RATE_MODELS = _LEGACY_RATE_MODELS | set(PROJECTION_ELEC_MODELS)
+# Renamed keys → their replacements (value copied to each). Phase 7 §2: the battery's single
+# power limit split into charge and discharge limits (Powerwall 3: 5 kW / 11.5 kW).
+RENAMED_KEYS = {"solar_battery_power_kw": ("solar_battery_charge_kw",
+                                           "solar_battery_discharge_kw")}
 # Retired rate-model values → replacement (Phase 7 §4.1). `urdb_tou` was a rate *source*; the
 # URDB plan is now the current energy rate of every projection method. Old links migrate.
 RETIRED_VALUES = {
@@ -211,7 +215,8 @@ RANGES = {
     "cooktop_induction_kwh_per_meal": (0.0, 20.0), "cooktop_meals_per_week": (0, 100),
     "solar_panels": (0, 200), "solar_kw_per_panel": (0.05, 2.0),
     "solar_battery_kwh": (0.0, 200.0), "solar_nbc": (0.0, 1.0),
-    "solar_battery_rte_pct": (50, 100), "solar_battery_power_kw": (0.5, 50.0),
+    "solar_battery_rte_pct": (50, 100), "solar_battery_charge_kw": (0.5, 50.0),
+    "solar_battery_discharge_kw": (0.5, 50.0),
     "elec_cagr_pct_a": _PCT, "acc_elec_cagr_a": _PCT, "gas_cagr_pct_a": _PCT, "acc_gas_cagr_a": _PCT,
     "elec_cagr_pct_b": _PCT, "acc_elec_cagr_b": _PCT, "gas_cagr_pct_b": _PCT, "acc_gas_cagr_b": _PCT,
     "social_climate_rate": (0.0, 100.0), "social_health_rate": (0.0, 100.0),
@@ -242,6 +247,13 @@ def sanitize(values: dict) -> tuple[dict, list[str]]:
 
     base = factory_defaults()
     clean: dict = {}
+    values = dict(values)
+    for old, new_keys in RENAMED_KEYS.items():          # old share links (Phase 7 §2)
+        if old in values:
+            v = values.pop(old)
+            for nk in new_keys:
+                values.setdefault(nk, v)
+            warnings.append(f"{old!r} renamed to {', '.join(map(repr, new_keys))}")
     for k, v in values.items():
         if k not in base:
             warnings.append(f"unknown key ignored: {k!r}"); continue

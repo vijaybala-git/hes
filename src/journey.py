@@ -7,6 +7,7 @@ from typing import Optional
 import mesa
 import numpy as np
 
+from battery_defaults import DEFAULT_BATTERY
 from dispatch import dispatch_month
 
 _DAYS_IN_MONTH = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
@@ -33,18 +34,20 @@ class SolarConfig:
 @dataclass
 class BatteryConfig:
     """Home battery — live physics in the hourly energy balance (Phase 7 §2)."""
+    # Defaults: Tesla Powerwall 3 datasheet (data/appliances/battery_defaults.json, §2).
     battery_enabled: bool  = True     # On by default — NEM 3.0 + battery is the new-install norm
-    battery_kwh:     float = 13.5     # usable capacity (one Powerwall-class unit)
-    round_trip_eff:  float = 0.90     # energy out / energy in (√η on charge and on discharge)
-    power_kw:        float = 5.0      # charge / discharge limit
+    battery_kwh:     float = DEFAULT_BATTERY["usable_kwh"]      # usable capacity
+    round_trip_eff:  float = DEFAULT_BATTERY["round_trip_eff"]  # out / in (√η each way)
+    charge_kw:       float = DEFAULT_BATTERY["charge_kw"]       # charge limit
+    discharge_kw:    float = DEFAULT_BATTERY["discharge_kw"]    # discharge limit
     grid_charging:   bool  = True     # Cost-saving mode may top up from the grid when it pays
 
     def params(self):
         """dispatch.BatteryParams for this battery (capacity 0 when switched off)."""
         from dispatch import BatteryParams
         return BatteryParams(cap_kwh=self.battery_kwh if self.battery_enabled else 0.0,
-                             round_trip_eff=self.round_trip_eff, power_kw=self.power_kw,
-                             grid_charging=self.grid_charging)
+                             round_trip_eff=self.round_trip_eff, charge_kw=self.charge_kw,
+                             discharge_kw=self.discharge_kw, grid_charging=self.grid_charging)
 
 
 @dataclass
@@ -58,11 +61,12 @@ class SolarBatteryConfig:
     panels:          int   = 15
     kw_per_panel:    float = 0.42
     battery_enabled: bool  = True
-    battery_kwh:     float = 13.5
+    battery_kwh:     float = DEFAULT_BATTERY["usable_kwh"]
     nem_mode:        str   = "nbt"
     nbc:             float = 0.025
-    round_trip_eff:  float = 0.90
-    power_kw:        float = 5.0
+    round_trip_eff:  float = DEFAULT_BATTERY["round_trip_eff"]
+    charge_kw:       float = DEFAULT_BATTERY["charge_kw"]
+    discharge_kw:    float = DEFAULT_BATTERY["discharge_kw"]
     grid_charging:   bool  = True
 
     @property
@@ -77,8 +81,8 @@ class SolarBatteryConfig:
     @property
     def battery(self) -> BatteryConfig:
         return BatteryConfig(battery_enabled=self.battery_enabled, battery_kwh=self.battery_kwh,
-                             round_trip_eff=self.round_trip_eff, power_kw=self.power_kw,
-                             grid_charging=self.grid_charging)
+                             round_trip_eff=self.round_trip_eff, charge_kw=self.charge_kw,
+                             discharge_kw=self.discharge_kw, grid_charging=self.grid_charging)
 
     @classmethod
     def from_parts(cls, solar: SolarConfig, battery: BatteryConfig) -> "SolarBatteryConfig":
@@ -86,8 +90,8 @@ class SolarBatteryConfig:
         return cls(panels=solar.panels, kw_per_panel=solar.kw_per_panel,
                    battery_enabled=battery.battery_enabled, battery_kwh=battery.battery_kwh,
                    nem_mode=solar.nem_mode, nbc=solar.nbc,
-                   round_trip_eff=battery.round_trip_eff, power_kw=battery.power_kw,
-                   grid_charging=battery.grid_charging)
+                   round_trip_eff=battery.round_trip_eff, charge_kw=battery.charge_kw,
+                   discharge_kw=battery.discharge_kw, grid_charging=battery.grid_charging)
 
 # Category constants shared across journey and model layers
 CATEGORY_ORDER  = ["Baseload", "WaterHeating", "HVAC_Cooling", "HVAC_Heating", "Transportation"]

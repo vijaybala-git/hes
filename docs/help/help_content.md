@@ -655,8 +655,10 @@ The export rate depends on your net-metering era:
 
 - Self-consumption is calculated, not entered. A gas home with little electric use
   exports most of its solar at first; as you electrify, more of it is used at home.
-- The battery loses about 10% of what it stores (90% round-trip efficiency) and charges or
-  discharges at up to 5 kW; both are adjustable under the battery settings.
+- The default battery is a Tesla Powerwall 3 — the most common home battery in the Bay Area —
+  using its datasheet values: 13.5 kWh usable, 89% round-trip efficiency (it loses about 11% of
+  what it stores), charging at up to 5 kW and discharging at up to 11.5 kW. All are adjustable
+  under the battery settings.
 - Yield assumes a typical roof system: fixed roof mount, 20° tilt, facing south, 14%
   losses. Across California it ranges from about 1,350 kWh per kW per year on the foggy
   north coast to about 1,840 in the desert; San José is about 1,640. Degradation,
@@ -671,9 +673,9 @@ The export rate depends on your net-metering era:
 - Kilowatts per panel — 0.42 (about a 6.3 kW system)
 - Yield — from your ZIP (San José area about 1,640 kWh per kW per year, so about
   10,350 kWh/yr for the default 6.3 kW system)
-- Battery storage — on, 13.5 kWh
-- Battery efficiency — 90% round trip; power — 5 kW; grid charging — on (used only when
-  it saves money)
+- Battery storage — on, 13.5 kWh (Tesla Powerwall 3)
+- Battery efficiency — 89% round trip; charge — 5 kW; discharge — 11.5 kW; grid charging — on
+  (used only when it saves money)
 - Net-metering mode — NEM 3.0 / NBT
 - Non-bypassable charge (NEM 2.0) — $0.025/kWh
 - Total installed cost — $30,000

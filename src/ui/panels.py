@@ -1626,8 +1626,10 @@ def SolarDetail(model):
                     if battery_on:
                         with solara.Column(style="width:80px; flex-shrink:0"):
                             solara.InputFloat("kWh", value=solar_battery_kwh)
-                        with solara.Column(style="width:70px; flex-shrink:0"):
-                            solara.InputFloat("kW", value=solar_battery_power_kw)
+                        with solara.Column(style="width:78px; flex-shrink:0"):
+                            solara.InputFloat("Charge kW", value=solar_battery_charge_kw)
+                        with solara.Column(style="width:88px; flex-shrink:0"):
+                            solara.InputFloat("Discharge kW", value=solar_battery_discharge_kw)
                         with solara.Column(style="width:70px; flex-shrink:0"):
                             solara.InputInt("Eff. %", value=solar_battery_rte_pct)
                     # Thin separator
@@ -1655,7 +1657,7 @@ def SolarDetail(model):
                            value=solar_battery_grid_charging)
                 solara.HTML(tag="div", unsafe_innerHTML=(
                     "<div style='font-size:0.73em; color:#888; margin-top:2px;'>"
-                    + ("Export: ACC avoided cost (~$0.06/kWh avg)" if nem == "nbt"
+                    + ("Export: hourly ACC value (midday solar ~$0.05/kWh, evening far more)" if nem == "nbt"
                        else f"Export: retail − ${solar_nbc.value:.3f}/kWh NBC")
                     + "</div>"
                 ))
