@@ -22,7 +22,9 @@ TWO residual drivers, one per fuel (docs/OfflineRateProjection_Plan.md §2.1 + t
       conservative → Pruning RR (curtail gas investment — managed decline)
       moderate     → Front Load RR (accelerated cost recovery)
       stress       → Flat RR (business-as-usual investment → death spiral)
-    Retail follows the CEC delivered-price shape rebased to WhyWatt's base; the residual is implied.
+    Retail = the CEC delivered price itself (BASE_RETAIL["gas"] is the CEC 2025 value in nominal $,
+    so BASE × index reproduces the CEC series exactly — no rebase since the 2026-09-24 gas-rate
+    base review); the residual is implied.
     The CEC scenario's own Revenue Requirement and Demand columns feed rr_index()/sales_index() —
     so the gas death spiral (RR ÷ FALLING demand) is real CEC data, not a preset.
     NOTE the tn=264063 delivered price is published in REAL 2024$ (its 'Commodity Prices' sheet is
@@ -44,11 +46,31 @@ from pathlib import Path
 
 from .escalation import segmented_path
 
-# Base-year retail anchors (URDB/tariff level, methodology §3.2). PG&E 2025, per CLAUDE.md.
-# NOTE: elec base is the E-1 schedule ($0.386); the CEC blended residential average is ~$0.408.
-# The electricity path follows the CEC *growth shape* rebased to this base (a ~6% level offset).
 BASE_YEAR = 2025
-BASE_RETAIL = {"elec": 0.386, "gas": 2.08}     # $/kWh, $/therm (nominal)
+_REPO_PROJECTION = Path(__file__).resolve().parents[2] / "data" / "rates" / "projection"
+_GAS_BASE_SCENARIO = "Planning Area Demand Front Load RR"   # all three share the 2025 value
+
+
+def cec_gas_base_nominal(data_dir: Path = _REPO_PROJECTION, year: int = BASE_YEAR) -> float:
+    """The CEC 2025 IEPR PG&E residential gas DELIVERED price for `year`, in nominal $/therm.
+
+    tn=264063 publishes real 2024$ ($2.5886 in 2025); × deflator(year) / deflator(2024) → $2.649.
+    Gas-rate base review (docs/GasRateBase_Review_Plan.md, option A): the gas curves follow the CEC
+    as published — no rebase. The old $2.08 "G-1" anchor was PG&E's CARE baseline schedule charge
+    without the public-purpose surcharge, ~20 % below what PG&E households pay.
+    """
+    d = Path(data_dir)
+    gas = json.loads((d / "cec_gas_rate.json").read_text(encoding="utf-8"))["scenarios"]
+    real = float(gas[_GAS_BASE_SCENARIO]["delivered"][str(year)])
+    defl = json.loads((d / "gdp_deflator.json").read_text(encoding="utf-8"))["deflator"]
+    return round(real * float(defl[str(year)]) / float(defl["2024"]), 6)
+
+
+# Base-year retail anchors (methodology §3.2), nominal.
+# elec — PG&E E-1 schedule ($0.386); the curve follows the CEC *growth shape* rebased to this base
+#   (CEC blended ~$0.408, EIA 2025 $0.399 — a ~3–6 % level offset; see the gas review plan §2.8).
+# gas  — the CEC delivered price itself (no rebase; gas-rate base review, 2026-09-24).
+BASE_RETAIL = {"elec": 0.386, "gas": cec_gas_base_nominal()}     # $/kWh, $/therm (nominal)
 
 # Scenarios. Electricity: a residual deviation around the CEC-driven central path (moderate = CEC
 # exactly). Gas: each maps to a CEC "Planning Area Demand" case on the RR-recovery axis.

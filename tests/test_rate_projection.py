@@ -146,10 +146,34 @@ def test_v2_gas_moderate_really_rises_in_real_terms(m):
 
 # ── V3 — backcast base anchor ─────────────────────────────────────────────────
 
-@pytest.mark.parametrize("fuel,expected", [("elec", 0.386), ("gas", 2.08)])
+@pytest.mark.parametrize("fuel,expected", [("elec", 0.386), ("gas", 2.64914)])
 def test_v3_backcast_base_anchor(m, fuel, expected):
-    """Base year reproduces the 2025 PG&E tariff by construction (plug auto-satisfies V3)."""
-    assert m.retail(fuel, "moderate")[m.base_year] == pytest.approx(expected, rel=1e-9)
+    """Base year reproduces the 2025 anchor by construction (plug auto-satisfies V3): electricity
+    the PG&E E-1 tariff; gas the CEC 2025 delivered price in nominal $ (gas-rate base review)."""
+    assert m.retail(fuel, "moderate")[m.base_year] == pytest.approx(expected, rel=1e-6)
+
+
+@pytest.mark.parametrize("scenario,cec", [("conservative", "Planning Area Demand Pruning RR"),
+                                          ("moderate", "Planning Area Demand Front Load RR"),
+                                          ("stress", "Planning Area Demand Flat RR")])
+def test_gas_curve_is_the_cec_delivered_price(m, scenario, cec):
+    """Option A of the gas-rate base review: no rebase — every year of every gas scenario equals
+    the CEC tn=264063 delivered price, real 2024$ inflated to nominal."""
+    src = json.loads((PROJ / "cec_gas_rate.json").read_text(encoding="utf-8"))["scenarios"][cec]
+    defl = json.loads((PROJ / "gdp_deflator.json").read_text(encoding="utf-8"))["deflator"]
+    r = m.retail("gas", scenario)
+    for y in range(2025, 2051):
+        nominal = src["delivered"][str(y)] * defl[str(y)] / defl["2024"]
+        assert r[y] == pytest.approx(nominal, rel=1e-5), y
+
+
+def test_gas_base_agrees_with_what_pge_households_pay():
+    """The curve's 2025 level (CEC delivered, nominal) is within 3 % of EIA-176's PG&E effective
+    residential rate carried to 2025 — the old $2.08 'G-1' anchor was ~20 % low (CARE baseline)."""
+    from rate_projection.projected_rate_model import BASE_RETAIL
+    eia = json.loads((PROJ.parent / "eia_rates_by_utility.json").read_text(encoding="utf-8"))
+    pge = eia["gas_ldcs"]["17610617"]["starting_rate"]["rate"]
+    assert BASE_RETAIL["gas"] == pytest.approx(pge, rel=0.03)
 
 
 # ── V4 — cross-fuel COP parity ────────────────────────────────────────────────

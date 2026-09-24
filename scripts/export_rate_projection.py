@@ -144,11 +144,16 @@ def main():
         "provider": "CEC-IOU",
         "geography": {"state": "CA", "area": "SF Bay Area / South Bay",
                       "climate_zone": "CZ4", "census_division": "Pacific (9)"},
-        "utilities": {"electric": "PG&E (E-1)", "gas": "PG&E (G-1)"},
+        "utilities": {"electric": "PG&E (E-1)", "gas": "PG&E residential (CEC delivered)"},
         "base_retail": {"elec": BASE_RETAIL["elec"], "gas": BASE_RETAIL["gas"]},
-        "base_retail_note": ("Anchored to the PG&E E-1/G-1 tariff. Scenario curves follow the CEC "
-                             "trajectory but sit ~7% below the CEC blended-residential line by this "
-                             "base choice, not a growth difference."),
+        "base_retail_note": ("Electricity: anchored to the PG&E E-1 tariff ($0.386); the curves "
+                             "follow the CEC trajectory but sit below the CEC blended-residential "
+                             "line by this base choice, not a growth difference. Gas: the CEC 2025 "
+                             "IEPR delivered price itself (tn=264063, real 2024$ inflated to "
+                             "nominal: $2.649/therm in 2025) — no rebase since the 2026-09-24 "
+                             "gas-rate base review (the former $2.08 'G-1' anchor was PG&E's CARE "
+                             "baseline charge). The live model uses only the curves' shape, scaled "
+                             "from each home's current rate."),
         "default_scenario": "moderate",
         "monthly_shape": {
             "note": ("ANNUAL rate levels. Apply the existing ACC monthly (seasonal) shape to "
