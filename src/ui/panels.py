@@ -443,27 +443,27 @@ def _device_classes(key: str, extra=()) -> list:
 @solara.component
 def PlanRow():
     """One-glance toggles for every device in the journey (§4.2 step 2)."""
-    with solara.Row(classes=["plan-row"], gap="6px",
-                    style="align-items:center; flex-wrap:wrap"):
+    with solara.Row(classes=["plan-row"], gap="8px", style="align-items:center; width:100%"):
         solara.HTML(tag="span", unsafe_innerHTML=(
-            "<span style='font-size:0.78em; font-weight:600; color:var(--ink-3,#6b7280);"
-            " margin-right:2px'>Plan:</span>"))
+            "<span style='font-size:0.86em; font-weight:600; color:var(--ink-3,#6b7280);"
+            " margin-right:2px; white-space:nowrap'>Plan:</span>"))
         for key, label, planned_rv, _state in _plan_items():
             st = plan_status(key)
-            base = ("border-radius:14px; padding:2px 10px; font-size:0.78em; min-width:0;"
-                    " letter-spacing:0; text-transform:none; height:26px;")
+            # size / stretch come from the .plan-pill CSS (layout.py): nine equal pills across
+            # the three card columns, wrapping to three per line on narrow screens
+            base = "border-radius:17px; letter-spacing:0; text-transform:none;"
             if st == "done":
-                solara.Button(f"✓ {label} · done", disabled=True,
+                solara.Button(f"✓ {label} · done", disabled=True, classes=["plan-pill"],
                               style=base + " background:#E8F5E9; color:#2E7D32;"
                                            " border:1px solid #A5D6A7;")
             elif st == "locked":
-                solara.Button(f"○ {label}", disabled=True,
+                solara.Button(f"○ {label}", disabled=True, classes=["plan-pill"],
                               style=base + " background:#F5F5F5; color:#B0BEC5;"
                                            " border:1px dashed #CFD8DC;")
             else:
                 on = st == "planned"
                 solara.Button(
-                    ("✓ " if on else "○ ") + label,
+                    ("✓ " if on else "○ ") + label, classes=["plan-pill"],
                     on_click=lambda rv=planned_rv: rv.set(not rv.value),
                     style=base + (" background:#3B6FD4; color:white; border:1px solid #3B6FD4;"
                                   if on else

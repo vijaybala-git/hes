@@ -1524,6 +1524,17 @@ def Page():
                 ".jgrid>.device.unplanned:hover,.jgrid>.device.unplanned:focus-within"
                 "{opacity:1}"
                 ".v-row.plan-row{margin:0!important}"
+                # nine equal pills across the full width of the three card columns
+                ".plan-row{flex-wrap:nowrap!important}"
+                ".plan-row>.v-btn.plan-pill{flex:1 1 0!important;min-width:0!important;"
+                "height:34px!important;padding:0 6px!important;font-size:0.86em!important;"
+                "font-weight:600!important}"
+                ".plan-row>.v-btn.plan-pill .v-btn__content{white-space:nowrap;overflow:hidden;"
+                "text-overflow:ellipsis;max-width:100%}"
+                "@media (max-width:1150px){.plan-row>.v-btn.plan-pill{padding:0 3px!important;"
+                "font-size:0.8em!important}}"
+                "@media (max-width:720px){.plan-row{flex-wrap:wrap!important}"
+                ".plan-row>.v-btn.plan-pill{flex:1 1 30%!important}}"
                 # collapse-all button: beat Vuetify .v-btn--default sizing
                 ".v-btn.collapse-all{height:26px!important;min-height:26px!important;"
                 "min-width:0!important;padding:0 9px!important}"
