@@ -26,6 +26,7 @@ from projected_rate_source import ProjectedRateSource, PROJECTION_LABELS, _bundl
 # rejects an untracked one even when small; an SVG is plain text, so it deploys as a normal
 # file, stays crisp, and renders in the guide's <img>.
 OUT = REPO / "public" / "help" / "rate_projection_curves.svg"
+REPORT_ASSETS = REPO / "docs" / "reports" / "assets"      # the rate-model impact report
 
 YEARS = list(range(2025, 2051))          # bundle horizon 2025-2050
 REAL_BASE = 2024                         # canonical reporting basis: real 2024$ (matches the CEC anchors)
@@ -94,18 +95,21 @@ def main():
             ax.set_yscale("log")
             ax.set_ylabel(_esc(unit + "  (log scale)"))
 
-    anchor = _esc(f"Anchored to the PG&E tariff (elec ${base['elec']:.3f}/kWh, "
-                  f"gas ${base['gas']:.2f}/therm at 2025). Real 2024$ (inflation removed). "
+    anchor = _esc(f"Elec: PG&E E-1 ${base['elec']:.3f}/kWh · gas: CEC delivered "
+                  f"${base['gas']:.2f}/therm (2025, nominal). Real 2024$. "
                   "Source: whywatt_rate_projection.json (CEC 2025 IEPR / EIA AEO).")
     fig.suptitle(_esc("WhyWatt projected retail rates — selectable rate models, 2025–2050 (real 2024$)"),
                  fontsize=12.5, fontweight="bold")
     fig.text(0.5, 0.005, anchor, ha="center", fontsize=7.5, color="#555")
     fig.tight_layout(rect=(0, 0.03, 1, 0.95))
 
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(OUT, format="svg", facecolor="white")
+    # The guide's copy + the impact report's copies (docs/reports/assets) — one source, no drift.
+    for out, fmt in ((OUT, "svg"), (REPORT_ASSETS / "rate_projection_curves.svg", "svg"),
+                     (REPORT_ASSETS / "rate_projection_curves.png", "png")):
+        out.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(out, format=fmt, facecolor="white", **({"dpi": 150} if fmt == "png" else {}))
+        print(f"wrote {out.relative_to(REPO)}")
     plt.close(fig)
-    print(f"wrote {OUT.relative_to(REPO)}")
 
 
 if __name__ == "__main__":

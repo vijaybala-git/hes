@@ -38,6 +38,10 @@ _HVAC_WH = {
     "hvac_swap_planned": True, "hvac_swap_year": 3,     # 2027
     "wh_swap_planned":   True, "wh_swap_year":   5,     # 2029
     "dryer_swap_planned": False, "cooktop_swap_planned": False, "ev_swap_planned": False,
+    # Social & Health costs default to OFF in the app since 2026-09-23; the report quotes the
+    # avoided social cost, so pin them on (as the regression cases do). Bills are unaffected.
+    "social_climate_enabled": True, "social_health_enabled": True,
+    "gasoline_climate_enabled": True, "gasoline_health_enabled": True,
 }
 SCENARIOS: dict[str, dict] = {
     "hvac2027_wh2029": {
