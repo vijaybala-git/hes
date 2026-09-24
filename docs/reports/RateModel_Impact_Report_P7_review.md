@@ -2,9 +2,12 @@
 
 > Re-run 2026-09-24 on branch `fix/gas-rate-base-review` (Phase 7 closed + gas curves on the CEC
 > delivered price). Data: `tests/validation/rate_model_impact.json` (regenerated; the pre-Phase-7
-> snapshot was 2026-09-10). Charts in `docs/reports/assets/` are regenerated. **The report text
-> (`RateModel_Impact_Report.md`) is not yet edited** — this file lists every claim, whether it
-> still holds, and the proposed rewrite, for approval.
+> snapshot was 2026-09-10). Charts in `docs/reports/assets/` are regenerated. This file lists every
+> claim, whether it still holds, and the proposed rewrite.
+>
+> **Applied 2026-09-24** — all rewrites approved as proposed and applied to
+> `RateModel_Impact_Report.md`; HTML rebuilt; the hand-exported `.docx` dropped;
+> `notebooks/rate_switch_review.ipynb` re-run.
 
 ## Why the numbers moved
 

@@ -1,9 +1,11 @@
 # The Rate Assumption Is the Story: Electrification Cost Impact Across Eight Rate Models
 
 **WhyWatt technical report — DRAFT for manual editing**
-_Prepared 2026-09-09 · Data snapshot: `tests/validation/rate_model_impact.json` (Phase 6 WS1),
-regenerated after the gas rate projection was put on a consistent real 2024$ basis (see
-`docs/rate_projection_gas_provenance.md`)._
+_Prepared 2026-09-09 (Phase 6 WS1) · **Re-run 2026-09-24 on Phase 7 + the gas-rate base review**
+· Data snapshot: `tests/validation/rate_model_impact.json`. Since Phase 7 every projection starts from
+the home's own current rate and the curves supply only the growth; the gas curves now follow the CEC
+delivered price (see `docs/GasRateBase_Review_Plan.md`). What changed and why:
+`docs/reports/RateModel_Impact_Report_P7_review.md`._
 
 > **Draft status.** This is a working draft assembled from the committed impact snapshot and the
 > project's rate-projection guide. Prose marked **[EDITOR NOTE]** flags a decision or a number to
@@ -35,8 +37,9 @@ institutions that publish rate outlooks do not agree, and they are not supposed 
 - **E3** (Energy + Environmental Economics), the firm that builds California's Avoided Cost
   Calculator, published the foundational gas death-spiral study; its managed high-electrification
   path is an independent high case.
-- **PG&E's** own published tariffs are the ground-truth *starting point* — today's E-1 electric and
-  G-1 gas rates — that every projection must be anchored to.
+- **PG&E's** own published tariffs are the ground-truth *starting point*: the home's own current
+  rate — its utility's time-of-use plan (URDB) or, where there is none, its EIA effective rate —
+  which every projection grows from.
 
 The single most important message of this report is therefore not a number but a **shape**: the
 near-term, mid-term, and long-term rate outlook is genuinely uncertain, and that uncertainty
@@ -60,7 +63,8 @@ The projection builds the **price side** of the future bill: a schedule of dolla
 dollars-per-therm for every year and month out to 2050. It is deliberately framed as a
 **projection under stated assumptions, not a prediction**. Rather than one mystery number, it lays
 out a low, a central, and a high path — each anchored to today's real PG&E rate and grown using
-published government and expert forecasts — so the reasoning is visible instead of hidden.
+published government and expert forecasts — so the reasoning is visible instead of hidden. In the
+simulator the curves supply only the *growth*; the level is the home's own current rate.
 
 ### 2.2 A growing rate is a *function*, not a single percentage (§R2)
 
@@ -103,8 +107,9 @@ time.
 | Electricity central line | **CEC 2025 IEPR** electricity rate workbook (PG&E residential, tn=268239) | Drives the WhyWatt electricity scenarios (real-flat ~36¢/kWh 2024$) |
 | Gas death-spiral cases | **CEC 2025 IEPR** gas rate workbook (tn=264063, `PG&E Res` sheet, col H "Delivered Price"; Planning-Area + extreme case; real 2024$) | Drives the WhyWatt gas scenarios and the CEC extreme benchmark |
 | Independent high case | **E3 (2020)** "Retail Gas in California's Low-Carbon Future" | Second, independent gas-spiral benchmark |
-| Neutral anchor | **US EIA** national average + AEO Pacific | Federal reference lines; the recommended default anchor |
-| Base-year anchor & backcast | **PG&E published tariffs** (E-1, G-1, 2018→2025) | Sets today's rate; checks the model retraces recent history |
+| Federal reference | **US EIA** national average + AEO Pacific | Their *growth* applied to your current rate — a near-flat real outlook |
+| Current rate | **URDB** plan (PG&E E-TOU-C) / **EIA-861M & EIA-176** per utility (2025) | Sets today's rate for the home; every projection grows from it |
+| Electricity curve anchor & backcast | **PG&E E-1** published tariff (2018→2025) | Anchors the electricity curves; checks the model retraces recent history (gas curves = the CEC delivered price, no anchor) |
 | Nominal↔real bridge | **CEC 2023 IEPR GDP deflator** (~2.2%/yr) | The single inflation series used across all sources |
 
 **A note on dollar basis.** The rate *curves* in Section 3 (Figure 1 and its table) are shown in
@@ -124,7 +129,8 @@ The figure below plots **every selectable rate model**, both fuels, 2025–2050 
 
 _Figure 1. Projected retail rate for every selectable rate model — the three WhyWatt scenarios plus
 the CEC and EIA reference lines — both fuels, 2025–2050 (gas log scale), in **real 2024$** (inflation
-removed); each line labelled with its 2050 value. Anchored to the PG&E E-1/G-1 tariff. Generated from
+removed); each line labelled with its 2050 value. Electricity anchored to PG&E E-1; gas = the CEC
+delivered price. Generated from
 `whywatt_rate_projection.json` by `scripts/build_guide_charts.py`._
 
 **In plain terms — electricity stays modest; only gas spirals.** All the electricity lines sit in a
@@ -133,31 +139,31 @@ dramatically. That divergence is the entire economic engine of electrification: 
 off the fuel whose price is climbing and onto the fuel whose price is stable.
 
 **How far gas rises is a policy choice, not physics.** Using the CEC's own gas study (PG&E
-residential, today ≈ $2.08/therm), the projected **2050** gas rates — in **real 2024$** — are:
+residential, today ≈ $2.59/therm in 2024$), the projected **2050** gas rates — in **real 2024$** — are:
 
 | Line | 2050 gas rate | What it represents |
 |---|--:|---|
 | US EIA national | ~$1.3 | federal reference — no CA death spiral modeled |
 | EIA AEO Pacific | ~$1.9 | federal reference, our region — still roughly flat |
 | E3 (2020) | ~$7.8 | E3's managed high-electrification path |
-| WhyWatt Conservative | ~$14 | CEC managed decline ("pruning" gas spend) |
-| WhyWatt Moderate (default) | ~$26 | CEC steadier recovery ("front-load") |
-| WhyWatt Stress | ~$67 | CEC business-as-usual spending ("flat") |
-| CEC extreme | ~$103 | CEC fast electrification **+** business-as-usual spending (~50×) |
+| WhyWatt Conservative | ~$18 | CEC managed decline ("pruning" gas spend) |
+| WhyWatt Moderate (default) | ~$33 | CEC steadier recovery ("front-load") |
+| WhyWatt Stress | ~$85 | CEC business-as-usual spending ("flat") |
+| CEC extreme | ~$103 | CEC fast electrification **+** business-as-usual spending (~40×) |
 
 _(All real 2024$. In nominal dollars each gas figure is ~1.7× larger by 2050 — e.g. Moderate ≈
-$46/therm nominal — which is the basis the Section 4 bill totals are summed in.)_
+$58.5/therm nominal — which is the basis the Section 4 bill totals are summed in.)_
 
 The federal (EIA) lines stay near today's rate because they don't assume California's gas transition
 happens; the CEC cases show what *does* happen to remaining gas customers when it does.
 
-**The anchor thesis (why the default is the neutral EIA average).** When a conversation drifts into
-"but rates could do anything," anchor it: run the analysis at the **conservative US EIA national
-average** (electricity ~18¢/kWh, gas ~$1.25/therm — about *half* of California's rates). As Section 4
-shows, even at those modest national rates, electrification **plus solar** still comes out ahead in
-California. A homeowner's actual California costs will be higher — which only strengthens the case —
-but anchoring to the neutral federal number keeps the argument defensible and sidesteps
-"California is a special case" skepticism.
+**The anchor thesis (the neutral federal outlook).** When a conversation drifts into "but rates
+could do anything," anchor it: run the analysis with the **US EIA outlook** — the home's own current
+rate, growing only at the federal pace (roughly flat after inflation, no California gas spiral). As
+Section 4 shows, even if prices only follow the federal outlook, electrification **plus solar** saves
+**$76k** (EIA national) / **$72k** (EIA Pacific) over 20 years. Any California gas rise only
+strengthens the case — but anchoring to the neutral federal outlook keeps the argument defensible and
+sidesteps "California is a special case" skepticism.
 
 ---
 
@@ -247,12 +253,13 @@ nothing else. Peak load 78 A → panel status **yellow**. 20-year horizon.
 ![Net savings by rate model — HVAC 2027 + WH 2029](assets/impact_hvac2027_wh2029.png)
 
 **Key finding.** This is the scenario where the rate assumption changes the *verdict*, not just the
-size of the win. Under the flat-rate legacy and EIA models the partial journey is roughly
-break-even to mildly negative (−$14k to +$1k, no clean payback except EIA Pacific's marginal year-11
-crossing). But the moment gas is allowed to rise along any CEC-grounded path, the same two swaps save
-**$95k–$180k** over 20 years (payback in years 5–7). The do-nothing baseline is what moves: from
-$132k under flat rates to $313k under Stress. **A partial electrification's case is made or broken
-entirely by the gas-rate outlook.**
+size of the win. Under the legacy fixed-%/yr models the partial journey loses money (−$9k to −$14k,
+no payback). Under the federal EIA outlook it is mildly positive (+$5k to +$6k, payback year 3). But
+the moment gas is allowed to rise along any CEC-grounded path, the same two swaps save
+**$138k–$251k** over 20 years (payback in year 3). The do-nothing baseline is what moves: from
+$132k under flat rates to $388k under Stress. **The size of a partial electrification's case is
+decided by the gas-rate outlook** — only the legacy fixed-% models, which escalate electricity as fast
+as gas, make it negative.
 
 ---
 
@@ -264,15 +271,15 @@ horizon.
 ![Net savings by rate model — full electrification, 200 A](assets/impact_full_electrification_2027_29.png)
 
 **Key finding.** Adding the EV and the remaining appliances roughly doubles the avoided social cost
-(from ~$20k to ~$42k) and, under every gas-rising model, drives net savings to **$117k–$211k**. Under
+(from ~$20k to ~$42k) and, under every gas-rising model, drives net savings to **$166k–$293k**. Under
 the flat-rate legacy models the *operating-bill* delta is slightly negative (−$38k to −$39k), because
 the EV adds electric load that flat rates never reward — yet the model still reports a **year-2
 payback** across the board. Per §4.0 this is a *transient* payback: the cheap early appliance swaps
 put the journey briefly ahead, then the later heat-pump/WH swaps pull the cumulative bill delta back
 negative by year 20 (payback year 2, negative final Δopex = "paid back early, then reversed"). Even
-the neutral EIA national and Pacific anchors turn **positive** here
-(+$16k / +$14k). **Full electrification is a clear win under every California-grounded rate model and
-is at worst break-even-to-positive under the neutral federal anchor.**
+under the federal EIA outlook (national and Pacific) it stays **positive** here
+(+$6k / +$6k). **Full electrification is a clear win under every California-grounded rate model and
+is still positive under the neutral federal outlook.**
 
 ---
 
@@ -286,12 +293,12 @@ horizon.
 ![Cumulative bills, journey vs do-nothing — full electrification + solar](assets/bills_full_electrification_solar.png)
 
 **Key finding — this is the report's punchline.** With solar, the journey wins under **every single
-rate model, without exception**, including the most conservative flat-rate legacy case (+$93k) and
-both neutral EIA anchors (+$53k national, +$60k Pacific). Payback is **year 1** everywhere. The
-journey's cumulative bill collapses to $14k–$46k while do-nothing runs $67k–$313k (Figure, lower
+rate model, without exception**, including the most conservative flat-rate legacy case (+$95k) and
+both neutral EIA outlooks (+$76k national, +$72k Pacific). Payback is **year 1** everywhere. The
+journey's cumulative bill collapses to $25k–$45k while do-nothing runs $98k–$388k (Figure, lower
 panel). This is the concrete backing for the anchor thesis in Section 3: *you do not need to believe
-California's gas death spiral for electrification-plus-solar to pay — it pays even at flat national
-rates.*
+California's gas death spiral for electrification-plus-solar to pay — it pays even if prices only
+follow the federal outlook.*
 
 ---
 
@@ -320,9 +327,10 @@ load 78 A → panel status **yellow**.
 ![Net savings by rate model — HVAC + WH, 30-year horizon](assets/impact_hvac2027_wh2029_30yr.png)
 
 **Key finding.** Lengthening the horizon does not change the *direction* of any result but hugely
-amplifies its *magnitude* wherever gas rises. Do-nothing under Stress balloons to **$1.02M** and under
-the CEC extreme to **$1.34M**, pushing net savings to **$721k** and **$1.01M** respectively — while the
-flat-rate models stay near break-even, exactly as at 20 years. **The longer the horizon, the more the
+amplifies its *magnitude* wherever gas rises. Do-nothing under Stress balloons to **$1.28M** and under
+the CEC extreme to **$1.35M**, pushing net savings to **$961k** and **$1.03M** respectively — while the
+legacy fixed-%/yr models stay negative (−$21k to −$24k) and the federal outlook is mildly positive
+(+$9k to +$11k), as at 20 years. **The longer the horizon, the more the
 scenario choice dominates the outcome** — which is the strongest possible argument for showing a range
 rather than a single rate.
 
@@ -333,25 +341,26 @@ rather than a single rate.
 Across five electrification configurations and eight rate models, one pattern holds:
 
 1. **The rate assumption, not the hardware, decides the answer for partial journeys.** HVAC + water
-   heater alone is break-even under flat rates and a $95k–$180k winner under any California-grounded
+   heater alone loses money under the legacy fixed-%/yr rates (−$9k to −$14k), is mildly positive
+   under the federal outlook (+$5k to +$6k), and is a $138k–$251k winner under any California-grounded
    gas outlook. You cannot answer "should I electrify?" without first choosing a rate story — which is
    why WhyWatt refuses to ship a single mystery percentage.
 
-2. **Full electrification is robust.** Under every California-grounded model it saves $117k–$211k over
-   20 years, and even at the neutral federal anchor it is break-even to positive.
+2. **Full electrification is robust.** Under every California-grounded model it saves $166k–$293k over
+   20 years, and under the federal outlook it is still positive (+$6k).
 
 3. **Solar makes the answer unanimous.** With rooftop solar, electrification wins under *every* rate
    model tested — flat, federal, or spiraling — with year-1 payback. This is the defensible headline:
    the recommendation survives the most skeptical, non-California rate assumption available.
 
 4. **Horizon and panel are separate axes.** A longer horizon amplifies the gas-rate divergence
-   (30-year savings reach ~$0.7M–$1.0M under the stress and CEC cases); an undersized panel adds a
+   (30-year savings reach ~$1.0M under the stress and CEC cases — $961k / $1.03M); an undersized panel adds a
    one-time capital hurdle that leaves the long-run bill story unchanged.
 
 The overarching message is the one Section 1 opened with: **the future rate cannot honestly be a
 single number, so the tool's job is to show the range and demonstrate that the electrification case
-holds across it.** For the conservative, sceptic-proof version of that case, anchor to the neutral US
-EIA average and add solar — the answer is still yes.
+holds across it.** For the conservative, sceptic-proof version of that case, assume prices only follow
+the federal outlook and add solar — the answer is still yes (+$72k–$76k over 20 years).
 
 ---
 
