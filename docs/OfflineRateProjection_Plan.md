@@ -113,9 +113,11 @@ from the 25-IEPR-03 page.
 `Commodity + Transportation`, and — crucially — `Demand` and `Revenue Requirement` columns, across an
 18-case matrix (Demand scenario × RR-recovery). Per stakeholder decision, WhyWatt gas scenarios map to
 **Planning-Area demand** with RR recovery = **Pruning / Front-Load / Flat** → conservative / moderate /
-stress. Gas retail follows the CEC delivered-price shape rebased to $2.08; `rr_index`/`sales_index`
-for gas are now the CEC scenario's real RR and Demand. Gas 2050 (nominal, rebased): **$14 / $27 / $68
-per therm**. NOTE the CEC gas RR-recovery scenarios **cross in the near term** (Flat/BAU defers cost
+stress. Gas retail **is** the CEC delivered price, inflated from real 2024$ to nominal ($2.649 in
+2025) — *no rebase since the 2026-09-24 gas-rate base review* (it used to be rebased to $2.08, which
+turned out to be PG&E's CARE baseline charge; `docs/GasRateBase_Review_Plan.md`). `rr_index` /
+`sales_index` for gas are the CEC scenario's real RR and Demand. Gas 2050: **$17.8 / $33.1 / $84.9 per
+therm in real 2024$** ($31.6 / $58.5 / $150.4 nominal). (Before the review: $14 / $27 / $68.) NOTE the CEC gas RR-recovery scenarios **cross in the near term** (Flat/BAU defers cost
 recovery → lowest early, then spirals) — ordering only holds long-run (guarded by a dedicated test).
 The gas benchmark line = CEC "GT AAFS 2.5 Demand Flat RR" ($2.59→$103.37/therm, confirms the earlier
 $102.76). `data/rates/projection/cec_gas_rate.json`. 30 tests pass.

@@ -63,17 +63,20 @@ they differ only on the CEC **RR-recovery axis** (`RR Growth rate` sheet):
 | moderate | `Planning Area Demand Front Load RR` | accelerated cost recovery | $33.05 |
 | stress | `Planning Area Demand Flat RR` | BAU investment → full death spiral | $84.89 |
 
-WhyWatt then **rebases** the CEC delivered *shape* onto the WhyWatt base rate
+~~WhyWatt then **rebases** the CEC delivered *shape* onto the WhyWatt base rate
 ($2.08/therm G-1, vs the CEC's $2.5886 base), so the headline WhyWatt gas rates are
-~0.80× the CEC delivered price: 2050 moderate ≈ $26.6, stress ≈ $68 on that base.
+~0.80× the CEC delivered price: 2050 moderate ≈ $26.6, stress ≈ $68 on that base.~~
+*(Until 2026-09-24 — see the resolution below.)*
 
-> **Open review (post-Phase-7, noted 2026-09-24):** the $2.08 G-1 base looks low. The CEC's own
-> 2025 delivered base is $2.5886, EIA-176's effective PG&E rate is $2.66 (2024 × CA ratio), and a
-> spot check of PG&E's site agrees with ~$2.66. Check which component the $2.08 omits (tier mix,
-> public-purpose surcharge, fixed/customer charge, taxes, seasonal weighting) and whether the
-> rebase should use the CEC delivered base. Since Phase 7 §4.1 the model uses only the curve's
-> *shape* (scaled from the home's current rate), so this affects the published curve levels, not
-> Phase 7 model results. Tracked in `docs/Phase7_Spec.md` → Post-Phase-7.
+> **Resolved 2026-09-24 — no rebase.** The $2.08 "G-1" base was PG&E's **CARE (GL-1) baseline**
+> schedule charge without the public-purpose surcharge (Gas RateFinder Jan 2024: CARE baseline
+> $1.948 vs the file's $1.92; G-1 non-CARE baseline $2.439, excess $2.867, + G-PPPS $0.111). It left
+> out the CARE discount (~20 %), the surcharge and the excess-tier premium. PG&E's AL 5014-G1 advisory
+> gives the 2025 bundled residential average as $2.885 non-CARE / $2.275 CARE; the CEC delivered
+> price in nominal 2025 $ ($2.649) and EIA-176 ($2.66) agree within 0.5 %. **The WhyWatt gas curves
+> now follow the CEC delivered price as published** (inflated to nominal): 2050 real 2024$ =
+> $17.81 / $33.05 / $84.89 (were ≈ $14 / $27 / $68). Model results are unchanged — since Phase 7
+> §4.1 only the curves' shape is used. Full review: `docs/GasRateBase_Review_Plan.md`.
 
 ---
 

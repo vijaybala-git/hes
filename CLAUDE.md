@@ -26,9 +26,9 @@ Phase 7 is **complete and closed** as of 2026-09-24. See `docs/Phase7_Spec.md` (
 Before the Beta release (each on its own branch off `main`):
 - **§6 NREL End-Use Load Profiles** — replace `device_load_shapes.json` in the hourly energy
   balance (per CEC zone × end use × month × 24 h); own golden re-baseline.
-- **Gas-rate base review** — the WhyWatt gas curves were rebased onto $2.08 (PG&E G-1) vs the CEC
-  delivered $2.59 and EIA effective $2.66; check which component the $2.08 drops
-  (`docs/rate_projection_gas_provenance.md` "Open review", Phase 7 Post-Phase-7 list).
+- ✅ **Gas-rate base review** (branch `fix/gas-rate-base-review`, `docs/GasRateBase_Review_Plan.md`)
+  — the $2.08 "G-1" figure was PG&E's CARE baseline charge; the WhyWatt gas curves now follow the CEC
+  delivered price ($2.649 nominal 2025, ≈ EIA's $2.66). Model results unchanged (shape only).
 
 Other post-Phase-7 items (not gating Beta): default → a projection method (target: WhyWatt
 Conservative + PG&E E-TOU-C + solar + battery = regression case 13 — review the gas curve first),
@@ -119,7 +119,11 @@ Source: DOE/ENERGY STAR occupancy proxy. Applied by HESModel at init; devices re
 **PG&E 2025 base rates:**
 ```
 Electricity (E-1):  $0.386/kWh   (Cal Advocates Q2 2025 report)
-Gas (G-1):          $2.08/therm  (PG&E Advice Letter 5014-G1, Jan 2025)
+Gas (G-1):          $2.08/therm  ⚠ NOT the typical rate — this "G-1" series (pge_gas_g1.json,
+                    used only by the legacy ACC mode) is PG&E's CARE baseline charge without the
+                    public-purpose surcharge. PG&E's 2025 bundled residential average is $2.885
+                    non-CARE / $2.275 CARE (AL 5014-G1); EIA-176 effective $2.66; CEC delivered
+                    $2.649 (the projection curves' base since 2026-09-24).
 ```
 
 **Phase 7 rate model (current):** default rate model is still **My Utility** (`cagr_flat`: EIA

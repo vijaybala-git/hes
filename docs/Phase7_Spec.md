@@ -1244,21 +1244,13 @@ tests/
   home costs $247k over 20 yr vs $132k under My Utility and $98k under EIA Pacific.
 - **§5 extensions:** whether the projection drives the gas social-cost overlay (the NEM export
   path is settled — hourly ACC, issue 12).
-- **Review the gas rate harvest — did the base drop a CEC component?** (noted 2026-09-24.) Three
-  PG&E residential gas levels for 2025 disagree: the projection bundle's `base_retail.gas`
-  **$2.08** (PG&E G-1, Advice Letter 5014-G1, Jan 2025), the CEC's own 2025 delivered price
-  **$2.5886** (tn=264063, `PG&E Res`, col H "Delivered Price" = Commodity + Transportation), and
-  the EIA-176 effective rate **$2.66** (2024 $2.3147 × CA ratio 1.1499). A spot check against
-  PG&E's own site agrees with ~$2.66. The WhyWatt gas curves were **rebased** from the CEC's
-  $2.5886 onto $2.08 (`docs/rate_projection_gas_provenance.md`), i.e. ~0.80× the CEC delivered
-  price. Check what the $2.08 leaves out (tier mix — baseline vs excess; public-purpose program
-  surcharge; any customer/fixed charge; franchise fees / taxes; winter vs annual weighting) and
-  whether the rebase should use the CEC delivered base (or an effective rate) instead.
-  **Phase 7 decision (kept):** projection methods scale the home's *current* rate — PG&E gas
-  starts at $2.66 and grows by the curve's shape (S[y] / S[2025]), so the curve's absolute base
-  does not set the price; only its shape does. Fixing the base therefore changes the curves'
-  published levels (charts, guide) but not Phase 7 model results, unless the curve *shape* also
-  changes.
+- ✅ **Gas rate harvest reviewed** (2026-09-24, branch `fix/gas-rate-base-review`,
+  `docs/GasRateBase_Review_Plan.md`). The $2.08 "G-1" base was PG&E's **CARE baseline** schedule
+  charge without the public-purpose surcharge — it dropped the CARE discount (~20 %), the surcharge
+  and the excess-tier premium. The CEC's delivered price ($2.649 nominal 2025) and EIA-176 ($2.66)
+  agree within 0.5 %. **Fixed (option A):** the gas curves follow the CEC delivered price with no
+  rebase (every gas curve ×1.2736); the model's results are unchanged (shape only); legacy ACC mode
+  still starts from the $2.08 file (ACC-1, noted for the post-P7 ACC rework).
 - **SCE re-harvest** — SCE's URDB TOU-D-4-9PM record is quarantined ($0.33 summer on-peak vs
   ~$0.58 published); re-harvest, verify against SCE's tariff sheets, lift the quarantine (§3).
 - **Retire the `SolarBatteryConfig` shim** — pass `SolarConfig` + `BatteryConfig` directly (pure

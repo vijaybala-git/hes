@@ -115,9 +115,10 @@
     <h2>§R4 · The three scenarios</h2>
     <p><em>Conservative, Moderate, and Stress — a low, central, and high path. All three come from the</em>
     California Energy Commission's own 2025 forecast; Moderate is the default.</p>
-    <p><img alt="Projected retail rates for every selectable rate model, electricity and gas, 2025–2050" src="rate_projection_curves.svg" /></p>
+    <p><img alt="Projected retail rates for every selectable rate model, electricity and gas, 2025–2050, real 2024 dollars" src="rate_projection_curves.svg" /></p>
     <p><em>Figure: the projected retail rate for every selectable rate model — the three WhyWatt scenarios
-    plus the CEC and EIA reference lines — both fuels, 2025–2050 (gas on a log scale). Electricity stays
+    plus the CEC and EIA reference lines — both fuels, 2025–2050, in </em><em>real 2024$</em><em> (inflation removed;
+    gas on a log scale). Each line is labelled with its 2050 value at the right edge. Electricity stays
     modest across all models; only gas spirals, and how far depends on the scenario. Generated from
     <code>whywatt_rate_projection.json</code> by <code>scripts/build_guide_charts.py</code>.</em></p>
     <h3>In plain terms</h3>
@@ -136,11 +137,17 @@
       <strong>death spiral</strong> (§R5). One subtlety: business-as-usual keeps gas rates <em>lowest</em> in the near term
       (it delays the spending), then overtakes the managed cases and spirals — so the lines cross around
       the early 2030s.</p>
-    <p><strong>Why our lines sit a little below the CEC's published lines.</strong> WhyWatt anchors to your actual tariff
-    (the standard PG&amp;E E-1 electric / G-1 gas rate) and grows it along the CEC trajectory. The CEC reports
-    the <em>blended residential average</em> across all rate plans, which runs a bit higher (electricity: our
-    $0.386 vs the CEC's ~$0.417) — so our curves move <em>with</em> the CEC but sit ~7% below its own line. Same
-    shape, slightly lower level.</p>
+    <p><strong>Where our lines sit relative to the CEC's.</strong> Our <strong>gas</strong> curves <em>are</em> the CEC's residential PG&amp;E
+    delivered price (inflated from the CEC's 2024 dollars to each year's dollars) — same shape, same level
+    (≈ $2.65/therm in 2025). Our <strong>electricity</strong> curves grow along the CEC trajectory from the standard
+    PG&amp;E E-1 rate ($0.386/kWh); the CEC reports the <em>blended residential average</em> across all rate plans,
+    which runs a bit higher (~$0.417), so the electricity curves move <em>with</em> the CEC but sit ~7% below its
+    own line — same shape, slightly lower level. (Until September 2026 the gas curves were also anchored
+    lower, to a $2.08/therm "G-1" figure; that figure turned out to be PG&amp;E's discounted CARE baseline
+    rate, about 20% below what PG&amp;E households pay on average, so the gas curves now follow the CEC
+    directly.)</p>
+    <p>In the simulator itself only the curves' <em>shape</em> is used: your prices start from your own current
+    rate and grow by how much the curve rises.</p>
     <p>A key correction (Aug 2026): earlier drafts had electricity rising much faster. Checking against the
     CEC's published forecast showed electricity should stay roughly flat in real terms — because growing
     electricity sales offset the rising revenue requirement. Only <strong>gas</strong> spirals.</p>
@@ -152,15 +159,16 @@
     <p>The gas distribution system costs roughly the same to run whether a million homes or half a million
     use it. As homes electrify, that fixed cost is spread over fewer therms — so the <em>rate</em> per therm
     rises even if total spending doesn't.</p>
-    <p>Using the CEC's own gas study (residential PG&amp;E, today ≈ $2.08/therm), our three scenarios reach
-    these 2050 rates:
-    - <strong>Conservative</strong> (state winds down gas spending) → ~<strong>$14/therm</strong>
-    - <strong>Moderate</strong> (steadier recovery) → ~<strong>$27/therm</strong>
-    - <strong>Stress</strong> (business-as-usual spending) → ~<strong>$68/therm</strong></p>
+    <p>Using the CEC's own gas study (residential PG&amp;E, today ≈ $2.59/therm in 2024 dollars), our three
+    scenarios reach these 2050 rates — in <strong>real 2024$</strong> (i.e. today's purchasing power, inflation removed):
+    - <strong>Conservative</strong> (state winds down gas spending) → ~<strong>$18/therm</strong>
+    - <strong>Moderate</strong> (steadier recovery) → ~<strong>$33/therm</strong>
+    - <strong>Stress</strong> (business-as-usual spending) → ~<strong>$85/therm</strong></p>
     <p>And the CEC's <em>most extreme</em> published case (fast electrification <strong>and</strong> business-as-usual spending)
-    reaches <strong>~$103/therm</strong> by 2050 — a ~50× increase. The spread is the whole point: how bad the spiral
-    gets is mostly a <strong>policy choice</strong> about whether the state keeps investing in a shrinking gas system,
-    not physics.</p>
+    reaches <strong>~$103/therm</strong> by 2050 — a ~40× increase in real terms. The spread is the whole point: how
+    bad the spiral gets is mostly a <strong>policy choice</strong> about whether the state keeps investing in a
+    shrinking gas system, not physics. (These are real 2024$; the <em>nominal</em> sticker price on a 2050 bill
+    would be ~1.7× higher again, from inflation alone.)</p>
     <p>Important: WhyWatt models <strong>one home</strong>. Whether the neighborhood-wide decline is mild or severe is a
     <strong>scenario you choose</strong>, not something the tool derives from your house alone.</p>
     <hr />
@@ -192,9 +200,10 @@
     run ~2× the national average — which only strengthens the case, not weakens it. Anchoring to the
     neutral EIA number keeps the argument defensible and sidesteps "California is a special case"
     skepticism, while the CA-specific curves (CEC) show the real magnitude.</p>
-    <h3>The gas death-spiral, benchmarked (residential PG&amp;E, by 2050 — nominal $/therm)</h3>
+    <h3>The gas death-spiral, benchmarked (residential PG&amp;E, by 2050 — real 2024$/therm)</h3>
     <p>The single most striking result: how far the gas <em>rate</em> could rise depends almost entirely on
-    whether the gas system keeps spending as customers leave. Today ≈ $2.08/therm.</p>
+    whether the gas system keeps spending as customers leave. Today ≈ $2.59/therm (2024$). All figures below are
+    <strong>real 2024$</strong> (inflation removed) so every source is on one basis.</p>
     <table>
     <thead>
     <tr>
@@ -206,32 +215,32 @@
     <tbody>
     <tr>
     <td><strong>US EIA national</strong></td>
-    <td>~$2.3</td>
+    <td>~$1.3</td>
     <td>federal reference — no CA death spiral modeled</td>
     </tr>
     <tr>
     <td><strong>EIA AEO Pacific</strong></td>
-    <td>~$3.4</td>
+    <td>~$1.9</td>
     <td>federal reference, our region — still ~flat</td>
     </tr>
     <tr>
-    <td><strong>WhyWatt conservative</strong></td>
-    <td>~$14</td>
-    <td>CEC: managed decline ("pruning")</td>
-    </tr>
-    <tr>
     <td><strong>E3 (2020)</strong></td>
-    <td>~$13.8</td>
+    <td>~$7.8</td>
     <td>E3's managed high-electrification path</td>
     </tr>
     <tr>
+    <td><strong>WhyWatt conservative</strong></td>
+    <td>~$18</td>
+    <td>CEC: managed decline ("pruning")</td>
+    </tr>
+    <tr>
     <td><strong>WhyWatt moderate</strong></td>
-    <td>~$27</td>
+    <td>~$33</td>
     <td>CEC: steadier recovery ("front-load")</td>
     </tr>
     <tr>
     <td><strong>WhyWatt stress</strong></td>
-    <td>~$68</td>
+    <td>~$85</td>
     <td>CEC: business-as-usual spending ("flat")</td>
     </tr>
     <tr>
@@ -244,7 +253,8 @@
     <p>The federal references (EIA) stay near today's rate because they don't assume California's gas
     transition happens; the CEC cases show what <em>does</em> happen to remaining gas customers when it does.
     Our three scenarios sit inside the CEC's own range, ordered conservative ≤ moderate ≤ stress in the
-    long run (they cross in the early 2030s, per §R4) — a check we enforce in testing.</p>
+    long run (they cross in the early 2030s, per §R4) — a check we enforce in testing. (In <em>nominal</em>
+    dollars every gas figure here is ~1.7× larger by 2050; we report real so the sources compare fairly.)</p>
     <p><strong>On electricity, our lines run ~7% below the CEC's own line</strong> — same trajectory, but anchored to the
     E-1 tariff rather than the CEC's blended residential average (§R4). Not a disagreement, a base choice.</p>
     <hr />
@@ -300,8 +310,9 @@
     <h3>CEC 2023 IEPR GDP deflator (the nominal↔real bridge)</h3>
     <ul>
     <li><strong>Source:</strong> CEC 2023 IEPR GDP deflator series, embedded in the ACC gas workbook.</li>
-    <li><strong>Why:</strong> We report bills in <strong>nominal</strong> dollars by default, but some trusted sources (notably E3)
-      report in <strong>real</strong> dollars. We need one authoritative inflation series to convert between them.</li>
+    <li><strong>Why:</strong> We report in <strong>real 2024$</strong> by default (constant purchasing power, matching the CEC
+      anchors), while some sources are published nominal (notably EIA). We need one authoritative
+      inflation series to convert between the two.</li>
     <li><strong>How we use it:</strong> <code>scripts/build_rate_projection.py</code> → <code>data/rates/projection/gdp_deflator.json</code>.
       Powers the guide/notebook's "real dollars" toggle so every cross-source comparison is fair.</li>
     </ul>
@@ -312,10 +323,10 @@
       (Natural Gas Monthly) — grown by the <strong>AEO Reference case</strong> (~+5% <em>real</em> through 2050 ≈ real-flat).</li>
     <li><strong>Why:</strong> A neutral, independent, federal number that isn't CA-specific — the defensible anchor for
       the thesis in §R7. It's the <em>US average</em>, deliberately <strong>not</strong> California (CA is ~2× higher).</li>
-    <li><strong>How we use it:</strong> Anchor line, both fuels. Nominal series built with the same CEC IEPR deflator
-      (~2.22%/yr) so real/nominal stays consistent with the other sources. By 2050: elec ~$0.318 nominal
-      (~18¢ real), gas ~$2.27 nominal (~$1.28 real) — essentially flat in real terms.
-      <code>benchmarks/eia_aeo.json</code>.</li>
+    <li><strong>How we use it:</strong> Anchor line, both fuels, converted to the report's real 2024$ basis with the
+      same CEC IEPR deflator (~2.22%/yr) so it stays consistent with the other sources. By 2050 (real
+      2024$): elec ~18¢/kWh, gas ~$1.28/therm — essentially flat in real terms (nominal ~$0.318 and
+      ~$2.27). <code>benchmarks/eia_aeo.json</code>.</li>
     <li><strong>Precise regional series (AEO 2026 Pacific):</strong> the file also carries the exact EIA AEO 2026
       <strong>Pacific census-division</strong> residential prices (real 2025$/MMBtu from EIA, converted): electricity
       ~24¢/kWh, gas ~$1.99/therm, both roughly flat to 2050. Key point for the story: <strong>the AEO reference
@@ -340,8 +351,8 @@
     <li><strong>Why:</strong> The foundational, high-quality analysis of the gas death spiral; widely cited, and E3 is
       the same firm that builds the ACC. Trusted enough to anchor a high case as a benchmark.</li>
     <li><strong>How we use it:</strong> A benchmark gas curve (residential gas ~+80% by 2030, ~+480% by 2050 in <em>real</em>
-      terms, with ~−60% demand) — a <em>managed</em> high-electrification path, ≈$13.8/therm nominal by 2050.
-      Stored in <code>data/rates/projection/benchmarks/e3_pathways_2020.json</code>.</li>
+      terms, with ~−60% demand) — a <em>managed</em> high-electrification path, ≈<strong>$7.8/therm real 2024$</strong> by
+      2050 (≈$13.8 nominal). Stored in <code>data/rates/projection/benchmarks/e3_pathways_2020.json</code>.</li>
     </ul>
     <h3>CEC 2025 IEPR Electricity Rate Forecast — electricity central line</h3>
     <ul>
@@ -355,15 +366,22 @@
       (we anchor to the E-1 tariff, the CEC to the blended residential average).
       <code>data/rates/projection/benchmarks/cec_2025_iepr_electric.json</code>.</li>
     </ul>
-    <h3>CEC 2025 IEPR Gas Rate Forecast — gas death-spiral (extreme case)</h3>
+    <h3>CEC 2025 IEPR Gas Rate Forecast — gas death-spiral (extreme case) + WhyWatt gas scenarios</h3>
     <ul>
-    <li><strong>Source:</strong> CEC 2025 IEPR gas rate workbook <strong>tn=264063</strong>, scenario "GT AAFS 2.5 Demand Flat RR"
-      (fast electrification <strong>+</strong> business-as-usual / flat cost recovery).</li>
-    <li><strong>Why:</strong> The most extreme published CEC case — the worst-case anchor for the chart.</li>
+    <li><strong>Source:</strong> CEC 2025 IEPR gas rate workbook <strong>tn=264063</strong>, sheet <strong><code>PG&amp;E Res</code></strong>, column <strong>H
+      "Delivered Price"</strong> (all values <strong>real 2024$</strong> — the workbook's <code>Commodity Prices</code> sheet is headed
+      "2024$/Therm"). The extreme benchmark is scenario "GT AAFS 2.5 Demand Flat RR" (fast electrification
+      <strong>+</strong> business-as-usual / flat cost recovery); WhyWatt's own conservative/moderate/stress read the
+      milder "Planning Area Demand × Pruning / Front Load / Flat RR" cases from the same column.</li>
+    <li><strong>Why:</strong> The state's own official gas-rate scenarios; the GT AAFS Flat case is the most extreme
+      published — the worst-case anchor for the chart.</li>
     <li><strong>How we use it:</strong> Benchmark death-spiral curve — PG&amp;E residential gas <strong>$2.59/therm (2025) →
-      $103.37/therm (2050)</strong>, ~40×. (Confirms the earlier CPUC-cited ~$102.76 figure.) WhyWatt's own
-      scenarios use the milder CEC "Planning-Area" demand cases and sit below this line.
-      <code>data/rates/projection/benchmarks/cec_2025_iepr_gas.json</code>.</li>
+      $103.37/therm (2050)</strong> real 2024$, ~40×. (Confirms the earlier CPUC-cited ~$102.76 figure.)
+      WhyWatt's scenarios use the Planning-Area demand cases and sit below this line. Values verified
+      against the source workbook to ±0.00005/therm (see <code>docs/rate_projection_gas_provenance.md</code>).
+      <strong>Not to be confused with</strong> the CEC <strong>CED 2025 Baseline</strong> gas forecast (tn=269887, "Rates Form 2.3"),
+      a single central-demand case that reaches only ~$8.6/therm real 2024$ by 2045 — the low end of the
+      same forecast family, not the death-spiral scenarios we plot. <code>benchmarks/cec_2025_iepr_gas.json</code>.</li>
     </ul>
     <h3>PG&amp;E published tariffs — historical actuals</h3>
     <ul>
@@ -373,20 +391,27 @@
     <li><strong>How we use it:</strong> Sets the base-year retail anchor and the <strong>backcast</strong> check (does our model
       retrace 2019→2025?).</li>
     </ul>
-    <h3>A note on nominal vs. real dollars — and where inflation comes from</h3>
+    <h3>A note on real vs. nominal dollars — and where inflation comes from</h3>
     <ul>
-    <li>Our default reporting is <strong>nominal</strong> (the dollars you'd actually see on a bill); a <strong>real</strong>
-      (inflation-adjusted) toggle removes inflation so long-run trends are comparable. E3 and the CEC
-      Figure 8 report in real dollars; EIA reports nominal — so both views are needed.</li>
+    <li><strong>Our default reporting is real 2024$</strong> — constant purchasing power, inflation removed — because
+      that is the basis every CEC anchor is published in (electricity tn=268239, gas tn=264063), so
+      cross-source comparison is apples-to-apples. A <strong>nominal</strong> view (the dollars you'd literally see on
+      a future bill) adds inflation back. E3 and the CEC report real; EIA is published nominal and we
+      convert it — so all lines on the charts share the one real 2024$ basis.</li>
     <li><strong>We do not invent an inflation rate.</strong> We use the exact one E3 and the ACC use: the <strong>CEC IEPR
       GDP deflator</strong> (the 2023-IEPR vintage embedded in the ACC gas workbook, base 2022), which runs
       <strong>~2.2%/yr</strong>. The ACC itself works in real $2022 and converts to nominal with this deflator (it
       also carries a flat 2.0% "inflation" parameter for escalating contract/IRP costs). The deflator
       ultimately comes from the CEC's licensed macroeconomic forecast (IHS / S&amp;P Global). Using the same
-      index means our nominal↔real conversions are consistent with E3 by construction — no second,
+      index means our real↔nominal conversions are consistent with E3 by construction — no second,
       conflicting inflation number. <code>data/rates/projection/gdp_deflator.json</code>.</li>
-    <li><strong>Worked example (PG&amp;E electricity, moderate):</strong> real-flat ~35¢/kWh (2024$) <em>is</em> ~62¢/kWh
-      <strong>nominal</strong> by 2050 — the difference is just ~2.2%/yr inflation compounding. Both match CEC.</li>
+    <li><strong>Worked example (PG&amp;E electricity, moderate):</strong> the real-flat ~32–35¢/kWh (2024$) we report <em>is</em>
+      ~62¢/kWh <strong>nominal</strong> by 2050 — the difference is just ~2.2%/yr inflation compounding. Both match
+      CEC. Likewise gas moderate ~$26/therm real 2024$ is ~$46/therm nominal by 2050.</li>
+    <li><strong>Under the hood</strong> the model computes in nominal dollars (the marginal-cost inputs are nominal) and
+      converts to real 2024$ for reporting; the CEC gas delivered price is itself real 2024$ and is
+      inflated to nominal before it enters that calculation, so both fuels stay on one basis. See
+      <code>docs/rate_projection_gas_provenance.md</code>.</li>
     </ul>
     <p><em>(🚧 Residual revenue-requirement, fixed-charge policy, and social-overlay sources added as those
     inputs are harvested.)</em></p>

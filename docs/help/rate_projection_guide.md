@@ -124,11 +124,18 @@ forecast; they differ by one policy choice — how the state recovers the cost o
   (it delays the spending), then overtakes the managed cases and spirals — so the lines cross around
   the early 2030s.
 
-**Why our lines sit a little below the CEC's published lines.** WhyWatt anchors to your actual tariff
-(the standard PG&E E-1 electric / G-1 gas rate) and grows it along the CEC trajectory. The CEC reports
-the *blended residential average* across all rate plans, which runs a bit higher (electricity: our
-$0.386 vs the CEC's ~$0.417) — so our curves move *with* the CEC but sit ~7% below its own line. Same
-shape, slightly lower level.
+**Where our lines sit relative to the CEC's.** Our **gas** curves *are* the CEC's residential PG&E
+delivered price (inflated from the CEC's 2024 dollars to each year's dollars) — same shape, same level
+(≈ $2.65/therm in 2025). Our **electricity** curves grow along the CEC trajectory from the standard
+PG&E E-1 rate ($0.386/kWh); the CEC reports the *blended residential average* across all rate plans,
+which runs a bit higher (~$0.417), so the electricity curves move *with* the CEC but sit ~7% below its
+own line — same shape, slightly lower level. (Until September 2026 the gas curves were also anchored
+lower, to a $2.08/therm "G-1" figure; that figure turned out to be PG&E's discounted CARE baseline
+rate, about 20% below what PG&E households pay on average, so the gas curves now follow the CEC
+directly.)
+
+In the simulator itself only the curves' *shape* is used: your prices start from your own current
+rate and grow by how much the curve rises.
 
 A key correction (Aug 2026): earlier drafts had electricity rising much faster. Checking against the
 CEC's published forecast showed electricity should stay roughly flat in real terms — because growing
@@ -146,14 +153,14 @@ The gas distribution system costs roughly the same to run whether a million home
 use it. As homes electrify, that fixed cost is spread over fewer therms — so the *rate* per therm
 rises even if total spending doesn't.
 
-Using the CEC's own gas study (residential PG&E, today ≈ $2.08/therm), our three scenarios reach
-these 2050 rates — in **real 2024$** (i.e. today's purchasing power, inflation removed):
-- **Conservative** (state winds down gas spending) → ~**$14/therm**
-- **Moderate** (steadier recovery) → ~**$26/therm**
-- **Stress** (business-as-usual spending) → ~**$67/therm**
+Using the CEC's own gas study (residential PG&E, today ≈ $2.59/therm in 2024 dollars), our three
+scenarios reach these 2050 rates — in **real 2024$** (i.e. today's purchasing power, inflation removed):
+- **Conservative** (state winds down gas spending) → ~**$18/therm**
+- **Moderate** (steadier recovery) → ~**$33/therm**
+- **Stress** (business-as-usual spending) → ~**$85/therm**
 
 And the CEC's *most extreme* published case (fast electrification **and** business-as-usual spending)
-reaches **~$103/therm** by 2050 — a ~50× increase in real terms. The spread is the whole point: how
+reaches **~$103/therm** by 2050 — a ~40× increase in real terms. The spread is the whole point: how
 bad the spiral gets is mostly a **policy choice** about whether the state keeps investing in a
 shrinking gas system, not physics. (These are real 2024$; the *nominal* sticker price on a 2050 bill
 would be ~1.7× higher again, from inflation alone.)
@@ -201,7 +208,7 @@ skepticism, while the CA-specific curves (CEC) show the real magnitude.
 
 ### The gas death-spiral, benchmarked (residential PG&E, by 2050 — real 2024$/therm)
 The single most striking result: how far the gas *rate* could rise depends almost entirely on
-whether the gas system keeps spending as customers leave. Today ≈ $2.08/therm. All figures below are
+whether the gas system keeps spending as customers leave. Today ≈ $2.59/therm (2024$). All figures below are
 **real 2024$** (inflation removed) so every source is on one basis.
 
 | Line on the chart | 2050 gas rate | What it is |
@@ -209,9 +216,9 @@ whether the gas system keeps spending as customers leave. Today ≈ $2.08/therm.
 | **US EIA national** | ~$1.3 | federal reference — no CA death spiral modeled |
 | **EIA AEO Pacific** | ~$1.9 | federal reference, our region — still ~flat |
 | **E3 (2020)** | ~$7.8 | E3's managed high-electrification path |
-| **WhyWatt conservative** | ~$14 | CEC: managed decline ("pruning") |
-| **WhyWatt moderate** | ~$26 | CEC: steadier recovery ("front-load") |
-| **WhyWatt stress** | ~$67 | CEC: business-as-usual spending ("flat") |
+| **WhyWatt conservative** | ~$18 | CEC: managed decline ("pruning") |
+| **WhyWatt moderate** | ~$33 | CEC: steadier recovery ("front-load") |
+| **WhyWatt stress** | ~$85 | CEC: business-as-usual spending ("flat") |
 | **CEC extreme** | ~$103 | CEC: fast electrification **+** business-as-usual spending |
 
 The federal references (EIA) stay near today's rate because they don't assume California's gas

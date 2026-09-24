@@ -103,6 +103,10 @@ So WS1 is **additive**: add one branch, one enum value, one adapter. No existing
 - Base-year sanity: the bundle anchors to the same PG&E tariff ($0.386/kWh, $2.08/therm) as
   CLAUDE.md, so `cec_projection` ≈ the formula path at `year 0` and diverges only via escalation —
   which is exactly the quantity WS1 exists to measure.
+  > **Superseded 2026-09-24 (gas-rate base review):** the $2.08/therm was PG&E's CARE baseline charge,
+  > ~20 % low. The bundle's gas curves now follow the CEC delivered price directly ($2.649 in 2025,
+  > nominal), and since Phase 7 §4.1 the model uses only the curves' shape. See
+  > `docs/GasRateBase_Review_Plan.md`. (This spec is kept as the Phase 6 record.)
 
 ### §1b — Wire it as a non-default `rate_model`
 
