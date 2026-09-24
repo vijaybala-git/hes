@@ -1,11 +1,15 @@
 # WhyWatt — Phase 7 Development Spec
 
-**Status:** 🔵 PLANNED — the data-pipeline + golden-rebaseline phase. Flow new simulation data
-through the model, and adopt the CEC projected-rate escalation as the default.
+**Status:** 🟡 IN PROGRESS — the data-pipeline + golden-rebaseline phase. Flow new simulation
+data through the model. (Adopting the WhyWatt projection as the *default* moved to post-Phase-7, §5.)
 **Follows:** Phase 6 (`docs/Phase6_Spec.md`) — Solar/Battery split, inert roof-geometry inputs, and
 the **non-default `cec_projection` rate hand-off interface** (evaluated but not switched). Offline
 PVWatts/URDB data is harvested and validated separately in `docs/OfflineSolarData_Plan.md`.
-**Last updated:** 2026-09-23 — §4.1 round-2 decisions: My Utility stays default until after P7
+**Last updated:** 2026-09-23 — full-pass review: stale text aligned with the round-2 decisions;
+naming fixed (**current energy rate** = a rate *source*, e.g. `urdb_tou`; **projection method** =
+long-term growth, e.g. the WhyWatt/`cec_projection` curves); battery defaults → **Tesla Powerwall 3**
+datasheet harvest; peak / off-peak only (super-off-peak priced as off-peak); issues 12/13 clarified.
+Earlier 2026-09-23 — §4.1 round-2 decisions: My Utility stays default until after P7
 (golden unchanged); projections scale the URDB plan from its anchor year; EIA — Pacific for
 non-PG&E + new `starting_rates.json`; §5 default flip deferred post-P7. Earlier: added §4.1 UI rework review (utilities in Home Profile; current prices vs projection method; 15 issues incl. municipal-utility ZIP mis-resolution). Earlier 2026-09-23 — §3 URDB TOU pricing landed as an option (`urdb_tou`; SCE
 quarantined to EIA; golden unchanged). Earlier 2026-09-23 — added §6 **NREL End-Use Load Profiles** (planned, separate branch
@@ -135,7 +139,8 @@ mode[m]   = argmin(bill_self, bill_cost)        # tie → Self-powered
   Until §3 lands (flat/ACC pricing), every month is therefore Self-powered.
 - Both modes share: **steady state** (the day is run twice, the second pass kept, so start- and
   end-of-day charge match); **battery parameters** `cap = battery_kwh` (usable), `η` round-trip
-  efficiency (default 0.90, √η on charge and on discharge), `p_max` power cap (default 5 kW);
+  efficiency (√η on charge and on discharge), charge / discharge power caps — defaults from the
+  **Tesla Powerwall 3** datasheet (§2: 13.5 kWh, 89%, 11.5 kW out; landed code still 0.90 / 5 kW);
   no battery → `cap = 0` and both modes reduce to solar → home → export.
 - **Outputs per month:** `mode`, `direct`, `battery_charge_solar`, `battery_charge_grid`,
   `discharge`, `export`, `grid[h]` (24-vector). `grid[h]` is what §3 prices; `export` earns the
@@ -307,7 +312,25 @@ to devices — **this changes no total, dispatch, or physics**. Convention:
   slider and its 80/35 battery snap (`src/ui/panels.py`, `state.py`, `config.py`, `layout.py`,
   `sim.py`), and `solar_scf` from `whywatt_default.json`; stale share-link values are dropped.
 - **Battery config becomes live physics:** `BatteryConfig(battery_enabled, battery_kwh,
-  round_trip_eff=0.90, power_kw=5.0, grid_charging=True)`. `battery_enabled=False` ⇒ `cap = 0`.
+  round_trip_eff, power_kw, grid_charging=True)`. `battery_enabled=False` ⇒ `cap = 0`. *(Landed in
+  commit C with placeholder defaults 0.90 / 5 kW.)*
+- **Battery defaults = Tesla Powerwall 3 (decided 2026-09-23 — the most common home battery in the
+  Bay Area today).** Harvest the datasheet into `data/appliances/battery_defaults.json` with
+  provenance (source URL, sha256, datasheet year); the PDF itself is not committed.
+  Source: `energylibrary.tesla.com/.../Powerwall/3/Datasheet/en-us/Powerwall-3-Datasheet.pdf`
+  (2025 edition, sha256 `051a791a…5d5e377b`, fetched 2026-09-23):
+
+  | Parameter | Powerwall 3 | Model use | Today (landed) |
+  |---|---|---|---|
+  | Nominal battery energy | 13.5 kWh AC | `battery_kwh` default (usable) | 13.5 ✓ |
+  | Solar → battery → home/grid efficiency | **89%** (25 °C, beginning of life, 3.3 kW) | `round_trip_eff` | 0.90 |
+  | Continuous output (on-grid) | **11.5 kW** (configurable 5.8 / 7.6 / 10 / 11.5) | discharge cap | 5 kW |
+  | Max continuous charge | **5 kW** (the only published charge rating — off-grid PV-only, single unit; 8 kW with expansion units) | charge cap | 5 kW |
+  | Solar → home/grid efficiency | 97.5% (CEC weighted) | not modelled (PVWatts losses cover the inverter) | — |
+
+  Model change: split `power_kw` into `charge_kw` (5) and `discharge_kw` (11.5); `round_trip_eff`
+  0.89. With a 24-point hourly day the 11.5 kW discharge cap rarely binds. This moves battery cases
+  → **its own golden-diff commit** (small, explained), the one planned output change left in Phase 7.
 - **Dispatch is one pure function**, `dispatch_month(G, L, peak_hours, rates, battery, mode)` with
   `mode ∈ {"self", "cost", "auto"}` (`"auto"` = run both, keep the cheaper — what the model uses).
   Pure and deterministic (arrays in, flows out) so tests can run each mode on its own. The
@@ -451,29 +474,47 @@ selected tariff.
   `HomeConfig.solar_resource`.
 - **Solar/Battery panel:** the "Self-use" slider (`scf`) and its 80/35 battery snap are removed;
   self-consumption is now *reported* (from the §0 balance), not entered. Battery inputs are size
-  (kWh) and on/off, with round-trip efficiency, power cap and **grid charging (on)** under Details.
+  (kWh) and on/off, with round-trip efficiency, charge/discharge power (Powerwall 3 defaults, §2)
+  and **grid charging (on)** under Details.
   The chosen mode per month is shown ("Battery: Self-powered Nov–Mar, Cost-saving Apr–Oct").
 - New energy-balance readout / chart per year: solar → home, solar → battery → home, export,
   grid import (the four flows of §0).
-- Rate-model selector gains a **URDB TOU** option alongside today's EIA/ACC/CAGR modes and the
-  `cec_projection` option added (non-default) in Phase 6 — which §5 now promotes to the default.
+- ~~Rate-model selector gains a URDB TOU option; §5 promotes `cec_projection` to the default.~~
+  **Superseded by §4.1:** URDB TOU is a **current energy rate** *source* (landed as the interim
+  selector option `urdb_tou`, retired in U1); the WhyWatt curves (Phase 6's `cec_projection`) are
+  **projection methods**; the default stays My Utility through Phase 7.
 - **Plan-button consolidation (Spec 5.6 #6)** lands here, alongside the Solar/Battery/Panel UI
   work, when a unified plan-row can be coherent (it was deferred from 5.6 for exactly this moment).
 
 ---
 
-### §4.1 — UI rework: your utilities, current prices vs projection method (PLANNED — review 2026-09-23)
+### §4.1 — UI rework: your utilities, current energy rate vs projection method (PLANNED — review 2026-09-23)
+
+**Naming (fixed 2026-09-23 — use these terms in code, config, UI and docs).** Phase 6/7 text
+blurred two different things under "rate model":
+
+| Term | What it answers | Scope | Values | Proposed config keys (U1) |
+|---|---|---|---|---|
+| **Current energy rate** (a *rate source*) | What do you pay **today**? | per fuel; a **home fact** — shared by scenarios A and B | electricity: `urdb` (the URDB plan, + `elec_tariff_label`) · `eia_utility` (EIA per-utility) · `eia_region` (`starting_rates.json`); gas: `eia_utility` · `eia_region` | resolved from the ZIP; only the plan is user-chosen: `elec_tariff_label` |
+| **Projection method** | How do prices **grow** over the years? | per fuel, **per scenario** | `whywatt_conservative / _moderate / _stress` (the CEC-driven curves Phase 6 called `cec_projection`) · `eia_pacific`; legacy fixed-%: `cagr_flat` (My Utility) · `ca_average` · `acc_shaped` | `elec_projection_a/b`, `gas_projection_a/b` |
+
+- `urdb_tou` is a **rate source**, not a projection — it disappears from the projection selector in U1.
+- `cec_projection` is the **family name** of the WhyWatt curves (§5); the keys are `whywatt_*`.
+- Legacy modes (My Utility / CA Average / ACC) still set *both* axes their old way through Phase 7.
+- Old `elec_rate_model_a/b` / `gas_rate_model_a/b` share links and regression cases migrate by a map
+  (old key → projection method; `urdb_tou` → `whywatt_moderate`), golden-neutral.
 
 **Requested (2026-09-23):**
 1. **Home Profile** shows, next to the climate-zone line, *your electricity utility* and *your gas
    utility*. A ZIP we don't cover shows the fallback.
 2. **Home Energy Prices** splits into two things that today are one "rate model":
-   - **Current energy prices** (the *starting* price, per fuel). If we know the utility: a button
+   - **Current energy rate** (the *starting* price, per fuel). If we know the utility: a button
      with its name + default plan, e.g. **"PG&E · E-TOU-C"**; clicking it offers the other plans.
      If we don't: an EIA-based price.
    - **Projection method** (how prices *grow*). Primary buttons: **WhyWatt Conservative / Moderate
-     / Stress** plus **EIA — Pacific**. **"My Utility" is removed.** **CA Average** and **ACC** move
-     to a dropdown under Details, and selecting either shows its escalation slider.
+     / Stress** plus **EIA — Pacific**. ~~"My Utility" is removed~~ — *round 2: My Utility stays (the
+     default) in the Details dropdown until post-P7.* **CA Average** and **ACC** move to that dropdown,
+     and selecting any of the three shows its escalation slider.
 3. EIA — Pacific curves for other regions are a **TODO** for beyond-CA.
 
 **Target model — two independent axes (the core change).** Today one enum (`elec_rate_model_a`
@@ -498,17 +539,17 @@ Price in year y = StartingRate × idx[y]
 |---|---|---|
 | 1 | **No starting-rate abstraction.** Loaders (`RateLoader`, `ACCRateLoader`, `ProjectedRateSource`) each return a full `(n_years, 12)` array — level and growth fused. | New `StartingRate` + `Projection` objects; the model multiplies them. Refactor first with numbers unchanged. |
 | 2 | **Projection curves are price levels, not growth.** The bundle stores absolute $/kWh (PG&E Moderate starts at $0.386; EIA Pacific at $0.242 — a Pacific-wide average incl. WA/OR). Phase 6 used the level directly. | Use only the *shape*: `idx[y] = series[y] / series[sim start]`. The level comes from the home's own starting rate. Behaviour change vs Phase 6 — document it. |
-| 3 | **WhyWatt scenarios exist only for `CA_PGE`.** For SDG&E / SCE / others there is no curve. This conflicts with §5.1 (non-PG&E escalate on EIA Pacific). | **Decision needed:** (a) apply the PG&E index everywhere with a "PG&E-based" badge, or (b) keep §5.1 — WhyWatt buttons enabled for PG&E only, EIA Pacific the default elsewhere. |
+| 3 | **WhyWatt scenarios exist only for `CA_PGE`.** For SDG&E / SCE / others there is no curve. | ✅ **Resolved (round 2, decision 3):** non-PG&E defaults to EIA — Pacific; WhyWatt selectable everywhere, badged "PG&E-based" outside PG&E. |
 | 4 | **EIA Pacific is a single copy inside the `CA_PGE` market** (AEO Pacific census division). Beyond CA needs one curve per EIA region. Gas EIA Pacific *drops* 10% 2025→2026 before rising. | Treat as region-level data (`benchmarks` keyed by EIA region); **TODO beyond CA:** harvest AEO curves for all census divisions. Flag the first-year gas dip in help. |
 | 5 | **"EIA — Pacific (default)" mixes a price with a projection.** Today an uncovered ZIP starts from the **California-average EIA price ($0.32/kWh)**, and *out-of-state* ZIPs (e.g. 10001 NYC, 97201 Portland) also get the CA average — wrong outside CA. | Utility label: "Not covered — California average (EIA)"; projection defaults to EIA — Pacific. **TODO beyond CA:** EIA state (or division) average starting prices. |
 | 6 | **Municipal utilities resolve to PG&E.** `zip_to_electric_utility.json` holds only the three IOUs; a ZIP with *any* PG&E customers maps to PG&E. SMUD (95814), Silicon Valley Power (95050), Palo Alto CPAU (94301) all show **PG&E** (SMUD's rate is roughly half of PG&E's); LADWP ZIPs fall back to CA average. Becomes very visible once the UI says "Your utility". | Separate fix before/with the UI: add the non-IOU file, resolve multi-utility ZIPs by service share, show "Municipal utility — EIA rate" for munis; flag ambiguous ZIPs. |
-| 7 | **CA Average and ACC aren't projections today.** CA Average = CA-average *price* × CAGR; ACC = PG&E CPUC *base level* + ACC *monthly shape* + ACC CAGR. | In the new model both become "constant CAGR" projections (slider shown). ACC's monthly shape must **not** stack on a URDB starting rate (double-counts seasonality, §3) — with URDB, ACC is just a CAGR; with an EIA flat start it may keep its seasonal shape. **Decision needed:** keep the ACC shape at all, or drop it for simplicity? |
-| 8 | **Removing "My Utility" moves the default** — the current default is `cagr_flat` (EIA utility price × EIA historical CAGR, +7%/yr). The golden baseline, 12 regression cases, trend offsets (`01__elec_cagr_up`, `08__acc_*`), tests and **share links** all use the old keys. | Keep an internal `eia_historical` projection (not shown) so the refactor is golden-neutral; add a config migration map (old key → start + projection); make the default change its own commit (= §5's default flip). |
-| 9 | **Horizon & start year.** Bundle covers 2025–2050; a 30-year run from 2025 reaches 2054 and holds 2050 flat. `sim_start_year` can differ from 2025. | Index relative to `sim_start_year`; after 2050 continue at the last 5-year CAGR (not flat) — or keep flat and say so in help. |
+| 7 | **CA Average and ACC aren't projections today.** CA Average = CA-average *price* × CAGR; ACC = PG&E CPUC *base level* + ACC *monthly shape* + ACC CAGR. | ⏸ **Deferred (round 2, decision 4):** both stay as today's legacy fixed-% modes through P7; reinterpreting them as pure projections (and whether ACC keeps its seasonal shape on a URDB start) is post-P7. |
+| 8 | **Moving the default off My Utility** would move the golden, the regression cases, trend offsets (`01__elec_cagr_up`, `08__acc_*`), tests and share links. | ✅ **Mostly avoided (round 2, decision 1):** My Utility stays the default through P7. Remaining: the old-key → new-key migration map (naming table above). |
+| 9 | **Horizon & start year.** Bundle covers 2025–2050; a 30-year run from 2025 reaches 2054. `sim_start_year` can differ from 2025. | ✅ **Resolved by the anchor-year rule:** index = `S[y] / S[anchor]` with *y* the calendar year; after 2050 hold the 2050 value (stated in help), revisit post-P7. |
 | 10 | **Base-year mismatch.** EIA per-utility prices are 2024; URDB tariffs are 2024–26 vintage; projections start 2025. | Resolved by the anchor-year rule + data-vintage check: EIA electricity rebased to 2025, gas bridged to 2025, URDB anchored at 2026. |
 | 11 | **Gas has no URDB and one market.** The gas "button" is just the LDC (PG&E, SoCalGas, SDG&E) with no plan choices; WhyWatt gas scenarios (the gas-spiral curves) are PG&E-market. | Gas button shows the LDC name (no dropdown); same decision as issue 3 for non-PG&E gas. |
-| 12 | **NEM export credit escalation.** Today NEM 3.0 export = ACC avoided cost × CAGR, independent of the chosen projection. | Follow the electricity projection index (ties to §5's open "does the projection drive NEM export?"). |
-| 13 | **Scenario A/B.** The starting rate / tariff is a fact about the home; only the projection is a what-if. | One tariff picker (shared); projection chosen per scenario. |
+| 12 | **How do NEM 3.0 export credits change over the years?** The export credit *value* comes from the ACC (correct): the ACC's monthly-average avoided cost. But the model then grows it by **the retail-rate CAGR** of the chosen scenario (`get_nem3_export_rates`: `ACC[m] × (1 + retail CAGR)^y`, e.g. +7%/yr) — so export credits rise with retail prices. That is not how ACC or the Net Billing Tariff works: under NBT the export values are **locked for 9 years** at the ACC values of the year the system is interconnected; after that they follow the ACC's own future-year avoided costs, which are *not* tied to retail rates. Also, the ACC value is hourly (September evenings are very high), but we use one monthly average for every hour. | **Decision needed (not in U1).** Proposal: export credits **ignore the projection method** (they're a grid value, not a retail price): lock the install-year ACC values for 9 years, then step to the ACC's own later-year values (from the ACC workbooks already local) or hold flat; optionally use the ACC hourly shape for the evening hours. Changes solar cases → its own golden-diff commit; can be post-P7. |
+| 13 | **Which choices are per home vs per scenario (A/B)?** Scenarios A and B are WhyWatt's side-by-side what-if comparison. *Not the battery modes* — those are never a user choice; the model picks Self-powered or Cost-saving each month automatically (and A and B can pick differently because their prices differ). | ✅ **Decided:** the **current energy rate** (utility + plan) is a fact about the home → **one** plan picker, shared by A and B. The **projection method** is the what-if → chosen **per scenario**. |
 | 14 | **Labels.** Data has long names ("Pacific Gas & Electric"); URDB plan names are long. | Short-name map (PG&E, SCE, SDG&E, SoCalGas) + URDB `family` → "PG&E · E-TOU-C". |
 | 15 | **SCE is quarantined** (§3). | Button "SCE · EIA rate" (no plan dropdown) with the quarantine note until the re-harvest. |
 
@@ -613,6 +654,11 @@ Clarified 2026-09-23: *the URDB data file is used when the ZIP resolves to a uti
 
 ### §5 — Adopt the CEC projected-rate escalation as the default (Phase 6 WS1 → live)
 
+> **Status (2026-09-23): default switch DEFERRED to post-Phase-7.** In Phase 7 the WhyWatt
+> (`cec_projection`) curves ship as selectable **projection methods** applied as *growth* on the
+> home's **current energy rate** (§4.1). The factory default, the golden re-baseline for it, and the
+> NEM / social-overlay extensions below move post-P7 (NEM export: §4.1 issue 12).
+
 Phase 6 built `cec_projection` as a **non-default** rate model (a `ProjectedRateSource` reading
 `data/rates/projection/whywatt_rate_projection.json`) and produced a difference evaluation
 (`notebooks/rate_switch_review.ipynb`) quantifying what switching would change. Phase 7 makes the
@@ -660,9 +706,10 @@ So Phase 7 scopes projection to PG&E and defers SCE/SDG&E:
 the escalation. Adding SCE/SDG&E later is then a **data drop** (new markets), no code change — the
 selector and the EIA-Pacific fallback are built once, now.
 
-**Acceptance (§5):** `cec_projection` is the PG&E default; non-PG&E CA ZIPs escalate on EIA Pacific
-via the market selector; the golden is re-baselined in a dedicated commit whose diff matches the
-Phase 6 evaluation; NEM/social extension decisions are recorded.
+**Acceptance (§5, Phase 7 part):** the WhyWatt curves are selectable projection methods for every
+CA ZIP (PG&E market); non-PG&E CA ZIPs default to EIA — Pacific growth via the market selector; the
+golden does **not** move. *(Post-P7: the default flip with its own golden re-baseline; NEM/social
+extension decisions.)*
 
 ---
 
@@ -735,27 +782,38 @@ src/
   solar_loader.py       (NEW) SolarResourceLoader + SolarResource — ZIP → zone → default, clock time
   home_config.py        HomeConfig.solar_resource (derived property from zip_code; not serialized)
   journey.py            SolarConfig = user choices only (no specific_yield, no scf);
-                        BatteryConfig live (round_trip_eff, power_kw); SolarBatteryConfig retired;
+                        BatteryConfig live (round_trip_eff, charge/discharge kW — Powerwall 3
+                        defaults); SolarBatteryConfig shim kept (retirement deferred);
                         hourly representative-day energy balance (§0)
   urdb_rates.py         (NEW, landed) URDBRates + RateStructure: coverage gate (+ SCE quarantine),
                         baseline-scaled tiers, period_fractions / price_month, tariff options (§3)
+  starting_rates.py     (NEW, U1) current energy rate resolver (URDB plan | EIA per-utility |
+                        starting_rates.json) + projection index S[y]/S[anchor] (§4.1)
   projected_rate_source.py  market selector: eiaid → market, EIA-Pacific fallback for non-PG&E (§5.1)
-  model.py              wire peak/non-peak split + solar/battery reduction order; home-level bill
-  ui/sim.py, panels.py  roof geometry live; URDB TOU rate-model option + per-utility tariff picker
-  ui/charts.py          solar-monthly / peak-offpeak / battery-dispatch charts
-  data/config/whywatt_default.json   default rate model cagr_flat → cec_projection (§5)
+  model.py              peak/non-peak + solar/battery (landed); projection keys = current rate ×
+                        index (U1); legacy keys untouched
+  ui/sim.py, panels.py  roof geometry stays inert; Current energy rate + Projection method cards,
+                        utilities in Home Profile (U2)
+  ui/charts.py          solar-monthly / peak-offpeak / energy-balance charts (§4)
+  data/config/whywatt_default.json   default stays cagr_flat (My Utility) through P7; new keys per
+                        the §4.1 naming table; battery defaults from battery_defaults.json
 data/
   solar/pvwatts_zip.json       (from OfflineSolarData_Plan) now CONSUMED via SolarResourceLoader
-  rates/urdb_tou.json          (from OfflineURDB_Plan, DONE) now CONSUMED by URDBRateStructure
+  rates/urdb_tou.json          (from OfflineURDB_Plan, DONE) now CONSUMED by URDBRates / RateStructure
   rates/urdb_coverage.json     (from OfflineURDB_Plan, DONE) the "can we use URDB?" gate
   rates/urdb_baseline_crosswalk.json (from OfflineURDB_Plan, DONE) ZIP→territory baselines
-  rates/projection/whywatt_rate_projection.json  now the DEFAULT rate source (§5); CA_PGE only —
-                        add CA_SCE/CA_SDGE markets post-P7 (§5.1)
+  rates/projection/whywatt_rate_projection.json  consumed as a growth index (§4.1); default only
+                        post-P7; CA_PGE only — add CA_SCE/CA_SDGE markets post-P7 (§5.1)
+  rates/eia_rates_by_utility.json  rebuilt at base year 2025 (electricity EIA-861M 2025; gas bridged
+                        by the CA state ratio until EIA-176 2025) (§4.1 data-vintage check)
+  rates/starting_rates.json    (NEW, U1) current energy rate when the ZIP has no utility (EIA — Pacific)
+  appliances/battery_defaults.json  (NEW) Tesla Powerwall 3 datasheet values + provenance (§2)
   loads/end_use_profiles.json  (§6, separate branch) NREL End-Use Load Profiles per CEC zone ×
                         end use × month × 24 clock hours — replaces device_load_shapes.json in the
                         energy balance
 scripts/
   build_urdb*.py / build_baseline_crosswalk.py  (OfflineURDB, DONE; re-run to add utilities)
+  build_starting_rates.py      (NEW, U1) starting_rates.json + the 2025 rebase of eia_rates_by_utility
 tests/
   test_solar_loader.py  (NEW) ZIP→zone→default, schema_version gate, clock-time shift (rows still
                         sum to 1; July output moves +1 h, Jan does not), production = system_kw×ac_annual,
@@ -794,10 +852,13 @@ tests/
 
 ## Still open (resolve during Phase 7)
 
-- Confirm battery defaults (round-trip 0.90, 5 kW power cap) against a current spec sheet; the
-  hourly grain makes the power cap meaningful, so it stays in the model.
-- Mid-day "super-off-peak" period (SCE/SDG&E) is folded into off-peak by the 2-rate model — confirm
-  acceptable, or extend to 3 billing periods later.
+- ✅ Battery defaults → **Tesla Powerwall 3** datasheet (§2): 13.5 kWh, 89%, 5 kW charge / 11.5 kW
+  discharge. Harvest + model split is a work item (own golden diff).
+- ✅ **Two periods only — peak and off-peak.** WhyWatt has no super-off-peak period; where a
+  URDB plan has one (e.g. SDG&E, SCE midday) it is ignored for now and those hours are priced as
+  off-peak. No 3-period extension planned.
+- **NEM export credit escalation** (§4.1 issue 12): lock-for-9-years + ACC future values vs
+  today's retail-CAGR growth — decide; likely post-P7.
 - §6 load profiles: does the ACC rate weighting also switch to the NREL profiles, or keep
   `device_load_shapes.json`? NREL source details (version, geography → CEC zone, EV coverage,
   timestamps) to verify at planning.
@@ -817,14 +878,19 @@ tests/
       self-consumption/export from real load; balance identities close in every mode; per-mode
       log generated; two-mode picker within a few % of the offline LP benchmark; `scf` removed.
       *(commit C, 2026-09-22 — matched the LP optimum on all battery cases)*
-- [ ] URDB `RateStructure` consumed: `period_fractions` split via real per-tariff peak hours,
-      `price_month` slabs on the home aggregate, coverage gate + ZIP→baseline resolved (offline DONE).
+- [x] URDB `RateStructure` consumed: `period_fractions` split via real per-tariff peak hours,
+      `price_month` slabs on the home aggregate, coverage gate + ZIP→baseline resolved.
+      *(§3, 2026-09-23 — as the interim `urdb_tou` option; SCE quarantined)*
+- [ ] Battery defaults = Tesla Powerwall 3 (harvested with provenance; charge/discharge caps split);
+      own golden diff.
 - [ ] **PG&E area fully working** end-to-end as a selectable choice (URDB plan × WhyWatt curve
       growth, §4.1); non-PG&E areas default to EIA — Pacific growth with WhyWatt selectable; ZIPs
       without a URDB price start from `starting_rates.json`; all CA ZIPs degrade gracefully.
-- [ ] §4.1 UI rework (U1 + U2): Home Profile utilities, Current energy prices, Projection method;
-      My Utility / CA Average / ACC in the Details dropdown. NEM/social extension recorded.
-- [ ] Golden unchanged through Phase 7 (My Utility stays the default); full `pytest` green.
+- [ ] §4.1 UI rework (U1 + U2): Home Profile utilities, **Current energy rate**, **Projection
+      method** (naming table applied to keys, UI and help); My Utility / CA Average / ACC in the
+      Details dropdown; municipal-utility ZIPs resolved before U2. NEM export decision recorded.
+- [ ] Golden unchanged by U1/U2 (My Utility stays the default); only the battery-defaults commit
+      moves it, with the diff explained; full `pytest` green.
 - [ ] *(post-Phase-7)* default → projection with URDB starting price (own golden diff).
 - [ ] Charts + Help updated (roof geometry remains inert — default orientation).
 - [ ] §6 NREL End-Use Load Profiles drive the energy balance (separate branch; own golden re-baseline).
