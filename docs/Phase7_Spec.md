@@ -1,7 +1,9 @@
 # WhyWatt — Phase 7 Development Spec
 
-**Status:** 🟡 IN PROGRESS — the data-pipeline + golden-rebaseline phase. Flow new simulation
-data through the model. (Adopting the WhyWatt projection as the *default* moved to post-Phase-7, §5.)
+**Status:** ✅ **CLOSED 2026-09-24** — the data-pipeline + golden-rebaseline phase. Real solar,
+battery physics, URDB time-of-use pricing and projection methods flow through the model; UI and
+charts updated. Adopting a projection as the *default* moved to post-Phase-7 (§5). Next, before
+the Beta release: §6 NREL End-Use Load Profiles and the gas-rate base review (own branches).
 **Follows:** Phase 6 (`docs/Phase6_Spec.md`) — Solar/Battery split, inert roof-geometry inputs, and
 the **non-default `cec_projection` rate hand-off interface** (evaluated but not switched). Offline
 PVWatts/URDB data is harvested and validated separately in `docs/OfflineSolarData_Plan.md`.
@@ -1310,4 +1312,4 @@ tests/
       EU.9 monthly solar generation (year selector); EU.10 solar & battery energy balance; R.6
       peak vs off-peak (URDB plans). Help updated; golden unchanged. *(2026-09-24)*
 - [ ] §6 NREL End-Use Load Profiles drive the energy balance (separate branch; own golden re-baseline).
-- [ ] CLAUDE.md updated: Phase 7 closed.
+- [x] CLAUDE.md updated: Phase 7 closed. *(2026-09-24)*

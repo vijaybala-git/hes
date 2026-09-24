@@ -1,6 +1,8 @@
 # WhyWatt — Project Brain (Claude Code reads this automatically)
 
-> Keep this file current after each phase. Last updated: 2026-05-29 — Phase 2 closed, entering user testing & evaluation.
+> Keep this file current after each phase. Last updated: 2026-09-24 — **Phase 7 closed** (real solar,
+> battery physics, URDB time-of-use pricing, projection methods). Next: §6 NREL load profiles +
+> gas-rate base review → Beta release.
 
 ---
 
@@ -16,15 +18,22 @@ Primary audience: electrification advocates running sessions with homeowners.
 
 ---
 
-## Current phase: USER TESTING & EVALUATION (post Phase 2)
+## Current phase: PHASE 7 CLOSED → Beta prep
 
-Phase 2 is **complete and closed** as of 2026-05-29. See `docs/Phase2_Spec.md` for the full delivery record.
+Phase 7 is **complete and closed** as of 2026-09-24. See `docs/Phase7_Spec.md` (Definition of done,
+"Landed" notes per section) for the full delivery record.
 
-Next development phase (Phase 3) has not been scoped. Items deferred from Phase 2:
-- Income-qualified rebates
-- Monte Carlo uncertainty bands
-- HomeConfig JSON save/load (user sessions)
-- Multi-utility support (SCE, SDG&E)
+Before the Beta release (each on its own branch off `main`):
+- **§6 NREL End-Use Load Profiles** — replace `device_load_shapes.json` in the hourly energy
+  balance (per CEC zone × end use × month × 24 h); own golden re-baseline.
+- **Gas-rate base review** — the WhyWatt gas curves were rebased onto $2.08 (PG&E G-1) vs the CEC
+  delivered $2.59 and EIA effective $2.66; check which component the $2.08 drops
+  (`docs/rate_projection_gas_provenance.md` "Open review", Phase 7 Post-Phase-7 list).
+
+Other post-Phase-7 items (not gating Beta): default → a projection method (target: WhyWatt
+Conservative + PG&E E-TOU-C + solar + battery = regression case 13 — review the gas curve first),
+independent battery, SCE re-harvest, `SolarBatteryConfig` shim retirement, solar wave 2 (PCE /
+SJCE), beyond-CA data.
 
 ---
 
@@ -32,6 +41,18 @@ Next development phase (Phase 3) has not been scoped. Items deferred from Phase 
 
 - **Phase 1:** Mesa agent framework, dual JSON home configs, EnergyPrice class,
   Solara EN-ROADS-style UI, 6 chart types, 42 unit tests. Internal unit: MMBtu (now eliminated).
+- **Phases 2–6:** see `docs/Phase2_Spec.md` … `docs/Phase6_Spec.md` (journey model, ZIP-driven
+  climate, EIA per-utility rates, UI redesign, regression harness, share links, rate-projection
+  hand-off).
+- **Phase 7 (closed 2026-09-24):** offline PVWatts per-ZIP solar (zone fallback, clock time);
+  hourly representative-day energy balance with two battery modes (Self-powered / Cost-saving,
+  cheaper per month); Tesla Powerwall 3 battery defaults; URDB time-of-use plans (PG&E, SDG&E;
+  SCE quarantined) priced with tiers + fixed charge; "current energy rate × projection growth"
+  (WhyWatt Conservative / Moderate / Stress, EIA Pacific) with EIA 2025 starting rates; NEM 3.0
+  export credit = hourly ACC by calendar year; municipal utilities resolved by geography; UI:
+  utilities line, Current Energy Rate / Projection Method cards, Solar / Battery / Panel cards in
+  the Journey, unified Plan row; charts R.1/R.2 (four projection curves), EU.9, EU.10, R.6;
+  regression suite 32 base cases (PG&E plans × projections, gas-isolation set).
 
 ---
 
@@ -101,7 +122,15 @@ Electricity (E-1):  $0.386/kWh   (Cal Advocates Q2 2025 report)
 Gas (G-1):          $2.08/therm  (PG&E Advice Letter 5014-G1, Jan 2025)
 ```
 
-**Escalation scenarios:**
+**Phase 7 rate model (current):** default rate model is still **My Utility** (`cagr_flat`: EIA
+per-utility 2024 rate × fixed %/yr) — golden-stable until the post-P7 default flip. Projection
+methods price *current energy rate × S[y]/S[anchor]*: current rate = URDB plan (PG&E E-TOU-C,
+effective 2026) → utility EIA 2025 (PG&E elec $0.3991/kWh; gas $2.66/therm = EIA-176 2024 × CA
+ratio 1.1499, bridged) → EIA Pacific ($0.242 / $1.99) when no utility. Battery default = Tesla
+Powerwall 3 (13.5 kWh, 89%, 5 kW charge / 11.5 kW discharge). NEM 3.0 export = hourly ACC 2024
+(CZ4) for each calendar year (`data/rates/nbt_export_acc.json`).
+
+**Escalation scenarios (legacy fixed-%/yr presets):**
 ```
 conservative:  elec +4%/yr,  gas +4%/yr
 moderate:      elec +7%/yr,  gas +8%/yr   ← default (matches 10-yr historical)
@@ -170,6 +199,18 @@ tests/
   test_journey.py       Objective 3
   test_dual_scenario.py Objective 5
 ```
+
+**Added in Phase 7** (see `docs/Phase7_Spec.md` → Module / data deltas):
+```
+src/  solar_loader.py  dispatch.py  urdb_rates.py  starting_rates.py  nbt_export.py
+      battery_defaults.py
+data/ solar/pvwatts_zip.json  rates/urdb_tou.json  rates/starting_rates.json
+      rates/nbt_export_acc.json  appliances/battery_defaults.json
+scripts/ build_pvwatts.py  build_urdb*.py  build_starting_rates.py  build_nbt_export.py
+      build_battery_defaults.py  ca_munis.py (+ muni rule in build_zip_utility_map.py)
+```
+Interpreter: `.venv/Scripts/python.exe` (the base `python` has no deps). Regression:
+`scripts/run_regression.py` (`--update` re-blesses golden).
 
 **Deleted in Phase 2:**
 - src/energy_consumer.py → replaced by src/devices/
