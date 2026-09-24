@@ -171,6 +171,24 @@ report text before the Beta.
 6. Notebooks that print curve levels (`notebooks/rate_projection_review.ipynb`,
    `rate_switch_review.ipynb`): re-run so their outputs match (or note them as historical).
 
+## 5b. Landed (2026-09-24, group A)
+
+- `projected_rate_model.py`: `BASE_RETAIL["gas"] = cec_gas_base_nominal()` ($2.64914) — derived
+  from `cec_gas_rate.json` × the deflator. `export_rate_projection.py` → bundle rebuilt: every gas
+  scenario ×1.2736 (conservative / moderate / stress 2050 nominal $31.55 / $58.54 / $150.37; real
+  2024$ $17.81 / $33.05 / $84.89); electricity and benchmarks byte-identical; `base_retail_note` and
+  the gas utility label rewritten.
+- Tests: anchor = CEC nominal; the gas curve equals the CEC delivered price in every year and
+  scenario; the 2025 base is within 3 % of EIA-176 PG&E. **Golden unchanged** (60 trend moves
+  correct); 550 tests pass.
+- Guide text + `rate_projection_curves.svg` + served HTML (which also picked up earlier, never-built
+  guide edits); provenance doc Open review resolved; OfflineRateProjection_Plan, Phase6_Spec (dated
+  note), Phase7_Spec post-P7 item, CLAUDE.md constants; `rate_projection_review.ipynb` re-run; help
+  caveat on the legacy ACC gas base (ACC-1).
+- **Open:** group B — the Phase 6 model-result reports (§4c), pending a decision.
+- **Not done (optional §3 items):** fees / taxes in the EIA revenue definition; the electricity
+  analogue (E-1 $0.386 vs EIA $0.399 vs CEC ~$0.408) — reported, not changed.
+
 ## 6. Acceptance
 
 - The $2.08's missing components are identified and written down (provenance doc).
