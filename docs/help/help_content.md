@@ -677,7 +677,7 @@ The export rate depends on your net-metering era:
 
 ### Default values
 
-- Add solar — off
+- Solar — not planned (tick Plan on the Solar card, or Solar in the Plan row)
 - Install year — 1
 - Number of panels — 15
 - Kilowatts per panel — 0.42 (about a 6.3 kW system)

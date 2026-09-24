@@ -740,7 +740,7 @@ def _PanelControls():
     planned = panel_upgrade_planned.value
     # Row 1: plan checkbox
     with solara.Row(gap="8px", style=_ROW_CTRL):
-        _PlanCheck(panel_upgrade_planned, "Plan panel upgrade", right=False)
+        _PlanCheck(panel_upgrade_planned, "Plan")
     # Row 2: full-width year slider + subscript
     if planned:
         with solara.Column(style="width:100%"):
@@ -839,7 +839,7 @@ def SolarSummaryCard():
     with solara.Column(classes=_device_classes("solar")):
         _card_header("solar", "Solar")
         with solara.Row(gap="10px", style=_ROW_CTRL):
-            _Check(label="Add solar", value=solar_planned)
+            _PlanCheck(solar_planned, "Plan")
         if planned:
             # Panels slider
             panels = solar_panels.value
@@ -880,7 +880,6 @@ def BatterySummaryCard():
         _card_header("battery", "Battery")
         if solar_on:
             with solara.Row(gap="8px", style=_ROW_CTRL + " align-items:center"):
-                _Check(label="Battery", value=solar_battery_enabled)
                 if solar_battery_enabled.value:
                     solara.HTML(tag="div", unsafe_innerHTML=(
                         f"<div style='font-size:0.78em; color:#555;'>"
@@ -888,6 +887,7 @@ def BatterySummaryCard():
                         if _battery_is_default() else
                         f"<div style='font-size:0.78em; color:#555;'>"
                         f"{solar_battery_kwh.value:g} kWh</div>"))
+                _PlanCheck(solar_battery_enabled, "Plan")
         solara.HTML(tag="div", unsafe_innerHTML=(
             "<div style='font-size:0.78em; color:#90A4AE; margin-top:3px;'>"
             + _battery_link_note() + "</div>"))
