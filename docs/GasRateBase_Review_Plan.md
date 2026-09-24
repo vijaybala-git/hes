@@ -46,7 +46,7 @@ $2.08 is the outlier.
    single "G-1 rate" includes), not a one-off data error.
 5. **The legacy ACC mode also uses the $2.08** (`RateLoader` → `pge_gas_g1.json`), so ACC-mode gas
    results (regression case 08, offsets `08__acc_*`) sit ~20 % below what PG&E households pay.
-7. **What the $2.08 is (investigation step 1 — done 2026-09-24).** PG&E's Gas RateFinder for
+6. **What the $2.08 is (investigation step 1 — done 2026-09-24).** PG&E's Gas RateFinder for
    January 2024 (`GRF0124.pdf`) gives the residential schedule components:
 
    | $/therm, Jan 2024 | G-1 baseline | G-1 excess | GL-1 (CARE) baseline | GL-1 (CARE) excess |
@@ -70,15 +70,15 @@ $2.08 is the outlier.
    (Sep 2024: $2.657 / $2.095). A PG&E-wide residential mix of ≈ 72 % non-CARE / 28 % CARE gives
    ≈ $2.71 — consistent with EIA-176 ($2.66) and the CEC delivered price ($2.649 nominal). The
    $2.08 was never PG&E's non-CARE rate for 2025.
-8. **Modelling note (for later, not this branch):** the model's current gas rate ($2.66, EIA
+7. **Modelling note (for later, not this branch):** the model's current gas rate ($2.66, EIA
    revenue ÷ volume) is a **CARE + non-CARE blended** average. A non-CARE home pays ≈ $2.89, a CARE
    home ≈ $2.28 (2025). A CARE / non-CARE choice belongs with the deferred income-qualified work.
-9. **Electricity has the same question, milder:** `BASE_RETAIL.elec` $0.386 (E-1) vs EIA 2025
+8. **Electricity has the same question, milder:** `BASE_RETAIL.elec` $0.386 (E-1) vs EIA 2025
    $0.3991 vs the CEC blended ~$0.408 (the code comment already notes "~6 % level offset").
 
 ## 3. Investigation steps (what the $2.08 leaves out)
 
-1. ✅ **Trace the $2.08 to its source** — done (finding 7): it tracks the CARE (GL-1) baseline
+1. ✅ **Trace the $2.08 to its source** — done (finding 6): it tracks the CARE (GL-1) baseline
    schedule charge without the public-purpose surcharge.
 2. **Quantify each candidate component** for a typical PG&E residential customer (2024–2025):
    - **tier mix** — baseline vs excess ("above baseline") therms and the excess-tier premium;
@@ -88,7 +88,7 @@ $2.08 is the outlier.
    - **franchise fees, taxes** (state / local, e.g. utility users' tax — EIA revenue may or may not
      include them; confirm the EIA-176 revenue definition).
 3. **Reconcile:** CARE baseline → + CARE discount → + surcharge → + tier mix → the system average
-   (≈ $2.65–2.71). Record the build-up in the provenance doc. (First pass in finding 7; confirm with
+   (≈ $2.65–2.71). Record the build-up in the provenance doc. (First pass in finding 6; confirm with
    the 2025 RateFinder / tariff sheets if PG&E publishes them at a stable URL.)
 4. **Check the electricity analogue** the same way (E-1 $0.386 vs EIA $0.399 vs CEC $0.408) —
    report; fix in this branch only if the cause is the same and the user agrees.
