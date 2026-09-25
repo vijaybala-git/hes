@@ -227,6 +227,11 @@ scripts/ build_pvwatts.py  build_urdb*.py  build_starting_rates.py  build_nbt_ex
 Interpreter: `.venv/Scripts/python.exe` (the base `python` has no deps). Regression:
 `scripts/run_regression.py` (`--update` re-blesses golden).
 
+**Architecture explainer** (`docs/explainer/`, static site → www.whywatt.org/explainer/): its charts
+read JS snapshots in `docs/explainer/assets/` — refresh with `scripts/build_explainer_data.py` after
+rebuilding climate / PVWatts / NREL / projection / URDB / ACC data; publish with
+`scripts/publish-explainer.ps1` (dry run; `-Push` commits + pushes the Pages repo clone).
+
 **Deleted in Phase 2:**
 - src/energy_consumer.py → replaced by src/devices/
 - src/energy_price.py    → replaced by src/rate_loader.py

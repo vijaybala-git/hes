@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Water Heater Model · WhyWatt? HEX</title>
+<meta name="description" content="How WhyWatt? HEX models a gas water heater and a heat-pump water heater: the physics, a worked example, and what is simplified.">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body data-root="../" data-page="wh">
+<main>
+<div class="detail">
+  <aside class="side" id="side"></aside>
+  <div>
+    <div class="crumbs"><a href="../index.html">System map</a> / <a href="index.html">Appliances</a> / Water heater</div>
+    <p class="eyebrow">Appliance · level of detail 3 of 4 · physics</p>
+    <h1>Water heater: gas tank → heat-pump water heater</h1>
+    <p class="lede">Hot water is usually a home's second-largest gas load. The energy needed is simple physics: <b>how many gallons</b>, times <b>how many degrees</b> each gallon is warmed from the water main to the tank setting, divided by <b>how efficiently</b> the heater does it.</p>
+
+    <div class="block">
+      <h2>The swap</h2>
+      <div class="homes">
+        <div class="home dn"><h4>Do nothing</h4>
+          <div class="slotrow"><span>System</span><span>Gas storage tank</span></div>
+          <div class="slotrow"><span>Efficiency</span><span>UEF 0.65</span></div>
+          <div class="slotrow"><span>Age · lifespan</span><span>10 yrs · 12 yrs</span></div>
+          <div class="slotrow"><span>Replacement</span><span>$1,200 like-for-like</span></div>
+        </div>
+        <div class="home yj"><h4>Your journey</h4>
+          <div class="slotrow"><span>System</span><span>Heat-pump water heater</span></div>
+          <div class="slotrow"><span>Efficiency</span><span>UEF 3.5 (moves heat from the air)</span></div>
+          <div class="slotrow"><span>Swap</span><span>year 5 · $2,500 − $500 rebate</span></div>
+          <div class="slotrow"><span>Lifespan · circuit</span><span>15 yrs · 15 A at 240 V</span></div>
+        </div>
+      </div>
+      <p style="margin-top:12px">Defaults shown; every value is editable in the app. Both heaters serve the same gallons at the same 120°F setting.</p>
+    </div>
+
+    <div class="block">
+      <h2>The physics</h2>
+      <p>Warming one gallon of water by 1°F takes 8.33 BTU. The water main is colder in winter, so each gallon needs more heating then. That monthly water temperature comes from the <a href="../pipelines/climate.html">climate pipeline</a>.</p>
+      <div class="formula">gas   therms[m] = gallons/day × days[m] × 8.33 × (120°F − water_main[m]) × 0.00001 / UEF
+HPWH  kWh[m]    = gallons/day × days[m] × 8.33 × (120°F − water_main[m]) / 3,412 / (UEF × location)</div>
+      <div class="row3" style="margin-top:12px">
+        <div class="kpi"><div class="k">Gallons per day</div><div class="u">By bedrooms: 1 BR 30 · 2 BR 50 · <b>3 BR 65</b> · 4 BR 75 · 5 BR 85 (DOE / ENERGY STAR), or your own number.</div></div>
+        <div class="kpi"><div class="k">UEF</div><div class="u">Uniform Energy Factor: heat delivered to the water ÷ energy used. A gas tank loses heat up its flue; a heat pump moves ~3.5 units of heat per unit of electricity.</div></div>
+        <div class="kpi"><div class="k">Location</div><div class="u">A heat pump in a cold garage works harder: efficiency × 0.85 in unconditioned space, × 1.00 indoors.</div></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2>Try it</h2>
+      <div class="ctl">
+        <div><label for="zone">Climate zone <output id="o-zone"></output></label><select id="zone" class="sel"></select></div>
+        <div><label for="br">Bedrooms <output id="o-br"></output></label><input type="range" id="br" min="1" max="5" step="1" value="3"></div>
+        <div><label for="gu">Gas UEF <output id="o-gu"></output></label><input type="range" id="gu" min="0.55" max="0.95" step="0.01" value="0.65"></div>
+        <div><label for="hu">HPWH UEF <output id="o-hu"></output></label><input type="range" id="hu" min="2" max="4.2" step="0.1" value="3.5"></div>
+        <div><label>Heat pump sits</label><div class="seg" id="loc"><button data-v="1" class="on">Indoors</button><button data-v="0.85">Garage</button></div></div>
+      </div>
+      <div class="row3" style="margin-bottom:12px">
+        <div class="kpi dn"><div class="k">Gas tank</div><div class="v" id="k-gas"></div><div class="u">therms / yr</div></div>
+        <div class="kpi yj"><div class="k">Heat-pump WH</div><div class="v" id="k-hp"></div><div class="u">kWh / yr</div></div>
+        <div class="kpi"><div class="k">Energy used</div><div class="v" id="k-ratio"></div><div class="u">heat pump vs gas tank, same hot water</div></div>
+      </div>
+      <div class="row2">
+        <div class="chart"><svg id="c-gas"></svg><div class="caption">Do nothing · therms per month</div></div>
+        <div class="chart"><svg id="c-hp"></svg><div class="caption">Your journey · kWh per month</div></div>
+      </div>
+      <p class="caption">Energy only. Cost = monthly therms × gas rate, or kWh × electric rate (see <a href="../pipelines/urdb.html">tariffs</a>). 1 therm = 29.3 kWh for the comparison.</p>
+    </div>
+
+    <div class="block">
+      <h2>Within the day</h2>
+      <p>The heat pump's monthly kWh is spread over the day with NREL's <b>water_heating</b> profile from ResStock's heat-pump-water-heater run: a morning shower peak and a smaller evening one. A heat-pump water heater can also be scheduled to heat ahead of the 4–9 pm peak; that isn't modeled yet.</p>
+      <div class="chart" style="max-width:680px"><svg id="c-shape"></svg></div>
+      <p class="caption">Share of the day's energy by clock hour · <span id="shz"></span> · <span id="shp"></span></p>
+    </div>
+
+    <div class="block">
+      <h2>What's modeled, what's simplified</h2>
+      <div class="row2">
+        <ul class="tight">
+          <li class="ok"><b>Monthly water-main temperature</b> for your climate zone, so winter hot water costs more.</li>
+          <li class="ok"><b>Household size</b> sets the gallons, and you can override it.</li>
+          <li class="ok"><b>Garage installs</b> pay an efficiency penalty.</li>
+          <li class="ok"><b>Checked by tests:</b> at the reference climate, the gas tank lands at ≈ 210 therms/yr and the HPWH at ≈ 1,050 kWh/yr (±5%).</li>
+        </ul>
+        <ul class="tight">
+          <li class="lim"><b>Standby losses are inside UEF,</b> not modeled separately.</li>
+          <li class="lim"><b>Constant heat-pump efficiency:</b> no switch to backup resistance heating on heavy-use or cold days.</li>
+          <li class="lim"><b>No load shifting:</b> a timer that heats before the peak would lower the bill.</li>
+        </ul>
+      </div>
+      <div class="sec code">Code</div>
+      <div class="chips code"><span class="chip file">src/devices/physics.py · GasWaterHeater, HeatPumpWaterHeater, AMBIENT_COP_FACTOR</span><span class="chip file">src/home_config.py · HOT_WATER_GAL_PER_DAY</span><span class="chip file">data/climate/tmy3_zones.json · monthly_inlet_water_f</span><span class="chip file">tests/test_devices.py</span></div>
+    </div>
+    <div class="pager" id="pager"></div>
+  </div>
+</div>
+</main>
+
+<script src="../assets/nodes.js"></script>
+<script src="../assets/climate_zones.js"></script>
+<script src="../assets/nrel_profiles.js"></script>
+<script src="../assets/explainer.js"></script>
+<script>
+const {C, bars, MONTHS, zoneOptions, nrelChart} = WW;
+const $ = id => document.getElementById(id), sum = a => a.reduce((x,y)=>x+y,0), fmt = n => Math.round(n).toLocaleString('en-US');
+const DAYS = [31,28,31,30,31,30,31,31,30,31,30,31], GAL = {1:30,2:50,3:65,4:75,5:85};
+zoneOptions($('zone'));
+let loc = 1;
+$('loc').querySelectorAll('button').forEach(b => b.onclick = () => { loc = +b.dataset.v; $('loc').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); render(); });
+function render(){
+  const z = ZONES[+$('zone').value], gal = GAL[+$('br').value], gu = +$('gu').value, hu = +$('hu').value;
+  const btu = DAYS.map((d,m) => gal*d*8.33*(120 - z.inlet[m]));
+  const gas = btu.map(b => b*1e-5/gu), hp = btu.map(b => b/3412/(hu*loc));
+  $('o-zone').textContent = z.city; $('o-br').textContent = `${$('br').value} · ${gal} gal/day`; $('o-gu').textContent = gu.toFixed(2); $('o-hu').textContent = hu.toFixed(1);
+  $('k-gas').textContent = fmt(sum(gas)); $('k-hp').textContent = fmt(sum(hp)); $('k-ratio').textContent = Math.round(sum(hp)/(sum(gas)*29.3)*100) + '%';
+  bars($('c-gas'), {x:MONTHS, series:[{d:gas, c:C.n}]}); bars($('c-hp'), {x:MONTHS, series:[{d:hp, c:C.j}]});
+  const r = nrelChart($('c-shape'), z.id, 'water_heating');
+  $('shz').textContent = z.id + ' ' + z.city; $('shp').textContent = `${r.janPeak}% (Jan) / ${r.julPeak}% (Jul) of the day's energy lands in the peak`;
+}
+['zone','br','gu','hu'].forEach(id => $(id).oninput = $(id).onchange = render); render();
+</script>
+</body>
+</html>

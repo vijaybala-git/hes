@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rate Projection · WhyWatt? HEX</title>
+<meta name="description" content="How WhyWatt? HEX projects electricity and gas prices over 20 years from California Energy Commission forecasts.">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body data-root="../" data-page="projection">
+<main>
+<div class="detail">
+  <aside class="side" id="side"></aside>
+  <div>
+    <div class="crumbs"><a href="../index.html">System map</a> / Offline pipelines / Rate projection</div>
+    <p class="eyebrow" style="color:var(--proj)">Offline pipeline · rate projection</p>
+    <h1>Rate projection: how prices could grow over 20 years</h1>
+    <p class="lede">A heat pump bought today runs for 15 years or more, so what matters is the price of electricity and gas over that whole period, not just today. WhyWatt doesn't make up growth rates: it follows the <b>California Energy Commission's 2025 rate forecasts</b> and offers three scenarios, so you can see how sensitive the answer is.</p>
+
+    <div class="facts">
+      <div><div class="k">Source</div><div class="v">CEC 2025 IEPR electricity &amp; gas rate forecasts</div></div>
+      <div><div class="k">Cross-checks</div><div class="v">CPUC ACC 2024 · EIA AEO 2026 · E3 2020</div></div>
+      <div><div class="k">Horizon</div><div class="v">2025–2050 · nominal dollars</div></div>
+      <div><div class="k">Built</div><div class="v">2026-09-24 · PG&amp;E market</div></div>
+    </div>
+
+    <div class="block">
+      <h2>The pipeline</h2>
+      <p>Offline, the CEC workbooks and the CPUC avoided-cost model are reduced to a <b>growth curve</b> per fuel and scenario. At run time the curve supplies <b>only the shape</b>: today's level always comes from your <a href="urdb.html">tariff</a>. So a Moderate PG&amp;E home and a Moderate SMUD home grow at the same pace from different starting prices.</p>
+      <div class="canvas static" id="flow" style="margin-top:10px"></div>
+      <div class="formula" style="margin-top:12px">rate[y] = current_rate × S[y] / S[anchor year]        (anchor = the year the current rate is from)</div>
+    </div>
+
+    <div class="block">
+      <h2>The four curves</h2>
+      <p>Each line is price relative to 2025 (1.0 = today's price). Electricity stays close to inflation: the CEC expects it to flatten, then rise. Gas is very different: see the note below.</p>
+      <div class="row2">
+        <div class="chart"><svg id="c-elec"></svg><div class="caption">Electricity · growth index · linear scale</div></div>
+        <div class="chart"><svg id="c-gas"></svg><div class="caption">Gas · growth index · <b>log scale</b> (each gridline is 10×)</div></div>
+      </div>
+      <table class="data" style="margin-top:12px" id="stab"><thead><tr><th>Scenario</th><th>Built from</th><th>Elec ×, yr 20</th><th>Gas ×, yr 20</th></tr></thead><tbody></tbody></table>
+      <p class="caption">"Yr 20" = 2045, the last year of a 20-year run starting in 2026.</p>
+    </div>
+
+    <div class="block" style="border-left:4px solid var(--climate)">
+      <h2>Why the gas curves climb so steeply</h2>
+      <p>The CEC gas forecasts model a shrinking gas system: as homes electrify, the cost of pipelines and safety work is spread over fewer and fewer customers. <b>Conservative</b> assumes the utility manages that decline; <b>Stress</b> assumes costs are recovered as today (a "death spiral"). All three are CEC planning cases, not WhyWatt estimates, and they sit above the independent E3 2020 high-electrification path. A review of the gas curve is open before a projection method becomes the app's default.</p>
+    </div>
+
+    <div class="block">
+      <h2>What's inside an electricity price</h2>
+      <p>The build splits the retail price into the <b>marginal cost</b> of energy and delivery (from the CPUC avoided-cost model) and everything else: wires, wildfire mitigation, public programs. Nearly all the growth comes from the second part.</p>
+      <div class="chart" style="max-width:560px"><svg id="c-dec"></svg></div>
+      <p class="caption">Moderate scenario, $/kWh, PG&amp;E base $0.386 in 2025.</p>
+    </div>
+
+    <div class="block">
+      <h2>Try it</h2>
+      <div class="ctl">
+        <div><label for="sc">Scenario</label><select id="sc" class="sel"><option value="conservative">WhyWatt Conservative</option><option value="moderate" selected>WhyWatt Moderate</option><option value="stress">WhyWatt Stress</option><option value="eia_pacific">EIA Pacific</option></select></div>
+        <div><label for="e0">Today's electricity <output id="o-e0"></output></label><input type="range" id="e0" min="0.15" max="0.6" step="0.01" value="0.40"></div>
+        <div><label for="g0">Today's gas <output id="o-g0"></output></label><input type="range" id="g0" min="1" max="4" step="0.05" value="2.65"></div>
+      </div>
+      <div class="row2">
+        <div class="kpi yj"><div class="k">Electricity in 2045</div><div class="v" id="k-e"></div><div class="u" id="k-eu"></div></div>
+        <div class="kpi dn"><div class="k">Gas in 2045</div><div class="v" id="k-g"></div><div class="u" id="k-gu"></div></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2>What's modeled, what's simplified</h2>
+      <div class="row2">
+        <ul class="tight">
+          <li class="ok"><b>Grounded in the state's own forecasts,</b> not a flat % guess.</li>
+          <li class="ok"><b>Shape and level are separate,</b> so every utility keeps its real starting price.</li>
+          <li class="ok"><b>Scenarios, not one answer:</b> the comparison can be rerun under each.</li>
+        </ul>
+        <ul class="tight">
+          <li class="lim"><b>One growth shape for all of California:</b> PG&amp;E's CEC forecast stands in for every utility until others are built.</li>
+          <li class="lim"><b>The app starts on WhyWatt Conservative.</b> The older "My Utility" method (a fixed %/yr on the EIA rate: 4/4, 7/8 or 10/12 elec/gas) is still offered, and it is the engine's built-in fallback when no method is given.</li>
+          <li class="lim"><b>Deterministic:</b> no price spikes or year-to-year noise.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2>Sources</h2>
+      <div class="chips"><span class="chip src">CEC 2025 IEPR Electricity Rate Forecast (tn 268239)</span><span class="chip src">CEC 2025 IEPR Gas Rate Forecast (tn 264063)</span><span class="chip src">CPUC Avoided Cost Calculator 2024 (E3), CZ4</span><span class="chip src">EIA AEO 2026 Pacific</span><span class="chip src">E3 2020 "Challenge of Retail Gas"</span></div>
+      <div class="sec code">Code</div>
+      <div class="chips code">
+        <span class="chip file">scripts/build_rate_projection.py</span><span class="chip file">scripts/export_rate_projection.py</span><span class="chip file">src/rate_projection/</span>
+        <span class="chip file">data/rates/projection/whywatt_rate_projection.json</span><span class="chip file">src/projected_rate_source.py</span><span class="chip file">src/starting_rates.py · projection_index()</span>
+        <span class="chip file">docs/Energy_Rate_Projection_Spec.md</span><span class="chip file">docs/help/rate_projection_guide.md</span>
+      </div>
+    </div>
+    <div class="pager" id="pager"></div>
+  </div>
+</div>
+</main>
+
+<script src="../assets/nodes.js"></script>
+<script src="../assets/projection_curves.js"></script>
+<script src="../assets/explainer.js"></script>
+<script>
+const {C, txt, node, edge, arrowDefs, uniq, line, bars} = WW;
+const $ = id => document.getElementById(id);
+const K = {conservative:['Conservative',C.j,'CEC trajectory, ~1%/yr below','managed decline'], moderate:['Moderate',C.pr,'CEC central trajectory','front-loaded recovery'],
+           stress:['Stress',C.n,'CEC trajectory, ~1.5%/yr above','flat recovery (death spiral)'], eia_pacific:['EIA Pacific',C.slate,'EIA AEO 2026 regional path','EIA AEO 2026']};
+const Y = PROJ.years, i45 = Y.indexOf(2045);
+const idx = (s,f) => PROJ.curves[s][f].map(v => v / PROJ.curves[s][f][0]);
+
+(function(){
+  let s = `<svg viewBox="0 0 1100 250" xmlns="http://www.w3.org/2000/svg">${arrowDefs()}`;
+  s += `<rect x="8" y="30" width="1084" height="96" rx="12" fill="${C.cream}" stroke="${C.line}" stroke-dasharray="4 4"/>` + txt(20,22,'OFFLINE · when new forecasts are published','t-tag');
+  s += node('a','source',24,50,210,56,'CEC 2025 forecasts','electricity + gas workbooks',C.pr);
+  s += node('a2','source',254,50,200,56,'CPUC ACC 2024','marginal cost by year',C.pr);
+  s += node('b','proc',500,50,250,56,'Build scenarios','marginal cost + residual → 3 cases',C.pr);
+  s += node('c','store',796,44,280,68,'Projection bundle','S[y] · 2025–2050 · elec & gas',C.pr);
+  s += edge('M234,78 C244,78 480,78 498,78',C.pr,'pr') + edge('M750,78 L794,78',C.pr,'pr');
+  s += txt(20,160,'RUNTIME · once per run','t-tag');
+  s += node('d','proc',24,176,250,56,'Current energy rate','from the tariffs pipeline',C.j);
+  s += node('e','input',320,176,230,56,'Projection method','Conservative · Moderate · …',C.ink);
+  s += node('f','proc',600,176,190,56,'× S[y] / S[anchor]','',C.pr);
+  s += node('g','proc',836,176,240,56,'rates[y] for 20 years','→ the year loop',C.pr);
+  s += edge('M274,204 C300,204 300,160 580,170 L598,190',C.j,'j') + edge('M550,204 L598,204',C.ink,'ink') + edge('M790,204 L834,204',C.pr,'pr');
+  s += edge('M936,112 C936,150 700,140 695,174',C.pr,'pr','curve',820,150);
+  document.getElementById('flow').innerHTML = uniq(s + '</svg>');
+})();
+
+const XL = Y.map(String), S = ['conservative','moderate','stress','eia_pacific'];
+line($('c-elec'), {W:460, H:230, x0:40, x:XL, every:5, min:0.8, max:2.2, ticks:[1,1.5,2], fmt:v=>v.toFixed(1)+'×',
+  series:S.map(k => ({d:idx(k,'elec'), c:K[k][1], w:k==='moderate'?3:2, dash:k==='eia_pacific'?'5 4':'', label:K[k][0], at:i45, dy:k==='stress'?-8:k==='conservative'?14:k==='eia_pacific'?14:-8}))});
+line($('c-gas'), {W:460, H:230, x0:40, x:XL, every:5, log:true, min:0.8, max:80, ticks:[1,10,50], fmt:v=>v+'×',
+  series:S.map(k => ({d:idx(k,'gas'), c:K[k][1], w:k==='moderate'?3:2, dash:k==='eia_pacific'?'5 4':''}))});
+$('stab').querySelector('tbody').innerHTML = S.map(k => `<tr><td><span class="bar" style="width:10px;background:${K[k][1]}"></span> ${K[k][0]}</td><td>${K[k][2]} · gas: ${K[k][3]}</td><td>${idx(k,'elec')[i45].toFixed(2)}×</td><td>${idx(k,'gas')[i45].toFixed(1)}×</td></tr>`).join('');
+
+/* decomposition (moderate, from the bundle) */
+bars($('c-dec'), {W:560, H:200, x0:50, x:['2025','2035','2045'], stacked:true, fmt:v=>'$'+v.toFixed(2),
+  series:[{d:[0.0888,0.0994,0.1189], c:C.pr, label:'marginal cost'}, {d:[0.2972,0.3165,0.3738], c:'#b9a8e0', label:'everything else'}]});
+
+function tryit(){
+  const s = $('sc').value, e0 = +$('e0').value, g0 = +$('g0').value;
+  $('o-e0').textContent = '$'+e0.toFixed(2)+'/kWh'; $('o-g0').textContent = '$'+g0.toFixed(2)+'/therm';
+  /* anchor 2026, like a URDB plan effective 2026 */
+  const e = idx(s,'elec'), g = idx(s,'gas'), a = Y.indexOf(2026);
+  $('k-e').textContent = '$' + (e0*e[i45]/e[a]).toFixed(2); $('k-eu').textContent = `per kWh · ${(e[i45]/e[a]).toFixed(2)}× today`;
+  $('k-g').textContent = '$' + (g0*g[i45]/g[a]).toFixed(2); $('k-gu').textContent = `per therm · ${(g[i45]/g[a]).toFixed(1)}× today`;
+}
+['sc','e0','g0'].forEach(id => $(id).oninput = $(id).onchange = tryit); tryit();
+</script>
+</body>
+</html>

@@ -889,12 +889,17 @@ def Masthead():
                     solara.Button("Export…", text=True,
                                   on_click=lambda: _settings_export_open.set(True))
 
-            # Help dropdown — three destinations, each its own page (opens in a new tab).
+            # Help dropdown — each destination is its own page (opens in a new tab).
             _hm_item = ("display:block; padding:8px 14px; color:#263238;"
                         " text-decoration:none; font-size:0.9em; white-space:nowrap;")
             with solara.lab.Menu(activator=solara.Button("? Help ▾", classes=["btn", "primary"])):
                 with solara.Column(gap="0px", style="padding:4px; min-width:190px"):
                     HelpLink("WhyWatt Help", "index.html", style=_hm_item)
+                    # Architecture explainer — external site, so not a HelpLink (local help URL).
+                    solara.HTML(tag="a", unsafe_innerHTML="How it Works",
+                                attributes={"href": "https://www.whywatt.org/explainer/",
+                                            "target": "_blank", "rel": "noopener"},
+                                style=_hm_item)
                     HelpLink("Release Notes", "release_notes.html", style=_hm_item)
                     HelpLink("Support", "support.html", style=_hm_item)
                     # Technical Reports — long-form analyses served from public/help/.
@@ -904,6 +909,7 @@ def Masthead():
                                       " font-weight:700; letter-spacing:.04em;"
                                       " text-transform:uppercase; color:#78909c;")
                     HelpLink("Rate-Model Impact", "RateModel_Impact_Report.html", style=_hm_item)
+                    HelpLink("Starting Rates (URDB)", "URDB_Rate_Report.html", style=_hm_item)
         _ShareDialog(_share_open)
         _SettingsLoadDialog(_settings_load_open, _settings_load_err)
         _SettingsExportDialog(_settings_export_open)

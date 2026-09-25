@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dryer Model · WhyWatt? HEX</title>
+<meta name="description" content="How WhyWatt? HEX models a gas clothes dryer and a heat-pump dryer.">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body data-root="../" data-page="dryer">
+<main>
+<div class="detail">
+  <aside class="side" id="side"></aside>
+  <div>
+    <div class="crumbs"><a href="../index.html">System map</a> / <a href="index.html">Appliances</a> / Dryer</div>
+    <p class="eyebrow">Appliance · level of detail 1 of 4 · fixed usage</p>
+    <h1>Dryer: gas → heat-pump dryer</h1>
+    <p class="lede">A dryer uses about the same energy per load in January as in July, so WhyWatt doesn't need weather physics here. It multiplies <b>energy per load</b> by <b>loads per week</b>. That's level 1 of 4: simple on purpose, because the simple version already gives the right answer.</p>
+
+    <div class="block">
+      <h2>The swap</h2>
+      <div class="homes">
+        <div class="home dn"><h4>Do nothing</h4>
+          <div class="slotrow"><span>System</span><span>Gas dryer</span></div>
+          <div class="slotrow"><span>Energy per load</span><span>0.22 therms</span></div>
+          <div class="slotrow"><span>Age · lifespan</span><span>10 yrs · 15 yrs</span></div>
+          <div class="slotrow"><span>Replacement</span><span>$800 like-for-like</span></div>
+        </div>
+        <div class="home yj"><h4>Your journey</h4>
+          <div class="slotrow"><span>System</span><span>Heat-pump dryer</span></div>
+          <div class="slotrow"><span>Energy per load</span><span>1.8 kWh</span></div>
+          <div class="slotrow"><span>Swap</span><span>not planned by default · $1,200</span></div>
+          <div class="slotrow"><span>Lifespan · circuit</span><span>15 yrs · 30 A at 240 V</span></div>
+        </div>
+      </div>
+      <p style="margin-top:12px">Both homes run the same number of loads. Turn the swap on in the app's journey plan to include it.</p>
+    </div>
+
+    <div class="block">
+      <h2>The model</h2>
+      <div class="formula">gas      therms/yr = 0.22 therms/load × loads/week × 52        → spread evenly over 12 months
+heat pump   kWh/yr = 1.8 kWh/load   × loads/week × 52</div>
+      <div class="ctl" style="margin-top:12px">
+        <div><label for="lw">Loads per week <output id="o-lw"></output></label><input type="range" id="lw" min="1" max="14" step="1" value="5"></div>
+        <div><label for="gt">Gas therms per load <output id="o-gt"></output></label><input type="range" id="gt" min="0.1" max="0.4" step="0.01" value="0.22"></div>
+        <div><label for="hk">Heat-pump kWh per load <output id="o-hk"></output></label><input type="range" id="hk" min="0.8" max="3.5" step="0.1" value="1.8"></div>
+      </div>
+      <div class="row3">
+        <div class="kpi dn"><div class="k">Gas dryer</div><div class="v" id="k-gas"></div><div class="u">therms / yr</div></div>
+        <div class="kpi yj"><div class="k">Heat-pump dryer</div><div class="v" id="k-hp"></div><div class="u">kWh / yr</div></div>
+        <div class="kpi"><div class="k">Energy used</div><div class="v" id="k-ratio"></div><div class="u">heat pump vs gas</div></div>
+      </div>
+      <p class="caption">Defaults (5 loads/week) give ≈ 57 therms or ≈ 468 kWh a year, which the unit tests check (±2%).</p>
+    </div>
+
+    <div class="block">
+      <h2>Within the day</h2>
+      <p>The heat-pump dryer's kWh are spread with NREL's <b>clothes_dryer</b> profile: mostly daytime, with some evening loads landing in the peak.</p>
+      <div class="ctl" style="max-width:320px"><div><label for="zone">Climate zone</label><select id="zone" class="sel"></select></div></div>
+      <div class="chart" style="max-width:680px"><svg id="c-shape"></svg></div>
+      <p class="caption" id="shp"></p>
+    </div>
+
+    <div class="block">
+      <h2>What's modeled, what's simplified</h2>
+      <div class="row2">
+        <ul class="tight"><li class="ok"><b>Your laundry habits</b> (loads per week) drive the result.</li><li class="ok"><b>Real timing</b> of loads through the day, from NREL.</li><li class="ok"><b>Panel impact</b> of a 240 V dryer circuit is counted in the <a href="panel.html">panel check</a>.</li></ul>
+        <ul class="tight"><li class="lim"><b>Same energy every month:</b> damp winter loads aren't modeled.</li><li class="lim"><b>Energy per load is an average</b> across load sizes and fabrics.</li></ul>
+      </div>
+      <div class="sec code">Code</div>
+      <div class="chips code"><span class="chip file">src/devices/seasonal.py · GasDryer, HeatPumpDryer</span><span class="chip file">src/ui/sim.py · _build_slot_configs</span><span class="chip file">tests/test_devices.py</span></div>
+    </div>
+    <div class="pager" id="pager"></div>
+  </div>
+</div>
+</main>
+<script src="../assets/nodes.js"></script>
+<script src="../assets/climate_zones.js"></script>
+<script src="../assets/nrel_profiles.js"></script>
+<script src="../assets/explainer.js"></script>
+<script>
+const $ = id => document.getElementById(id), fmt = n => Math.round(n).toLocaleString('en-US');
+WW.zoneOptions($('zone'));
+function render(){
+  const lw = +$('lw').value, gt = +$('gt').value, hk = +$('hk').value, g = gt*lw*52, e = hk*lw*52;
+  $('o-lw').textContent = lw; $('o-gt').textContent = gt.toFixed(2); $('o-hk').textContent = hk.toFixed(1);
+  $('k-gas').textContent = fmt(g); $('k-hp').textContent = fmt(e); $('k-ratio').textContent = Math.round(e/(g*29.3)*100) + '%';
+  const z = ZONES[+$('zone').value], r = WW.nrelChart($('c-shape'), z.id, 'clothes_dryer');
+  $('shp').textContent = `${z.id} ${z.city} · ${r.janPeak}% (Jan) / ${r.julPeak}% (Jul) of the day's dryer energy lands in the 4–9 pm peak.`;
+}
+['lw','gt','hk','zone'].forEach(id => $(id).oninput = $(id).onchange = render); render();
+</script>
+</body>
+</html>

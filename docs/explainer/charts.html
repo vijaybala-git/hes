@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Charts · WhyWatt? HEX</title>
+<meta name="description" content="The 21 charts in WhyWatt? HEX, what each one shows, and which part of the engine produced its data.">
+<link rel="stylesheet" href="assets/explainer.css">
+<style>
+  .lineage svg .src rect{transition:opacity .2s, stroke-width .2s}
+  .lineage svg .lnk{transition:opacity .2s}
+  .lineage svg .chip{cursor:pointer}
+  .lineage svg .chip rect{transition:stroke-width .15s}
+  .lineage svg .chip:hover rect{stroke-width:2.2}
+  .lineage.pick svg .lnk{opacity:.06}
+  .lineage.pick svg .lnk.on{opacity:1}
+  .lineage.pick svg .src rect{opacity:.35}
+  .lineage.pick svg .src.on rect{opacity:1;stroke-width:2.4}
+  .lineage.pick svg .chip rect{opacity:.45}
+  .lineage.pick svg .chip.on rect{opacity:1;stroke-width:2.6}
+  .fam{display:inline-block;font-family:var(--f-mono);font-size:10px;letter-spacing:.12em;padding:2px 7px;border-radius:4px;color:#fff;margin-right:6px}
+  table.charts td:nth-child(n){text-align:left;vertical-align:top}
+  table.charts td:first-child{font-family:var(--f-mono);white-space:nowrap}
+  table.charts tr{cursor:pointer}
+  table.charts tr:hover td{background:var(--journey-soft)}
+  table.charts tr.on td{background:var(--journey-soft)}
+  .srcchip{display:inline-block;font-family:var(--f-mono);font-size:10px;border-radius:4px;padding:1px 6px;margin:1px 3px 1px 0;border:1px solid}
+</style>
+</head>
+<body data-root="" data-page="charts">
+<main>
+<div class="detail">
+  <aside class="side" id="side"></aside>
+  <div>
+    <div class="crumbs"><a href="index.html">System map</a> / Outputs / Charts</div>
+    <p class="eyebrow">Outputs · charts</p>
+    <h1>21 charts, one source of truth</h1>
+    <p class="lede">Every chart in WhyWatt? HEX reads from the same <b>year-by-year record</b> the engine writes as it steps the two homes. No chart runs its own calculation, so two charts can never disagree about the same number. The charts come in three families: <b style="color:var(--journey)">Journey Costs (JC)</b>, <b style="color:var(--solar)">Energy Use (EU)</b> and <b style="color:var(--proj)">Rates (R)</b>. The code in each chart's header (JC.1, EU.7…) matches the labels here.</p>
+
+    <div class="facts">
+      <div><div class="k">On screen by default</div><div class="v">JC.1 Cumulative Energy Costs · JC.5 Journey Timeline</div></div>
+      <div><div class="k">How to switch</div><div class="v">Dropdown above each of the two chart panels</div></div>
+      <div><div class="k">Years</div><div class="v">1 … N (20 by default), both homes</div></div>
+      <div><div class="k">Dollars</div><div class="v">Energy: nominal · install costs: today's $</div></div>
+    </div>
+
+    <div class="block">
+      <h2>Where each chart's data comes from</h2>
+      <p>Left: the parts of the engine that produce data. Right: the charts. <b>Click a chart</b> to see which parts feed it; click empty space to reset.</p>
+      <div class="canvas static lineage" id="lin"></div>
+      <div id="card" class="drawer" style="position:static;min-height:0;margin-top:12px;box-shadow:none"><p class="empty">Click a chart on the right, or a row in the table below.</p></div>
+    </div>
+
+    <div class="block">
+      <h2>How to read the headline chart</h2>
+      <div class="row2">
+        <div>
+          <p><b>JC.1 Cumulative Energy Costs</b> adds up each year's energy bill (electricity, gas, gasoline and public EV charging, net of solar) for both homes. The shaded band between the lines is the running difference. The <b>payback</b> marker is the first year your journey's cumulative energy cost drops below do nothing's.</p>
+          <p><b>It does not include install costs.</b> Swaps, replacements, solar and the panel are on <b>JC.4</b> (with a net-CapEx total) and <b>JC.5</b> (the timeline). To judge the investment, compare JC.1's final gap with JC.4's net install cost.</p>
+          <p>With social and health costs switched on, dotted lines add those costs of burning gas and gasoline on top.</p>
+        </div>
+        <div class="chart"><svg id="schem"></svg><div class="caption">Schematic only, not a model result.</div></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2>All 21 at a glance</h2>
+      <table class="data charts" id="tbl"><thead><tr><th>Code</th><th>Chart</th><th>What it shows</th><th>Reads from</th></tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="block">
+      <h2>Units, conversions and caveats</h2>
+      <div class="row2">
+        <ul class="tight">
+          <li class="ok"><b>1 therm = 29.3 kWh</b> and <b>1 gallon = 33.7 kWh</b>: conversions for display only (EU.2, EU.6, EU.7), never used inside the engine.</li>
+          <li class="ok"><b>Emissions (EU.8):</b> gas 5.30 kg CO₂/therm (6.5 kg CO₂e with 2.3% methane leakage), gasoline 8.89 kg/gal.</li>
+          <li class="ok"><b>Home-meter charts</b> (EU.1–EU.3) exclude gasoline and public EV charging.</li>
+        </ul>
+        <ul class="tight">
+          <li class="lim"><b>Mixed dollar basis:</b> energy costs are nominal (they grow with the projection); install costs are at today's prices; nothing is discounted to present value.</li>
+          <li class="lim"><b>EU.8 leaves out electricity's grid emissions</b>, so the true net reduction is smaller than the drop shown.</li>
+          <li class="lim"><b>R.3–R.5</b> belong to the older ACC rate models, still offered alongside the projection methods.</li>
+        </ul>
+      </div>
+      <div class="sec code">Code</div>
+      <div class="chips code"><span class="chip file">src/ui/charts.py · CHART_FNS</span><span class="chip file">src/ui/theme.py · CHART_OPTIONS, CHART_CODES</span><span class="chip file">src/model.py · DataCollector reporters</span><span class="chip file">src/journey.py · *_history</span><span class="chip file">docs/help/help_content.md §14</span></div>
+    </div>
+    <div class="pager" id="pager"></div>
+  </div>
+</div>
+</main>
+<script src="assets/nodes.js"></script>
+<script src="assets/explainer.js"></script>
+<script>
+const {C, soft, txt, uniq, line} = WW;
+const $ = id => document.getElementById(id);
+
+/* Engine parts that produce chart data */
+const SRC = [
+  ['appl',  'Appliance energy (12,)',      'kWh · therms · gallons per slot', C.cl,  'appliances/index.html'],
+  ['year',  'Home year totals',            'cost by category · annual · cumulative', C.ink, 'engine/loop.html'],
+  ['capex', 'Install-cost events',         'swaps · replacements · add-ons', C.n,  'engine/loop.html'],
+  ['hour',  'Hourly energy balance',       'solar · battery · grid peak/off-peak', C.s, 'engine/hourly-balance.html'],
+  ['rates', 'Rate arrays',                 'current rate × projection', C.pr, 'pipelines/projection.html'],
+  ['acc',   'ACC rate shape',              'CPUC hourly/seasonal band', C.slate, 'pipelines/projection.html'],
+  ['panel', 'Panel load check',            'NEC 220 amps per year', C.j, 'appliances/panel.html'],
+  ['fuel',  'Gasoline & public charging',  'separate from the home meter', '#8a5a44', 'appliances/vehicle.html'],
+];
+/* code, name, family, sources, description (from the app's help, §14) */
+const CH = [
+  ['JC.1','Cumulative Energy Costs','JC',['year','hour','fuel'],'Every year\'s energy bill added up, your journey vs do nothing. Where the journey line drops below is the payback year. Energy only; install costs are on JC.4.'],
+  ['JC.2','Annual Cost by Year','JC',['year','fuel'],'Each single year\'s total (electricity, gas, gasoline, public charging) as side-by-side bars. The gap is that year\'s saving or extra cost.'],
+  ['JC.3','Cost Breakdown by Category','JC',['year'],'Cumulative cost stacked by category (heating, cooling, water heating, baseload, cooking, transportation), for one home at a time.'],
+  ['JC.4','Equipment Replacements (CapEx)','JC',['capex'],'One-time install costs by appliance in the year they happen: journey (solid) beside do-nothing wear-out replacements (hatched), with a net total.'],
+  ['JC.5','Journey Timeline','JC',['capex'],'A rail of the plan: each swap and add-on (solar, panel, EV charger) as a marker with its net cost; do-nothing replacements below.'],
+  ['JC.6','Estimated Electrical Load','JC',['panel'],'The home\'s NEC service load in amps as each electric appliance comes online, against the panel\'s capacity.'],
+  ['EU.1','Home Energy Cost by Device','EU',['appl'],'Annual home-meter energy cost by appliance, stacked, year over year.'],
+  ['EU.2','Home Energy Use by Device','EU',['appl'],'The same in kWh-equivalent (gas at 29.3 kWh/therm), home meter only.'],
+  ['EU.3','Annual kWh by Device','EU',['appl'],'Electricity per appliance per year; an EV counts home charging only.'],
+  ['EU.4','Annual Gas by Device','EU',['appl'],'Therms per appliance per year: bars shrink toward zero as gas appliances are swapped.'],
+  ['EU.6','Energy Mix Timeline','EU',['appl','hour','fuel'],'Where the home\'s energy comes from each year: gas, gasoline, grid, own solar, public charging, in kWh-equivalent.'],
+  ['EU.7','HVAC Monthly Energy','EU',['appl'],'Month by month in the HVAC swap year: heat-pump heating and cooling vs the furnace in kWh-equivalent. The (12,) monthly values, shown directly.'],
+  ['EU.8','Direct Emissions (CO₂ / CO₂e)','EU',['appl','fuel'],'Tons of CO₂ (or CO₂e with methane leakage) from burning gas and gasoline, per year.'],
+  ['EU.9','Monthly Solar Generation','EU',['hour'],'Solar production each month vs the home\'s electricity use, for a year you pick.'],
+  ['EU.10','Solar & Battery Energy Balance','EU',['hour'],'Per year: solar used directly, via the battery, and from the grid (incl. grid charging), with exports below the axis.'],
+  ['R.1','Electricity Price Projection','R',['rates'],'Your electricity price over the years under all four projection methods, from your current rate. The method in use is bold.'],
+  ['R.2','Gas Price Projection','R',['rates'],'The same for gas. The WhyWatt curves rise steeply (CEC gas-system forecast); EIA Pacific stays nearly flat.'],
+  ['R.3','ACC Electrical Rate Projection','R',['rates','acc'],'Electricity price along the selected model with the ACC off-peak-to-peak band shaded.'],
+  ['R.4','ACC Gas Rate Projection','R',['rates','acc'],'Gas price with the ACC summer-to-winter band shaded.'],
+  ['R.5','ACC Electrical Rate Shape','R',['acc'],'Heatmap of the effective electricity rate by hour and month under the ACC.'],
+  ['R.6','Peak vs Off-Peak Electricity','R',['hour','rates'],'Each year\'s electricity cost split into peak energy, off-peak energy and fixed charge, after solar and battery, with the export credit below the axis.'],
+];
+const FAMC = {JC:C.j, EU:C.s, R:C.pr}, FAMN = {JC:'Journey Costs', EU:'Energy Use', R:'Rates'};
+
+/* lineage diagram */
+(function(){
+  const W=1100, sy = i => 40 + i*62, sx = 20, sw = 280;
+  const cols = {JC:[560,0], EU:[740,0], R:[920,0]}, cy = {}, cx = {};
+  let s = `<svg viewBox="0 0 ${W} 560" xmlns="http://www.w3.org/2000/svg">`;
+  s += txt(sx, 22, 'ENGINE · produces', 't-tag') + Object.entries(cols).map(([f,[x]]) => txt(x, 22, FAMN[f].toUpperCase(), 't-tag')).join('');
+  CH.forEach(c => { const col = cols[c[2]]; cx[c[0]] = col[0]; cy[c[0]] = 40 + col[1]*50; col[1]++; });
+  // links first (under the boxes)
+  CH.forEach(c => c[3].forEach(k => { const i = SRC.findIndex(q => q[0]===k), y1 = sy(i)+24, y2 = cy[c[0]]+18, x2 = cx[c[0]];
+    s += `<path class="lnk" data-c="${c[0]}" data-s="${k}" d="M${sx+sw},${y1} C${sx+sw+120},${y1} ${x2-110},${y2} ${x2},${y2}" fill="none" stroke="${SRC[i][3]}" stroke-width="1.6" opacity=".55"/>`; }));
+  SRC.forEach(([k,t,sub,c,href],i) => { s += `<a href="${href}"><g class="src" data-s="${k}"><rect x="${sx}" y="${sy(i)}" width="${sw}" height="48" rx="9" fill="${soft(c)}" stroke="${c}" stroke-width="1.5"/>${txt(sx+12, sy(i)+21, t)}${txt(sx+12, sy(i)+37, sub, 't-sub')}</g></a>`; });
+  CH.forEach(c => { const x = cx[c[0]], y = cy[c[0]], col = FAMC[c[2]];
+    s += `<g class="chip" data-c="${c[0]}"><rect x="${x}" y="${y}" width="164" height="36" rx="8" fill="#fff" stroke="${col}" stroke-width="1.4"/>${txt(x+10, y+15, c[0], 't-tag')}${txt(x+10, y+29, c[1].length>24 ? c[1].slice(0,23)+'…' : c[1], 't-sub')}</g>`; });
+  $('lin').innerHTML = uniq(s + '</svg>');
+})();
+
+function pick(code){
+  const lin = $('lin'), c = CH.find(x => x[0]===code);
+  lin.classList.toggle('pick', !!c);
+  lin.querySelectorAll('.lnk').forEach(p => p.classList.toggle('on', !!c && p.dataset.c===code));
+  lin.querySelectorAll('.chip').forEach(p => p.classList.toggle('on', !!c && p.dataset.c===code));
+  lin.querySelectorAll('.src').forEach(p => p.classList.toggle('on', !!c && c[3].includes(p.dataset.s)));
+  $('tbl').querySelectorAll('tr[data-c]').forEach(r => r.classList.toggle('on', !!c && r.dataset.c===code));
+  $('card').innerHTML = c ? `<span class="fam" style="background:${FAMC[c[2]]}">${c[0]}</span><b style="font-family:var(--f-head);font-size:18px">${c[1]}</b><p style="margin-top:8px">${c[4]}</p><div class="sec">Reads from</div><div class="chips">${c[3].map(k => { const q = SRC.find(x=>x[0]===k); return `<a class="chip" href="${q[4]}" style="border-color:${q[3]};color:${q[3]}">${q[1]} →</a>`; }).join('')}</div>`
+                     : '<p class="empty">Click a chart on the right, or a row in the table below.</p>';
+}
+$('lin').addEventListener('click', e => { const g = e.target.closest('.chip'); if(e.target.closest('a')) return; pick(g ? g.dataset.c : null); });
+
+/* table */
+$('tbl').querySelector('tbody').innerHTML = CH.map(c => `<tr data-c="${c[0]}"><td><span class="fam" style="background:${FAMC[c[2]]}">${c[0]}</span></td><td><b>${c[1]}</b></td><td>${c[4]}</td><td>${c[3].map(k => { const q = SRC.find(x=>x[0]===k); return `<span class="srcchip" style="border-color:${q[3]};color:${q[3]}">${q[1]}</span>`; }).join('')}</td></tr>`).join('');
+$('tbl').querySelectorAll('tr[data-c]').forEach(r => r.onclick = () => { pick(r.dataset.c); $('lin').scrollIntoView({behavior:'smooth', block:'center'}); });
+
+/* schematic JC.1 */
+{ const yrs = [...Array(20).keys()].map(i=>String(i+1)), dn = [], jr = []; let a=0, b=0;
+  for(let y=1;y<=20;y++){ a += 3000*Math.pow(1.06,y); b += (y<3?3000*Math.pow(1.06,y):2300*Math.pow(1.04,y)); dn.push(a); jr.push(b); }
+  line($('schem'), {W:460, H:220, x0:14, right:90, x:yrs, every:19, min:0, max:Math.max(...dn)*1.05, ticks:[], series:[{d:dn,c:C.n,label:'do nothing'},{d:jr,c:C.j,label:'your journey'}]}); }
+</script>
+</body>
+</html>

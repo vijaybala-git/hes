@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Climate Pipeline · WhyWatt? HEX</title>
+<meta name="description" content="How WhyWatt turns a ZIP code into monthly heating and cooling degree-days and water-main temperature.">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body data-root="../" data-page="climate">
+<main>
+<div class="detail">
+  <aside class="side" id="side"></aside>
+  <div>
+    <div class="crumbs"><a href="../index.html">System map</a> / Offline pipelines / Climate · TMYx</div>
+    <p class="eyebrow" style="color:var(--climate)">Offline pipeline · climate</p>
+    <h1>How cold, how hot: from ZIP code to degree-days</h1>
+    <p class="lede">Heating and hot water are the biggest energy loads in a California home, and both depend on the weather. This pipeline answers one question for the engine: <b>for each month, how much does this home need to heat, cool, and warm up its water?</b></p>
+
+    <div class="facts">
+      <div><div class="k">Source</div><div class="v">OneBuilding TMYx 2011–2025 weather files</div></div>
+      <div><div class="k">Coverage</div><div class="v">16 CEC climate zones · <span id="nzip2"></span> CA ZIPs</div></div>
+      <div><div class="k">Resolution</div><div class="v">Monthly HDD · CDD · water-main °F</div></div>
+      <div><div class="k">Built</div><div class="v">2026-06-16 · checksummed raw snapshots</div></div>
+    </div>
+
+    <!-- 1 · The pipeline -->
+    <div class="block">
+      <h2>The pipeline</h2>
+      <p>Two halves. The <b>offline</b> half runs once, when the data is built, and turns raw weather files into a small table of 16 climate zones. The <b>runtime</b> half runs every time you enter a ZIP code: a lookup, with no weather processing.</p>
+      <div class="canvas static" id="flow" style="margin-top:10px"></div>
+      <div class="legendbar"><span><i class="lg-data" style="border-color:var(--climate)"></i>data flow</span><span><i class="lg-ctrl"></i>setting (optional)</span><span>(12,) = one value per month</span></div>
+    </div>
+
+    <!-- 2 · Concept -->
+    <div class="block">
+      <h2>What's a degree-day?</h2>
+      <p>A <b>heating degree-day</b> (HDD) counts how far the day's average temperature fell below 65°F. A 50°F day adds 15 HDD; a 70°F day adds none. Add them up over a month and you get how much heating that month needs. <b>Cooling degree-days</b> (CDD) are the same count above 65°F. Heating energy is proportional to HDD, which is why one number per month is enough for the engine.</p>
+      <div class="ctl" style="max-width:360px"><div><label for="zone">Climate zone <output id="zlbl"></output></label><select id="zone" class="sel"></select></div></div>
+      <div class="row3" style="margin-bottom:14px">
+        <div class="kpi cl"><div class="k">Heating degree-days / yr</div><div class="v" id="k-hdd"></div><div class="u">base 65°F</div></div>
+        <div class="kpi yj"><div class="k">Cooling degree-days / yr</div><div class="v" id="k-cdd"></div><div class="u">base 65°F</div></div>
+        <div class="kpi"><div class="k">Water-main temperature</div><div class="v" id="k-in"></div><div class="u">coldest → warmest month</div></div>
+      </div>
+      <div class="row2">
+        <div class="chart"><svg id="c-temp" viewBox="0 0 460 230"></svg><div class="caption">Average monthly temperature vs the 65°F base. Shaded gap below = heating need, above = cooling need.</div></div>
+        <div class="chart"><svg id="c-dd" viewBox="0 0 460 230"></svg><div class="caption">The 12 + 12 numbers the engine actually receives.</div></div>
+      </div>
+    </div>
+
+    <!-- 3 · All zones -->
+    <div class="block">
+      <h2>California's 16 climate zones</h2>
+      <p>The California Energy Commission divides the state into 16 building climate zones. WhyWatt maps each of <b id="nzip"></b> California ZIP codes to one zone, and each zone to the typical-year weather file of its reference station.</p>
+      <table class="data" id="ztable"><thead><tr><th>Zone</th><th>Reference station</th><th>HDD</th><th></th><th>CDD</th><th></th></tr></thead><tbody></tbody></table>
+    </div>
+
+    <!-- 4 · Feeds -->
+    <div class="block">
+      <h2>What it feeds</h2>
+      <div class="row2">
+        <div><h3>HVAC · heating &amp; cooling</h3><p>Monthly <b>HDD</b> drives furnace or heat-pump heating; <b>CDD</b> drives cooling. Energy is proportional to degree-days × the home's heat-loss factor.</p><a class="chip file" href="../appliances/hvac.html" style="font-size:12px">HVAC page →</a></div>
+        <div><h3>Water heater</h3><p>The <b>water-main temperature</b> sets how far each gallon must be heated to reach 120°F. Winter water is colder, so winter hot water costs more.</p><span class="chip">Water heater page · soon</span></div>
+      </div>
+      <p style="margin-top:12px">The same climate zone also picks your <a href="nrel.html">NREL load profiles</a> and, where no ZIP-level run exists, your <a href="pvwatts.html">solar yield</a> station.</p>
+    </div>
+
+    <!-- 5 · Trend -->
+    <div class="block">
+      <h2>Optional: a warming climate</h2>
+      <p>By default every year of the simulation uses the same typical year. You can instead let degree-days drift year by year along a climate projection. The drift rates were fitted to the Cal-Adapt 32-model ensemble at each station.</p>
+      <table class="data" style="max-width:520px" id="trend"><thead><tr><th>Setting</th><th></th><th>HDD per year</th><th>CDD per year</th></tr></thead><tbody></tbody></table>
+      <p class="caption">For the selected zone. Fewer heating degree-days and more cooling degree-days each year.</p>
+    </div>
+
+    <!-- 6 · Honest limits -->
+    <div class="block">
+      <h2>What's modeled, what's simplified</h2>
+      <div class="row2">
+        <ul class="tight">
+          <li class="ok"><b>Recent weather:</b> typical-year files built from 2011–2025 observations, not the older 1991–2005 TMY3 set.</li>
+          <li class="ok"><b>Monthly resolution:</b> captures the seasonal swing that drives heating bills.</li>
+          <li class="ok"><b>Reproducible:</b> the source weather files are snapshotted with checksums; rebuilding gives the same table.</li>
+        </ul>
+        <ul class="tight">
+          <li class="lim"><b>One station per zone:</b> every ZIP in a zone shares its reference station, so microclimates (coast vs valley within a zone) aren't separated.</li>
+          <li class="lim"><b>Fixed 65°F base:</b> doesn't vary with your thermostat setting.</li>
+          <li class="lim"><b>Typical, not extreme:</b> a typical year smooths out cold snaps and heat waves.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 7 · Sources -->
+    <div class="block">
+      <h2>Sources</h2>
+      <div class="chips">
+        <span class="chip src">OneBuilding TMYx 2011–2025 (climate.onebuilding.org)</span>
+        <span class="chip src">CEC Building Climate Zones</span>
+        <span class="chip src">Burch &amp; Christensen 2007 · water-main temperature</span>
+        <span class="chip src">Cal-Adapt LOCA 32-model ensemble · RCP 4.5 / 8.5</span>
+      </div>
+      <div class="sec code">Code</div>
+      <div class="chips code">
+        <span class="chip file">scripts/build_climate_db.py</span>
+        <span class="chip file">data/climate/sources/ (sha256 snapshots)</span>
+        <span class="chip file">data/climate/tmy3_zones.json</span>
+        <span class="chip file">data/climate/zip_to_zone.json</span>
+        <span class="chip file">src/climate_loader.py</span>
+        <span class="chip file">src/model.py · climate.advance_to(year)</span>
+      </div>
+    </div>
+
+    <div class="pager" id="pager"></div>
+  </div>
+</div>
+</main>
+
+<script src="../assets/nodes.js"></script>
+<script src="../assets/climate_zones.js"></script>
+<script src="../assets/explainer.js"></script>
+<script>
+const {C, txt, node, edge, ctrl, arrowDefs, uniq} = WW;
+const M = 'JFMAMJJASOND';
+const sum = a => a.reduce((x,y) => x+y, 0);
+const fmt = n => n.toLocaleString('en-US');
+
+/* ── pipeline diagram ── */
+(function(){
+  let s = `<svg viewBox="0 0 1112 340" xmlns="http://www.w3.org/2000/svg">${arrowDefs()}`;
+  s += `<rect x="8" y="30" width="800" height="110" rx="12" fill="${C.cream}" stroke="${C.line}" stroke-dasharray="4 4"/>` + txt(20,22,'OFFLINE · built once, when the data is refreshed','t-tag');
+  s += txt(20,178,'RUNTIME · every time you enter a ZIP code','t-tag');
+  s += node('a','source',24,56,230,60,'Weather files · 16 stations','hourly, typical year 2011–2025',C.cl);
+  s += node('b','proc',290,56,230,60,'Offline build','degree-days · water temp · trend fit',C.cl);
+  s += node('c','store',556,50,230,72,'Climate-zone table','16 zones · checksum-pinned',C.cl);
+  s += edge('M254,86 L288,86',C.cl,'cl') + edge('M520,86 L554,86',C.cl,'cl');
+  s += node('d','input',24,200,200,56,'Your ZIP code','',C.ink);
+  s += node('e','store',270,194,240,70,'ZIP → zone lookup',`${fmt(ZIP_COUNT)} California ZIPs`,C.ink);
+  s += node('f','proc',556,200,230,60,'Your zone record','e.g. CZ4 · San Jose station',C.cl);
+  s += edge('M224,228 L268,228',C.ink,'ink') + edge('M510,228 L554,228',C.ink,'ink','zone id',520,220);
+  s += edge('M671,124 L671,198',C.cl,'cl','lookup',678,166);
+  s += node('t','input',556,284,230,40,'Trend: none · RCP 4.5 · 8.5','',C.ink);
+  s += ctrl('M671,284 L671,262');
+  [['HDD  (12,)',196],['CDD  (12,)',236],['Water °F  (12,)',276]].forEach(([l,y],i) => {
+    s += node('o'+i,'proc',840,y-16,130,32,l,'',C.cl);
+    s += edge(`M786,230 C812,230 812,${y} 838,${y}`,C.cl,'cl');
+  });
+  s += `<a href="../appliances/hvac.html">${node('h','proc',1000,196,104,56,'HVAC →','',C.j)}</a>`;
+  s += node('w','planned',1000,262,104,40,'Water heater','',C.j);
+  s += edge('M970,196 L998,212',C.j,'j') + edge('M970,236 L998,232',C.j,'j') + edge('M970,276 L998,280',C.j,'j');
+  document.getElementById('flow').innerHTML = uniq(s + '</svg>');
+})();
+
+/* ── charts ── */
+function tempChart(z){
+  const W=460,H=230,x0=40,y0=20,w=W-x0-12,h=H-y0-34, lo=40, hi=90;
+  const X = m => x0 + (m+.5)*w/12, Y = t => y0 + h - (t-lo)/(hi-lo)*h;
+  let s = '';
+  [40,50,60,70,80,90].forEach(t => s += `<line x1="${x0}" x2="${x0+w}" y1="${Y(t)}" y2="${Y(t)}" stroke="${C.line}"/>` + txt(x0-6,Y(t)+3,t+'°','t-tag','end'));
+  z.temp.forEach((t,m) => { const c = t<65 ? C.cl : C.j; s += `<rect x="${X(m)-9}" y="${Math.min(Y(t),Y(65))}" width="18" height="${Math.abs(Y(t)-Y(65))}" fill="${c}" opacity=".22"/>`; });
+  s += `<line x1="${x0}" x2="${x0+w}" y1="${Y(65)}" y2="${Y(65)}" stroke="${C.ink}" stroke-dasharray="5 4"/>` + txt(x0+w-4,Y(65)-5,'65°F base','t-frame','end');
+  s += `<path d="${z.temp.map((t,m) => (m?'L':'M')+X(m)+','+Y(t)).join('')}" fill="none" stroke="${C.ink}" stroke-width="2"/>`;
+  z.temp.forEach((t,m) => s += `<circle cx="${X(m)}" cy="${Y(t)}" r="3.2" fill="#fff" stroke="${C.ink}" stroke-width="1.6"/>` + txt(X(m),H-12,M[m],'t-tag','middle'));
+  document.getElementById('c-temp').innerHTML = s;
+}
+function ddChart(z){
+  const W=460,H=230,x0=40,y0=20,w=W-x0-12,h=H-y0-34;
+  const top = Math.max(500, ...z.hdd, ...z.cdd);
+  const X = m => x0 + m*w/12, Y = v => y0 + h - v/top*h, bw = w/12/2 - 3;
+  let s = '';
+  [0,.5,1].forEach(f => s += `<line x1="${x0}" x2="${x0+w}" y1="${Y(top*f)}" y2="${Y(top*f)}" stroke="${C.line}"/>` + txt(x0-6,Y(top*f)+3,Math.round(top*f),'t-tag','end'));
+  z.hdd.forEach((v,m) => {
+    s += `<rect x="${X(m)+3}" y="${Y(v)}" width="${bw}" height="${h-(Y(v)-y0)}" rx="1.5" fill="${C.cl}"><title>${M[m]} HDD ${v}</title></rect>`;
+    s += `<rect x="${X(m)+3+bw+1}" y="${Y(z.cdd[m])}" width="${bw}" height="${h-(Y(z.cdd[m])-y0)}" rx="1.5" fill="${C.j}"><title>${M[m]} CDD ${z.cdd[m]}</title></rect>`;
+    s += txt(X(m)+w/24,H-12,M[m],'t-tag','middle');
+  });
+  s += `<rect x="${x0+w-120}" y="${y0}" width="10" height="10" fill="${C.cl}"/>` + txt(x0+w-106,y0+9,'HDD','t-frame') +
+       `<rect x="${x0+w-60}" y="${y0}" width="10" height="10" fill="${C.j}"/>` + txt(x0+w-46,y0+9,'CDD','t-frame');
+  document.getElementById('c-dd').innerHTML = s;
+}
+
+/* ── zone table + selector ── */
+const sel = document.getElementById('zone');
+ZONES.forEach((z,i) => sel.insertAdjacentHTML('beforeend', `<option value="${i}" ${z.id==='CZ4'?'selected':''}>${z.id} · ${z.city}</option>`));
+document.getElementById('nzip').textContent = fmt(ZIP_COUNT); document.getElementById('nzip2').textContent = fmt(ZIP_COUNT);
+const maxH = Math.max(...ZONES.map(z => sum(z.hdd))), maxC = Math.max(...ZONES.map(z => sum(z.cdd)));
+function render(){
+  const z = ZONES[+sel.value];
+  document.getElementById('zlbl').textContent = z.city;
+  document.getElementById('k-hdd').textContent = fmt(sum(z.hdd));
+  document.getElementById('k-cdd').textContent = fmt(sum(z.cdd));
+  document.getElementById('k-in').textContent = `${Math.min(...z.inlet)}–${Math.max(...z.inlet)}°F`;
+  tempChart(z); ddChart(z);
+  document.querySelector('#ztable tbody').innerHTML = ZONES.map((q,i) => { const H = sum(q.hdd), Cc = sum(q.cdd);
+    return `<tr class="${i==+sel.value?'hl':''}"><td>${q.id}</td><td>${q.city} <span style="color:var(--mute);font-family:var(--f-mono);font-size:10.5px">${q.station}</span></td>
+      <td>${fmt(H)}</td><td style="width:22%"><span class="bar" style="width:${H/maxH*100}%;background:var(--climate)"></span></td>
+      <td>${fmt(Cc)}</td><td style="width:22%"><span class="bar" style="width:${Cc/maxC*100}%;background:var(--journey)"></span></td></tr>`; }).join('');
+  const pct = v => (v>0?'+':'') + (v*100).toFixed(2) + '%';
+  document.querySelector('#trend tbody').innerHTML = `<tr><td>None (default)</td><td></td><td>0%</td><td>0%</td></tr>` +
+    [['RCP 4.5 · moderate emissions','rcp45'],['RCP 8.5 · high emissions','rcp85']].map(([l,k]) => `<tr><td>${l}</td><td></td><td>${pct(z.trend[k][0])}</td><td>${pct(z.trend[k][1])}</td></tr>`).join('');
+}
+sel.onchange = render; render();
+</script>
+</body>
+</html>

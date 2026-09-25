@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Appliances · WhyWatt? HEX</title>
+<meta name="description" content="The nine appliances WhyWatt? HEX models, how each one reports its monthly energy, and at what level of detail.">
+<link rel="stylesheet" href="../assets/explainer.css">
+<style>
+  .acard{display:block;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;text-decoration:none;color:inherit;scroll-margin-top:90px;transition:border-color .15s,box-shadow .15s}
+  a.acard:hover{border-color:var(--journey)}
+  .acard:target{border:2px solid var(--journey);box-shadow:0 0 0 5px var(--journey-soft)}
+  .acard h3{margin:0 0 2px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .acard h3 small{font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);font-weight:500}
+  .acard .swap{font-family:var(--f-mono);font-size:11.5px;color:var(--slate)}
+  .acard dl{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin:10px 0 0;font-size:12.5px}
+  .acard dt{color:var(--mute);font-family:var(--f-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;padding-top:2px}
+  .acard dd{margin:0;color:var(--ink)}
+  .acard .open{margin-top:10px;font-family:var(--f-mono);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--journey)}
+  .acard.soon .open{color:var(--mute)}
+  .lod4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .lodc{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--paper)}
+  .lodc b{display:block;font-size:14px;margin:6px 0 2px}
+  .lodc p{font-size:12.5px !important;margin:0 0 6px}
+  .lodc .who{font-family:var(--f-mono);font-size:10.5px;color:var(--journey-deep)}
+  @media (max-width:1000px){ .lod4{grid-template-columns:1fr 1fr} }
+</style>
+</head>
+<body data-root="../" data-page="apps">
+<main>
+<div class="detail">
+  <aside class="side" id="side"></aside>
+  <div>
+    <div class="crumbs"><a href="../index.html">System map</a> / Appliances</div>
+    <p class="eyebrow">Appliances</p>
+    <h1>Nine appliances, one question: how much energy each month?</h1>
+    <p class="lede">However different they are, a furnace, a cooktop and an EV all answer to the engine the same way: <b>12 monthly numbers</b>, in kWh for electric or therms for gas. That shared interface lets the model price, compare and swap any of them the same way, while each one uses as much detail as its physics needs.</p>
+
+    <div class="block">
+      <h2>The shared interface</h2>
+      <p>Every appliance takes its settings from your home profile and, if it depends on weather, the climate pipeline. It returns 12 values. The engine prices those with each month's rate. Electric appliances also get spread over a 24-hour day using the NREL load profile for their end use, so peak and off-peak hours can be priced separately.</p>
+      <div class="canvas static" id="iface"></div>
+      <h3 style="margin-top:18px">Swapping an appliance</h3>
+      <p>Each appliance has a <b>baseline</b> (usually gas) and an <b>electric</b> version. The do-nothing home keeps the baseline for all 20 years (replacing it like-for-like when it wears out); your journey switches in the swap year and books the install cost, less rebates, that year.</p>
+      <div class="chart"><svg id="swapline"></svg></div>
+      <p class="caption">Default HVAC plan: furnace years 1–2, heat pump from year 3. An appliance that is <b>already electric</b> today stays electric in both homes.</p>
+    </div>
+
+    <div class="block">
+      <h2>Four levels of detail</h2>
+      <p>The model spends detail where it changes the answer. Heating and hot water swing with the seasons and dominate the bill, so they get climate physics. A cooktop's use is steady, so a per-meal energy figure is enough.</p>
+      <div class="lod4" id="lod"></div>
+    </div>
+
+    <h2 style="margin-top:6px">The nine</h2>
+    <div class="row3" id="cards"></div>
+
+    <div class="block" style="margin-top:18px">
+      <div class="sec code">Code</div>
+      <div class="chips code">
+        <span class="chip file">src/devices/base.py · EnergyConsumer.monthly_consumption()</span>
+        <span class="chip file">src/devices/physics.py</span>
+        <span class="chip file">src/devices/seasonal.py</span>
+        <span class="chip file">src/devices/schedule.py</span>
+        <span class="chip file">src/devices/vehicle.py</span>
+        <span class="chip file">src/journey.py · DeviceSlot</span>
+        <span class="chip file">src/load_profiles.py · DEVICE_END_USE</span>
+        <span class="chip file">data/homes/journey_slots_default.json</span>
+      </div>
+      <p class="caption" style="margin:0">Turn on <b>Show code</b> (top right) to see the files behind each part.</p>
+    </div>
+
+    <div class="pager" id="pager"></div>
+  </div>
+</div>
+</main>
+
+<script src="../assets/nodes.js"></script>
+<script src="../assets/explainer.js"></script>
+<script>
+const {C, txt, node, edge, arrowDefs, uniq, APPS, meter, ROOT} = WW;
+
+/* interface diagram */
+(function(){
+  let s = `<svg viewBox="0 0 1000 200" xmlns="http://www.w3.org/2000/svg">${arrowDefs()}`;
+  s += node('a','input',10,20,180,44,'Home profile','UA · gallons · bedrooms',C.ink);
+  s += node('b','source',10,110,180,50,'Climate','HDD · CDD · water °F (12,)',C.cl);
+  s += node('c','proc',250,55,190,70,'Any appliance','baseline or electric',C.ink);
+  s += node('d','proc',500,55,160,70,'12 monthly values','kWh or therms',C.j);
+  s += node('e','source',720,10,260,50,'× monthly rate','→ cost per month',C.j);
+  s += node('f','source',720,125,260,56,'× NREL end-use profile','electric only → 24-hour day (12×24)',C.s);
+  s += edge('M190,42 C220,42 222,80 248,80',C.ink,'ink') + edge('M190,135 C220,135 222,100 248,100',C.cl,'cl');
+  s += edge('M440,90 L498,90',C.j,'j','(12,)',452,84);
+  s += edge('M660,80 C690,80 690,35 718,35',C.j,'j') + edge('M660,100 C690,100 690,153 718,153',C.s,'s');
+  document.getElementById('iface').innerHTML = uniq(s + '</svg>');
+})();
+
+/* swap timeline */
+(function(){
+  const W=900,H=110,x0=20,w=W-40, X = y => x0 + (y-1)*w/20, sw = 3;
+  let s = `<rect x="${X(1)}" y="30" width="${X(sw)-X(1)}" height="26" rx="4" fill="${C.n}" opacity=".85"/>` + txt(X(1)+8,47,'gas furnace','t-frame').replace('t-frame"','t-frame" style="fill:#fff"');
+  s += `<rect x="${X(sw)}" y="30" width="${X(21)-X(sw)}" height="26" rx="4" fill="${C.j}" opacity=".85"/>` + txt(X(sw)+10,47,'heat pump · 15-year life','t-frame').replace('t-frame"','t-frame" style="fill:#fff"');
+  s += `<line x1="${X(sw)}" x2="${X(sw)}" y1="18" y2="66" stroke="${C.ink}" stroke-width="2"/>` + txt(X(sw),13,'swap · $14,000 − $3,500 rebate','t-frame','middle');
+  s += `<line x1="${X(17)}" x2="${X(17)}" y1="26" y2="60" stroke="#fff" stroke-width="2" stroke-dasharray="3 2"/>` + txt(X(17),76,'replaced at end of life (yr 17)','t-tag','middle');
+  for(let y=1;y<=20;y++) s += txt(X(y)+w/40, 96, y, 't-tag', 'middle');
+  s += txt(x0, 108, 'YEAR', 't-tag');
+  const svg = document.getElementById('swapline'); svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.innerHTML = s;
+})();
+
+/* level-of-detail ladder */
+const LOD = [
+  [1,'Fixed usage','Energy per use × uses per week (or a baseload scaled by bedrooms). Same every year.'],
+  [2,'Schedule','A monthly pattern from miles driven and charging efficiency, with a small summer uptick.'],
+  [3,'Climate physics','Heat loss × degree-days, or water heated from the monthly water-main temperature. Changes with your ZIP and home.'],
+  [4,'Hourly energy balance','Solved on a representative day each month against solar output, the TOU peak window and the battery.'],
+];
+document.getElementById('lod').innerHTML = LOD.map(([n,t,p]) => `<div class="lodc">${meter(n)}<b>${t}</b><p>${p}</p><div class="who">${APPS.filter(a=>a.lod===n).map(a=>a.t).join(' · ')}</div></div>`).join('');
+
+/* nine cards */
+const SWAPYR = {hvac:'year 3', wh:'year 5', dryer:'not planned', cooktop:'not planned', lights:'—', vehicle:'not planned', pv:'your choice', battery:'your choice', panel:'when needed'};
+document.getElementById('cards').innerHTML = APPS.map(a => `<a class="acard ${a.built?'':'soon'}" id="${a.id}" href="${a.built?ROOT+a.href:'#'+a.id}">
+  <h3>${a.t}<small>detail ${a.lod}/4</small></h3><div class="swap">${a.swap}</div>${meter(a.lod)}
+  <dl><dt>Method</dt><dd>${a.method}</dd><dt>Driven by</dt><dd>${a.drives}</dd><dt>Hourly</dt><dd>${a.eu}</dd><dt>Default swap</dt><dd>${SWAPYR[a.id]}</dd></dl>
+  <div class="open">${a.built ? 'Open the model →' : 'Page coming soon'}</div></a>`).join('');
+</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How WhyWatt? HEX Works</title>
+<meta name="description" content="Architecture explainer for WhyWatt? HEX, the Home Electrification Explorer: inputs, offline data pipelines, the simulation engine and its outputs.">
+<link rel="stylesheet" href="assets/explainer.css">
+</head>
+<body data-root="" data-page="overview">
+<main>
+  <p class="eyebrow">System map</p>
+  <h1>How WhyWatt? HEX turns a home into a 20-year cost comparison</h1>
+  <p class="lede">You describe a home and a plan. Your ZIP code looks up climate, tariffs, load profiles and sunshine from data built offline. The engine runs two copies of the home, <b style="color:var(--nothing)">do nothing</b> and <b style="color:var(--journey)">your journey</b>, year by year, and compares what each one costs. <b>Click any box</b> for its breakout, or <b>an appliance</b> to see how it is modeled.</p>
+
+  <div class="canvas-wrap">
+    <div>
+      <div class="canvas" id="map"></div>
+      <div class="legendbar">
+        <span><i class="lg-ctrl"></i>control flow (what runs when)</span>
+        <span><i class="lg-data"></i>data flow</span>
+        <span><i class="lg-box" style="background:var(--climate)"></i>climate</span>
+        <span><i class="lg-box" style="background:var(--journey)"></i>tariffs</span>
+        <span><i class="lg-box" style="background:var(--proj)"></i>projection</span>
+        <span><i class="lg-box" style="background:var(--solar)"></i>load profiles · solar</span>
+        <span>▮▮▮▯ level of detail</span>
+      </div>
+    </div>
+    <aside class="drawer" id="drawer"><p class="empty">Click a box in the diagram. Its breakout (what it does, the rule it follows, where the data comes from) opens here, with a link to its own page. Clicking an appliance opens the appliances page.</p></aside>
+  </div>
+
+  <div class="note"><b>How to read the engine.</b> Nothing is computed day by day. Each appliance reports <b>12 monthly numbers</b> (kWh or therms). Only the home's total <em>electric</em> load is then spread over one <b>representative 24-hour day per month</b>, which is what time-of-use pricing, solar and batteries need.</div>
+
+  <div class="row3" style="margin-top:22px">
+    <a class="block" href="pipelines/climate.html" style="text-decoration:none;color:inherit;margin:0"><p class="eyebrow" style="color:var(--climate)">Offline pipelines</p><h3>Five data sources, built once</h3><p>Climate (TMYx), solar (PVWatts), tariffs (URDB), rate projection (CEC) and load profiles (NREL). Each is harvested by a script, checksum-pinned, and looked up by ZIP at run time.</p></a>
+    <a class="block" href="appliances/index.html" style="text-decoration:none;color:inherit;margin:0"><p class="eyebrow">Appliances</p><h3>Nine appliances, one question</h3><p>How much energy each month? Four levels of detail, from fixed usage to climate physics to an hourly energy balance.</p></a>
+    <a class="block" href="engine/loop.html" style="text-decoration:none;color:inherit;margin:0"><p class="eyebrow" style="color:var(--proj)">Engine</p><h3>Two homes, one loop</h3><p>How do nothing and your journey are stepped year by year, and how the hourly energy balance prices solar and batteries.</p></a>
+  </div>
+</main>
+<footer class="foot">WhyWatt? HEX · Home Electrification Explorer · architecture explainer · figures from the Phase 7 model defaults (CZ4 San Jose, PG&amp;E) · 2026-09</footer>
+
+<script src="assets/nodes.js"></script>
+<script src="assets/explainer.js"></script>
+<script>WW.wireMap(document.getElementById('map'), document.getElementById('drawer'));</script>
+</body>
+</html>

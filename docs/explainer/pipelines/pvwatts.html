@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solar Pipeline · WhyWatt? HEX</title>
+<meta name="description" content="How WhyWatt? HEX turns NREL PVWatts into monthly and hourly solar output for your ZIP code.">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body data-root="../" data-page="pvwatts">
+<main>
+<div class="detail">
+  <aside class="side" id="side"></aside>
+  <div>
+    <div class="crumbs"><a href="../index.html">System map</a> / Offline pipelines / Solar · PVWatts</div>
+    <p class="eyebrow" style="color:var(--solar)">Offline pipeline · solar yield</p>
+    <h1>Solar: how much sunshine becomes kWh at your address</h1>
+    <p class="lede">For a solar array, the engine needs two things: <b>how many kWh each kW of panels makes in each month</b>, and <b>when in the day</b> those kWh arrive, since noon output can't cover a 7 pm peak unless a battery stores it. Both come from NREL's PVWatts calculator, run ahead of time.</p>
+
+    <div class="facts">
+      <div><div class="k">Source</div><div class="v">NREL PVWatts v8 · NSRDB weather</div></div>
+      <div><div class="k">Coverage</div><div class="v">16 zone stations + <span id="nzip"></span> ZIPs (SVCE)</div></div>
+      <div><div class="k">System modeled</div><div class="v">1 kW DC · 20° tilt · south · 14% losses</div></div>
+      <div><div class="k">Built</div><div class="v">2026-09-22 · checksummed raw snapshots</div></div>
+    </div>
+
+    <div class="block">
+      <h2>The pipeline</h2>
+      <p>The offline script calls PVWatts <b>once per site</b> for a 1 kW system and saves the reduced result. At run time the model only looks the answer up and scales it by your system size. No API calls happen while you use the app.</p>
+      <div class="canvas static" id="flow" style="margin-top:10px"></div>
+      <div class="legendbar"><span><i class="lg-data" style="border-color:var(--solar)"></i>data flow</span><span>(12,) = one value per month · (12×24) = a 24-hour day for each month</span></div>
+    </div>
+
+    <div class="block">
+      <h2>What one kilowatt makes</h2>
+      <div class="ctl" style="max-width:640px">
+        <div><label for="zone">Climate-zone station <output id="zlbl"></output></label><select id="zone" class="sel"></select></div>
+        <div><label for="kw">System size <output id="o-kw"></output></label><input type="range" id="kw" min="2" max="12" step="0.5" value="6"></div>
+      </div>
+      <div class="row3" style="margin-bottom:12px">
+        <div class="kpi" style="--c:var(--solar)"><div class="k">Per kW per year</div><div class="v" id="k-per" style="color:var(--solar)"></div><div class="u">kWh AC</div></div>
+        <div class="kpi"><div class="k">Your system per year</div><div class="v" id="k-sys" style="color:var(--solar)"></div><div class="u">kWh AC</div></div>
+        <div class="kpi"><div class="k">Summer ÷ winter</div><div class="v" id="k-ratio"></div><div class="u">July vs December output</div></div>
+      </div>
+      <div class="row2">
+        <div class="chart"><svg id="c-month"></svg><div class="caption">Monthly output of your system (kWh).</div></div>
+        <div class="chart"><svg id="c-day"></svg><div class="caption">When in the day it arrives: share of each month's output per clock hour, June vs December.</div></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2>Across California</h2>
+      <p>Yield per kW differs by about a third from the foggy north coast to the desert. Where a ZIP has its own PVWatts run (so far, Silicon Valley Clean Energy's 29 ZIPs), that is used; otherwise the ZIP's climate-zone station; otherwise San Jose.</p>
+      <table class="data" id="ztable"><thead><tr><th>Zone</th><th>Station</th><th>kWh / kW / yr</th><th></th></tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="block">
+      <h2>What it feeds</h2>
+      <p>Your system size × this yield gives the solar generation <b>G</b> for each month's representative day. The <b>hourly energy balance</b> matches it against the home's hourly load (from the NREL load profiles): solar serves the home first, then charges the battery, then exports at the NEM 3.0 hourly credit.</p>
+      <div class="formula">G[m,h] = system_kW × ac_monthly[m] / days[m] × intraday_shape[m,h]</div>
+    </div>
+
+    <div class="block">
+      <h2>What's modeled, what's simplified</h2>
+      <div class="row2">
+        <ul class="tight">
+          <li class="ok"><b>Real sunshine data</b> (NSRDB typical year) for your zone's station, or your ZIP where harvested.</li>
+          <li class="ok"><b>Hour-by-hour shape</b> per month, so evening peaks and battery value are priced correctly.</li>
+          <li class="ok"><b>Same clock as the tariff:</b> stored in standard time, shifted +1 h in daylight-saving months, like the load profiles.</li>
+        </ul>
+        <ul class="tight">
+          <li class="lim"><b>One orientation:</b> south-facing, 20° tilt. East/west roofs make less and later.</li>
+          <li class="lim"><b>No shading</b> from trees or neighbors.</li>
+          <li class="lim"><b>No panel degradation:</b> year 20 makes the same as year 1 (real panels lose ~0.5%/yr).</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2>Sources</h2>
+      <div class="chips"><span class="chip src">NREL PVWatts v8 API</span><span class="chip src">NSRDB PSM v3 TMY</span><span class="chip src">SVCE member communities (ZIP wave 1)</span></div>
+      <div class="sec code">Code</div>
+      <div class="chips code">
+        <span class="chip file">scripts/build_pvwatts.py</span><span class="chip file">scripts/solar_regions.py</span>
+        <span class="chip file">data/solar/pvwatts_zip.json</span><span class="chip file">data/solar/sources/zone_stations/</span>
+        <span class="chip file">src/solar_loader.py · to_clock_time()</span><span class="chip file">docs/OfflineSolarData_Plan.md</span>
+      </div>
+    </div>
+    <div class="pager" id="pager"></div>
+  </div>
+</div>
+</main>
+
+<script src="../assets/nodes.js"></script>
+<script src="../assets/pvwatts.js"></script>
+<script src="../assets/explainer.js"></script>
+<script>
+const {C, txt, node, edge, arrowDefs, uniq, line, bars, MONTHS, HOURS} = WW;
+const $ = id => document.getElementById(id), sum = a => a.reduce((x,y)=>x+y,0), fmt = n => Math.round(n).toLocaleString('en-US');
+$('nzip').textContent = PV_ZIPS;
+
+(function(){
+  let s = `<svg viewBox="0 0 1100 330" xmlns="http://www.w3.org/2000/svg">${arrowDefs()}`;
+  s += `<rect x="8" y="30" width="1084" height="110" rx="12" fill="${C.cream}" stroke="${C.line}" stroke-dasharray="4 4"/>` + txt(20,22,'OFFLINE · run when the data is refreshed','t-tag');
+  s += node('a','source',24,56,220,60,'PVWatts v8 (NREL)','1 kW · hourly · one call per site',C.s);
+  s += node('b','proc',290,56,250,60,'Reduce 8,760 hours','→ 12 monthly totals + 12×24 shape',C.s);
+  s += node('c','store',586,50,230,72,'Solar yield table','45 sites · checksummed raw',C.s);
+  s += node('k','store',862,50,210,72,'Local cache','re-runs make no API calls',C.slate);
+  s += edge('M244,86 L288,86',C.s,'s') + edge('M540,86 L584,86',C.s,'s') + edge('M816,86 L860,86',C.slate,'slate');
+  s += txt(20,176,'RUNTIME · every run','t-tag');
+  s += node('d','input',24,200,180,52,'Your ZIP','',C.ink);
+  s += node('e','proc',250,194,300,64,'ZIP site → zone station → San Jose','first one that exists wins',C.ink);
+  s += node('f','proc',596,194,200,64,'× your system kW','+ daylight-saving shift',C.s);
+  s += node('g','proc',842,194,230,64,'Solar generation G','(12×24) → hourly balance',C.s);
+  s += edge('M204,226 L248,226',C.ink,'ink') + edge('M550,226 L594,226',C.s,'s') + edge('M796,226 L840,226',C.s,'s','(12×24)',800,218);
+  s += edge('M701,124 C701,160 400,160 400,192',C.s,'s','lookup',560,152);
+  document.getElementById('flow').innerHTML = uniq(s + '</svg>');
+})();
+
+const keys = Object.keys(PV).sort((a,b) => +a.slice(5) - +b.slice(5));
+keys.forEach(k => $('zone').insertAdjacentHTML('beforeend', `<option value="${k}" ${k==='CA_CZ4'?'selected':''}>${k.slice(3)} · ${PV[k].label}</option>`));
+const maxA = Math.max(...keys.map(k => sum(PV[k].ac)));
+function render(){
+  const z = PV[$('zone').value], kw = +$('kw').value, per = sum(z.ac);
+  $('zlbl').textContent = z.label.replace(/ \(\d+\)/,''); $('o-kw').textContent = kw + ' kW';
+  $('k-per').textContent = fmt(per); $('k-sys').textContent = fmt(per*kw);
+  $('k-ratio').textContent = (z.ac[6]/z.ac[11]).toFixed(1) + '×';
+  bars($('c-month'), {x:MONTHS, series:[{d:z.ac.map(v=>v*kw), c:C.s}]});
+  /* stored in standard time; June is a DST month → shown +1 h in clock time, as the loader does */
+  const jun = [z.jun[23], ...z.jun.slice(0,23)];
+  line($('c-day'), {W:460, H:210, x0:40, x:HOURS, every:6, min:0, max:.18, ticks:[0,.05,.1,.15], fmt:v=>Math.round(v*100)+'%',
+    series:[{d:jun, c:C.s, label:'June', at:13, dy:-8}, {d:z.dec, c:C.jl, label:'Dec', at:12, dy:-10}]});
+  $('ztable').querySelector('tbody').innerHTML = keys.map(k => { const a = sum(PV[k].ac);
+    return `<tr class="${PV[k]===z?'hl':''}"><td>${k.slice(3)}</td><td>${PV[k].label}</td><td>${fmt(a)}</td><td style="width:40%"><span class="bar" style="width:${a/maxA*100}%;background:var(--solar)"></span></td></tr>`; }).join('');
+}
+$('zone').onchange = render; $('kw').oninput = render; render();
+</script>
+</body>
+</html>

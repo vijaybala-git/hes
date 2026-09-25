@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solar PV Model · WhyWatt? HEX</title>
+<meta name="description" content="How WhyWatt? HEX sizes, prices and credits a rooftop solar system.">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body data-root="../" data-page="pv">
+<main>
+<div class="detail">
+  <aside class="side" id="side"></aside>
+  <div>
+    <div class="crumbs"><a href="../index.html">System map</a> / <a href="index.html">Appliances</a> / Solar PV</div>
+    <p class="eyebrow" style="color:var(--solar)">Appliance · level of detail 4 of 4 · hourly energy balance</p>
+    <h1>Solar PV: making some of your own electricity</h1>
+    <p class="lede">Solar doesn't use energy; it makes it. Its value depends on <b>when</b> it makes it: kWh that run the home at noon avoid retail prices, while surplus kWh exported under NEM 3.0 earn a much smaller hourly credit. That's why solar is the one appliance priced hour by hour, in the <a href="../engine/hourly-balance.html">hourly energy balance</a>.</p>
+
+    <div class="block">
+      <h2>What gets added</h2>
+      <div class="homes">
+        <div class="home dn"><h4>Do nothing</h4>
+          <div class="slotrow"><span>Solar</span><span>none</span></div>
+          <div class="slotrow"><span>Bill</span><span>everything from the grid</span></div>
+        </div>
+        <div class="home yj"><h4>Your journey</h4>
+          <div class="slotrow"><span>System</span><span>15 panels × 0.42 kW = 6.3 kW</span></div>
+          <div class="slotrow"><span>Install</span><span>year 1 · $30,000 incl. battery</span></div>
+          <div class="slotrow"><span>Credit</span><span>NEM 3.0 (net billing)</span></div>
+          <div class="slotrow"><span>Lifespan</span><span>25 years</span></div>
+        </div>
+      </div>
+      <p style="margin-top:12px">Defaults shown; solar is off until you add it. Solar and the <a href="battery.html">battery</a> are one install event with one cost. Solar only exists in your journey; the do-nothing home never has it.</p>
+    </div>
+
+    <div class="block">
+      <h2>How much it makes</h2>
+      <p>Output per kW comes from the <a href="../pipelines/pvwatts.html">PVWatts pipeline</a> for your ZIP or climate zone (south-facing, 20° tilt, 14% losses). Size is panels × kW per panel.</p>
+      <div class="ctl">
+        <div><label for="zone">Climate zone <output id="o-zone"></output></label><select id="zone" class="sel"></select></div>
+        <div><label for="np">Panels <output id="o-np"></output></label><input type="range" id="np" min="4" max="30" step="1" value="15"></div>
+      </div>
+      <div class="row3" style="margin-bottom:12px">
+        <div class="kpi"><div class="k">System size</div><div class="v" id="k-kw" style="color:var(--solar)"></div><div class="u">kW DC</div></div>
+        <div class="kpi"><div class="k">Production</div><div class="v" id="k-kwh" style="color:var(--solar)"></div><div class="u">kWh / yr</div></div>
+        <div class="kpi"><div class="k">Best ÷ worst month</div><div class="v" id="k-r"></div><div class="u">July vs December</div></div>
+      </div>
+      <div class="chart"><svg id="c-m"></svg><div class="caption">Monthly production, kWh.</div></div>
+    </div>
+
+    <div class="block">
+      <h2>What it's worth</h2>
+      <p>Each month the balance runs a representative day. Solar first serves the home directly, then charges the battery, and only the rest is exported. Its value is the drop in the bill:</p>
+      <div class="formula">saving[month] = bill with no solar − (bill after solar &amp; battery − export credit)
+year saving   = Σ months, capped at the year's electric bill</div>
+      <table class="data" style="max-width:640px;margin-top:10px">
+        <thead><tr><th>Credit rule</th><th>For</th><th>Exported kWh earn</th></tr></thead>
+        <tbody><tr><td>NEM 3.0 · net billing (default)</td><td>new systems (since 2023)</td><td>hourly avoided cost (ACC), ~$0.05–0.35</td></tr>
+        <tr><td>NEM 2.0</td><td>existing pre-2023 systems</td><td>retail rate − $0.025 non-bypassable charge</td></tr></tbody>
+      </table>
+      <p class="caption">Under NEM 3.0 an exported kWh at noon earns about a tenth of what it would save if used at 6 pm. That gap is why solar is usually paired with a battery now.</p>
+    </div>
+
+    <div class="block">
+      <h2>What's modeled, what's simplified</h2>
+      <div class="row2">
+        <ul class="tight"><li class="ok"><b>Real hourly sun</b> for your location, on the tariff's clock.</li><li class="ok"><b>Self-use vs export</b> valued differently, as under NEM 3.0.</li><li class="ok"><b>Annual true-up cap:</b> savings can't push a year's electric bill below zero.</li></ul>
+        <ul class="tight"><li class="lim"><b>One orientation</b> (south, 20°), no shading; <b>no panel degradation</b> over 25 years.</li><li class="lim"><b>No existing solar</b> in the do-nothing home.</li><li class="lim"><b>Cost is a single number</b> you enter; no incentives or financing are modeled.</li></ul>
+      </div>
+      <div class="sec code">Code</div>
+      <div class="chips code"><span class="chip file">src/journey.py · SolarConfig, JourneyHome.step (solar block)</span><span class="chip file">src/solar_loader.py</span><span class="chip file">src/nbt_export.py</span><span class="chip file">src/ui/sim.py · "Solar + Battery" CapEx slot</span></div>
+    </div>
+    <div class="pager" id="pager"></div>
+  </div>
+</div>
+</main>
+<script src="../assets/nodes.js"></script>
+<script src="../assets/climate_zones.js"></script>
+<script src="../assets/pvwatts.js"></script>
+<script src="../assets/explainer.js"></script>
+<script>
+const $ = id => document.getElementById(id), fmt = n => Math.round(n).toLocaleString('en-US'), sum = a => a.reduce((x,y)=>x+y,0);
+WW.zoneOptions($('zone'));
+function render(){
+  const z = ZONES[+$('zone').value], pv = PV['CA_'+z.id], kw = +$('np').value*0.42, m = pv.ac.map(v => v*kw);
+  $('o-zone').textContent = z.city; $('o-np').textContent = $('np').value + ' × 0.42 kW';
+  $('k-kw').textContent = kw.toFixed(1); $('k-kwh').textContent = fmt(sum(m)); $('k-r').textContent = (pv.ac[6]/pv.ac[11]).toFixed(1) + '×';
+  WW.bars($('c-m'), {W:680, x:WW.MONTHS, series:[{d:m, c:WW.C.s}]});
+}
+['zone','np'].forEach(id => $(id).oninput = $(id).onchange = render); render();
+</script>
+</body>
+</html>

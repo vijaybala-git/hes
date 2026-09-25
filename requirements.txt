@@ -1,6 +1,6 @@
 mesa==3.5.1
-solara==1.57.4
-# Pin the whole vuetify-2 UI stack. solara-ui 1.57.4 declares these UNBOUNDED
+solara==1.62.1
+# Pin the whole vuetify-2 UI stack. solara-ui 1.62.1 declares these UNBOUNDED
 # (ipyvuetify>=1.6.10, ipyvue>=1.9.0, reacton>=1.9), so a fresh HF build otherwise pulls
 # ipyvuetify/ipyvue 2.x (vuetify 3) — which renames ExpansionPanelHeader (crashes
 # solara.Details), hides the header buttons, and restyles the sliders. These are the

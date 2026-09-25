@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hourly Energy Balance · WhyWatt? HEX</title>
+<meta name="description" content="How WhyWatt? HEX prices solar, batteries and time-of-use bills on a representative 24-hour day for each month.">
+<link rel="stylesheet" href="../assets/explainer.css">
+<style>
+  .modes{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .mode{border:1.5px solid var(--line);border-radius:12px;padding:14px;background:var(--paper)}
+  .mode.win{border-color:var(--solar);background:var(--solar-soft)}
+  .mode h3{margin:0 0 4px}
+  .mode .tag{font-family:var(--f-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
+  .mode p{font-size:13px !important;margin:6px 0 0}
+  .keyrow{display:flex;flex-wrap:wrap;gap:14px;font-family:var(--f-mono);font-size:10.5px;color:var(--slate);margin:6px 0 0}
+  .keyrow i{display:inline-block;width:11px;height:11px;border-radius:2px;vertical-align:-1px;margin-right:5px}
+  .check{font-family:var(--f-mono);font-size:11px;color:var(--solar)}
+  @media (max-width:1000px){ .modes{grid-template-columns:1fr} }
+</style>
+</head>
+<body data-root="../" data-page="hourly">
+<main>
+<div class="detail">
+  <aside class="side" id="side"></aside>
+  <div>
+    <div class="crumbs"><a href="../index.html">System map</a> / Engine / Hourly energy balance</div>
+    <p class="eyebrow" style="color:var(--solar)">Engine · hourly energy balance</p>
+    <h1>The hourly energy balance: solar, battery and the time-of-use bill</h1>
+    <p class="lede">Monthly totals can't tell you whether noon sunshine covers a 7 pm dinner, or what a battery is worth. For that the engine zooms in on <b>one representative day per month</b>: the home's electric load and the solar output hour by hour, a battery in between, and the grid covering the rest, priced on your time-of-use tariff.</p>
+
+    <div class="facts">
+      <div><div class="k">Resolution</div><div class="v">24 clock hours × 12 months, × days in month</div></div>
+      <div><div class="k">Battery</div><div class="v">2 modes, cheaper one chosen each month</div></div>
+      <div><div class="k">Export credit</div><div class="v">NEM 3.0: hourly avoided cost (ACC)</div></div>
+      <div><div class="k">Runs for</div><div class="v">Your journey, from the solar install year</div></div>
+    </div>
+
+    <div class="block">
+      <h2>The flow</h2>
+      <div class="canvas static" id="flow"></div>
+      <div class="legendbar"><span><i class="lg-data"></i>data flow</span><span><i class="lg-ctrl"></i>control: run both modes, keep the cheaper</span></div>
+    </div>
+
+    <div class="block">
+      <h2>Run it: one day in your month</h2>
+      <p>This is the model's dispatch algorithm (<span class="code" style="display:inline">src/dispatch.py, </span>ported line for line) running in your browser on an illustrative all-electric home: heat pump, heat-pump water heater, induction, heat-pump dryer, lights, and optionally an EV. It uses your zone's real climate, NREL load shapes, PVWatts sun and PG&amp;E's default time-of-use plan (E-TOU-C).</p>
+      <div class="ctl">
+        <div><label for="zone">Climate zone</label><select id="zone" class="sel"></select></div>
+        <div><label>Month</label><div class="seg" id="mon"><button data-m="0" class="on">January</button><button data-m="6">July</button></div></div>
+        <div><label for="kw">Solar <output id="o-kw"></output></label><input type="range" id="kw" min="0" max="12" step="0.5" value="6"></div>
+        <div><label>Battery</label><div class="seg" id="bat"><button data-v="1" class="on">Powerwall 3</button><button data-v="0">None</button></div></div>
+        <div><label>Mode</label><div class="seg" id="md"><button data-v="auto" class="on">Auto</button><button data-v="self">Self</button><button data-v="cost">Cost</button></div></div>
+        <div><label>EV at home</label><div class="seg" id="ev"><button data-v="1" class="on">Yes</button><button data-v="0">No</button></div></div>
+      </div>
+
+      <div class="row3" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">
+        <div class="kpi dn"><div class="k">Bill · no solar</div><div class="v" id="k-none"></div><div class="u">this month</div></div>
+        <div class="kpi"><div class="k">Solar only</div><div class="v" id="k-solar" style="color:var(--solar)"></div><div class="u" id="k-solar-u"></div></div>
+        <div class="kpi yj"><div class="k">Solar + battery</div><div class="v" id="k-bat"></div><div class="u" id="k-bat-u"></div></div>
+        <div class="kpi"><div class="k">Grid at peak</div><div class="v" id="k-pk"></div><div class="u">of the month's grid kWh</div></div>
+      </div>
+
+      <h3>Where the home's electricity comes from, each hour</h3>
+      <div class="chart"><svg id="c-in"></svg></div>
+      <div class="keyrow"><span><i style="background:var(--solar)"></i>solar → home</span><span><i style="background:var(--proj)"></i>battery → home</span><span><i style="background:var(--journey)"></i>grid → home (off-peak)</span><span><i style="background:var(--nothing)"></i>grid → home (peak)</span><span><i style="background:#9fb8e6"></i>grid → battery</span><span>— home load</span></div>
+      <h3 style="margin-top:16px">Where the sunshine goes, and the battery's charge</h3>
+      <div class="chart"><svg id="c-out"></svg></div>
+      <div class="keyrow"><span><i style="background:var(--solar)"></i>solar → home</span><span><i style="background:#7fd0b8"></i>solar → battery</span><span><i style="background:var(--climate)"></i>exported</span><span style="color:var(--proj)">— battery charge (kWh, right axis)</span></div>
+
+      <div class="modes" style="margin-top:14px">
+        <div class="mode" id="m-self"><span class="tag">Mode 1</span><h3>Self-powered</h3><div id="b-self"></div><p>Solar serves the home first; any surplus charges the battery, then exports. The battery covers any shortfall, at any hour, until it's empty. Then the grid.</p></div>
+        <div class="mode" id="m-cost"><span class="tag">Mode 2</span><h3>Cost-saving</h3><div id="b-cost"></div><p>Keeps just enough charge (the <b>reserve</b>) to cover the 4–9 pm peak, and discharges only then. If solar leaves it short and grid power is cheap enough (efficiency × peak price &gt; off-peak price), it tops up from the grid in the hours before the peak.</p></div>
+      </div>
+      <p class="caption" style="margin-top:8px"><span class="check" id="chk"></span> Illustrative home: 1,800 sq ft, average insulation, 3 bedrooms, the app's default appliance settings (lights &amp; plugs 1,910 kWh/yr; EV 12,000 mi, 85% charged at home), 2026 tariff (no escalation). Month bill = tiered TOU energy + $0.79/day fixed − export credit.</p>
+    </div>
+
+    <div class="block">
+      <h2>Energy is conserved, every hour</h2>
+      <p>Each mode's result satisfies these balances exactly (the model's tests check them), and the check line above recomputes them live. The day is run repeatedly until the battery ends the day at the same charge it started with (<b>steady state</b>), so no energy comes from an arbitrary starting charge. Round-trip losses are split evenly between charging and discharging (√η each way).</p>
+      <div class="formula">solar      G = solar→home + solar→battery + export
+load       L = solar→home + battery→home + grid→home
+grid         = grid→home + grid→battery
+battery    (solar→battery + grid→battery) × η = battery→home        (steady state)</div>
+    </div>
+
+    <div class="block">
+      <h2>From one day to a year's saving</h2>
+      <p>Each month's day is multiplied by the days in the month. The <b>saving</b> is the month's bill <em>without</em> solar or battery, minus the bill <em>with</em> them (which already subtracts the export credit), summed over 12 months. The year's total saving is capped at that year's electric bill, like an annual NEM true-up: summer credits can offset winter, but a year can't go below zero. That saving is subtracted from your journey's energy cost for the year (see <a href="loop.html">the year loop</a>).</p>
+    </div>
+
+    <div class="block">
+      <h2>What's modeled, what's simplified</h2>
+      <div class="row2">
+        <ul class="tight">
+          <li class="ok"><b>Real hourly shapes</b> for load (NREL, per zone and month) and sun (PVWatts), on one shared clock with the tariff.</li>
+          <li class="ok"><b>Real tariff structure:</b> tiers on the home total, the peak window and the fixed charge.</li>
+          <li class="ok"><b>Two standard battery settings</b>, the ones home batteries ship with; the cheaper one is chosen each month.</li>
+          <li class="ok"><b>NEM 3.0 export value</b> by hour and calendar year from the CPUC avoided-cost calculator.</li>
+        </ul>
+        <ul class="tight">
+          <li class="lim"><b>One average day per month:</b> no cloudy streaks or heat waves, so battery value on extreme days is averaged away.</li>
+          <li class="lim"><b>Perfect foresight within the day:</b> Cost-saving mode knows the day's load and sun when it sets its reserve.</li>
+          <li class="lim"><b>No battery wear</b> or capacity loss over the years, and no backup-power value.</li>
+          <li class="lim"><b>No demand charges,</b> and the ACC "plus" adder for early NEM 3.0 customers isn't included.</li>
+        </ul>
+      </div>
+      <div class="sec code">Code</div>
+      <div class="chips code">
+        <span class="chip file">src/dispatch.py · run_day · dispatch_month · month_bill</span><span class="chip file">src/journey.py · JourneyHome.step (solar block)</span>
+        <span class="chip file">src/urdb_rates.py · price_month</span><span class="chip file">src/nbt_export.py</span><span class="chip file">data/rates/nbt_export_acc.json</span>
+        <span class="chip file">src/battery_defaults.py</span><span class="chip file">tests/test_battery.py</span>
+      </div>
+    </div>
+    <div class="pager" id="pager"></div>
+  </div>
+</div>
+</main>
+
+<script src="../assets/nodes.js"></script>
+<script src="../assets/climate_zones.js"></script>
+<script src="../assets/nrel_profiles.js"></script>
+<script src="../assets/pvwatts.js"></script>
+<script src="../assets/tariff.js"></script>
+<script src="../assets/explainer.js"></script>
+<script>
+const {C, txt, node, edge, ctrl, arrowDefs, uniq, HOURS} = WW;
+const $ = id => document.getElementById(id);
+const sum = a => a.reduce((x,y)=>x+y,0), fmt$ = v => Math.round(v) < 0 ? '−$' + Math.abs(Math.round(v)).toLocaleString('en-US') + ' credit' : '$' + Math.round(v).toLocaleString('en-US');
+
+/* ── flow diagram ── */
+(function(){
+  let s = `<svg viewBox="0 0 1100 300" xmlns="http://www.w3.org/2000/svg">${arrowDefs()}`;
+  s += node('g','source',20,20,230,52,'Solar G (24 h)','kW × PVWatts month × hourly shape',C.s);
+  s += node('l','source',20,86,230,52,'Home load L (24 h)','Σ appliance kWh × NREL shape',C.j);
+  s += node('b','input',20,152,230,46,'Battery','13.5 kWh · 89% · 5 / 11.5 kW',C.ink);
+  s += node('t','source',20,212,230,52,'Tariff + export value','peak 4–9 pm · tiers · ACC hourly',C.j);
+  s += node('m1','proc',320,50,220,56,'Self-powered day','run to steady state',C.s);
+  s += node('m2','proc',320,150,220,56,'Cost-saving day','reserve for the peak · grid top-up',C.s);
+  s += node('bl','proc',600,100,200,60,'Price both months','× days · tiers · fixed − export',C.j);
+  s += node('pk','proc',860,100,220,60,'Keep the cheaper mode','tie → Self-powered',C.ink);
+  s += node('o','store',860,200,220,70,'Month result','grid peak/off-peak · export · saving',C.ink);
+  [46,112,175,238].forEach(y => { s += edge(`M250,${y} C285,${y} 285,78 318,78`,C.slate,'slate') + edge(`M250,${y} C285,${y} 285,178 318,178`,C.slate,'slate'); });
+  s += edge('M540,78 C570,78 570,120 598,120',C.s,'s') + edge('M540,178 C570,178 570,140 598,140',C.s,'s');
+  s += ctrl('M800,130 L858,130') + edge('M970,160 L970,198',C.ink,'ink');
+  s += txt(320,236,'no battery or flat tariff → Self-powered only','t-sub');
+  document.getElementById('flow').innerHTML = uniq(s + '</svg>');
+})();
+
+/* ── dispatch: a line-for-line port of src/dispatch.py ── */
+const H = 24, MAXP = 200, TOL = 1e-10;
+const zeros = () => new Array(H).fill(0);
+const flows = (mode, soc0) => ({mode, direct:zeros(), cs:zeros(), cg:zeros(), dis:zeros(), exp:zeros(), g2h:zeros(), socStart:soc0, socEnd:0});
+function selfDay(G, L, b, soc0){
+  const sq = Math.sqrt(b.eff), f = flows('self', soc0); let soc = soc0;
+  for(let h=0; h<H; h++){
+    const direct = Math.min(G[h], L[h]), surplus = G[h]-direct, deficit = L[h]-direct;
+    const charge = b.cap ? Math.min(surplus, Math.max(b.cap-soc,0)/sq, b.ckw) : 0; soc += charge*sq;
+    const dis = b.cap ? Math.min(deficit, soc*sq, b.dkw) : 0; soc -= dis/sq;
+    f.direct[h]=direct; f.cs[h]=charge; f.exp[h]=surplus-charge; f.dis[h]=dis; f.g2h[h]=deficit-dis;
+  }
+  f.socEnd = soc; return f;
+}
+function costDay(G, L, b, peak, reserve, plan, soc0){
+  const sq = Math.sqrt(b.eff), f = flows('cost', soc0); let soc = soc0;
+  for(let h=0; h<H; h++){
+    if(peak[h]){
+      const direct = Math.min(G[h], L[h]), surplus = G[h]-direct, deficit = L[h]-direct;
+      const dis = Math.min(deficit, soc*sq, b.dkw); soc -= dis/sq;
+      const charge = Math.min(surplus, Math.max(b.cap-soc,0)/sq, b.ckw); soc += charge*sq;
+      f.direct[h]=direct; f.cs[h]=charge; f.exp[h]=surplus-charge; f.dis[h]=dis; f.g2h[h]=deficit-dis;
+      continue;
+    }
+    const first = Math.min(G[h], Math.max(reserve-soc,0)/sq, b.ckw); soc += first*sq;
+    const direct = Math.min(G[h]-first, L[h]), leftover = G[h]-first-direct;
+    const more = Math.min(leftover, Math.max(b.cap-soc,0)/sq, b.ckw-first); soc += more*sq;
+    let gin = Math.min(plan[h], Math.max(b.cap-soc,0)/sq, b.ckw-first-more); gin = Math.max(gin,0); soc += gin*sq;
+    f.direct[h]=direct; f.cs[h]=first+more; f.exp[h]=leftover-more; f.cg[h]=gin; f.g2h[h]=L[h]-direct;
+  }
+  f.socEnd = soc; return f;
+}
+function steady(run){ let soc = 0, day; for(let i=0;i<MAXP;i++){ day = run(soc); if(Math.abs(day.socEnd-soc) < TOL) return day; soc = day.socEnd; } return day; }
+function runDay(G, L, b, mode, peak, rp, ro){
+  if(mode === 'self') return steady(soc => selfDay(G, L, b, soc));
+  const sq = Math.sqrt(b.eff);
+  const need = sum(L.map((l,h) => peak[h] ? Math.min(Math.max(l-G[h],0), b.dkw) : 0));
+  const reserve = Math.min(b.cap, need/sq);
+  const gridOk = b.gridCharging && peak.some(x=>x) && b.eff*rp > ro;
+  const plan = zeros();
+  let day = steady(soc => costDay(G, L, b, peak, reserve, plan, soc));
+  if(gridOk){
+    const start = peak.indexOf(true);
+    for(let p=0; p<MAXP; p++){
+      const socAtPeak = day.socStart + sq*(sum(day.cs.slice(0,start)) + sum(day.cg.slice(0,start)));
+      const short = reserve - socAtPeak; if(short <= TOL) break;
+      let needIn = short/sq;
+      for(let h=start-1; h>=0; h--){ const room = b.ckw - day.cs[h] - plan[h]; const add = Math.min(Math.max(room,0), needIn); plan[h] += add; needIn -= add; if(needIn <= TOL) break; }
+      const nw = steady(soc => costDay(G, L, b, peak, reserve, plan, soc));
+      if(nw.cg.every((v,h) => Math.abs(v-day.cg[h]) <= TOL)){ day = nw; break; }
+      day = nw;
+    }
+  }
+  return day;
+}
+const gridImport = d => d.g2h.map((v,h) => v + d.cg[h]);
+
+/* ── PG&E E-TOU-C (2026) + NEM 3.0 export (ACC 2026, clock time) ── */
+/* PG&E default TOU plan + NEM 3.0 export values: assets/tariff.js (generated from the model's data) */
+const PEAK = HOURS.map((_,h) => TARIFF.peak_hours.includes(h));
+const FIXED = TARIFF.fixed_per_day;
+function priceMonth(t, pk, op, days){   // UrdbRateStructure.price_month
+  const total = pk+op, share = total>0 ? pk/total : 0, bounds = [t.base*days, Infinity]; let cost = 0, prev = 0;
+  for(let i=0;i<2;i++){ const bound = Math.min(total, bounds[i]), k = Math.max(bound-prev,0); cost += k*(share*t.pk[i] + (1-share)*t.op[i]); prev = Math.max(prev,bound); if(prev>=total) break; }
+  return cost + FIXED*days;
+}
+function monthBill(d, days, t, xr){
+  const gi = gridImport(d), gpk = sum(gi.filter((_,h)=>PEAK[h]))*days, gop = sum(gi.filter((_,h)=>!PEAK[h]))*days;
+  return priceMonth(t, gpk, gop, days) - sum(d.exp.map((e,h)=>e*xr[h]))*days;
+}
+
+/* ── illustrative all-electric home ── */
+const zkeys = Object.keys(NREL).sort((a,b) => +a.slice(5) - +b.slice(5));
+zkeys.forEach(k => { const z = ZONES.find(q => q.id===k.slice(3)); $('zone').insertAdjacentHTML('beforeend', `<option value="${k}" ${k==='CA_CZ4'?'selected':''}>${k.slice(3)} · ${z?z.city:''}</option>`); });
+const EVW = [0.88,0.88,0.92,0.96,1.04,1.10,1.14,1.12,1.02,0.96,0.90,0.88].map((w,_,a) => w/a.reduce((x,y)=>x+y,0));   // vehicle.py driving seasonality
+const toClock = (a, m) => m===6 ? [a[23], ...a.slice(0,23)] : a;   // July: daylight saving, +1 h
+function homeLoad(zk, m, ev){
+  const z = ZONES.find(q => q.id===zk.slice(3)), p = NREL[zk], key = m===0 ? 'jan' : 'jul', days = 31, UA = 500;
+  const kwh = {
+    hvac_heating: z.hdd[m]*24*UA/(3.5*3412), hvac_cooling: z.cdd[m]*24*UA/(22*1000),
+    water_heating: 65*days*8.33*(120-z.inlet[m])/3412/3.5,
+    lights_plugs: 1910/12, cooking: 0.9*14*52/12, clothes_dryer: 1.8*5*52/12,
+    ev_managed: ev ? 12000/3.5/0.88*0.85*EVW[m] : 0,   // ElectricVehicle: 12,000 mi, 85% charged at home
+  };
+  const L = zeros();
+  Object.entries(kwh).forEach(([eu,k]) => { const sh = toClock(p[eu][key], m); for(let h=0;h<H;h++) L[h] += k/days*sh[h]; });
+  return {L, kwh, month: sum(Object.values(kwh))};
+}
+
+let M = 0, BAT = 1, MODE = 'auto', EV = 1;
+const seg = (id, set) => $(id).querySelectorAll('button').forEach(b => b.onclick = () => { set(b.dataset.m ?? b.dataset.v); $(id).querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); run(); });
+seg('mon', v => M = +v); seg('bat', v => BAT = +v); seg('md', v => MODE = v); seg('ev', v => EV = +v);
+$('zone').onchange = run; $('kw').oninput = run;
+
+function run(){
+  const zk = $('zone').value, kw = +$('kw').value, days = 31, t = TARIFF.months[M], xr = EXPORT[M];
+  $('o-kw').textContent = kw ? kw + ' kW' : 'none';
+  const {L, month} = homeLoad(zk, M, EV);
+  const pv = PV[zk], G = toClock(M===0 ? pv.jan : pv.jul, M).map(s => kw*pv.ac[M]/days*s);
+  const batt = {cap: BAT ? 13.5 : 0, eff:0.89, ckw:5, dkw:11.5, gridCharging:true};
+  const rp = t.pk[0], ro = t.op[0];
+  const noSolar = priceMonth(t, sum(L.filter((_,h)=>PEAK[h]))*days, sum(L.filter((_,h)=>!PEAK[h]))*days, days);
+  const solarOnly = monthBill(runDay(G, L, {...batt, cap:0}, 'self', PEAK, rp, ro), days, t, xr);
+  const cands = MODE==='auto' ? (batt.cap>0 ? ['self','cost'] : ['self']) : [MODE==='cost' && !batt.cap ? 'self' : MODE];
+  const res = {}; ['self','cost'].forEach(m => { if(batt.cap || m==='self'){ const d = runDay(G, L, batt, m, PEAK, rp, ro); res[m] = {d, bill: monthBill(d, days, t, xr)}; } });
+  const chosen = cands.reduce((a,m) => res[m].bill - (m==='self'?1e-9:0) < res[a].bill - (a==='self'?1e-9:0) ? m : a, cands[0]);
+  const d = res[chosen].d, gi = gridImport(d);
+
+  $('k-none').textContent = fmt$(noSolar);
+  $('k-solar').textContent = kw ? fmt$(solarOnly) : '—'; $('k-solar-u').textContent = kw ? `saves ${fmt$(noSolar-solarOnly)}` : 'no solar';
+  $('k-bat').textContent = batt.cap ? fmt$(res[chosen].bill) : '—';
+  $('k-bat-u').textContent = batt.cap ? `${chosen==='self'?'Self-powered':'Cost-saving'} · saves ${fmt$(noSolar-res[chosen].bill)}` : 'no battery';
+  const gtot = sum(gi); $('k-pk').textContent = gtot>1e-6 ? Math.round(sum(gi.filter((_,h)=>PEAK[h]))/gtot*100) + '%' : '—';
+  ['self','cost'].forEach(m => { const el = $('b-'+m), box = $('m-'+m);
+    el.innerHTML = res[m] ? `<b style="font-family:var(--f-head);font-size:22px">${fmt$(res[m].bill)}</b> <span class="tag">this month</span>` : '<span class="tag">needs a battery</span>';
+    box.classList.toggle('win', !!res[m] && m===chosen && batt.cap>0); });
+
+  /* energy-balance check (the identities above) */
+  const eG = Math.max(...G.map((g,h)=>Math.abs(g-(d.direct[h]+d.cs[h]+d.exp[h])))), eL = Math.max(...L.map((l,h)=>Math.abs(l-(d.direct[h]+d.dis[h]+d.g2h[h]))));
+  const eB = batt.cap ? Math.abs((sum(d.cs)+sum(d.cg))*batt.eff - sum(d.dis)) : 0;
+  $('chk').textContent = `Balance check (${chosen}): solar ${eG.toExponential(0)} · load ${eL.toExponential(0)} · battery ${eB.toExponential(0)} kWh ✓`;
+
+  drawIn(d, L); drawOut(d, G, batt);
+}
+
+function axes(W, H0, x0, top, fmt){ const y0=14, h=H0-y0-26, w=W-x0-46; const Y = v => y0+h-v/top*h, X = i => x0+i*w/24;
+  let s = `<rect x="${X(16)}" y="${y0}" width="${X(21)-X(16)}" height="${h}" fill="${C.n}" opacity=".07"/>` + txt((X(16)+X(21))/2, y0+10, 'peak', 't-tag', 'middle');
+  [0,.5,1].forEach(f => s += `<line x1="${x0}" x2="${x0+w}" y1="${Y(top*f)}" y2="${Y(top*f)}" stroke="${C.line}"/>` + txt(x0-6, Y(top*f)+3, fmt(top*f), 't-tag', 'end'));
+  [0,3,6,9,12,15,18,21].forEach(i => s += txt(X(i)+w/48, H0-8, i+'h', 't-tag', 'middle'));
+  return {s, X, Y, w, h, y0, bw: w/24-3}; }
+function stack(ax, parts, i){ let base = 0, s = ''; parts.forEach(([v,c]) => { if(v>1e-6){ s += `<rect x="${ax.X(i)+1.5}" y="${ax.Y(base+v)}" width="${ax.bw}" height="${ax.Y(base)-ax.Y(base+v)}" fill="${c}"/>`; } base += v; }); return s; }
+function drawIn(d, L){
+  const top = Math.max(0.5, ...L.map((l,h)=>l+d.cg[h]))*1.12, ax = axes(760, 250, 44, top, v=>v.toFixed(1)); let s = ax.s;
+  for(let h=0;h<24;h++) s += stack(ax, [[d.direct[h],C.s],[d.dis[h],C.pr],[d.g2h[h],PEAK[h]?C.n:C.j],[d.cg[h],'#9fb8e6']], h);
+  s += `<path d="${L.map((l,h)=>(h?'L':'M')+(ax.X(h)+1.5+ax.bw/2)+','+ax.Y(l)).join('')}" fill="none" stroke="${C.ink}" stroke-width="1.8" stroke-dasharray="4 3"/>`;
+  s += txt(ax.X(24)+4, ax.Y(top)+10, 'kWh', 't-tag');
+  $('c-in').setAttribute('viewBox','0 0 760 250'); $('c-in').innerHTML = s;
+}
+function drawOut(d, G, b){
+  const top = Math.max(0.5, ...G)*1.12, ax = axes(760, 250, 44, top, v=>v.toFixed(1)); let s = ax.s;
+  for(let h=0;h<24;h++) s += stack(ax, [[d.direct[h],C.s],[d.cs[h],'#7fd0b8'],[d.exp[h],C.cl]], h);
+  if(b.cap){ const sq = Math.sqrt(b.eff); let soc = d.socStart; const pts = [];
+    for(let h=0;h<24;h++){ soc += (d.cs[h]+d.cg[h])*sq - d.dis[h]/sq; pts.push(soc); }
+    const Ys = v => ax.y0 + ax.h - v/b.cap*ax.h;
+    s += `<path d="${pts.map((v,h)=>(h?'L':'M')+(ax.X(h)+1.5+ax.bw/2)+','+Ys(v)).join('')}" fill="none" stroke="${C.pr}" stroke-width="2.2"/>`;
+    [0,b.cap].forEach(v => s += txt(ax.X(24)+4, Ys(v)+3, v.toFixed(v?1:0), 't-tag'));
+  }
+  $('c-out').setAttribute('viewBox','0 0 760 250'); $('c-out').innerHTML = s;
+}
+run();
+</script>
+</body>
+</html>

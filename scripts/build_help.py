@@ -339,7 +339,7 @@ _INDEX_GROUPS: list[tuple[str, list[str]]] = [
     # Phase 6 WS1: link the rate-projection methodology guide for reviewers (reworked in
     # Phase 7 when the projection becomes the default). It's a standalone page, not a §section.
     ("Technical reference",    ["climate_data.html", "rates_reference.html",
-                                "rate_projection_guide.html"]),
+                                "rate_projection_guide.html", "URDB_Rate_Report.html"]),
     ("About & support",        ["about.html", "release_notes.html", "support.html"]),
 ]
 
@@ -347,6 +347,7 @@ _INDEX_GROUPS: list[tuple[str, list[str]]] = [
 # file to its index title. Built by dedicated renderers, listed in _INDEX_GROUPS above.
 _EXTRA_INDEX_TITLES: dict[str, str] = {
     "rate_projection_guide.html": "Rate Projection — methodology (draft)",
+    "URDB_Rate_Report.html": "Technical Report — How the starting electricity & gas rates are determined",
 }
 
 # "See also" cross-links appended to the bottom of specific section pages (html_file → list

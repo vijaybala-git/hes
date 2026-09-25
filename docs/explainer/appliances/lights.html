@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lights and Plugs Model · WhyWatt? HEX</title>
+<meta name="description" content="How WhyWatt? HEX models a home's baseload: lighting, plug loads and small appliances.">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body data-root="../" data-page="lights">
+<main>
+<div class="detail">
+  <aside class="side" id="side"></aside>
+  <div>
+    <div class="crumbs"><a href="../index.html">System map</a> / <a href="index.html">Appliances</a> / Lights &amp; plugs</div>
+    <p class="eyebrow">Appliance · level of detail 1 of 4 · fixed usage</p>
+    <h1>Lights &amp; plugs: the electricity every home uses</h1>
+    <p class="lede">Lighting, the fridge, electronics, chargers, everything plugged in. This <b>baseload</b> is electric in both homes and doesn't change with electrification, so it cancels out of the comparison. So why model it? Because it sits on the same meter: it pushes the home up the tariff's tiers, and it's the first thing solar and the battery serve.</p>
+
+    <div class="block">
+      <h2>Both homes</h2>
+      <div class="homes">
+        <div class="home dn"><h4>Do nothing</h4>
+          <div class="slotrow"><span>Baseload</span><span>formula below</span></div>
+          <div class="slotrow"><span>Always-on part</span><span>500 kWh/yr</span></div>
+        </div>
+        <div class="home yj"><h4>Your journey</h4>
+          <div class="slotrow"><span>Baseload</span><span>same formula</span></div>
+          <div class="slotrow"><span>Optional upgrade</span><span>LEDs + smart plugs · $400</span></div>
+          <div class="slotrow"><span>Always-on after</span><span>300 kWh/yr</span></div>
+        </div>
+      </div>
+      <p style="margin-top:12px">Without the optional efficiency upgrade, both homes have identical baseload every year.</p>
+    </div>
+
+    <div class="block">
+      <h2>The model</h2>
+      <p>The baseload scales with <b>floor area</b> (more rooms to light, bigger fridge) and <b>bedrooms</b> (more people, more devices), plus an always-on constant for standby loads.</p>
+      <div class="formula">kWh/yr = 0.45 kWh/sq ft (EIA RECS 2020, CA) + 200 kWh × bedrooms (DOE occupancy proxy) + always-on constant
+       → spread evenly over 12 months</div>
+      <div class="ctl" style="margin-top:12px">
+        <div><label for="sq">Floor area <output id="o-sq"></output></label><input type="range" id="sq" min="800" max="3500" step="100" value="1800"></div>
+        <div><label for="br">Bedrooms <output id="o-br"></output></label><input type="range" id="br" min="1" max="5" step="1" value="3"></div>
+        <div><label>Always-on</label><div class="seg" id="ao"><button data-v="500" class="on">500 · today</button><button data-v="300">300 · upgraded</button></div></div>
+      </div>
+      <div class="row3">
+        <div class="kpi"><div class="k">Baseload</div><div class="v" id="k-kwh"></div><div class="u">kWh / yr</div></div>
+        <div class="kpi"><div class="k">Per month</div><div class="v" id="k-mo"></div><div class="u">kWh</div></div>
+        <div class="kpi"><div class="k">Share in the peak</div><div class="v" id="k-pk"></div><div class="u">of each day's baseload, 4–9 pm (Jan)</div></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2>Within the day</h2>
+      <p>NREL's <b>lights_plugs</b> profile: a low overnight floor from always-on loads, then a strong evening rise as lights and screens come on, much of it inside the peak window.</p>
+      <div class="ctl" style="max-width:320px"><div><label for="zone">Climate zone</label><select id="zone" class="sel"></select></div></div>
+      <div class="chart" style="max-width:680px"><svg id="c-shape"></svg></div>
+      <p class="caption">Any electric device without its own NREL end use also uses this profile.</p>
+    </div>
+
+    <div class="block">
+      <h2>What's modeled, what's simplified</h2>
+      <div class="row2">
+        <ul class="tight"><li class="ok"><b>Scales with the home</b>, so tiers and solar sizing see a realistic load.</li><li class="ok"><b>Evening-heavy timing</b> from NREL, which matters for peak pricing.</li></ul>
+        <ul class="tight"><li class="lim"><b>Same every month:</b> longer winter evenings aren't reflected in the monthly total (the hourly shape does shift).</li><li class="lim"><b>Not itemized:</b> a second fridge or a hot tub is only captured through the constant.</li></ul>
+      </div>
+      <div class="sec code">Code</div>
+      <div class="chips code"><span class="chip file">src/home_config.py · compute_baseload_kwh, BASELOAD_* constants</span><span class="chip file">src/devices/seasonal.py · LightsAndPlugs</span><span class="chip file">src/model.py · "Lights and Appliances" injection</span><span class="chip file">src/load_profiles.py · FALLBACK_END_USE</span></div>
+    </div>
+    <div class="pager" id="pager"></div>
+  </div>
+</div>
+</main>
+<script src="../assets/nodes.js"></script>
+<script src="../assets/climate_zones.js"></script>
+<script src="../assets/nrel_profiles.js"></script>
+<script src="../assets/explainer.js"></script>
+<script>
+const $ = id => document.getElementById(id), fmt = n => Math.round(n).toLocaleString('en-US');
+WW.zoneOptions($('zone'));
+let ao = 500;
+$('ao').querySelectorAll('button').forEach(b => b.onclick = () => { ao = +b.dataset.v; $('ao').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); render(); });
+function render(){
+  const sq = +$('sq').value, br = +$('br').value, k = 0.45*sq + 200*br + ao;
+  $('o-sq').textContent = fmt(sq) + ' sq ft'; $('o-br').textContent = br;
+  $('k-kwh').textContent = fmt(k); $('k-mo').textContent = fmt(k/12);
+  const z = ZONES[+$('zone').value], r = WW.nrelChart($('c-shape'), z.id, 'lights_plugs');
+  $('k-pk').textContent = r.janPeak + '%';
+}
+['sq','br','zone'].forEach(id => $(id).oninput = $(id).onchange = render); render();
+</script>
+</body>
+</html>

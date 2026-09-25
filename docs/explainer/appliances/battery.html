@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Battery Model · WhyWatt? HEX</title>
+<meta name="description" content="How WhyWatt? HEX models a home battery: specs, the two operating modes, and when charging from the grid pays.">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body data-root="../" data-page="battery">
+<main>
+<div class="detail">
+  <aside class="side" id="side"></aside>
+  <div>
+    <div class="crumbs"><a href="../index.html">System map</a> / <a href="index.html">Appliances</a> / Battery</div>
+    <p class="eyebrow" style="color:var(--solar)">Appliance · level of detail 4 of 4 · hourly energy balance</p>
+    <h1>Battery: moving energy into the peak</h1>
+    <p class="lede">A battery makes no energy and loses about a tenth of what passes through it. It earns its keep by <b>timing</b>: storing midday solar (or cheap off-peak power) and releasing it during the 4–9 pm peak, when electricity costs the most. Its value only shows up hour by hour.</p>
+
+    <div class="block">
+      <h2>The default battery</h2>
+      <div class="row3" style="grid-template-columns:repeat(4,1fr)">
+        <div class="kpi"><div class="k">Capacity</div><div class="v">13.5</div><div class="u">kWh usable</div></div>
+        <div class="kpi"><div class="k">Round trip</div><div class="v">89%</div><div class="u">√0.89 lost charging, √0.89 discharging</div></div>
+        <div class="kpi"><div class="k">Charge</div><div class="v">5 kW</div><div class="u">solar + grid together</div></div>
+        <div class="kpi"><div class="k">Discharge</div><div class="v">11.5 kW</div><div class="u">to the home</div></div>
+      </div>
+      <p style="margin-top:12px">Tesla Powerwall 3 datasheet values, all editable in the app. The battery is part of the solar install (one event, one cost) and is on by default when you add solar. It currently <b>requires solar</b>; a battery on its own isn't modeled yet.</p>
+    </div>
+
+    <div class="block">
+      <h2>Two modes, the cheaper one each month</h2>
+      <div class="row2">
+        <div class="block" style="margin:0;background:var(--paper)"><h3>Self-powered</h3><p>Solar serves the home; surplus fills the battery; the battery covers any shortfall at any hour until empty. Best when there's plenty of solar and the goal is to use as little grid power as possible.</p></div>
+        <div class="block" style="margin:0;background:var(--paper)"><h3>Cost-saving</h3><p>Keeps a <b>reserve</b> just big enough for the peak and discharges only during it. If solar alone won't fill that reserve, it tops up from the grid before 4 pm, but only when that pays.</p></div>
+      </div>
+      <p style="margin-top:12px">For every month the engine runs <b>both</b> and keeps whichever gives the lower bill, so the answer reflects a well-run battery. Try it in the <a href="../engine/hourly-balance.html">hourly energy balance simulator</a>.</p>
+    </div>
+
+    <div class="block">
+      <h2>When does charging from the grid pay?</h2>
+      <p>Buying a kWh off-peak, storing it, and using it at peak returns only 0.89 kWh. So grid charging pays only when <b>0.89 × peak price &gt; off-peak price</b>. On PG&amp;E E-TOU-C:</p>
+      <table class="data" style="max-width:640px"><thead><tr><th>Season</th><th></th><th>0.89 × peak</th><th>off-peak</th><th>Grid charging</th></tr></thead><tbody id="gc"></tbody></table>
+      <div class="ctl" style="max-width:420px;margin-top:12px"><div><label for="eff">Round-trip efficiency <output id="o-eff"></output></label><input type="range" id="eff" min="0.75" max="0.95" step="0.01" value="0.89"></div></div>
+      <p class="caption">Tier-1 prices, 2026. A small price gap plus losses means winter grid charging doesn't pay on this plan; the battery then relies on solar.</p>
+    </div>
+
+    <div class="block">
+      <h2>What's modeled, what's simplified</h2>
+      <div class="row2">
+        <ul class="tight"><li class="ok"><b>Power and energy limits</b> (5 kW in, 11.5 kW out, 13.5 kWh) and round-trip losses.</li><li class="ok"><b>Steady state:</b> each day ends at the charge it started with, so no free energy.</li><li class="ok"><b>Both standard modes</b>, cheaper chosen monthly.</li></ul>
+        <ul class="tight"><li class="lim"><b>No capacity fade</b> over the years.</li><li class="lim"><b>No backup-power value</b> during outages.</li><li class="lim"><b>Average day:</b> no multi-day cloudy stretches; perfect foresight within the day.</li><li class="lim"><b>No stand-alone battery</b> (without solar) yet.</li></ul>
+      </div>
+      <div class="sec code">Code</div>
+      <div class="chips code"><span class="chip file">src/dispatch.py · BatteryParams, run_day, dispatch_month</span><span class="chip file">src/battery_defaults.py</span><span class="chip file">data/appliances/battery_defaults.json</span><span class="chip file">src/journey.py · BatteryConfig</span><span class="chip file">tests/test_battery.py</span></div>
+    </div>
+    <div class="pager" id="pager"></div>
+  </div>
+</div>
+</main>
+<script src="../assets/nodes.js"></script>
+<script src="../assets/explainer.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+function render(){
+  const e = +$('eff').value; $('o-eff').textContent = Math.round(e*100) + '%';
+  $('gc').innerHTML = [['Summer (Jun–Sep)',0.441,0.318],['Winter',0.31617,0.28617]].map(([s,pk,op]) => { const ok = e*pk > op;
+    return `<tr><td>${s}</td><td></td><td>$${(e*pk).toFixed(3)}</td><td>$${op.toFixed(3)}</td><td style="color:${ok?'var(--solar)':'var(--nothing)'};font-weight:600">${ok?'pays':'doesn’t pay'}</td></tr>`; }).join('');
+}
+$('eff').oninput = render; render();
+</script>
+</body>
+</html>

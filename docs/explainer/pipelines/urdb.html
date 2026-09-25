@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tariffs Pipeline · WhyWatt? HEX</title>
+<meta name="description" content="How WhyWatt? HEX finds what a home pays for electricity and gas today: URDB time-of-use tariffs, EIA utility rates and fallbacks.">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body data-root="../" data-page="urdb">
+<main>
+<div class="detail">
+  <aside class="side" id="side"></aside>
+  <div>
+    <div class="crumbs"><a href="../index.html">System map</a> / Offline pipelines / Tariffs · URDB</div>
+    <p class="eyebrow">Offline pipeline · tariffs</p>
+    <h1>Tariffs: what your home pays for energy today</h1>
+    <p class="lede">Before prices can grow (see <a href="projection.html">Rate projection</a>), the model needs today's price, called the <b>current energy rate</b>. For electricity that is a real utility plan, with its peak hours, tiers and daily fixed charge, taken from the U.S. Utility Rate Database (URDB). Gas uses the utility's EIA-reported average price.</p>
+
+    <div class="facts">
+      <div><div class="k">Source</div><div class="v">OpenEI URDB v8 (electric) · EIA-861 / EIA-176</div></div>
+      <div><div class="k">Coverage</div><div class="v">PG&amp;E · SDG&amp;E priced from URDB · SCE harvested, quarantined</div></div>
+      <div><div class="k">Plans kept</div><div class="v">19 flagship plans from hundreds of raw records</div></div>
+      <div><div class="k">Built</div><div class="v">2026-09-22 · checksummed raw snapshots</div></div>
+    </div>
+
+    <div class="block">
+      <h2>The pipeline</h2>
+      <p>Offline, the script downloads every approved residential tariff for a utility, keeps the current <b>flagship families</b> (E-1, E-TOU-C, E-TOU-D, E-ELEC, EV2…), picks one representative per family, and turns each one into the same simple shape: per month, a peak and an off-peak <b>tier ladder</b>, the peak hours, and a fixed charge. At run time the model walks a <b>fallback chain</b>: it uses the first source that has your utility.</p>
+      <div class="canvas static" id="flow" style="margin-top:10px"></div>
+      <div class="legendbar"><span><i class="lg-data"></i>data flow</span><span><i class="lg-ctrl"></i>fallback (used only when the step before has no data)</span></div>
+    </div>
+
+    <div class="block">
+      <h2>Inside a time-of-use plan: PG&amp;E E-TOU-C</h2>
+      <p>WhyWatt's default plan for PG&amp;E homes. Electricity costs more from <b>4 to 9 pm</b> every day, more in summer (June–September), and more once daily use passes the <b>baseline allowance</b> for your baseline region. There's also a daily fixed charge.</p>
+      <div class="row2">
+        <div class="chart"><svg id="c-tou"></svg><div class="caption">Tier-1 price by clock hour ($/kWh), summer vs winter. Above the baseline allowance each rate rises about $0.08.</div></div>
+        <div>
+          <table class="data">
+            <thead><tr><th>$/kWh</th><th></th><th>Peak 4–9 pm</th><th>Off-peak</th></tr></thead>
+            <tbody>
+              <tr><td>Summer</td><td>≤ baseline</td><td>0.441</td><td>0.318</td></tr>
+              <tr><td></td><td>above</td><td>0.522</td><td>0.399</td></tr>
+              <tr><td>Winter</td><td>≤ baseline</td><td>0.316</td><td>0.286</td></tr>
+              <tr><td></td><td>above</td><td>0.398</td><td>0.368</td></tr>
+            </tbody>
+          </table>
+          <p class="caption">Baseline allowance, region X: 9.8 kWh/day summer, 9.7 winter. Fixed charge $0.79/day. Effective 2026-03-27.</p>
+        </div>
+      </div>
+      <h3 style="margin-top:16px">Try a month's bill</h3>
+      <p>The same tier walk the model uses: the month's kWh fill the baseline tier first, and each tier is split peak / off-peak by the share of use in the peak window.</p>
+      <div class="ctl">
+        <div><label>Season</label><div class="seg" id="season"><button data-v="s" class="on">Summer</button><button data-v="w">Winter</button></div></div>
+        <div><label for="kwh">Use per day <output id="o-kwh"></output></label><input type="range" id="kwh" min="4" max="40" step="1" value="16"></div>
+        <div><label for="pk">Share in 4–9 pm <output id="o-pk"></output></label><input type="range" id="pk" min="0" max="60" step="1" value="30"></div>
+      </div>
+      <div class="row3">
+        <div class="kpi yj"><div class="k">Month's bill</div><div class="v" id="k-bill"></div><div class="u" id="k-parts"></div></div>
+        <div class="kpi"><div class="k">Average price</div><div class="v" id="k-avg"></div><div class="u">$/kWh incl. fixed charge</div></div>
+        <div class="kpi"><div class="k">If none of it were at peak</div><div class="v" id="k-shift"></div><div class="u">what a battery or timer can save</div></div>
+      </div>
+      <p class="caption">30-day month. Energy and fixed charge only; taxes and surcharges not modeled.</p>
+    </div>
+
+    <div class="block">
+      <h2>The fallback chain</h2>
+      <table class="data">
+        <thead><tr><th>Step</th><th>Used when</th><th>Electricity</th><th>Gas</th></tr></thead>
+        <tbody>
+          <tr><td>1 · URDB plan</td><td>utility harvested and checked</td><td>plan tiers + TOU + fixed</td><td>—</td></tr>
+          <tr><td>2 · Utility EIA 2025</td><td>utility known (incl. municipal)</td><td>e.g. PG&amp;E $0.3991/kWh</td><td>e.g. PG&amp;E $2.66/therm</td></tr>
+          <tr><td>3 · EIA Pacific</td><td>ZIP maps to no utility</td><td>$0.242/kWh</td><td>$1.99/therm</td></tr>
+        </tbody>
+      </table>
+      <p class="caption">EIA Pacific averages CA, OR, WA, AK and HI, so it sits well below California utility rates. It's a last resort.</p>
+    </div>
+
+    <div class="block">
+      <h2>What it feeds</h2>
+      <p>The <b>current energy rate</b> is the starting level that the <a href="projection.html">rate projection</a> grows each year. The TOU plan's <b>peak hours and ladders</b> go to the hourly energy balance, which prices each month's grid purchases, peak and off-peak, after solar and battery. Solar exports aren't credited at these retail rates; under NEM 3.0 they earn the hourly avoided-cost value (CPUC ACC 2024).</p>
+    </div>
+
+    <div class="block">
+      <h2>What's modeled, what's simplified</h2>
+      <div class="row2">
+        <ul class="tight">
+          <li class="ok"><b>Real published plans</b>, including peak window, seasons, baseline tiers and fixed charge.</li>
+          <li class="ok"><b>Your baseline region</b> is found from your ZIP, which sets the tier allowance.</li>
+          <li class="ok"><b>Known-bad data is quarantined:</b> SCE's URDB record shows a summer peak of $0.33 against SCE's published ~$0.58, so SCE homes use EIA until it is re-harvested.</li>
+        </ul>
+        <ul class="tight">
+          <li class="lim"><b>One plan for all 20 years:</b> the plan's structure is fixed and scaled by the projection; future redesigns (e.g. new fixed charges) aren't anticipated.</li>
+          <li class="lim"><b>No CARE/FERA discounts</b> or all-electric baseline variants yet.</li>
+          <li class="lim"><b>Gas is an average price,</b> not a tiered tariff.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2>Sources</h2>
+      <div class="chips"><span class="chip src">OpenEI Utility Rate Database v8</span><span class="chip src">EIA-861 / 861M (electric sales &amp; revenue)</span><span class="chip src">EIA-176 (gas)</span><span class="chip src">AEO 2026 Pacific</span><span class="chip src">CPUC ACC 2024 (export credit)</span></div>
+      <div class="sec code">Code</div>
+      <div class="chips code">
+        <span class="chip file">scripts/build_urdb.py</span><span class="chip file">scripts/regions.py</span><span class="chip file">scripts/build_eia_rates.py</span><span class="chip file">scripts/build_starting_rates.py</span>
+        <span class="chip file">data/rates/urdb_tou.json</span><span class="chip file">data/rates/urdb_baseline_crosswalk.json</span><span class="chip file">data/rates/eia_rates_by_utility.json</span>
+        <span class="chip file">src/urdb_rates.py · price_month()</span><span class="chip file">src/rate_resolver.py</span><span class="chip file">src/starting_rates.py</span><span class="chip file">docs/OfflineURDB_Plan.md</span>
+      </div>
+    </div>
+    <div class="pager" id="pager"></div>
+  </div>
+</div>
+</main>
+
+<script src="../assets/nodes.js"></script>
+<script src="../assets/explainer.js"></script>
+<script>
+const {C, txt, node, edge, ctrl, arrowDefs, uniq, line, HOURS} = WW;
+const $ = id => document.getElementById(id);
+
+(function(){
+  let s = `<svg viewBox="0 0 1100 370" xmlns="http://www.w3.org/2000/svg">${arrowDefs()}`;
+  s += `<rect x="8" y="30" width="1084" height="110" rx="12" fill="${C.cream}" stroke="${C.line}" stroke-dasharray="4 4"/>` + txt(20,22,'OFFLINE · run when tariffs change','t-tag');
+  s += node('a','source',24,56,210,60,'URDB (OpenEI)','all approved residential plans',C.j);
+  s += node('b','proc',270,56,230,60,'Keep flagship families','one representative each',C.j);
+  s += node('c','proc',536,56,250,60,'Normalize every plan','monthly tier ladders · peak hours · fixed',C.j);
+  s += node('d','store',822,50,250,72,'Tariff table','3 utilities · 19 plans · 1 default each',C.j);
+  s += edge('M234,86 L268,86',C.j,'j') + edge('M500,86 L534,86',C.j,'j') + edge('M786,86 L820,86',C.j,'j');
+  s += txt(20,176,'RUNTIME · first source with data wins','t-tag');
+  s += node('z','input',24,196,170,52,'Your ZIP','→ utility · baseline region',C.ink);
+  s += node('r1','proc',240,190,240,64,'1 · URDB plan','e.g. PG&E E-TOU-C',C.j);
+  s += node('r2','proc',240,272,240,50,'2 · Utility EIA 2025','average $/kWh · $/therm',C.slate);
+  s += node('r3','proc',240,336,240,26,'3 · EIA Pacific','',C.slate);
+  s += edge('M194,222 L238,222',C.ink,'ink');
+  s += ctrl('M360,254 L360,270') + ctrl('M360,322 L360,334');
+  s += edge('M946,124 C946,160 360,150 360,188',C.j,'j','lookup',640,152);
+  s += node('o1','proc',560,190,250,64,'Current energy rate','level for the projection',C.j);
+  s += node('o2','proc',560,272,250,50,'Peak hours + tier ladders','→ hourly energy balance',C.j);
+  s += edge('M480,222 L558,222',C.j,'j') + edge('M480,236 C520,236 520,297 558,297',C.j,'j') + edge('M480,297 C520,297 520,240 558,236',C.slate,'slate');
+  s += node('g','source',850,190,230,64,'Gas: always EIA','utility average $/therm',C.slate);
+  s += node('x','source',850,272,230,50,'Solar export: ACC hourly','NEM 3.0 credit (not retail)',C.s);
+  document.getElementById('flow').innerHTML = uniq(s + '</svg>');
+})();
+
+/* E-TOU-C price by hour */
+const T = {s:{pk:[0.441,0.5224], op:[0.318,0.3994], base:9.8}, w:{pk:[0.31617,0.39757], op:[0.28617,0.36757], base:9.7}};
+const PEAK = h => h>=16 && h<=20;
+line($('c-tou'), {W:460, H:220, x0:44, x:HOURS, every:4, min:0.25, max:0.47, ticks:[0.25,0.3,0.35,0.4,0.45], fmt:v=>'$'+v.toFixed(2), shade:[16,21,'peak'],
+  series:[{d:HOURS.map((_,h)=>PEAK(h)?T.s.pk[0]:T.s.op[0]), c:C.n, label:'summer', at:2, dy:-8},
+          {d:HOURS.map((_,h)=>PEAK(h)?T.w.pk[0]:T.w.op[0]), c:C.j, label:'winter', at:2, dy:16}]});
+
+/* bill: same tier walk as UrdbRateStructure.price_month */
+let season = 's';
+$('season').querySelectorAll('button').forEach(b => b.onclick = () => { season = b.dataset.v; $('season').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); bill(); });
+function price(t, total, share, days){
+  let cost = 0, prev = 0; const bounds = [t.base*days, Infinity];
+  for(let i=0;i<2;i++){ const bound = Math.min(total, bounds[i]), k = Math.max(bound-prev,0);
+    cost += k*(share*t.pk[i] + (1-share)*t.op[i]); prev = Math.max(prev,bound); if(prev>=total) break; }
+  return cost;
+}
+function bill(){
+  const t = T[season], days = 30, total = +$('kwh').value*days, share = +$('pk').value/100, fixed = 0.79343*days;
+  $('o-kwh').textContent = $('kwh').value + ' kWh'; $('o-pk').textContent = $('pk').value + '%';
+  const e = price(t,total,share,days), e0 = price(t,total,0,days);
+  $('k-bill').textContent = '$' + Math.round(e+fixed);
+  $('k-parts').textContent = `$${Math.round(e)} energy + $${Math.round(fixed)} fixed · ${total} kWh`;
+  $('k-avg').textContent = '$' + ((e+fixed)/total).toFixed(3);
+  $('k-shift').textContent = '−$' + Math.round(e-e0);
+}
+$('kwh').oninput = bill; $('pk').oninput = bill; bill();
+</script>
+</body>
+</html>

@@ -1334,6 +1334,37 @@ a precise bill, use the manual override with figures from your own statement.
 
 This is the version history for WhyWatt. Each release is labeled **Release &lt;number&gt; &lt;Month&gt; &lt;Year&gt;**. The newest release is listed first.
 
+### Release 3 — October 2026
+
+Phase 7 — real data behind the numbers: your utility's actual rate plan, real rooftop-solar
+output for your ZIP code, a real home battery, and hour-by-hour use patterns from NREL.
+
+- A new session opens on a typical San José home (PG&amp;E, 3 bedrooms, gas today) planning a
+  heat pump in year 3 and a heat-pump water heater in year 5: about $138k saved over 20 years,
+  paying back in year 3. Solar, battery, EV, dryer and cooktop start unplanned.
+- **Current Energy Rate:** PG&amp;E and SDG&amp;E homes are priced on their actual time-of-use
+  plan from the OpenEI Utility Rate Database (PG&amp;E E-TOU-C by default) — peak / off-peak,
+  seasons, baseline tiers and the daily fixed charge. Other utilities use their EIA 2025 rate;
+  municipal utilities are matched by geography.
+- **Projection Method:** WhyWatt Conservative / Moderate / Stress or the EIA Pacific outlook
+  grow your current rate. **WhyWatt Conservative is the new default**; the older fixed-%/yr
+  methods remain under Details.
+- Gas curves now follow the California Energy Commission's delivered price ($2.65/therm in
+  2025).
+- **Solar output** from NREL PVWatts for your ZIP code, and an **hour-by-hour energy balance**
+  for a typical day each month: solar serves the home, then the battery, then exports. The
+  battery runs Self-powered or Cost-saving, whichever is cheaper that month.
+- **Tesla Powerwall 3** battery defaults; **NEM 3.0 export credit** from the CPUC Avoided
+  Cost Calculator's hourly values for each year.
+- **Hourly use patterns** from NREL ResStock simulations of California homes, by climate zone
+  and month (heat pump heating and cooling split; EV charging mostly overnight).
+- The Journey gains **Solar**, **Battery** and **Electrical Panel** cards, and a **Plan row**
+  turns every device on or off in one place.
+- New charts: electricity and gas price projections (R.1 / R.2), peak vs off-peak electricity
+  (R.6), monthly solar generation (EU.9), and the solar &amp; battery energy balance (EU.10).
+- Technical Reports: the Rate Model Impact Report was re-run for this release, and a new
+  report explains how the starting electricity and gas rates are determined.
+
 ### Release 2 — September 2026
 
 Phase 6 — the rate hand-off interface and Phase 7 groundwork.

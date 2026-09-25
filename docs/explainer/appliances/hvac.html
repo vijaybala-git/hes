@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HVAC Model · WhyWatt? HEX</title>
+<meta name="description" content="How WhyWatt models a gas furnace and a heat pump: the physics, a worked example, and what is simplified.">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body data-root="../" data-page="hvac">
+<main>
+<div class="detail">
+  <aside class="side" id="side"></aside>
+  <div>
+    <div class="crumbs"><a href="../index.html">System map</a> / <a href="index.html">Appliances</a> / HVAC</div>
+    <p class="eyebrow">Appliance · level of detail 3 of 4 · physics</p>
+    <h1>HVAC: gas furnace → heat pump</h1>
+    <p class="lede">Space heating is usually the largest gas load in the home. WhyWatt estimates it from physics: how fast the house loses heat, how cold each month is, and how efficiently each system turns fuel into heat.</p>
+
+    <!-- 1 · The swap -->
+    <div class="block">
+      <h2>The swap</h2>
+      <div class="homes">
+        <div class="home dn"><h4>Do nothing</h4>
+          <div class="slotrow"><span>System</span><span>Gas furnace</span></div>
+          <div class="slotrow"><span>Efficiency</span><span>AFUE 0.80 (80% of gas → heat)</span></div>
+          <div class="slotrow"><span>Age · lifespan</span><span>10 yrs · 20 yrs</span></div>
+          <div class="slotrow"><span>Cooling</span><span>none (Bay Area default)</span></div>
+        </div>
+        <div class="home yj"><h4>Your journey</h4>
+          <div class="slotrow"><span>System</span><span>Heat pump (heats and cools)</span></div>
+          <div class="slotrow"><span>Efficiency</span><span>COP 3.5 heating · SEER 22 cooling</span></div>
+          <div class="slotrow"><span>Swap</span><span>year 3 · $14,000 − $3,500 rebate</span></div>
+          <div class="slotrow"><span>Lifespan</span><span>15 yrs</span></div>
+        </div>
+      </div>
+      <p style="margin-top:12px">Defaults shown; every value is editable in the app. The install cost covers the <b>whole heat pump</b> (heating and cooling) as one event. If the home already has central AC, the do-nothing home keeps it, and its cooling is counted too.</p>
+    </div>
+
+    <!-- 2 · The physics -->
+    <div class="block">
+      <h2>The physics, one line each</h2>
+      <p>Every month, the house loses heat in proportion to how much colder it is outside (degree-days, from the <a href="../pipelines/climate.html">climate pipeline</a>) times how leaky it is (<b>UA</b>, in BTU per hour per °F). The system has to replace that heat.</p>
+      <div class="formula">furnace   therms[m] = HDD[m] × 24 h × UA / (AFUE × 100,000 BTU/therm)
+heat pump kWh[m]    = HDD[m] × 24 h × UA / (COP  × 3,412 BTU/kWh)
+cooling   kWh[m]    = CDD[m] × 24 h × UA / (SEER × 1,000)</div>
+      <div class="row3" style="margin-top:12px">
+        <div class="kpi"><div class="k">UA · how leaky</div><div class="u">poor 650 · average 500 · good 350 BTU/hr·°F at 1,800 sq ft, scaled by floor area</div></div>
+        <div class="kpi"><div class="k">AFUE vs COP</div><div class="u">A furnace turns 80% of gas into heat. A heat pump <b>moves</b> 3.5 units of heat per unit of electricity.</div></div>
+        <div class="kpi"><div class="k">Result</div><div class="u">12 monthly numbers per system. The engine prices them with that month's rates.</div></div>
+      </div>
+    </div>
+
+    <!-- 3 · Try it -->
+    <div class="block">
+      <h2>Try it</h2>
+      <p>The same formulas the model uses, run live in the page. Change the zone or the house and watch the monthly numbers move.</p>
+      <div class="ctl">
+        <div><label for="zone">Climate zone <output id="o-zone"></output></label><select id="zone" style="width:100%;margin-top:4px;font:inherit;padding:6px;border:1px solid var(--line);border-radius:8px"></select></div>
+        <div><label>Insulation</label><div class="seg" id="ins"><button data-v="poor">Poor</button><button data-v="average" class="on">Average</button><button data-v="good">Good</button></div></div>
+        <div><label for="sqft">Floor area <output id="o-sqft"></output></label><input type="range" id="sqft" min="800" max="3500" step="100" value="1800"></div>
+        <div><label for="afue">Furnace AFUE <output id="o-afue"></output></label><input type="range" id="afue" min="0.6" max="0.98" step="0.01" value="0.80"></div>
+        <div><label for="cop">Heat pump COP <output id="o-cop"></output></label><input type="range" id="cop" min="2" max="5" step="0.1" value="3.5"></div>
+        <div><label for="seer">Cooling SEER <output id="o-seer"></output></label><input type="range" id="seer" min="13" max="30" step="1" value="22"></div>
+      </div>
+      <div class="row3" style="margin-bottom:12px">
+        <div class="kpi dn"><div class="k">Gas furnace</div><div class="v" id="k-gas"></div><div class="u">therms / yr</div></div>
+        <div class="kpi yj"><div class="k">Heat pump</div><div class="v" id="k-hp"></div><div class="u" id="k-hp-u"></div></div>
+        <div class="kpi"><div class="k">Energy used</div><div class="v" id="k-ratio"></div><div class="u">heat pump heating vs furnace, same heat delivered</div></div>
+      </div>
+      <div class="row2">
+        <div class="chart"><svg id="c-gas" viewBox="0 0 460 210"></svg><div class="caption">Do nothing · furnace therms per month</div></div>
+        <div class="chart"><svg id="c-hp" viewBox="0 0 460 210"></svg><div class="caption">Your journey · heat-pump kWh per month (heating + cooling)</div></div>
+      </div>
+      <p class="caption">Energy only. Cost = each month's kWh × electric rate, or therms × gas rate, from the rates pipeline. The comparison uses 1 therm = 29.3 kWh, for display only.</p>
+    </div>
+
+    <!-- 4 · Hourly -->
+    <div class="block">
+      <h2>Within the day</h2>
+      <p>For time-of-use pricing and solar, the heat pump's monthly kWh is spread over a representative 24-hour day. Heating and cooling are spread <b>separately</b>, each with its own <a href="../pipelines/nrel.html">NREL ResStock load profile</a> for your climate zone and month. Winter heating peaks in the early morning; summer cooling in the late afternoon, right into the peak window.</p>
+      <div class="chart" style="max-width:680px"><svg id="c-shape"></svg></div>
+      <p class="caption">Share of the day's energy in each clock hour · <span id="shz"></span> (follows the zone picked above). The peak window (4–9 pm on PG&amp;E E-TOU-C) is shaded.</p>
+    </div>
+
+    <!-- 5 · Honest limits -->
+    <div class="block">
+      <h2>What's modeled, what's simplified</h2>
+      <div class="row2">
+        <ul class="tight">
+          <li class="ok"><b>Heat loss scales with the house:</b> insulation quality and floor area set UA.</li>
+          <li class="ok"><b>Real monthly climate</b> for your ZIP's zone, not a statewide average.</li>
+          <li class="ok"><b>Devices age:</b> the swap year, lifespans and replacement costs are tracked year by year.</li>
+          <li class="ok"><b>Checked by tests:</b> at a fixed reference climate, the furnace lands at ≈ 286 therms/yr and heat-pump heating at ≈ 1,930 kWh/yr (±5%).</li>
+        </ul>
+        <ul class="tight">
+          <li class="lim"><b>Constant COP:</b> real heat pumps lose some efficiency in cold weather. That effect is small in most California zones, larger in CZ16 (mountains).</li>
+          <li class="lim"><b>No duct losses or thermostat setbacks:</b> both are folded into UA.</li>
+          <li class="lim"><b>Monthly, not hourly, physics:</b> the heating energy is right for the month, but its spread within the day is a stock-average NREL shape, not your household's own schedule.</li>
+        </ul>
+      </div>
+      <div class="sec code">Code</div>
+      <div class="chips code">
+        <span class="chip file">src/devices/physics.py · GasFurnace, HeatPumpHVAC, CentralAC</span>
+        <span class="chip file">src/home_config.py · compute_ua()</span>
+        <span class="chip file">data/homes/journey_slots_default.json</span>
+        <span class="chip file">data/loads/end_use_profiles.json · hvac_heating, hvac_cooling</span>
+        <span class="chip file">tests/test_devices.py</span>
+      </div>
+    </div>
+
+    <div class="pager" id="pager"></div>
+  </div>
+</div>
+</main>
+
+<script src="../assets/nodes.js"></script>
+<script src="../assets/climate_zones.js"></script>
+<script src="../assets/nrel_profiles.js"></script>
+<script src="../assets/explainer.js"></script>
+<script>
+const {C, txt} = WW;
+const M = 'JFMAMJJASOND', sum = a => a.reduce((x,y) => x+y, 0), fmt = n => Math.round(n).toLocaleString('en-US');
+const UA_BASE = {poor:650, average:500, good:350};   // home_config.UA_BY_INSULATION
+
+const $ = id => document.getElementById(id);
+const sel = $('zone');
+ZONES.forEach((z,i) => sel.insertAdjacentHTML('beforeend', `<option value="${i}" ${z.id==='CZ4'?'selected':''}>${z.id} · ${z.city}</option>`));
+let ins = 'average';
+$('ins').querySelectorAll('button').forEach(b => b.onclick = () => { ins = b.dataset.v; $('ins').querySelectorAll('button').forEach(x => x.classList.toggle('on', x===b)); render(); });
+
+function bars(svgId, series, colors, unit){
+  const W=460,H=210,x0=44,y0=16,w=W-x0-10,h=H-y0-30;
+  const tot = series[0].map((_,m) => series.reduce((a,s) => a + s[m], 0));
+  const top = Math.max(1, ...tot) * 1.1;
+  const X = m => x0 + m*w/12, Y = v => y0 + h - v/top*h, bw = w/12 - 8;
+  let s = '';
+  [0,.5,1].forEach(f => s += `<line x1="${x0}" x2="${x0+w}" y1="${Y(top*f)}" y2="${Y(top*f)}" stroke="${C.line}"/>` + txt(x0-6,Y(top*f)+3,fmt(top*f),'t-tag','end'));
+  for(let m=0;m<12;m++){
+    let base = 0;
+    series.forEach((ser,k) => { const v = ser[m]; if(v>0) s += `<rect x="${X(m)+4}" y="${Y(base+v)}" width="${bw}" height="${Y(base)-Y(base+v)}" fill="${colors[k]}" rx="1.5"><title>${M[m]}: ${v.toFixed(1)} ${unit}</title></rect>`; base += v; });
+    s += txt(X(m)+w/24, H-10, M[m], 't-tag', 'middle');
+  }
+  $(svgId).innerHTML = s;
+}
+
+function render(){
+  const z = ZONES[+sel.value], sq = +$('sqft').value, afue = +$('afue').value, cop = +$('cop').value, seer = +$('seer').value;
+  const UA = UA_BASE[ins] * sq / 1800;
+  const gas  = z.hdd.map(h => h*24*UA / (afue*100000));
+  const heat = z.hdd.map(h => h*24*UA / (cop*3412));
+  const cool = z.cdd.map(c => c*24*UA / (seer*1000));
+  $('o-zone').textContent = z.city; $('o-sqft').textContent = fmt(sq)+' sq ft';
+  $('o-afue').textContent = afue.toFixed(2); $('o-cop').textContent = cop.toFixed(1); $('o-seer').textContent = seer;
+  $('k-gas').textContent = fmt(sum(gas));
+  $('k-hp').textContent = fmt(sum(heat) + sum(cool));
+  $('k-hp-u').textContent = `kWh / yr · ${fmt(sum(heat))} heat + ${fmt(sum(cool))} cool`;
+  $('k-ratio').textContent = sum(gas) ? Math.round(sum(heat) / (sum(gas)*29.3) * 100) + '%' : '—';
+  bars('c-gas', [gas], [C.n], 'therms');
+  bars('c-hp', [heat, cool], [C.j, '#7fa6e3'], 'kWh');
+}
+['sqft','afue','cop','seer'].forEach(id => $(id).oninput = render);
+sel.onchange = render; render();
+
+/* hourly shape chart: NREL heating (January) and cooling (July) for the selected zone, clock time */
+function shape(){
+  const z = 'CA_' + ZONES[+sel.value].id, p = NREL[z] || NREL.CA_CZ4;
+  const heat = p.hvac_heating.jan, cool = [p.hvac_cooling.jul[23], ...p.hvac_cooling.jul.slice(0,23)];   // July: +1 h daylight saving
+  const top = Math.max(...heat, ...cool) * 1.15;
+  WW.line($('c-shape'), {W:640, H:210, x0:44, x:WW.HOURS, every:3, min:0, max:top, ticks:[0,top/2,top], fmt:v=>Math.round(v*100)+'%', shade:[16,21,'peak 4–9 pm'],
+    series:[{d:heat, c:C.j, label:'heating · Jan', at:heat.indexOf(Math.max(...heat)), dy:-8}, {d:cool, c:C.jl, label:'cooling · Jul', at:cool.indexOf(Math.max(...cool)), dy:-8}]});
+  $('shz').textContent = ZONES[+sel.value].id + ' · ' + ZONES[+sel.value].city;
+}
+sel.addEventListener('change', shape); shape();
+</script>
+</body>
+</html>

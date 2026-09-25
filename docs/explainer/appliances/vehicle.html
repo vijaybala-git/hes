@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vehicle and EV Model · WhyWatt? HEX</title>
+<meta name="description" content="How WhyWatt? HEX models switching from a gasoline car to an electric vehicle, with home and public charging.">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body data-root="../" data-page="vehicle">
+<main>
+<div class="detail">
+  <aside class="side" id="side"></aside>
+  <div>
+    <div class="crumbs"><a href="../index.html">System map</a> / <a href="index.html">Appliances</a> / Vehicle / EV</div>
+    <p class="eyebrow">Appliance · level of detail 2 of 4 · miles &amp; charging</p>
+    <h1>Vehicle: gasoline → electric</h1>
+    <p class="lede">For many households the car's fuel costs more than all the home's gas put together, so switching to an EV often moves the comparison the most. WhyWatt follows the <b>miles you drive</b>: as gallons of gasoline, or as kWh, most charged at home on your tariff and the rest at public chargers.</p>
+
+    <div class="block">
+      <h2>The swap</h2>
+      <div class="homes">
+        <div class="home dn"><h4>Do nothing</h4>
+          <div class="slotrow"><span>Vehicle</span><span>gasoline · 28 mpg</span></div>
+          <div class="slotrow"><span>Driving</span><span>12,000 mi/yr</span></div>
+          <div class="slotrow"><span>Fuel</span><span>$4.50/gal · flat by default</span></div>
+          <div class="slotrow"><span>Vehicle cost</span><span>not modeled</span></div>
+        </div>
+        <div class="home yj"><h4>Your journey</h4>
+          <div class="slotrow"><span>Vehicle</span><span>EV · 3.5 mi/kWh</span></div>
+          <div class="slotrow"><span>Charging</span><span>85% home · 15% public ($0.25/kWh, +3%/yr)</span></div>
+          <div class="slotrow"><span>Losses</span><span>88% charging efficiency</span></div>
+          <div class="slotrow"><span>Install</span><span>home charger $800 · 32 A</span></div>
+        </div>
+      </div>
+      <p style="margin-top:12px">Defaults shown. The switch year is yours to choose (off by default). The car itself isn't priced: the model compares <b>fuel and charging costs</b> plus the home charger, not vehicle purchases.</p>
+    </div>
+
+    <div class="block">
+      <h2>The model: two slots that can run together</h2>
+      <p>Transportation uses <b>two slots</b>: a gasoline slot and an EV slot. Before the switch, all miles are gasoline. After it, the EV takes the planned miles and the gasoline slot keeps any miles you still drive in a gas car (zero by default), so a household can switch one of two cars. An EV you already drive with no home charger is charged 100% in public.</p>
+      <div class="formula">gasoline   gallons/yr = miles ÷ mpg                                    → × $/gal
+EV         wall kWh/yr = miles ÷ (mi/kWh) ÷ charging efficiency
+           home kWh    = wall kWh × home share     → on the home meter, priced on your tariff
+           public kWh  = wall kWh × (1 − home share) → × public $/kWh (a separate cost, not on the bill)
+both spread over months with a small summer driving uptick</div>
+    </div>
+
+    <div class="block">
+      <h2>Try it (year 1, flat prices)</h2>
+      <div class="ctl">
+        <div><label for="mi">Miles per year <output id="o-mi"></output></label><input type="range" id="mi" min="2000" max="25000" step="500" value="12000"></div>
+        <div><label for="mpg">Gas car mpg <output id="o-mpg"></output></label><input type="range" id="mpg" min="15" max="55" step="1" value="28"></div>
+        <div><label for="gp">Gasoline $/gal <output id="o-gp"></output></label><input type="range" id="gp" min="3" max="7" step="0.1" value="4.5"></div>
+        <div><label for="eff">EV mi/kWh <output id="o-eff"></output></label><input type="range" id="eff" min="2.5" max="4.5" step="0.1" value="3.5"></div>
+        <div><label for="hs">Charged at home <output id="o-hs"></output></label><input type="range" id="hs" min="0" max="100" step="5" value="85"></div>
+        <div><label for="hr">Home electricity $/kWh <output id="o-hr"></output></label><input type="range" id="hr" min="0.15" max="0.6" step="0.01" value="0.35"></div>
+      </div>
+      <div class="row3">
+        <div class="kpi dn"><div class="k">Gasoline</div><div class="v" id="k-gas"></div><div class="u" id="k-gas-u"></div></div>
+        <div class="kpi yj"><div class="k">EV charging</div><div class="v" id="k-ev"></div><div class="u" id="k-ev-u"></div></div>
+        <div class="kpi"><div class="k">Year-1 difference</div><div class="v" id="k-d"></div><div class="u">before the $800 charger</div></div>
+      </div>
+      <p class="caption">This calculator uses one flat home price. In the model, the home-charged kWh go through the <a href="../engine/hourly-balance.html">hourly energy balance</a> and are priced on the real tariff, peak and off-peak, and can be covered by solar.</p>
+    </div>
+
+    <div class="block">
+      <h2>Within the day</h2>
+      <p>Home charging uses NREL's <b>managed</b> EV profile (ResStock's demand-flexibility run), where charging is steered away from the peak and into the late evening. The dashed line shows the <b>unmanaged</b> profile, plug in at 6 pm and charge, for comparison. It isn't used by the model.</p>
+      <div class="ctl" style="max-width:320px"><div><label for="zone">Climate zone</label><select id="zone" class="sel"></select></div></div>
+      <div class="chart" style="max-width:680px"><svg id="c-shape"></svg></div>
+      <p class="caption" id="shp"></p>
+    </div>
+
+    <div class="block">
+      <h2>What's modeled, what's simplified</h2>
+      <div class="row2">
+        <ul class="tight"><li class="ok"><b>Home vs public charging</b> priced separately; public charging never reduces the home bill or the solar cap.</li><li class="ok"><b>Charging losses</b> included (wall kWh, not battery kWh).</li><li class="ok"><b>Optional externalities:</b> climate ($1.69/gal) and health ($0.75/gal) costs of gasoline can be shown as an overlay.</li></ul>
+        <ul class="tight"><li class="lim"><b>No vehicle purchase, maintenance or insurance.</b></li><li class="lim"><b>Gasoline price is flat by default</b> (0%/yr); you can set an escalation.</li><li class="lim"><b>Managed charging assumed</b> for home charging timing.</li></ul>
+      </div>
+      <div class="sec code">Code</div>
+      <div class="chips code"><span class="chip file">src/devices/vehicle.py · GasolineVehicle, ElectricVehicle</span><span class="chip file">src/journey.py · DeviceSlot.step (home / external split)</span><span class="chip file">src/ui/sim.py · Transportation + EV Driving slots</span><span class="chip file">src/model.py · gasoline &amp; external EV rates</span></div>
+    </div>
+    <div class="pager" id="pager"></div>
+  </div>
+</div>
+</main>
+<script src="../assets/nodes.js"></script>
+<script src="../assets/climate_zones.js"></script>
+<script src="../assets/nrel_profiles.js"></script>
+<script src="../assets/explainer.js"></script>
+<script>
+const $ = id => document.getElementById(id), fmt = n => Math.round(n).toLocaleString('en-US'), usd = n => '$' + fmt(n);
+WW.zoneOptions($('zone'));
+function render(){
+  const mi = +$('mi').value, mpg = +$('mpg').value, gp = +$('gp').value, eff = +$('eff').value, hs = +$('hs').value/100, hr = +$('hr').value;
+  $('o-mi').textContent = fmt(mi); $('o-mpg').textContent = mpg; $('o-gp').textContent = '$'+gp.toFixed(2); $('o-eff').textContent = eff.toFixed(1); $('o-hs').textContent = Math.round(hs*100)+'%'; $('o-hr').textContent = '$'+hr.toFixed(2);
+  const gal = mi/mpg, gas = gal*gp, wall = mi/eff/0.88, ev = wall*hs*hr + wall*(1-hs)*0.25;
+  $('k-gas').textContent = usd(gas); $('k-gas-u').textContent = `${fmt(gal)} gallons`;
+  $('k-ev').textContent = usd(ev); $('k-ev-u').textContent = `${fmt(wall)} kWh: ${fmt(wall*hs)} home + ${fmt(wall*(1-hs))} public`;
+  const d = gas - ev; $('k-d').textContent = (d>=0?'saves ':'costs ') + usd(Math.abs(d));
+  const z = ZONES[+$('zone').value], p = NREL['CA_'+z.id] || NREL.CA_CZ4;
+  const r = WW.nrelChart($('c-shape'), z.id, 'ev_managed', [{d:p.ev_unmanaged.jan, c:WW.C.mute, dash:'5 4', w:1.6, label:'unmanaged (Jan)', at:18, dy:-8}]);
+  $('shp').textContent = `${z.id} ${z.city} · managed: ${r.janPeak}% (Jan) / ${r.julPeak}% (Jul) of charging in the peak; unmanaged: ${Math.round(p.ev_unmanaged.jan.slice(16,21).reduce((a,b)=>a+b,0)*100)}% (Jan).`;
+}
+['mi','mpg','gp','eff','hs','hr','zone'].forEach(id => $(id).oninput = $(id).onchange = render); render();
+</script>
+</body>
+</html>

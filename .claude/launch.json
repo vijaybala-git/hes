@@ -12,6 +12,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8042", "--bind", "127.0.0.1", "--directory", "docs/presentations/intro_whywatt_v1"],
       "port": 8042
+    },
+    {
+      "name": "explainer",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8043", "--bind", "127.0.0.1", "--directory", "docs/explainer"],
+      "port": 8043
     }
   ]
 }

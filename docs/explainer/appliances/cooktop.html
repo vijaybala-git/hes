@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cooktop Model · WhyWatt? HEX</title>
+<meta name="description" content="How WhyWatt? HEX models a gas cooktop and an induction cooktop.">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body data-root="../" data-page="cooktop">
+<main>
+<div class="detail">
+  <aside class="side" id="side"></aside>
+  <div>
+    <div class="crumbs"><a href="../index.html">System map</a> / <a href="index.html">Appliances</a> / Cooktop</div>
+    <p class="eyebrow">Appliance · level of detail 1 of 4 · fixed usage</p>
+    <h1>Cooktop: gas → induction</h1>
+    <p class="lede">Cooking is a small energy load, a few dollars a month either way. WhyWatt models it as <b>energy per meal × meals per week</b>. A cooktop swap is rarely about the energy bill, but it belongs in the plan: it can add an install cost and a 240 V circuit to the panel.</p>
+
+    <div class="block">
+      <h2>The swap</h2>
+      <div class="homes">
+        <div class="home dn"><h4>Do nothing</h4>
+          <div class="slotrow"><span>System</span><span>Gas cooktop</span></div>
+          <div class="slotrow"><span>Energy per meal</span><span>0.05 therms</span></div>
+          <div class="slotrow"><span>Age · lifespan</span><span>10 yrs · 20 yrs</span></div>
+          <div class="slotrow"><span>Replacement</span><span>$1,000 like-for-like</span></div>
+        </div>
+        <div class="home yj"><h4>Your journey</h4>
+          <div class="slotrow"><span>System</span><span>Induction cooktop</span></div>
+          <div class="slotrow"><span>Energy per meal</span><span>0.9 kWh</span></div>
+          <div class="slotrow"><span>Swap</span><span>not planned by default · $1,500</span></div>
+          <div class="slotrow"><span>Lifespan · circuit</span><span>20 yrs · 40 A at 240 V</span></div>
+        </div>
+      </div>
+      <p style="margin-top:12px">If your home already cooks with induction, it stays induction in the do-nothing home too.</p>
+    </div>
+
+    <div class="block">
+      <h2>The model</h2>
+      <div class="formula">gas        therms/yr = 0.05 therms/meal × meals/week × 52        → spread evenly over 12 months
+induction     kWh/yr = 0.9 kWh/meal    × meals/week × 52</div>
+      <div class="ctl" style="margin-top:12px">
+        <div><label for="mw">Meals per week <output id="o-mw"></output></label><input type="range" id="mw" min="3" max="28" step="1" value="14"></div>
+        <div><label for="gt">Gas therms per meal <output id="o-gt"></output></label><input type="range" id="gt" min="0.02" max="0.1" step="0.005" value="0.05"></div>
+        <div><label for="ik">Induction kWh per meal <output id="o-ik"></output></label><input type="range" id="ik" min="0.4" max="1.6" step="0.05" value="0.9"></div>
+      </div>
+      <div class="row3">
+        <div class="kpi dn"><div class="k">Gas cooktop</div><div class="v" id="k-gas"></div><div class="u">therms / yr</div></div>
+        <div class="kpi yj"><div class="k">Induction</div><div class="v" id="k-hp"></div><div class="u">kWh / yr</div></div>
+        <div class="kpi"><div class="k">Energy used</div><div class="v" id="k-ratio"></div><div class="u">induction vs gas</div></div>
+      </div>
+      <p class="caption">Why the energy ratio is higher than for heat pumps: induction puts most of its energy straight into the pan, but it can't <em>move</em> heat the way a heat pump does, so it saves less energy relative to gas.</p>
+    </div>
+
+    <div class="block">
+      <h2>Within the day</h2>
+      <p>Induction kWh follow NREL's <b>cooking</b> profile: breakfast, lunch, and a dinner peak that lands right in the 4–9 pm window.</p>
+      <div class="ctl" style="max-width:320px"><div><label for="zone">Climate zone</label><select id="zone" class="sel"></select></div></div>
+      <div class="chart" style="max-width:680px"><svg id="c-shape"></svg></div>
+      <p class="caption" id="shp"></p>
+    </div>
+
+    <div class="block">
+      <h2>What's modeled, what's simplified</h2>
+      <div class="row2">
+        <ul class="tight"><li class="ok"><b>Your cooking habits</b> (meals per week) drive the energy.</li><li class="ok"><b>Panel impact:</b> a range counts as 8 kVA under NEC 220.55 in the <a href="panel.html">panel check</a>.</li><li class="ok"><b>Optional social cost:</b> the app can add a climate and health cost per therm of gas burned, as a separate overlay.</li></ul>
+        <ul class="tight"><li class="lim"><b>Indoor air quality</b> benefits of removing a gas flame aren't priced in the energy comparison.</li><li class="lim"><b>Oven not separated:</b> the cooktop slot stands for the kitchen's cooking energy.</li></ul>
+      </div>
+      <div class="sec code">Code</div>
+      <div class="chips code"><span class="chip file">src/devices/seasonal.py · GasCooktop, InductionCooktop</span><span class="chip file">src/panel_assessor.py · RANGE_DEMAND_VA</span><span class="chip file">src/social_cost.py</span></div>
+    </div>
+    <div class="pager" id="pager"></div>
+  </div>
+</div>
+</main>
+<script src="../assets/nodes.js"></script>
+<script src="../assets/climate_zones.js"></script>
+<script src="../assets/nrel_profiles.js"></script>
+<script src="../assets/explainer.js"></script>
+<script>
+const $ = id => document.getElementById(id), fmt = n => Math.round(n).toLocaleString('en-US');
+WW.zoneOptions($('zone'));
+function render(){
+  const mw = +$('mw').value, gt = +$('gt').value, ik = +$('ik').value, g = gt*mw*52, e = ik*mw*52;
+  $('o-mw').textContent = mw; $('o-gt').textContent = gt.toFixed(3); $('o-ik').textContent = ik.toFixed(2);
+  $('k-gas').textContent = fmt(g); $('k-hp').textContent = fmt(e); $('k-ratio').textContent = Math.round(e/(g*29.3)*100) + '%';
+  const z = ZONES[+$('zone').value], r = WW.nrelChart($('c-shape'), z.id, 'cooking');
+  $('shp').textContent = `${z.id} ${z.city} · ${r.janPeak}% (Jan) / ${r.julPeak}% (Jul) of the day's cooking energy lands in the 4–9 pm peak.`;
+}
+['mw','gt','ik','zone'].forEach(id => $(id).oninput = $(id).onchange = render); render();
+</script>
+</body>
+</html>

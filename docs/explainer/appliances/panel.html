@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel Check · WhyWatt? HEX</title>
+<meta name="description" content="How WhyWatt? HEX checks whether an electrical panel can carry an electrified home, using the NEC Article 220 load calculation.">
+<link rel="stylesheet" href="../assets/explainer.css">
+<style>
+  .chk{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 12px}
+  .chk label{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:13px;background:var(--paper);cursor:pointer}
+  .chk input{accent-color:var(--journey)}
+  .status{display:inline-block;padding:3px 10px;border-radius:12px;font-family:var(--f-mono);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+</style>
+</head>
+<body data-root="../" data-page="panel">
+<main>
+<div class="detail">
+  <aside class="side" id="side"></aside>
+  <div>
+    <div class="crumbs"><a href="../index.html">System map</a> / <a href="index.html">Appliances</a> / Panel</div>
+    <p class="eyebrow">Appliance · capacity check · install cost only</p>
+    <h1>Panel: can the wiring carry an electric home?</h1>
+    <p class="lede">Many older California homes have a 100-amp panel. Swapping gas appliances for electric ones adds 240-volt circuits, and at some point the panel may need an upgrade, often a real cost. WhyWatt runs the <b>same load calculation an electrician or permit office uses</b> (NEC Article 220), year by year as your plan adds appliances. The panel uses no energy; it only adds an install cost if you plan the upgrade.</p>
+
+    <div class="block">
+      <h2>What gets checked</h2>
+      <div class="homes">
+        <div class="home dn"><h4>Do nothing</h4>
+          <div class="slotrow"><span>Check</span><span>not needed (no new circuits)</span></div>
+        </div>
+        <div class="home yj"><h4>Your journey</h4>
+          <div class="slotrow"><span>Panel today</span><span>100 A (editable)</span></div>
+          <div class="slotrow"><span>Method</span><span>NEC 220.82 optional (default)</span></div>
+          <div class="slotrow"><span>Upgrade</span><span>your choice · $3,000 · 25-yr life</span></div>
+        </div>
+      </div>
+      <p style="margin-top:12px">The check is advice: it flags when the planned appliances would exceed the panel, but it doesn't add an upgrade by itself. You add the upgrade, and its cost, to your plan.</p>
+    </div>
+
+    <div class="block">
+      <h2>Try the load calculation</h2>
+      <div class="ctl">
+        <div><label for="sq">Floor area <output id="o-sq"></output></label><input type="range" id="sq" min="800" max="3500" step="100" value="1800"></div>
+        <div><label>Panel</label><div class="seg" id="amps"><button data-v="100" class="on">100 A</button><button data-v="125">125</button><button data-v="150">150</button><button data-v="200">200</button></div></div>
+        <div><label>Method</label><div class="seg" id="meth"><button data-v="optional" class="on">Optional</button><button data-v="standard">Standard</button></div></div>
+      </div>
+      <div class="chk" id="devs"></div>
+      <div class="row3" style="margin-bottom:12px">
+        <div class="kpi"><div class="k">Calculated load</div><div class="v" id="k-a"></div><div class="u" id="k-va"></div></div>
+        <div class="kpi"><div class="k">Panel used</div><div class="v" id="k-p"></div><div class="u"><span class="status" id="k-s"></span></div></div>
+        <div class="kpi"><div class="k">Headroom</div><div class="v" id="k-h"></div><div class="u">amps before the panel is full</div></div>
+      </div>
+      <div class="chart"><svg id="c-bar"></svg></div>
+      <p class="caption">Green under 70% · yellow 70–90% · orange 90–100% · red over 100% of the panel rating. Service at 240 V.</p>
+    </div>
+
+    <div class="block">
+      <h2>The rules, in brief</h2>
+      <div class="formula">general  = 3 VA × sq ft + 3,000 VA (two kitchen circuits) + 1,500 VA (laundry)
+appliances (nameplate volts × amps):  heat pump = tons × 10 A · HPWH 15 A · dryer ≥ 5,000 VA
+                                      range 8,000 VA (NEC 220.55) · EV charger × 1.25 (continuous load)
+optional (220.82): [first 10 kVA of general + non-HVAC appliances at 100%, the rest at 40%] + HVAC at 100%
+standard (220.42): [general: first 10 kVA at 100%, rest at 40%] + every appliance at 100%
+amps = VA ÷ 240</div>
+      <p>The optional method is what Bay Area permit offices accept for existing homes, and it's why a fully electric home can often fit a smaller service than people expect. The standard method always gives a higher number and is offered for comparison.</p>
+    </div>
+
+    <div class="block">
+      <h2>What's modeled, what's simplified</h2>
+      <div class="row2">
+        <ul class="tight"><li class="ok"><b>Code-based calculation</b>, year by year as the plan adds appliances.</li><li class="ok"><b>Both NEC methods</b>, so you can see the difference.</li><li class="ok"><b>Upgrade cost</b> goes on the journey's CapEx timeline.</li></ul>
+        <ul class="tight"><li class="lim"><b>Advisory only:</b> the check doesn't force an upgrade or change energy costs.</li><li class="lim"><b>Load-management devices</b> (smart panels, circuit sharing) that avoid an upgrade aren't modeled.</li><li class="lim"><b>Not a substitute</b> for an electrician's site check.</li></ul>
+      </div>
+      <div class="sec code">Code</div>
+      <div class="chips code"><span class="chip file">src/panel_assessor.py · PanelAssessor</span><span class="chip file">src/journey.py · CapExOnlySlot</span><span class="chip file">src/ui/sim.py · "Electrical Panel" slot · circuit amps</span></div>
+    </div>
+    <div class="pager" id="pager"></div>
+  </div>
+</div>
+</main>
+<script src="../assets/nodes.js"></script>
+<script src="../assets/explainer.js"></script>
+<script>
+const $ = id => document.getElementById(id), C = WW.C;
+/* same constants and rules as src/panel_assessor.py */
+const DEVS = [
+  {k:'hvac',  l:'Heat pump · 3 ton', va:3*10*240, hvac:true},
+  {k:'hpwh',  l:'Heat-pump WH · 15 A', va:15*240},
+  {k:'dryer', l:'Heat-pump dryer · 30 A', va:Math.max(5000, 30*240)},
+  {k:'range', l:'Induction · 40 A', va:8000},
+  {k:'ev',    l:'EV charger · 32 A', va:32*240*1.25},
+];
+const on = {hvac:true, hpwh:true, dryer:false, range:false, ev:false};
+$('devs').innerHTML = DEVS.map(d => `<label><input type="checkbox" data-k="${d.k}" ${on[d.k]?'checked':''}>${d.l}</label>`).join('');
+$('devs').querySelectorAll('input').forEach(i => i.onchange = () => { on[i.dataset.k] = i.checked; render(); });
+let amps = 100, meth = 'optional';
+const seg = (id, set) => $(id).querySelectorAll('button').forEach(b => b.onclick = () => { set(b.dataset.v); $(id).querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); render(); });
+seg('amps', v => amps = +v); seg('meth', v => meth = v); $('sq').oninput = render;
+const demand = va => va <= 10000 ? va : 10000 + (va-10000)*0.4;
+function render(){
+  const sq = +$('sq').value; $('o-sq').textContent = sq.toLocaleString() + ' sq ft';
+  const general = 3*sq + 3000 + 1500;
+  const act = DEVS.filter(d => on[d.k]), hvac = act.filter(d=>d.hvac).reduce((a,d)=>a+d.va,0), other = act.filter(d=>!d.hvac).reduce((a,d)=>a+d.va,0);
+  const va = meth==='optional' ? demand(general + other) + hvac : demand(general) + hvac + other;
+  const A = va/240, pct = A/amps*100;
+  const st = pct < 70 ? ['green',C.s] : pct < 90 ? ['yellow',C.cl] : pct <= 100 ? ['orange','#d9822b'] : ['red',C.n];
+  $('k-a').textContent = Math.round(A) + ' A'; $('k-va').textContent = Math.round(va).toLocaleString() + ' VA';
+  $('k-p').textContent = Math.round(pct) + '%'; $('k-s').textContent = st[0]; $('k-s').style.background = st[1]; $('k-s').style.color = '#fff';
+  $('k-h').textContent = (amps - A >= 0 ? '' : '−') + Math.abs(Math.round(amps - A)) + ' A';
+  /* bar: how the calculated load is built up */
+  const parts = meth==='optional'
+    ? [['general + appliances after demand factor', demand(general+other)/240, C.j], ['heat pump at 100%', hvac/240, C.pr]]
+    : [['general after demand factor', demand(general)/240, C.j], ['heat pump', hvac/240, C.pr], ['other appliances at 100%', other/240, C.cl]];
+  const W=760, H=90, x0=10, w=W-20, max = Math.max(amps, A)*1.1, X = a => x0 + a/max*w;
+  let s = '', x = 0;
+  parts.forEach(([l,a,c]) => { if(a>0){ s += `<rect x="${X(x)}" y="20" width="${X(x+a)-X(x)}" height="30" fill="${c}" opacity=".85"><title>${l}: ${Math.round(a)} A</title></rect>`; x += a; } });
+  s += `<line x1="${X(amps)}" x2="${X(amps)}" y1="10" y2="60" stroke="${C.ink}" stroke-width="2.5"/>` + WW.txt(X(amps), 74, amps + ' A panel', 't-frame', 'middle');
+  let lx = x0;
+  parts.forEach(([l,a,c]) => { if(a>0){ s += `<rect x="${lx}" y="88" width="9" height="9" fill="${c}"/>` + WW.txt(lx+13, 96, l, 't-tag'); lx += 13 + l.length*6.4 + 24; } });
+  $('c-bar').setAttribute('viewBox', `0 0 ${W} 104`); $('c-bar').innerHTML = s;
+}
+render();
+</script>
+</body>
+</html>

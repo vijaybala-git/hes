@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Load Profiles Pipeline · WhyWatt? HEX</title>
+<meta name="description" content="How WhyWatt? HEX uses NREL ResStock end-use load profiles to spread each appliance's energy over the day.">
+<link rel="stylesheet" href="../assets/explainer.css">
+<style>
+  .multi{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .multi .m{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--paper);cursor:pointer}
+  .multi .m.on{border-color:var(--solar);background:var(--solar-soft)}
+  .multi .m b{font-size:12.5px}
+  .multi .m span{float:right;font-family:var(--f-mono);font-size:10.5px;color:var(--nothing)}
+  .multi svg{display:block;width:100%;height:auto;margin-top:4px}
+  @media (max-width:640px){ .multi{grid-template-columns:1fr 1fr} }
+</style>
+</head>
+<body data-root="../" data-page="nrel">
+<main>
+<div class="detail">
+  <aside class="side" id="side"></aside>
+  <div>
+    <div class="crumbs"><a href="../index.html">System map</a> / Offline pipelines / Load profiles · NREL</div>
+    <p class="eyebrow" style="color:var(--solar)">Offline pipeline · load profiles</p>
+    <h1>Load profiles: <em>when</em> in the day each appliance uses energy</h1>
+    <p class="lede">On a time-of-use plan, a kWh at 6 pm can cost 40% more than one at noon, and solar only helps while the sun is up. So the model needs to know <b>when</b> each appliance draws power, not just how much per month. Those hourly shapes come from <b>NREL ResStock</b>: detailed simulations of real California housing stock, summarized per climate zone, end use and month.</p>
+
+    <div class="facts">
+      <div><div class="k">Source</div><div class="v">NREL ResStock 2025 Release 1 (AMY2018, OEDI)</div></div>
+      <div><div class="k">Sample</div><div class="v">~150 single-family homes per zone per run</div></div>
+      <div><div class="k">Coverage</div><div class="v">16 zones × 9 end uses × 12 months × 24 h</div></div>
+      <div><div class="k">Built</div><div class="v">2026-09-24 · replaces the old one-shape table</div></div>
+    </div>
+
+    <div class="block">
+      <h2>The pipeline</h2>
+      <p>Offline, the script samples homes from NREL's public data lake, reads only the end-use columns it needs, and reduces each one to a 12-month × 24-hour table. Summing over the sample gives a <b>stock-average shape</b>, and each month is scaled so its 24 hours add to 1. At run time the model looks up your zone's shapes and spreads each electric appliance's monthly kWh across the day.</p>
+      <div class="canvas static" id="flow" style="margin-top:10px"></div>
+      <div class="note" style="margin-top:12px"><b>Why "upgrade runs"?</b> Today's housing stock has few heat pumps, heat-pump water heaters and EVs, so a baseline sample can't say how they behave. ResStock also simulates the same homes <em>with</em> the upgrade installed. HVAC shapes come from run 4 (ducted heat pump), water heating from run 9 (HPWH), EV charging from runs 20/22. Lights, cooking, dryer and dishwasher use the baseline run.</div>
+    </div>
+
+    <div class="block">
+      <h2>Explore the shapes</h2>
+      <div class="ctl" style="max-width:640px">
+        <div><label for="zone">Climate zone</label><select id="zone" class="sel"></select></div>
+        <div><label for="eu">End use</label><select id="eu" class="sel"></select></div>
+      </div>
+      <div class="chart"><svg id="c-main"></svg></div>
+      <p class="caption">Share of the day's energy in each clock hour. Solid = NREL for this zone (January, July). Dashed grey = the old single shape used for every zone and month. Shaded = PG&amp;E peak window, 4–9 pm. <span id="nb"></span></p>
+      <h3 style="margin-top:16px">All nine end uses · <span id="mz"></span> · <span id="mm">January</span></h3>
+      <div class="seg" id="mon" style="max-width:220px;margin-bottom:10px"><button data-m="jan" class="on">January</button><button data-m="jul">July</button></div>
+      <div class="multi" id="multi"></div>
+      <p class="caption">Red figure = share of the day's energy that lands in the 4–9 pm peak. Click one to show it above.</p>
+    </div>
+
+    <div class="block">
+      <h2>What it feeds</h2>
+      <p>For each month, the <b>hourly energy balance</b> builds the home's electric load for one representative day: every electric appliance's monthly kWh ÷ days × its end-use shape, summed. Against that load it places solar output, runs the battery, and prices peak and off-peak purchases on your tariff.</p>
+      <div class="formula">L[m,h] = Σ_appliances  kWh[m] / days[m] × shape[zone, end_use, m, h]</div>
+      <table class="data" style="max-width:620px"><thead><tr><th>Appliance</th><th></th><th colspan="2" style="text-align:left">NREL end use</th></tr></thead><tbody>
+        <tr><td>Heat pump (heating / cooling)</td><td></td><td colspan="2" style="text-align:left">hvac_heating · hvac_cooling (each part spread separately)</td></tr>
+        <tr><td>Central AC</td><td></td><td colspan="2" style="text-align:left">hvac_cooling</td></tr>
+        <tr><td>Heat-pump water heater</td><td></td><td colspan="2" style="text-align:left">water_heating</td></tr>
+        <tr><td>Heat-pump dryer</td><td></td><td colspan="2" style="text-align:left">clothes_dryer</td></tr>
+        <tr><td>Induction cooktop · oven</td><td></td><td colspan="2" style="text-align:left">cooking</td></tr>
+        <tr><td>EV charging</td><td></td><td colspan="2" style="text-align:left">ev_managed (charging avoids the peak)</td></tr>
+        <tr><td>Lights &amp; plugs · anything else</td><td></td><td colspan="2" style="text-align:left">lights_plugs</td></tr>
+      </tbody></table>
+    </div>
+
+    <div class="block">
+      <h2>What's modeled, what's simplified</h2>
+      <div class="row2">
+        <ul class="tight">
+          <li class="ok"><b>Zone- and month-specific:</b> winter heating peaks in the morning; summer cooling in late afternoon.</li>
+          <li class="ok"><b>Physics-based simulations</b> of real California homes, not survey guesses.</li>
+          <li class="ok"><b>One clock</b> with solar and the tariff: NREL's Eastern-time stamps are shifted to Pacific standard time, then daylight saving is applied.</li>
+        </ul>
+        <ul class="tight">
+          <li class="lim"><b>A stock average, not your household:</b> the shape is smooth; a family that runs the dryer at 7 pm peaks harder.</li>
+          <li class="lim"><b>Managed EV charging assumed:</b> EVs use the demand-flexibility run, which keeps charging out of the peak. Plug-in-and-charge would cost more.</li>
+          <li class="lim"><b>Single-family detached only;</b> weather year 2018 (AMY), while the energy totals use the TMYx typical year. A month with almost no use (heating in August) borrows that end use's annual shape.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2>Sources</h2>
+      <div class="chips"><span class="chip src">NREL ResStock 2025 Release 1 · AMY2018</span><span class="chip src">Open Energy Data Initiative (OEDI) data lake</span><span class="chip src">Parker et al. 2025</span></div>
+      <p class="caption">Data includes information from the ResStock™ dataset developed by the National Laboratory of the Rockies (NLR) with funding from the U.S. Department of Energy.</p>
+      <div class="sec code">Code</div>
+      <div class="chips code">
+        <span class="chip file">scripts/build_load_profiles.py</span><span class="chip file">data/loads/end_use_profiles.json</span><span class="chip file">data/loads/sources/manifest.json</span>
+        <span class="chip file">src/load_profiles.py · DEVICE_END_USE</span><span class="chip file">data/rates/device_load_shapes.json (old)</span><span class="chip file">docs/NREL_LoadProfiles_Plan.md</span>
+      </div>
+    </div>
+    <div class="pager" id="pager"></div>
+  </div>
+</div>
+</main>
+
+<script src="../assets/nodes.js"></script>
+<script src="../assets/climate_zones.js"></script>
+<script src="../assets/nrel_profiles.js"></script>
+<script src="../assets/explainer.js"></script>
+<script>
+const {C, txt, node, edge, arrowDefs, uniq, line, HOURS} = WW;
+const $ = id => document.getElementById(id);
+const EU = {hvac_heating:['HVAC heating','hvac_heat'], hvac_cooling:['HVAC cooling','hvac_cool'], water_heating:['Water heating','hpwh'], ev_managed:['EV (managed)','ev'],
+            ev_unmanaged:['EV (unmanaged)',null], lights_plugs:['Lights & plugs','baseload'], cooking:['Cooking',null], clothes_dryer:['Clothes dryer',null], dishwasher:['Dishwasher',null]};
+/* stored in standard time; July is a DST month → +1 h to clock time (same roll as src/load_profiles.py) */
+const clock = (arr, m) => m==='jul' ? [arr[23], ...arr.slice(0,23)] : arr;
+const peakShare = a => a.slice(16,21).reduce((x,y)=>x+y,0);
+
+(function(){
+  let s = `<svg viewBox="0 0 1100 330" xmlns="http://www.w3.org/2000/svg">${arrowDefs()}`;
+  s += `<rect x="8" y="30" width="1084" height="110" rx="12" fill="${C.cream}" stroke="${C.line}" stroke-dasharray="4 4"/>` + txt(20,22,'OFFLINE · run when NREL publishes a release','t-tag');
+  s += node('a','source',24,56,200,60,'NREL ResStock (OEDI)','15-min end-use data',C.s);
+  s += node('b','proc',254,56,210,60,'Sample ~150 homes','per zone · baseline + upgrade runs',C.s);
+  s += node('c','proc',494,56,250,60,'Reduce each home → 12×24','Eastern → Pacific time · cached',C.s);
+  s += node('d','store',774,50,300,72,'Load-profile table','16 zones × 9 end uses · rows sum to 1',C.s);
+  s += edge('M224,86 L252,86',C.s,'s') + edge('M464,86 L492,86',C.s,'s') + edge('M744,86 L772,86',C.s,'s','Σ, normalize',742,76);
+  s += txt(20,176,'RUNTIME · every run','t-tag');
+  s += node('z','input',24,196,160,52,'Your ZIP','',C.ink);
+  s += node('e','proc',220,190,230,64,'Your zone\'s shapes','CZ4 if none · + daylight saving',C.s);
+  s += node('f','proc',486,190,250,64,'Each electric appliance','monthly kWh × its end-use shape',C.j);
+  s += node('g','proc',772,190,300,64,'Home load L (12×24)','→ hourly energy balance',C.s);
+  s += edge('M184,222 L218,222',C.ink,'ink') + edge('M450,222 L484,222',C.s,'s') + edge('M736,222 L770,222',C.j,'j','Σ',748,214);
+  s += edge('M924,124 C924,160 335,150 335,188',C.s,'s','lookup',620,152);
+  s += `<rect x="772" y="274" width="300" height="42" rx="9" fill="#fff" stroke="${C.slate}" stroke-dasharray="4 3"/>` + txt(784,292,'Replaced: old one-shape-per-appliance table','t-sub') + txt(784,306,'same curve for every zone and month','t-sub');
+  document.getElementById('flow').innerHTML = uniq(s + '</svg>');
+})();
+
+const zones = Object.keys(NREL).sort((a,b) => +a.slice(5) - +b.slice(5));
+const city = id => (ZONES.find(z => z.id === id.slice(3)) || {}).city || '';
+zones.forEach(k => $('zone').insertAdjacentHTML('beforeend', `<option value="${k}" ${k==='CA_CZ4'?'selected':''}>${k.slice(3)} · ${city(k)}</option>`));
+Object.entries(EU).forEach(([k,[l]]) => $('eu').insertAdjacentHTML('beforeend', `<option value="${k}" ${k==='hvac_heating'?'selected':''}>${l}</option>`));
+let mon = 'jan';
+$('mon').querySelectorAll('button').forEach(b => b.onclick = () => { mon = b.dataset.m; $('mon').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); render(); });
+
+function render(){
+  const z = $('zone').value, eu = $('eu').value, p = NREL[z][eu], old = EU[eu][1] && OLD_SHAPES[EU[eu][1]];
+  const jan = clock(p.jan,'jan'), jul = clock(p.jul,'jul');
+  const top = Math.max(.12, ...jan, ...jul, ...(old||[0])) * 1.1;
+  const series = [{d:jan, c:C.j, label:'Jan', at:jan.indexOf(Math.max(...jan)), dy:-8}, {d:jul, c:C.n, label:'Jul', at:jul.indexOf(Math.max(...jul)), dy:-8}];
+  if(old) series.push({d:old, c:C.mute, dash:'5 4', w:1.8, label:'old', at:2, dy:-6});
+  line($('c-main'), {W:760, H:250, x0:46, x:HOURS, every:3, min:0, max:top, ticks:[0,top/2,top].map(v=>+v.toFixed(3)), fmt:v=>Math.round(v*100)+'%', shade:[16,21,'peak 4–9 pm'], series});
+  $('nb').textContent = `Sample: ${NREL_N[z][eu]} homes in this zone for this end use.`;
+  $('mz').textContent = z.slice(3) + ' ' + city(z); $('mm').textContent = mon==='jan' ? 'January' : 'July';
+  $('multi').innerHTML = Object.entries(EU).map(([k,[l]]) => { const a = clock(NREL[z][k][mon], mon);
+    return `<div class="m ${k===eu?'on':''}" data-k="${k}"><b>${l.replace('&','&amp;')}</b><span>${Math.round(peakShare(a)*100)}% peak</span><svg data-s="${k}"></svg></div>`; }).join('');
+  $('multi').querySelectorAll('svg').forEach(svg => { const a = clock(NREL[z][svg.dataset.s][mon], mon);
+    line(svg, {W:220, H:80, x0:6, right:6, x:HOURS.map(()=>''), min:0, max:Math.max(...a)*1.1, ticks:[], shade:[16,21,''], series:[{d:a, c:C.s, w:1.8}]}); });
+  $('multi').querySelectorAll('.m').forEach(m => m.onclick = () => { $('eu').value = m.dataset.k; render(); });
+}
+$('zone').onchange = render; $('eu').onchange = render; render();
+</script>
+</body>
+</html>

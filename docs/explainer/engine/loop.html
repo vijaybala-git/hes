@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Year Loop · WhyWatt? HEX</title>
+<meta name="description" content="How the WhyWatt? HEX engine steps two copies of a home, do nothing and your journey, year by year and adds up what each costs.">
+<link rel="stylesheet" href="../assets/explainer.css">
+<style>
+  .rules{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  .rule{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--paper)}
+  .rule b{display:block;font-size:14px;margin-bottom:3px}
+  .rule p{font-size:13px !important;margin:0}
+  .rule .n{font-family:var(--f-mono);font-size:10px;letter-spacing:.14em;color:var(--journey);text-transform:uppercase}
+  @media (max-width:1000px){ .rules{grid-template-columns:1fr} }
+</style>
+</head>
+<body data-root="../" data-page="loop">
+<main>
+<div class="detail">
+  <aside class="side" id="side"></aside>
+  <div>
+    <div class="crumbs"><a href="../index.html">System map</a> / Engine / Two homes &amp; the year loop</div>
+    <p class="eyebrow" style="color:var(--proj)">Engine · the year loop</p>
+    <h1>Two homes, one loop: how the comparison is built</h1>
+    <p class="lede">The engine never estimates "savings" directly. It builds <b>two copies of your home</b> from the same inputs, <b style="color:var(--nothing)">do nothing</b> and <b style="color:var(--journey)">your journey</b>, steps both through the same years at the same prices, and records what each one spends. Your plan is the only difference between them, so the gap between the two totals is what the plan does.</p>
+
+    <div class="facts">
+      <div><div class="k">Step</div><div class="v">One year (a Mesa model step)</div></div>
+      <div><div class="k">Horizon</div><div class="v">20 years by default · 1–30</div></div>
+      <div><div class="k">Inside a year</div><div class="v">12 months · 12 × 24 h for the electric bill</div></div>
+      <div><div class="k">Randomness</div><div class="v">None: same inputs, same answer</div></div>
+    </div>
+
+    <div class="block">
+      <h2>Control flow, start to finish</h2>
+      <p>Dashed arrows are <b>what runs when</b>. Solid arrows are <b>data</b> going into, or out to, the stores on the right. Everything above the year loop runs once. Everything inside runs once per year, for each home.</p>
+      <div class="canvas static" id="flow" style="margin-top:10px"></div>
+      <div class="legendbar"><span><i class="lg-ctrl"></i>control flow</span><span><i class="lg-data"></i>data flow</span><span><i class="lg-box" style="background:var(--nothing)"></i>do nothing</span><span><i class="lg-box" style="background:var(--journey)"></i>your journey</span></div>
+    </div>
+
+    <div class="block">
+      <h2>How the two homes differ, and how they don't</h2>
+      <div class="rules">
+        <div class="rule"><div class="n">Same</div><b>Climate, prices, years</b><p>Both homes read the same climate zone, the same rate for each year and month, and the same tariff. Nothing about the outside world differs.</p></div>
+        <div class="rule"><div class="n">Same</div><b>House and appliance settings</b><p>Built from one set of appliance configurations: same insulation, same gallons of hot water, same miles driven.</p></div>
+        <div class="rule"><div class="n">Different</div><b>Which appliance is running</b><p>Do nothing keeps each appliance's baseline (usually gas) version. Your journey switches to the electric version in the swap year.</p></div>
+        <div class="rule"><div class="n">Different</div><b>Solar, battery, panel</b><p>These only exist in your journey. The do-nothing home has none of them.</p></div>
+        <div class="rule"><div class="n">Rule</div><b>Already electric stays electric</b><p>If an appliance is electric today (say, an induction cooktop), it is electric in <em>both</em> homes. "Do nothing" never goes back to gas.</p></div>
+        <div class="rule"><div class="n">Rule</div><b>Things wear out in both homes</b><p>When an appliance reaches its lifespan it is replaced like-for-like and its install cost is booked, in whichever home it is running.</p></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2>One appliance, 20 years</h2>
+      <p>The rules for a single appliance slot, run in the page. Each year the active appliance is chosen, it ages one year, and an install cost is booked either for the swap or for a like-for-like replacement at end of life.</p>
+      <div class="ctl">
+        <div><label for="ap">Appliance</label><select id="ap" class="sel"><option value="hvac">HVAC · furnace → heat pump</option><option value="wh">Water heater · gas → HPWH</option></select></div>
+        <div><label>Today it is</label><div class="seg" id="st"><button data-v="gas" class="on">Gas</button><button data-v="electric">Already electric</button></div></div>
+        <div><label for="sw">Swap year <output id="o-sw"></output></label><input type="range" id="sw" min="0" max="20" step="1" value="3"></div>
+      </div>
+      <div class="chart"><svg id="tl"></svg></div>
+      <p class="caption" id="tlcap"></p>
+    </div>
+
+    <div class="block">
+      <h2>Pricing a year: two stages</h2>
+      <p><b>Stage 1 · per appliance.</b> Each appliance's 12 monthly values are multiplied by that month's rate: $/therm for gas, $/kWh for electric. This gives a cost for every appliance, used for the by-category charts.</p>
+      <p><b>Stage 2 · the home's real electric bill.</b> A time-of-use tariff isn't a flat price per kWh: it has tiers that depend on the <em>whole home's</em> monthly use, peak hours and a daily fixed charge. So the engine adds up all electric appliances, spreads them over each month's 24-hour day, and prices the home total on the actual tariff. That bill replaces the stage-1 sum, and the difference is shared across categories in proportion to their electric cost. Both homes get this stage whenever the utility has a URDB plan; with an EIA average rate there are no tiers or peak hours, so stage 1 already is the bill.</p>
+      <p><b>Stage 3 · solar and battery</b> (your journey only). The <a href="hourly-balance.html">hourly energy balance</a> works out how much of that bill solar and the battery avoid, plus the export credit. The saving is capped at the year's electric bill: like a NEM true-up, solar can't push a year below zero.</p>
+      <div class="formula">year_cost[home] = Σ gas &amp; gasoline costs + home electric bill (tiers + TOU + fixed) − solar_saving (journey only)
+cumulative[home, y] = Σ year_cost for years 1…y</div>
+    </div>
+
+    <div class="block">
+      <h2>What comes out, and how to read it</h2>
+      <div class="row2">
+        <div>
+          <p>Every year, each home records its cost by category (heating, cooling, water heating, baseload, transportation), its kWh, therms and gallons, install-cost events, solar and battery flows, and the hourly peak / off-peak purchases. All of it goes into one table with a row per year, and every chart reads from that table.</p>
+          <p><b>Important:</b> the headline <b>cumulative cost</b> chart is <b>energy cost only</b> (net of solar). Install costs, including swaps, replacements, solar and panel, are shown on their own <b>CapEx</b> chart. So the "payback" marker is the year your journey's cumulative <em>energy</em> savings turn positive. It does not include what you paid for the equipment.</p>
+        </div>
+        <div class="chart"><svg id="schem"></svg><div class="caption">Schematic only: the shape of the headline chart, not a model result.</div></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2>What guarantees the loop is right</h2>
+      <div class="row2">
+        <ul class="tight">
+          <li class="ok"><b>Each year is recorded exactly once</b> per category: costs are summed first, then written once.</li>
+          <li class="ok"><b>Starting states are preserved</b> when the do-nothing home is built.</li>
+          <li class="ok"><b>A heat pump is one install event</b> (heating and cooling together), never split in two.</li>
+        </ul>
+        <ul class="tight">
+          <li class="ok"><b>Regression suite:</b> 32 saved scenarios (PG&amp;E plans × projections, plus a gas-only set) must reproduce their approved results after every change.</li>
+          <li class="ok"><b>Unit tests</b> check each appliance formula against reference values.</li>
+          <li class="lim"><b>Not modeled:</b> financing and interest, discounting future dollars, tax credits beyond the rebate you enter.</li>
+        </ul>
+      </div>
+      <p style="margin-top:10px">An optional <b>comparison mode</b> runs a second pair of homes under a different rate scenario, so two futures can be compared side by side.</p>
+      <div class="sec code">Code</div>
+      <div class="chips code">
+        <span class="chip file">src/model.py · HESModel.__init__ / step / run_all</span><span class="chip file">src/journey.py · JourneyHome.step</span>
+        <span class="chip file">src/journey.py · DeviceSlot.step · CapExOnlySlot</span><span class="chip file">src/model.py · _build_slots()</span>
+        <span class="chip file">src/ui/charts.py · make_cumulative_opex</span><span class="chip file">scripts/run_regression.py</span><span class="chip file">tests/test_journey.py · test_dual_scenario.py</span>
+      </div>
+    </div>
+    <div class="pager" id="pager"></div>
+  </div>
+</div>
+</main>
+
+<script src="../assets/nodes.js"></script>
+<script src="../assets/explainer.js"></script>
+<script>
+const {C, soft, txt, node, frame, edge, ctrl, badge, arrowDefs, uniq, line} = WW;
+const $ = id => document.getElementById(id);
+
+/* ── control-flow diagram ── */
+(function(){
+  let s = `<svg viewBox="0 0 1100 760" xmlns="http://www.w3.org/2000/svg">${arrowDefs()}`;
+  s += txt(20,22,'ONCE · setup','t-tag') + txt(830,22,'DATA','t-tag');
+  s += node('s1','proc',40,36,300,50,'Resolve your ZIP','climate zone · utility · load profiles · sun',C.ink);
+  s += node('s2','proc',40,110,300,50,'Build prices for every year','rates[y] = current rate × growth S[y]',C.pr);
+  s += node('s3','proc',40,184,300,50,'Build the two homes','same settings · do nothing keeps starting states',C.ink);
+  s += badge(24,61,1) + badge(24,135,2) + badge(24,209,3);
+  s += ctrl('M190,86 L190,108') + ctrl('M190,160 L190,182');
+  // year loop
+  s += frame(20,270,780,440,'for year y = 1 … N',C.pr);
+  s += node('y1','proc',40,296,300,44,'Set this year\'s prices + climate','rates[y] · degree-days (if trend on)',C.pr);
+  s += ctrl('M190,234 L190,294');
+  s += frame(40,370,740,300,'step each home:  do nothing, then your journey',C.ink,'#fff');
+  s += `<rect x="600" y="382" width="80" height="22" rx="6" fill="${soft(C.n)}" stroke="${C.n}"/>` + txt(640,397,'do nothing','t-frame','middle');
+  s += `<rect x="688" y="382" width="80" height="22" rx="6" fill="${soft(C.j)}" stroke="${C.j}"/>` + txt(728,397,'journey','t-frame','middle');
+  s += ctrl('M190,340 L190,392');
+  s += node('h1','proc',60,394,380,56,'a · For each of the appliances','pick active one → 12 monthly values × rates → cost',C.j);
+  s += node('h2','proc',60,470,380,50,'b · Price the home\'s electric bill','tiers + peak/off-peak + fixed, on the home total',C.j);
+  s += node('h3','proc',60,540,380,50,'c · Solar + battery (journey only)','hourly energy balance → saving, capped',C.s);
+  s += node('h4','proc',60,610,380,50,'d · Add up the year','sum by category → record once · cumulative += year',C.ink);
+  s += ctrl('M250,450 L250,468') + ctrl('M250,520 L250,538') + ctrl('M250,590 L250,608');
+  s += `<a href="hourly-balance.html">${node('hl','planned',470,540,200,50,'Hourly balance →','12 months × 24 h',C.s)}</a>`;
+  s += edge('M440,565 L468,565',C.s,'s');
+  s += txt(470,434,'install cost booked in the','t-sub') + txt(470,448,'swap year or at end of life','t-sub');
+  // loop back + after
+  s += ctrl('M60,660 C20,660 20,318 38,318');
+  s += txt(26,500,'↻','t-title');
+  s += node('c1','proc',40,724,300,30,'Collect the year\'s row → next year','',C.ink);
+  s += ctrl('M250,660 L250,722');
+  // data stores
+  s += node('d1','store',830,96,250,64,'Prices','rates[y][month] · tariff',C.pr);
+  s += node('d2','store',830,300,250,70,'Two home records','cost by category · kWh · therms · CapEx',C.ink);
+  s += node('d3','store',830,470,250,70,'Year-by-year table','one row per year, both homes',C.ink);
+  s += node('d4','proc',830,600,250,56,'Charts','cumulative · annual · CapEx · hourly',C.j);
+  s += edge('M340,135 L828,128',C.pr,'pr','',0,0) + edge('M828,140 C760,140 420,200 340,300',C.pr,'pr');
+  s += edge('M440,635 C620,635 700,340 828,335',C.ink,'ink');
+  s += edge('M340,739 C700,739 760,505 828,505',C.ink,'ink');
+  s += edge('M955,540 L955,598',C.j,'j');
+  document.getElementById('flow').innerHTML = uniq(s + '</svg>');
+})();
+
+/* ── one-slot timeline: the same rules as DeviceSlot.step ── */
+const P = {
+  hvac:{b:['gas furnace',10,20,6000], e:['heat pump',15,14000,3500], sw:3},
+  wh:  {b:['gas water heater',5,12,1200], e:['heat-pump WH',15,2500,500], sw:5},
+};
+let start = 'gas';
+$('st').querySelectorAll('button').forEach(b => b.onclick = () => { start = b.dataset.v; $('st').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); tl(); });
+$('ap').onchange = () => { $('sw').value = P[$('ap').value].sw; tl(); };
+$('sw').oninput = () => tl();
+function simulate(p, swap, isBaseline){
+  const B = {name:p.b[0], age:p.b[1], life:p.b[2], cost:p.b[3], fuel:'gas'}, E = {name:p.e[0], age:0, life:p.e[1], cost:p.e[2], fuel:'elec'};
+  const net = p.e[2] - p.e[3], years = [];
+  for(let y=1;y<=20;y++){
+    const act = start==='electric' ? E : (isBaseline || swap===null || y<swap) ? B : E;
+    act.age += 1;
+    let capex = null;
+    if(!isBaseline && swap!==null && y===swap && start==='gas' && net>0) capex = ['swap', net];
+    else if(act.age >= act.life){ capex = ['replace', act.cost]; act.age = 0; }
+    years.push({fuel:act.fuel, capex});
+  }
+  return years;
+}
+function tl(){
+  const p = P[$('ap').value], v = +$('sw').value, swap = v===0 ? null : v;
+  $('o-sw').textContent = swap===null ? 'not planning' : 'year ' + swap;
+  const rows = [['Do nothing', simulate(p, swap, true), C.n], ['Your journey', simulate(p, swap, false), C.j]];
+  const W=900, H=150, x0=110, w=W-x0-10, X = y => x0 + (y-1)*w/20, cw = w/20;
+  let s = '', capTot = [0,0];
+  rows.forEach(([lbl, yrs, col], r) => {
+    const y0 = 20 + r*56;
+    s += txt(0, y0+19, lbl, 't-title').replace('<text','<text style="fill:'+col+'"');
+    yrs.forEach((d,i) => {
+      s += `<rect x="${X(i+1)+1}" y="${y0}" width="${cw-2}" height="26" rx="3" fill="${d.fuel==='gas'?C.n:C.j}" opacity="${d.fuel==='gas'?.75:.8}"/>`;
+      if(d.capex){ capTot[r] += d.capex[1];
+        s += `<circle cx="${X(i+1)+cw/2}" cy="${y0+13}" r="8" fill="#fff" stroke="${C.ink}" stroke-width="1.5"/>` + txt(X(i+1)+cw/2, y0+17, d.capex[0]==='swap'?'S':'R', 't-frame', 'middle');
+        s += txt(X(i+1)+cw/2, y0+40, '$'+(d.capex[1]/1000).toFixed(1)+'k', 't-tag', 'middle'); }
+    });
+  });
+  for(let y=1;y<=20;y++) s += txt(X(y)+cw/2, H-4, y, 't-tag', 'middle');
+  const svg = $('tl'); svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.innerHTML = s;
+  $('tlcap').innerHTML = `<b style="color:var(--nothing)">■ gas</b> · <b style="color:var(--journey)">■ electric</b> · S = swap (install − rebate) · R = like-for-like replacement at end of life. Install costs over 20 years: do nothing <b>$${capTot[0].toLocaleString()}</b>, your journey <b>$${capTot[1].toLocaleString()}</b>. Energy costs are counted separately each year.`;
+}
+tl();
+
+/* ── schematic cumulative chart ── */
+{ const yrs = [...Array(20).keys()].map(i=>String(i+1)); const dn = [], jr = []; let a=0,b=0;
+  for(let y=1;y<=20;y++){ a += 3000*Math.pow(1.06,y); b += (y<3?3000*Math.pow(1.06,y):2300*Math.pow(1.04,y)); dn.push(a); jr.push(b); }
+  line($('schem'), {W:460, H:220, x0:14, right:90, x:yrs, every:19, min:0, max:Math.max(...dn)*1.05, ticks:[], series:[{d:dn,c:C.n,label:'do nothing'},{d:jr,c:C.j,label:'your journey'}]}); }
+</script>
+</body>
+</html>
